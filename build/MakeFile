@@ -1,0 +1,198 @@
+# Makefile for LLM Inference Server
+
+# Build variables
+BINARY_NAME=llm-server
+BINARY_PATH=./bin/$(BINARY_NAME)
+GO_BUILD_FLAGS=-ldflags="-s -w"
+GO_BUILD_CMD=go build $(GO_BUILD_FLAGS)
+
+# Version and build info
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+BUILD_TIME = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+COMMIT = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+# CGO flags for different build types
+CGO_CFLAGS_CPU = -O3
+CGO_CXXFLAGS_CPU = -O3
+CGO_LDFLAGS_CPU = 
+
+# CUDA flags
+CGO_CFLAGS_CUDA = -O3 -DGGML_USE_CUBLAS
+CGO_CXXFLAGS_CUDA = -O3 -DGGML_USE_CUBLAS
+CGO_LDFLAGS_CUDA = -lcublas -lcudart -lcublasLt
+
+# Metal flags (macOS)
+CGO_CFLAGS_METAL = -O3 -DGGML_USE_METAL
+CGO_CXXFLAGS_METAL = -O3 -DGGML_USE_METAL
+CGO_LDFLAGS_METAL = -framework Metal -framework Foundation -framework MetalKit
+
+# Default target
+.PHONY: all
+all: build-cpu
+
+# Clean build artifacts
+.PHONY: clean
+clean:
+	rm -rf ./bin/
+	rm -rf ./dist/
+	go clean -cache
+
+# Create bin directory
+./bin:
+	mkdir -p ./bin
+
+# CPU-only build
+.PHONY: build-cpu
+build-cpu: ./bin
+	@echo "Building CPU-only version..."
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_CFLAGS_CPU)" \
+	CGO_CXXFLAGS="$(CGO_CXXFLAGS_CPU)" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS_CPU)" \
+	$(GO_BUILD_CMD) -o $(BINARY_PATH)-cpu ./cmd/server
+	@echo "CPU build complete: $(BINARY_PATH)-cpu"
+
+# GPU build with CUDA
+.PHONY: build-cuda
+build-cuda: ./bin check-cuda
+	@echo "Building CUDA-enabled version..."
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_CFLAGS_CUDA)" \
+	CGO_CXXFLAGS="$(CGO_CXXFLAGS_CUDA)" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS_CUDA)" \
+	$(GO_BUILD_CMD) -o $(BINARY_PATH)-cuda ./cmd/server
+	@echo "CUDA build complete: $(BINARY_PATH)-cuda"
+
+# GPU build with Metal (macOS)
+.PHONY: build-metal
+build-metal: ./bin check-metal
+	@echo "Building Metal-enabled version..."
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_CFLAGS_METAL)" \
+	CGO_CXXFLAGS="$(CGO_CXXFLAGS_METAL)" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS_METAL)" \
+	$(GO_BUILD_CMD) -o $(BINARY_PATH)-metal ./cmd/server
+	@echo "Metal build complete: $(BINARY_PATH)-metal"
+
+# Check for CUDA installation
+.PHONY: check-cuda
+check-cuda:
+	@echo "Checking for CUDA installation..."
+	@if ! command -v nvcc >/dev/null 2>&1; then \
+		echo "Error: CUDA compiler (nvcc) not found. Please install CUDA toolkit."; \
+		exit 1; \
+	fi
+	@if ! ldconfig -p | grep -q libcublas; then \
+		echo "Error: CUDA libraries not found. Please ensure CUDA is properly installed."; \
+		exit 1; \
+	fi
+	@echo "CUDA installation found"
+
+# Check for Metal support (macOS)
+.PHONY: check-metal
+check-metal:
+	@echo "Checking for Metal support..."
+	@if [ "$(shell uname)" != "Darwin" ]; then \
+		echo "Error: Metal is only supported on macOS"; \
+		exit 1; \
+	fi
+	@echo "Metal support available"
+
+# Development build
+.PHONY: build-dev
+build-dev: ./bin
+	@echo "Building development version..."
+	CGO_ENABLED=1 \
+	go build -race -o $(BINARY_PATH)-dev ./cmd/server
+	@echo "Development build complete: $(BINARY_PATH)-dev"
+
+# Run tests
+.PHONY: test
+test:
+	go test -v ./...
+
+# Run tests with race detection
+.PHONY: test-race
+test-race:
+	go test -race -v ./...
+
+# Run benchmarks
+.PHONY: benchmark
+benchmark:
+	go test -bench=. -benchmem ./...
+
+# Format code
+.PHONY: fmt
+fmt:
+	go fmt ./...
+	goimports -w .
+
+# Lint code
+.PHONY: lint
+lint:
+	golangci-lint run
+
+# Generate Go modules
+.PHONY: mod-tidy
+mod-tidy:
+	go mod tidy
+
+# Install dependencies
+.PHONY: deps
+deps:
+	go mod download
+
+# Create release builds
+.PHONY: release
+release: clean build-cpu build-cuda build-metal
+	@echo "Creating release archive..."
+	mkdir -p ./dist
+	tar -czf ./dist/$(BINARY_NAME)-$(VERSION)-cpu.tar.gz -C ./bin $(BINARY_NAME)-cpu
+	@if [ -f "./bin/$(BINARY_NAME)-cuda" ]; then \
+		tar -czf ./dist/$(BINARY_NAME)-$(VERSION)-cuda.tar.gz -C ./bin $(BINARY_NAME)-cuda; \
+	fi
+	@if [ -f "./bin/$(BINARY_NAME)-metal" ]; then \
+		tar -czf ./dist/$(BINARY_NAME)-$(VERSION)-metal.tar.gz -C ./bin $(BINARY_NAME)-metal; \
+	fi
+	@echo "Release archives created in ./dist/"
+
+# Docker builds
+.PHONY: docker-cpu
+docker-cpu:
+	docker build -f build/Dockerfile.cpu -t $(BINARY_NAME):$(VERSION)-cpu .
+
+.PHONY: docker-cuda
+docker-cuda:
+	docker build -f build/Dockerfile.cuda -t $(BINARY_NAME):$(VERSION)-cuda .
+
+# Install binary to system
+.PHONY: install
+install: build-cpu
+	sudo cp $(BINARY_PATH)-cpu /usr/local/bin/$(BINARY_NAME)
+
+# Show build information
+.PHONY: version
+version:
+	@echo "Version: $(VERSION)"
+	@echo "Build time: $(BUILD_TIME)"
+	@echo "Commit: $(COMMIT)"
+
+# Help target
+.PHONY: help
+help:
+	@echo "Available targets:"
+	@echo "  build-cpu      Build CPU-only version"
+	@echo "  build-cuda     Build CUDA-enabled version"
+	@echo "  build-metal    Build Metal-enabled version (macOS)"
+	@echo "  build-dev      Build development version with race detection"
+	@echo "  test           Run tests"
+	@echo "  test-race      Run tests with race detection"
+	@echo "  benchmark      Run benchmarks"
+	@echo "  fmt            Format code"
+	@echo "  lint           Lint code"
+	@echo "  clean          Clean build artifacts"
+	@echo "  release        Create release builds"
+	@echo "  docker-cpu     Build CPU Docker image"
+	@echo "  docker-cuda    Build CUDA Docker image"
+	@echo "  install        Install binary to system"
+	@echo "  help           Show this help message"

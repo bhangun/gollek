@@ -1,0 +1,30 @@
+# LLM Inference Server Configuration
+
+# HTTP Server Configuration
+server:
+  host: "0.0.0.0"                    # Server host (0.0.0.0 for all interfaces)
+  port: 8080                         # Server port
+  read_timeout: "30s"                # HTTP read timeout
+  write_timeout: "300s"              # HTTP write timeout (longer for streaming)
+  max_request_size: 10485760         # Maximum request size in bytes (10MB)
+
+# LLM Engine Configuration
+llm:
+  model_path: "models/llama-2-7b-chat.q4_0.bin"  # Path to model file
+  context_size: 2048                 # Context window size
+  gpu_layers: 0                      # Number of layers to offload to GPU (0 for CPU-only)
+  threads: 4                         # Number of CPU threads to use
+  batch_size: 512                    # Batch size for processing
+  worker_pool_size: 2                # Number of worker threads
+  max_queue_size: 100                # Maximum queue size for requests
+  request_timeout: "5m"              # Timeout for individual requests
+  use_mmap: true                     # Use memory mapping for model loading
+  use_mlock: false                   # Lock model in memory (requires privileges)
+  use_fp16: true                     # Use 16-bit floating point
+  verbose: false                     # Enable verbose llama.cpp logging
+
+# Logging Configuration
+logs:
+  level: "info"                      # Log level: debug, info, warn, error
+  format: "json"                     # Log format: json, text
+  file: ""                           # Log file path (empty for stdout)

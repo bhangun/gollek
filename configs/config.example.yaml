@@ -1,0 +1,72 @@
+# LLM Inference Server Configuration Template
+# Copy this file to config.yaml and customize for your setup
+
+# HTTP Server Configuration
+server:
+  host: "0.0.0.0"                    # Server host (0.0.0.0 for all interfaces)
+  port: 8080                         # Server port
+  read_timeout: "30s"                # HTTP read timeout
+  write_timeout: "300s"              # HTTP write timeout (longer for streaming)
+  max_request_size: 10485760         # Maximum request size in bytes (10MB)
+
+# LLM Engine Configuration
+llm:
+  # Model Configuration
+  model_path: "models/your-model.bin" # REQUIRED: Path to your GGUF/GGML model file
+  context_size: 2048                 # Context window size (adjust based on model)
+  
+  # GPU Configuration
+  gpu_layers: 0                      # Number of layers to offload to GPU
+                                     # 0 = CPU-only
+                                     # 32 = Typical for 7B models with 8GB VRAM
+                                     # 40 = Typical for 7B models with 12GB+ VRAM
+  
+  # CPU Configuration  
+  threads: 4                         # Number of CPU threads (usually CPU cores / 2)
+  batch_size: 512                    # Batch size for processing
+  
+  # Concurrency Configuration
+  worker_pool_size: 2                # Number of worker threads (start with 1-2)
+  max_queue_size: 100                # Maximum queue size for requests
+  request_timeout: "5m"              # Timeout for individual requests
+  
+  # Memory Configuration
+  use_mmap: true                     # Use memory mapping (recommended)
+  use_mlock: false                   # Lock model in memory (requires root/admin)
+  use_fp16: true                     # Use 16-bit floating point (faster, less memory)
+  
+  # Debug Configuration
+  verbose: false                     # Enable verbose llama.cpp logging
+
+# Logging Configuration
+logs:
+  level: "info"                      # Log level: debug, info, warn, error
+  format: "json"                     # Log format: json, text
+  file: ""                           # Log file path (empty for stdout)
+
+# Environment Variable Overrides
+# You can override any setting using environment variables with LLM_SERVER_ prefix
+# Examples:
+#   LLM_SERVER_LLM_MODEL_PATH=/path/to/model.bin
+#   LLM_SERVER_LLM_GPU_LAYERS=32
+#   LLM_SERVER_SERVER_PORT=8080
+
+# Hardware-Specific Examples:
+
+# CPU-Only Configuration (no GPU)
+# llm:
+#   gpu_layers: 0
+#   threads: 8
+#   worker_pool_size: 2
+
+# NVIDIA GPU Configuration (RTX 4090, 24GB VRAM)
+# llm:
+#   gpu_layers: 35      # Offload most layers to GPU
+#   threads: 4          # Fewer CPU threads when using GPU
+#   worker_pool_size: 1 # Single worker for GPU
+
+# Apple Silicon Configuration (M1/M2)
+# llm:
+#   gpu_layers: 32      # Use Metal GPU acceleration
+#   threads: 8          # Use unified memory efficiently
+#   worker_pool_size: 2
