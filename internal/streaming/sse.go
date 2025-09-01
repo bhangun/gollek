@@ -10,7 +10,6 @@ import (
 
 	"github.com/bhangun/wayang-inference/internal/llm"
 	"github.com/bhangun/wayang-inference/pkg/types"
-
 	"github.com/sirupsen/logrus"
 )
 

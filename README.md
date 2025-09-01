@@ -1,4 +1,4 @@
-# LLM Inference Server
+# Wayang Inference Server
 
 A production-grade REST/gRPC API server built with Go and llama.cpp for high-performance local LLM inference with GPU acceleration support.
 

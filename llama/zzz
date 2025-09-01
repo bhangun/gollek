@@ -1,0 +1,62 @@
+// Directory structure (place these files under package folder `llama/`)
+//
+// llama/
+// ├── llama.go          // CGO directives + C helpers + backend init/free
+// ├── types.go          // Go types, enums, params, defaults
+// ├── model.go          // Model load/free + model info + chat template access
+// ├── context.go        // Context create/free + LLama wrapper + getters
+// ├── memory.go         // Memory operations (seq ops, clear)
+// ├── vocab.go          // Vocab helpers
+// ├── tokenizer.go      // Tokenize / Detokenize / TokenToPiece
+// ├── chat.go           // ChatMessage + ChatApplyTemplate
+// ├── batch.go          // Batch struct + add/free
+// ├── sampler.go        // Sampler creation/chain/sample
+// └── perf.go           // Perf context data + reset
+
+// =====================
+// File: llama/llama.go
+// =====================
+
+// =====================
+// File: llama/types.go
+// =====================
+
+// =====================
+// File: llama/model.go
+// =====================
+
+// =====================
+// File: llama/context.go
+// =====================
+
+// =====================
+// File: llama/memory.go
+// =====================
+
+// =====================
+// File: llama/vocab.go
+// =====================
+
+// =====================
+// File: llama/tokenizer.go
+// =====================
+
+// =====================
+// File: llama/chat.go
+// =====================
+
+// =====================
+// File: llama/batch.go
+// =====================
+
+// =====================
+// File: llama/sampler.go
+// =====================
+
+// =====================
+// File: llama/perf.go
+// =====================
+
+// =====================
+// File: llama/infer.go (optional helpers)
+// =====================

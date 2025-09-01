@@ -4,7 +4,6 @@ go 1.24.5
 
 require (
 	github.com/gin-gonic/gin v1.9.1
-	github.com/go-skynet/go-llama.cpp v0.0.0-20240314183750-6a8041ef6b46
 	github.com/gorilla/websocket v1.5.3
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0

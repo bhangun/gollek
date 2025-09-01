@@ -9,9 +9,8 @@ import (
 	"time"
 
 	"github.com/bhangun/wayang-inference/internal/config"
+	"github.com/bhangun/wayang-inference/pkg/llama"
 	"github.com/bhangun/wayang-inference/pkg/types"
-
-	// llama "github.com/go-skynet/go-llama.cpp"
 	"github.com/sirupsen/logrus"
 )
 
