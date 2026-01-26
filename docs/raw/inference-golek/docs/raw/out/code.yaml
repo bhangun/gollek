@@ -1,0 +1,15 @@
+id: onnx
+name: ONNX Runtime Provider
+description: ONNX model execution
+version: 1.0.0
+enabled: true
+priority: 85
+timeout: PT45S
+
+properties:
+  models.path: ./models/onnx
+  execution.provider: CUDA
+  intra.op.threads: 4
+  inter.op.threads: 2
+  enable.profiling: false
+  optimization.level: 3

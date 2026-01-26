@@ -1,0 +1,2162 @@
+# golek Inference Server - Next Generation Multi-Format LLM Serving Platform
+
+## 🎯 Executive Summary
+
+This is a **production-grade, plugin-extensible inference server** built on Quarkus that serves as the unified LLM runtime layer for the golek AI Agent Workflow Platform. It supports multiple model formats (GGUF, ONNX, Triton, Cloud Providers), provides a robust plugin system, and ensures the same runtime can be embedded in both the core platform and standalone portable agents.
+
+---
+
+## 🏗️ Architecture Overview
+
+### Core Design Principles
+
+1. **Hexagonal Architecture with Plugin System**
+   - Core domain isolated from infrastructure
+   - First-class plugin abstraction (not just CDI beans)
+   - Hot-reload capable plugins with lifecycle management
+   - Versioned plugin contracts with compatibility checks
+
+2. **Multi-Tenancy & Isolation**
+   - Tenant-scoped resource quotas
+   - Isolated model pools per tenant
+   - Secure credential management per tenant
+   - Row-level security for model metadata
+
+3. **Modular Runtime (Core + Portable)**
+   - Shared kernel between platform and standalone agents
+   - Minimal dependency footprint for portable agents
+   - Conditional module inclusion via Maven profiles
+   - GraalVM native image ready
+
+4. **Multi-Format Model Support**
+   - GGUF (llama.cpp)
+   - ONNX Runtime
+   - Triton Inference Server
+   - Cloud Providers (OpenAI, Anthropic, Google)
+   - Extensible format adapter system
+
+5. **Production-Grade Reliability**
+   - Circuit breakers and bulkheads
+   - Intelligent fallback strategies
+   - Warm model pools with eviction
+   - Request-scoped error handling with audit
+   - Comprehensive observability
+
+---
+
+## 📁 Project Structure
+
+```
+golek-inference-server/
+├── pom.xml                                    # Parent POM with profiles
+├── README.md
+├── ARCHITECTURE.md
+├── docker/
+│   ├── Dockerfile.platform-jvm
+│   ├── Dockerfile.platform-native
+│   ├── Dockerfile.portable-jvm
+│   └── Dockerfile.portable-native
+├── k8s/
+│   ├── base/
+│   ├── overlays/
+│   └── helm/
+│
+├── inference-api/                             # 📦 API Contracts (shared by all)
+│   ├── pom.xml
+│   └── src/main/java/tech/kayys/golek/inference/api/
+│       ├── InferenceRequest.java
+│       ├── InferenceResponse.java
+│       ├── StreamChunk.java
+│       ├── ModelMetadata.java
+│       ├── TenantContext.java
+│       ├── ErrorPayload.java                  # ⚠️ Standardized error
+│       └── AuditPayload.java                  # 📝 Audit events
+│
+├── inference-kernel/                          # 🧠 Core Kernel (shared)
+│   ├── pom.xml
+│   └── src/main/java/tech/kayys/golek/inference/kernel/
+│       ├── engine/
+│       │   ├── InferenceEngine.java           # Main entry point
+│       │   ├── EngineContext.java             # Global engine state
+│       │   ├── InferenceContext.java          # Request-scoped state
+│       │   └── DefaultInferenceEngine.java
+│       ├── pipeline/
+│       │   ├── InferencePipeline.java         # Phase executor
+│       │   ├── InferencePhase.java            # Ordered phases
+│       │   └── DefaultInferencePipeline.java
+│       ├── plugin/
+│       │   ├── Plugin.java                    # Base plugin contract
+│       │   ├── PluginDescriptor.java          # Plugin metadata
+│       │   ├── PluginContext.java             # Plugin initialization ctx
+│       │   ├── PluginRegistry.java            # Plugin management
+│       │   ├── PluginLoader.java              # Discovery & loading
+│       │   ├── ConfigurablePlugin.java        # Dynamic config support
+│       │   ├── InferencePhasePlugin.java      # Phase-bound plugins
+│       │   └── PluginLifecycle.java           # Lifecycle states
+│       ├── provider/
+│       │   ├── LLMProvider.java               # Provider SPI
+│       │   ├── ProviderRequest.java           # Normalized request
+│       │   ├── ProviderCapabilities.java      # Feature flags
+│       │   ├── StreamingLLMProvider.java      # Streaming support
+│       │   └── ProviderRegistry.java          # Provider management
+│       ├── safety/
+│       │   ├── SafetyPlugin.java              # Safety validation plugin
+│       │   ├── PolicyPlugin.java              # Policy enforcement plugin
+│       │   └── ContentModerator.java          # Content moderation
+│       ├── observability/
+│       │   ├── InferenceObserver.java         # Observer hook
+│       │   ├── MetricsCollector.java          # Metrics facade
+│       │   ├── TraceContext.java              # Tracing propagation
+│       │   └── AuditLogger.java               # Audit event logger
+│       └── exceptions/
+│           ├── InferenceException.java
+│           ├── PluginException.java
+│           ├── ProviderException.java
+│           └── ValidationException.java
+│
+├── inference-plugins-api/                     # 🔌 Plugin Abstraction
+│   ├── pom.xml
+│   └── src/main/java/tech/kayys/golek/inference/plugins/
+│       ├── validation/
+│       │   ├── ModelValidationPlugin.java     # Pre-flight validation
+│       │   └── RequestValidationPlugin.java
+│       ├── transformation/
+│       │   ├── InputTransformPlugin.java      # Request mutation
+│       │   └── OutputTransformPlugin.java     # Response mutation
+│       ├── routing/
+│       │   ├── RouterPlugin.java              # Custom routing logic
+│       │   └── LoadBalancerPlugin.java        # Load distribution
+│       ├── policy/
+│       │   ├── QuotaPlugin.java               # Rate limit/quota
+│       │   ├── AuthzPlugin.java               # Authorization
+│       │   └── CompliancePlugin.java          # Regulatory checks
+│       └── telemetry/
+│           ├── TracingPlugin.java             # Distributed tracing
+│           └── LoggingPlugin.java             # Structured logging
+│
+├── inference-providers-spi/                   # 🔧 Provider Adapters SPI
+│   ├── pom.xml
+│   └── src/main/java/tech/kayys/golek/inference/providers/
+│       ├── local/
+│       │   ├── LocalProviderAdapter.java      # Base for local models
+│       │   └── ModelLoader.java               # Artifact loading
+│       ├── cloud/
+│       │   ├── CloudProviderAdapter.java      # Base for cloud APIs
+│       │   └── RateLimitHandler.java          # API rate limiting
+│       └── streaming/
+│           ├── StreamingAdapter.java          # Streaming support
+│           └── ChunkProcessor.java            # SSE/WebSocket handlers
+│
+├── inference-provider-gguf/                   # 🦙 llama.cpp Provider
+│   ├── pom.xml
+│   └── src/main/java/tech/kayys/golek/inference/providers/gguf/
+│       ├── GGUFProvider.java
+│       ├── LlamaCppBinding.java               # JNI/FFM binding
+│       ├── GGUFModelLoader.java
+│       ├── GGUFSessionManager.java            # Context management
+│       └── resources/
+│           └── META-INF/
+│               ├── services/
+│               │   └── tech.kayys.golek.inference.kernel.provider.LLMProvider
+│               └── native-image/
+│                   └── reflect-config.json
+│
+├── inference-provider-onnx/                   # 🧮 ONNX Provider
+│   ├── pom.xml
+│   └── src/main/java/tech/kayys/golek/inference/providers/onnx/
+│       ├── ONNXProvider.java
+│       ├── ONNXRuntimeSession.java
+│       ├── ExecutionProviderSelector.java     # CPU/CUDA/TensorRT
+│       └── TensorConverter.java
+│
+├── inference-provider-triton/                 # 🚀 Triton Provider
+│   ├── pom.xml
+│   └── src/main/java/tech/kayys/golek/inference/providers/triton/
+│       ├── TritonProvider.java
+│       ├── TritonGrpcClient.java
+│       ├── TritonHttpClient.java
+│       ├── ModelRepository.java               # Model loading
+│       └── proto/                             # Generated gRPC stubs
+│
+├── inference-provider-openai/                 # 🌐 OpenAI Provider
+│   ├── pom.xml
+│   └── src/main/java/tech/kayys/golek/inference/providers/openai/
+│       ├── OpenAIProvider.java
+│       ├── OpenAIClient.java
+│       ├── StreamingHandler.java
+│       └── FunctionCallMapper.java            # Tool calling
+│
+├── inference-provider-anthropic/              # 🤖 Anthropic Provider
+│   └── (similar structure)
+│
+├── inference-core/                            # 🏛️ Platform Core Services
+│   ├── pom.xml
+│   └── src/main/java/tech/kayys/golek/inference/core/
+│       ├── domain/
+│       │   ├── ModelManifest.java             # Model metadata
+│       │   ├── ModelVersion.java
+│       │   ├── TenantId.java
+│       │   ├── ResourceRequirements.java
+│       │   └── InferenceSession.java
+│       ├── service/
+│       │   ├── InferenceOrchestrator.java     # Main orchestration
+│       │   ├── ModelRouterService.java        # Intelligent routing
+│       │   ├── SelectionPolicy.java           # Multi-factor scoring
+│       │   ├── ModelRunnerFactory.java        # Warm pool manager
+│       │   ├── FallbackStrategy.java          # Graceful degradation
+│       │   └── CircuitBreakerManager.java     # Resilience patterns
+│       ├── repository/
+│       │   ├── ModelRepository.java           # Model metadata store
+│       │   └── TenantConfigRepository.java    # Tenant settings
+│       └── config/
+│           ├── InferenceConfig.java
+│           ├── TenantConfig.java
+│           └── ProviderConfig.java
+│
+├── inference-infrastructure/                  # 🔩 Infrastructure Adapters
+│   ├── pom.xml
+│   └── src/main/java/tech/kayys/golek/inference/infrastructure/
+│       ├── persistence/
+│       │   ├── PostgresModelRepository.java   # PostgreSQL persistence
+│       │   ├── S3ArtifactStore.java           # S3/MinIO storage
+│       │   └── entity/
+│       │       ├── ModelEntity.java
+│       │       └── TenantEntity.java
+│       ├── messaging/
+│       │   ├── KafkaAuditPublisher.java       # Event streaming
+│       │   └── events/
+│       │       ├── InferenceStarted.java
+│       │       ├── InferenceCompleted.java
+│       │       └── InferenceFailed.java
+│       ├── security/
+│       │   ├── JwtTenantResolver.java
+│       │   ├── KeycloakIntegration.java
+│       │   ├── TenantFilter.java
+│       │   └── VaultSecretManager.java        # Vault integration
+│       └── observability/
+│           ├── PrometheusMetrics.java
+│           ├── OpenTelemetryTracing.java
+│           └── StructuredLogger.java
+│
+├── inference-platform-runtime/                # 🖥️ Platform Deployment
+│   ├── pom.xml
+│   └── src/main/
+│       ├── java/tech/kayys/golek/inference/platform/
+│       │   ├── rest/
+│       │   │   ├── InferenceResource.java     # REST endpoints
+│       │   │   ├── ModelManagementResource.java
+│       │   │   ├── HealthResource.java
+│       │   │   ├── PluginManagementResource.java
+│       │   │   └── filters/
+│       │   │       ├── RequestIdFilter.java
+│       │   │       └── RateLimitFilter.java
+│       │   ├── lifecycle/
+│       │   │   ├── StartupInitializer.java    # Warm pool init
+│       │   │   └── ShutdownHandler.java       # Graceful shutdown
+│       │   └── config/
+│       │       └── PlatformConfig.java
+│       └── resources/
+│           ├── application.yml
+│           ├── application-dev.yml
+│           ├── application-prod.yml
+│           └── META-INF/
+│               └── microprofile-config.properties
+│
+├── inference-portable-runtime/                # 📦 Portable Agent Runtime
+│   ├── pom.xml                                # Minimal dependencies
+│   └── src/main/
+│       ├── java/tech/kayys/golek/inference/portable/
+│       │   ├── PortableInferenceEngine.java   # Embedded engine
+│       │   ├── LocalModelLoader.java          # Filesystem models
+│       │   ├── SimplePluginRegistry.java      # Minimal plugin support
+│       │   └── config/
+│       │       └── PortableConfig.java        # File-based config
+│       └── resources/
+│           ├── application-portable.yml
+│           └── models/                        # Bundled models (optional)
+│
+└── inference-tests/
+    ├── pom.xml
+    └── src/test/
+        ├── java/
+        │   ├── unit/
+        │   ├── integration/
+        │   │   ├── PluginLifecycleTest.java
+        │   │   ├── MultiFormatTest.java
+        │   │   └── TenantIsolationTest.java
+        │   ├── performance/
+        │   │   └── LoadTest.java
+        │   └── e2e/
+        │       └── EndToEndTest.java
+        └── resources/
+            └── fixtures/
+                ├── models/
+                └── requests/
+```
+
+---
+
+## 🧩 Core Components Deep Dive
+
+### 1. Inference Kernel (The Heart)
+
+The kernel is a **request-scoped inference runtime** that executes deterministic phases with plugin hooks.
+
+#### 1.1 InferenceEngine
+
+```java
+package tech.kayys.golek.inference.kernel.engine;
+
+```
+
+#### 1.2 InferencePhase (Deterministic Execution Order)
+
+```java
+package tech.kayys.golek.inference.kernel.pipeline;
+
+/**
+ * Ordered phases of inference execution.
+ * Plugins are bound to specific phases.
+ */
+public enum InferencePhase {
+    
+    /**
+     * Phase 1: Input validation and sanitization
+     * - Schema validation
+     * - Content safety checks
+     * - Quota verification
+     */
+    VALIDATION(1),
+    
+    /**
+     * Phase 2: Request transformation and enrichment
+     * - Prompt templating
+     * - Context injection
+     * - Feature flag application
+     */
+    PRE_PROCESSING(2),
+    
+    /**
+     * Phase 3: Provider selection and dispatch
+     * - Model selection
+     * - Provider routing
+     * - Actual LLM call
+     */
+    PROVIDER_DISPATCH(3),
+    
+    /**
+     * Phase 4: Response post-processing
+     * - Output validation
+     * - Format normalization
+     * - Metadata enrichment
+     */
+    POST_PROCESSING(4),
+    
+    /**
+     * Phase 5: Audit and observability
+     * - Audit logging
+     * - Metrics emission
+     * - Trace completion
+     */
+    AUDIT(5);
+
+    private final int order;
+
+    InferencePhase(int order) {
+        this.order = order;
+    }
+
+    public int getOrder() {
+        return order;
+    }
+
+    public static List<InferencePhase> ordered() {
+        return Arrays.stream(values())
+            .sorted(Comparator.comparing(InferencePhase::getOrder))
+            .toList();
+    }
+}
+```
+
+#### 1.3 InferenceContext (Request-Scoped State)
+
+```java
+package tech.kayys.golek.inference.kernel.engine;
+
+import tech.kayys.golek.inference.api.*;
+import java.util.Optional;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Mutable context for a single inference request.
+ * Exists only during execute() and is discarded after.
+ */
+public interface InferenceContext {
+
+    /**
+     * Unique request identifier (correlation ID)
+     */
+    String requestId();
+
+    /**
+     * Tenant context
+     */
+    TenantContext tenantContext();
+
+    /**
+     * Original request
+     */
+    InferenceRequest request();
+
+    /**
+     * Mutable request (can be transformed by plugins)
+     */
+    InferenceRequest mutableRequest();
+    
+    void setRequest(InferenceRequest request);
+
+    /**
+     * Response (set by provider)
+     */
+    Optional<InferenceResponse> response();
+    
+    void setResponse(InferenceResponse response);
+
+    /**
+     * Error state
+     */
+    Optional<Throwable> error();
+    
+    void fail(Throwable error);
+    
+    boolean hasError();
+
+    /**
+     * Plugin-scoped attributes (cross-phase communication)
+     */
+    Map<String, Object> attributes();
+    
+    <T> Optional<T> getAttribute(String key, Class<T> type);
+    
+    void setAttribute(String key, Object value);
+
+    /**
+     * Trace context for distributed tracing
+     */
+    TraceContext traceContext();
+
+    /**
+     * Engine context (global state)
+     */
+    EngineContext engineContext();
+
+    /**
+     * Audit payload builder
+     */
+    AuditPayload.Builder auditBuilder();
+}
+```
+
+### 2. Plugin System (First-Class Extension Points)
+
+#### 2.1 Plugin Base Contract
+
+```java
+package tech.kayys.golek.inference.kernel.plugin;
+
+/**
+ * Base contract for all plugins.
+ * Plugins are discovered via ServiceLoader and registered at startup.
+ */
+public interface Plugin {
+
+    /**
+     * Unique plugin identifier (reverse domain notation)
+     */
+    String id();
+
+    /**
+     * Plugin descriptor with metadata
+     */
+    PluginDescriptor descriptor();
+
+    /**
+     * Execution order within phase (lower = earlier)
+     */
+    default int order() {
+        return 100;
+    }
+
+    /**
+     * Initialize plugin (called once at engine startup)
+     */
+    default void initialize(PluginContext context) {
+        // Default: no-op
+    }
+
+    /**
+     * Health check for this plugin
+     */
+    default HealthStatus health() {
+        return HealthStatus.healthy();
+    }
+
+    /**
+     * Graceful shutdown
+     */
+    default void shutdown() {
+        // Default: no-op
+    }
+}
+```
+
+#### 2.2 PluginDescriptor
+
+```java
+package tech.kayys.golek.inference.kernel.plugin;
+
+/**
+ * Immutable plugin metadata for compatibility checks and governance.
+ */
+public record PluginDescriptor(
+    String id,
+    String name,
+    String version,
+    PluginType type,
+    Set<PluginCapability> capabilities,
+    SemanticVersion minEngineVersion,
+    SemanticVersion maxEngineVersion,
+    Map<String, Object> metadata
+) {
+    
+    public boolean isCompatibleWith(SemanticVersion engineVersion) {
+        return engineVersion.isGreaterThanOrEqualTo(minEngineVersion) &&
+               engineVersion.isLessThanOrEqualTo(maxEngineVersion);
+    }
+}
+
+public enum PluginType {
+    VALIDATION,
+    TRANSFORMATION,
+    POLICY,
+    ROUTING,
+    OBSERVABILITY,
+    SAFETY
+}
+
+public enum PluginCapability {
+    HOT_RELOAD,
+    ASYNC_EXECUTION,
+    STREAMING_SUPPORT,
+    TENANT_SCOPED
+}
+```
+
+#### 2.3 InferencePhasePlugin
+
+```java
+package tech.kayys.golek.inference.kernel.plugin;
+
+import tech.kayys.golek.inference.kernel.engine.*;
+import tech.kayys.golek.inference.kernel.pipeline.*;
+import io.smallrye.mutiny.Uni;
+
+/**
+ * Plugin bound to a specific inference phase.
+ * Plugins are executed in order within their phase.
+ */
+public interface InferencePhasePlugin extends ConfigurablePlugin {
+
+    /**
+     * Phase this plugin is bound to
+     */
+    InferencePhase phase();
+
+    /**
+     * Execute plugin logic for this request
+     * 
+     * @param context Request-scoped context
+     * @param engine Engine context
+     * @return Uni for async execution
+     */
+    Uni<Void> execute(
+        InferenceContext context,
+        EngineContext engine
+    );
+
+    /**
+     * Whether to execute this plugin for the given request
+     * Allows conditional execution based on tenant, model, etc.
+     */
+    default boolean shouldExecute(InferenceContext context) {
+        return true;
+    }
+}
+```
+
+#### 2.4 ConfigurablePlugin
+
+```java
+package tech.kayys.golek.inference.kernel.plugin;
+
+import java.util.Map;
+
+/**
+ * Plugin that supports dynamic configuration updates.
+ */
+public interface ConfigurablePlugin extends Plugin {
+
+    /**
+     * Apply new configuration (hot-reload)
+     */
+    void onConfigUpdate(Map<String, Object> newConfig);
+
+    /**
+     * Get current configuration
+     */
+    Map<String, Object> getConfig();
+
+    /**
+     * Validate configuration before applying
+     */
+    default ValidationResult validateConfig(Map<String, Object> config) {
+        return ValidationResult.valid();
+    }
+}
+```
+
+#### 2.5 PluginRegistry
+
+```java
+package tech.kayys.golek.inference.kernel.plugin;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Central registry for managing plugin lifecycle.
+ */
+public interface PluginRegistry {
+
+    /**
+     * Get all registered plugins
+     */
+    List<Plugin> all();
+
+    /**
+     * Get plugins by type
+     */
+    <T extends Plugin> List<T> byType(Class<T> type);
+
+    /**
+     * Get plugins for specific phase
+     */
+    List<InferencePhasePlugin> byPhase(InferencePhase phase);
+
+    /**
+     * Get plugin by ID
+     */
+    Optional<Plugin> byId(String pluginId);
+
+    /**
+     * Register plugin at runtime
+     */
+    void register(Plugin plugin);
+
+    /**
+     * Unregister plugin
+     */
+    void unregister(String pluginId);
+
+    /**
+     * Reload plugin (hot-reload)
+     */
+    void reload(String pluginId);
+
+    /**
+     * Check if plugin is enabled
+     */
+    boolean isEnabled(String pluginId);
+
+    /**
+     * Enable/disable plugin
+     */
+    void setEnabled(String pluginId, boolean enabled);
+}
+```
+
+### 3. Provider System (Multi-Format Support)
+
+#### 3.1 LLMProvider SPI
+
+```java
+package tech.kayys.golek.inference.kernel.provider;
+
+import tech.kayys.golek.inference.api.*;
+import io.smallrye.mutiny.Uni;
+
+/**
+ * Service Provider Interface for LLM backends.
+ * All format adapters must implement this interface.
+ */
+public interface LLMProvider {
+
+    /**
+     * Provider identifier (unique)
+     */
+    String id();
+
+    /**
+     * Provider capabilities
+     */
+    ProviderCapabilities capabilities();
+
+    /**
+     * Initialize provider with configuration
+     */
+    void initialize(ProviderConfig config);
+
+    /**
+     * Execute synchronous inference
+     */
+    Uni<InferenceResponse> infer(ProviderRequest request);
+
+    /**
+     * Check if this provider supports the given model
+     */
+    boolean supportsModel(String modelId);
+
+    /**
+     * Health check
+     */
+    HealthStatus health();
+
+    /**
+     * Get current resource utilization
+     */
+    ResourceMetrics metrics();
+
+    /**
+     * Graceful shutdown
+     */
+    void shutdown();
+}
+```
+
+#### 3.2 StreamingLLMProvider
+
+```java
+package tech.kayys.golek.inference.kernel.provider;
+
+import io.smallrye.mutiny.Multi;
+
+/**
+ * Provider with streaming support (SSE/WebSocket).
+ */
+public interface StreamingLLMProvider extends LLMProvider {
+
+    /**
+     * Execute streaming inference
+     */
+    Multi<StreamChunk> stream(ProviderRequest request);
+}
+```
+
+#### 3.3 ProviderCapabilities
+
+```java
+package tech.kayys.golek.inference.kernel.provider;
+
+/**
+ * Feature flags for provider capabilities.
+ */
+public record ProviderCapabilities(
+    boolean streaming,
+    boolean toolCalling,
+    boolean multimodal,
+    boolean structuredOutputs,
+    int maxContextTokens,
+    int maxOutputTokens,
+    Set<ModelFormat> supportedFormats,
+    Set<DeviceType> supportedDevices
+) {
+    
+    public boolean supports(ProviderFeature feature) {
+        return switch (feature) {
+            case STREAMING -> streaming;
+            case TOOL_CALLING -> toolCalling;
+            case MULTIMODAL -> multimodal;
+            case STRUCTURED_OUTPUTS -> structuredOutputs;
+        };
+    }
+}
+
+public enum ProviderFeature {
+    STREAMING,
+    TOOL_CALLING,
+    MULTIMODAL,
+    STRUCTURED_OUTPUTS
+}
+```
+
+### 4. Error Handling & Audit Integration
+
+#### 4.1 ErrorPayload (Standardized)
+
+```java
+package tech.kayys.golek.inference.api;
+
+import java.time.Instant;
+import java.util.Map;
+
+/**
+ * Standardized error payload for all inference failures.
+ * Integrates with golek's error-as-input pattern.
+ */
+public record ErrorPayload(
+    String type,
+    String message,
+    Map<String, Object> details,
+    boolean retryable,
+    String originNode,
+    String originRunId,
+    int attempt,
+    int maxAttempts,
+    Instant timestamp,
+    String suggestedAction,
+    String provenanceRef
+) {
+    
+    public static ErrorPayload from(
+        Throwable error,
+        String nodeId,
+        InferenceContext context
+    ) {
+        return new ErrorPayload(
+            error.getClass().getSimpleName(),
+            error.getMessage(),
+            extractDetails(error),
+            isRetryable(error),
+            nodeId,
+            context.requestId(),
+            0,
+            3,
+            Instant.now(),
+            determineSuggestedAction(error),
+            context.auditBuilder().build().provenanceRef()
+        );
+    }
+
+    private static boolean isRetryable(Throwable error) {
+        return !(error instanceof ValidationException ||
+                 error instanceof AuthorizationException);
+    }
+
+    private static String determineSuggestedAction(Throwable error) {
+        if (error instanceof TenantQuotaExceededException) {
+            return "escalate";
+        } else if (error instanceof ProviderException) {
+            return "retry";
+        } else if (error instanceof ValidationException) {
+            return "human_review";
+        } else {
+            return "fallback";
+        }
+    }
+
+    private static Map<String, Object> extractDetails(Throwable error) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("errorClass", error.getClass().getName());
+        if (error.getCause() != null) {
+            details.put("cause", error.getCause().getMessage());
+        }
+        return details;
+    }
+}
+```
+
+#### 4.2 AuditPayload
+
+```java
+package tech.kayys.golek.inference.api;
+
+import java.time.Instant;
+import java.util.Map;
+
+/**
+ * Audit event for inference operations.
+ */
+public record AuditPayload(
+    Instant timestamp,
+    String runId,
+    String nodeId,
+    Actor actor,
+    String event,
+    String level,
+    List<String> tags,
+    Map<String, Object> metadata,
+    Map<String, Object> contextSnapshot,
+    String hash
+) {
+    
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private Instant timestamp = Instant.now();
+        private String runId;
+        private String nodeId;
+        private Actor actor;
+        private String event;
+        private String level = "INFO";
+        private List<String> tags = new ArrayList<>();
+        private Map<String, Object> metadata = new HashMap<>();
+        private Map<String, Object> contextSnapshot = new HashMap<>();
+
+        public Builder runId(String runId) {
+            this.runId = runId;
+            return this;
+        }
+
+        public Builder nodeId(String nodeId) {
+            this.nodeId = nodeId;
+            return this;
+        }
+
+        public Builder actor(Actor actor) {
+            this.actor = actor;
+            return this;
+        }
+
+        public Builder event(String event) {
+            this.event = event;
+            return this;
+        }
+
+        public Builder level(String level) {
+            this.level = level;
+            return this;
+        }
+
+        public Builder tag(String tag) {
+            this.tags.add(tag);
+            return this;
+        }
+
+        public Builder metadata(String key, Object value) {
+            this.metadata.put(key, value);
+            return this;
+        }
+
+        public Builder contextSnapshot(Map<String, Object> snapshot) {
+            this.contextSnapshot = snapshot;
+            return this;
+        }
+
+        public AuditPayload build() {
+            String hash = computeHash();
+            return new AuditPayload(
+                timestamp, runId, nodeId, actor, event, level,
+                tags, metadata, contextSnapshot, hash
+            );
+        }
+
+        private String computeHash() {
+            String content = String.join("|",
+                timestamp.toString(),
+                runId,
+                nodeId,
+                actor.id(),
+                event
+            );
+            return DigestUtils.sha256Hex(content);
+        }
+    }
+
+    public record Actor(
+        String type, // system|human|agent
+        String id,
+        String role
+    ) {}
+}
+```
+
+#### 4.3 AuditLogger Plugin
+
+```java
+package tech.kayys.golek.inference.infrastructure.observability;
+
+import tech.kayys.golek.inference.kernel.plugin.*;
+import tech.kayys.golek.inference.kernel.engine.*;
+import tech.kayys.golek.inference.kernel.pipeline.*;
+import io.smallrye.mutiny.Uni;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+/**
+ * Plugin that logs audit events for all inference requests.
+ * Executes in AUDIT phase after inference completion.
+ */
+@ApplicationScoped
+public class AuditLoggerPlugin implements InferencePhasePlugin {
+
+    @Inject
+    AuditEventPublisher publisher;
+
+    @Inject
+    ProvenanceStore provenanceStore;
+
+    @Override
+    public String id() {
+        return "tech.kayys.golek.audit.logger";
+    }
+
+    @Override
+    public PluginDescriptor descriptor() {
+        return new PluginDescriptor(
+            id(),
+            "Audit Logger Plugin",
+            "1.0.0",
+            PluginType.OBSERVABILITY,
+            Set.of(PluginCapability.ASYNC_EXECUTION),
+            SemanticVersion.of("1.0.0"),
+            SemanticVersion.of("2.0.0"),
+            Map.of("category", "audit")
+        );
+    }
+
+    @Override
+    public InferencePhase phase() {
+        return InferencePhase.AUDIT;
+    }
+
+    @Override
+    public int order() {
+        return 10; // Execute early in audit phase
+    }
+
+    @Override
+    public Uni<Void> execute(
+        InferenceContext context,
+        EngineContext engine
+    ) {
+        AuditPayload audit = context.auditBuilder()
+            .event(determineEvent(context))
+            .level(determineLevel(context))
+            .tag("inference")
+            .tag(context.tenantContext().tenantId().value())
+            .metadata("modelId", context.request().model())
+            .metadata("providerId", getProviderId(context))
+            .metadata("duration", getDuration(context))
+            .metadata("tokensUsed", getTokensUsed(context))
+            .contextSnapshot(buildSnapshot(context))
+            .build();
+
+        // Store in provenance
+        return provenanceStore.store(audit)
+            // Publish to event bus (Kafka)
+            .chain(() -> publisher.publish(audit));
+    }
+
+    private String determineEvent(InferenceContext context) {
+        if (context.hasError()) {
+            return "INFERENCE_FAILED";
+        } else {
+            return "INFERENCE_COMPLETED";
+        }
+    }
+
+    private String determineLevel(InferenceContext context) {
+        if (context.hasError()) {
+            Throwable error = context.error().get();
+            if (error instanceof ValidationException) {
+                return "WARN";
+            } else if (error instanceof ProviderException) {
+                return "ERROR";
+            } else {
+                return "CRITICAL";
+            }
+        } else {
+            return "INFO";
+        }
+    }
+
+    private String getProviderId(InferenceContext context) {
+        return context.getAttribute("providerId", String.class)
+            .orElse("unknown");
+    }
+
+    private long getDuration(InferenceContext context) {
+        return context.getAttribute("durationMs", Long.class)
+            .orElse(0L);
+    }
+
+    private int getTokensUsed(InferenceContext context) {
+        return context.response()
+            .map(InferenceResponse::tokensUsed)
+            .orElse(0);
+    }
+
+    private Map<String, Object> buildSnapshot(InferenceContext context) {
+        Map<String, Object> snapshot = new HashMap<>();
+        snapshot.put("requestId", context.requestId());
+        snapshot.put("tenantId", context.tenantContext().tenantId().value());
+        snapshot.put("model", context.request().model());
+        
+        // Redact sensitive data
+        if (context.response().isPresent()) {
+            snapshot.put("responseStatus", "success");
+            snapshot.put("tokensUsed", context.response().get().tokensUsed());
+        } else if (context.hasError()) {
+            snapshot.put("responseStatus", "error");
+            snapshot.put("errorType", context.error().get().getClass().getSimpleName());
+        }
+        
+        return snapshot;
+    }
+}
+```
+
+---
+
+## 🔌 Example Plugin Implementations
+
+### 1. Quota Enforcement Plugin
+
+```java
+package tech.kayys.golek.inference.plugins.policy;
+
+import tech.kayys.golek.inference.kernel.plugin.*;
+import tech.kayys.golek.inference.kernel.engine.*;
+import tech.kayys.golek.inference.kernel.pipeline.*;
+import io.smallrye.mutiny.Uni;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+/**
+ * Enforces tenant-level quotas for inference requests.
+ */
+@ApplicationScoped
+public class QuotaEnforcementPlugin implements InferencePhasePlugin {
+
+    @Inject
+    TenantQuotaService quotaService;
+
+    @Override
+    public String id() {
+        return "tech.kayys.golek.policy.quota";
+    }
+
+    @Override
+    public PluginDescriptor descriptor() {
+        return new PluginDescriptor(
+            id(),
+            "Quota Enforcement Plugin",
+            "1.0.0",
+            PluginType.POLICY,
+            Set.of(PluginCapability.TENANT_SCOPED),
+            SemanticVersion.of("1.0.0"),
+            SemanticVersion.of("2.0.0"),
+            Map.of()
+        );
+    }
+
+    @Override
+    public InferencePhase phase() {
+        return InferencePhase.VALIDATION;
+    }
+
+    @Override
+    public int order() {
+        return 10; // Execute early
+    }
+
+    @Override
+    public Uni<Void> execute(
+        InferenceContext context,
+        EngineContext engine
+    ) {
+        TenantId tenantId = context.tenantContext().tenantId();
+
+        return quotaService.checkQuota(tenantId)
+            .onItem().transformToUni(quota -> {
+                if (!quota.hasCapacity()) {
+                    return Uni.createFrom().failure(
+                        new TenantQuotaExceededException(
+                            "Tenant " + tenantId.value() + 
+                            " has exceeded quota: " + quota.limit()
+                        )
+                    );
+                }
+
+                // Reserve quota
+                return quotaService.reserve(tenantId, 1)
+                    .onItem().transform(v -> {
+                        // Store reservation for release on completion
+                        context.setAttribute("quotaReserved", true);
+                        return null;
+                    });
+            });
+    }
+}
+```
+
+### 2. Content Safety Plugin
+
+```java
+package tech.kayys.golek.inference.plugins.safety;
+
+import tech.kayys.golek.inference.kernel.plugin.*;
+import tech.kayys.golek.inference.kernel.engine.*;
+import tech.kayys.golek.inference.kernel.pipeline.*;
+import io.smallrye.mutiny.Uni;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+/**
+ * Validates input/output content for safety violations.
+ */
+@ApplicationScoped
+public class ContentSafetyPlugin implements InferencePhasePlugin {
+
+    @Inject
+    ContentModerator moderator;
+
+    @Override
+    public String id() {
+        return "tech.kayys.golek.safety.content";
+    }
+
+    @Override
+    public PluginDescriptor descriptor() {
+        return new PluginDescriptor(
+            id(),
+            "Content Safety Plugin",
+            "1.0.0",
+            PluginType.SAFETY,
+            Set.of(),
+            SemanticVersion.of("1.0.0"),
+            SemanticVersion.of("2.0.0"),
+            Map.of()
+        );
+    }
+
+    @Override
+    public InferencePhase phase() {
+        return InferencePhase.VALIDATION;
+    }
+
+    @Override
+    public int order() {
+        return 20;
+    }
+
+    @Override
+    public Uni<Void> execute(
+        InferenceContext context,
+        EngineContext engine
+    ) {
+        // Validate input
+        String inputText = extractInputText(context.request());
+
+        return moderator.moderate(inputText)
+            .onItem().transformToUni(result -> {
+                if (!result.isSafe()) {
+                    context.auditBuilder()
+                        .event("CONTENT_BLOCKED")
+                        .level("WARN")
+                        .metadata("reason", result.reason())
+                        .metadata("categories", result.categories());
+
+                    return Uni.createFrom().failure(
+                        new ContentSafetyException(
+                            "Input contains unsafe content: " + result.reason()
+                        )
+                    );
+                }
+
+                return Uni.createFrom().voidItem();
+            });
+    }
+
+    private String extractInputText(InferenceRequest request) {
+        return request.messages().stream()
+            .map(Message::content)
+            .collect(Collectors.joining("\n"));
+    }
+}
+```
+
+### 3. Model Router Plugin
+
+```java
+package tech.kayys.golek.inference.core.service;
+
+import tech.kayys.golek.inference.kernel.plugin.*;
+import tech.kayys.golek.inference.kernel.engine.*;
+import tech.kayys.golek.inference.kernel.pipeline.*;
+import tech.kayys.golek.inference.kernel.provider.*;
+import io.smallrye.mutiny.Uni;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+/**
+ * Intelligent model selection and provider routing.
+ */
+@ApplicationScoped
+public class ModelRouterPlugin implements InferencePhasePlugin {
+
+    @Inject
+    ModelRouterService routerService;
+
+    @Inject
+    ProviderRegistry providerRegistry;
+
+    @Override
+    public String id() {
+        return "tech.kayys.golek.routing.model";
+    }
+
+    @Override
+    public PluginDescriptor descriptor() {
+        return new PluginDescriptor(
+            id(),
+            "Model Router Plugin",
+            "1.0.0",
+            PluginType.ROUTING,
+            Set.of(),
+            SemanticVersion.of("1.0.0"),
+            SemanticVersion.of("2.0.0"),
+            Map.of()
+        );
+    }
+
+    @Override
+    public InferencePhase phase() {
+        return InferencePhase.PROVIDER_DISPATCH;
+    }
+
+    @Override
+    public int order() {
+        return 1; // Execute first in dispatch phase
+    }
+
+    @Override
+    public Uni<Void> execute(
+        InferenceContext context,
+        EngineContext engine
+    ) {
+        String modelId = context.request().model();
+        TenantContext tenant = context.tenantContext();
+
+        // Select best provider for this model
+        return routerService.selectProvider(modelId, tenant)
+            .onItem().transformToUni(providerId -> {
+                // Get provider instance
+                LLMProvider provider = providerRegistry
+                    .getProvider(providerId)
+                    .orElseThrow(() -> new ProviderException(
+                        "Provider not found: " + providerId
+                    ));
+
+                // Store for downstream phases
+                context.setAttribute("providerId", providerId);
+                context.setAttribute("provider", provider);
+
+                // Execute inference
+                ProviderRequest providerReq = ProviderRequest.from(
+                    context.request()
+                );
+
+                return provider.infer(providerReq)
+                    .onItem().transform(response -> {
+                        context.setResponse(response);
+                        return null;
+                    });
+            });
+    }
+}
+```
+
+---
+
+## 📦 Portable Runtime Configuration
+
+### Maven Profile for Portable Agent
+
+```xml
+<profile>
+    <id>portable-runtime</id>
+    <properties>
+        <quarkus.package.type>uber-jar</quarkus.package.type>
+        <quarkus.native.additional-build-args>
+            --initialize-at-run-time=tech.kayys.golek.inference.providers
+        </quarkus.native.additional-build-args>
+    </properties>
+    
+    <dependencies>
+        <!-- Core kernel (minimal) -->
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>inference-kernel</artifactId>
+        </dependency>
+
+        <!-- Portable runtime -->
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>inference-portable-runtime</artifactId>
+        </dependency>
+
+        <!-- Include only local providers (no cloud APIs) -->
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>inference-provider-gguf</artifactId>
+        </dependency>
+
+        <!-- Minimal plugins -->
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>inference-plugins-api</artifactId>
+        </dependency>
+
+        <!-- Exclude platform-only dependencies -->
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>inference-infrastructure</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.quarkus</groupId>
+                <artifactId>quarkus-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>build</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</profile>
+```
+
+### Portable Runtime Main Class
+
+```java
+package tech.kayys.golek.inference.portable;
+
+import tech.kayys.golek.inference.kernel.engine.*;
+import tech.kayys.golek.inference.kernel.plugin.*;
+import tech.kayys.golek.inference.api.*;
+
+import io.quarkus.runtime.Quarkus;
+import io.quarkus.runtime.QuarkusApplication;
+import io.quarkus.runtime.annotations.QuarkusMain;
+
+import jakarta.inject.Inject;
+
+/**
+ * Portable inference engine for standalone agents.
+ * Minimal footprint with file-based configuration.
+ */
+@QuarkusMain
+public class PortableInferenceEngine implements QuarkusApplication {
+
+    @Inject
+    InferenceEngine engine;
+
+    @Inject
+    PluginRegistry pluginRegistry;
+
+    @Inject
+    LocalModelLoader modelLoader;
+
+    public static void main(String... args) {
+        Quarkus.run(PortableInferenceEngine.class, args);
+    }
+
+    @Override
+    public int run(String... args) throws Exception {
+        // Load bundled models
+        modelLoader.loadLocalModels();
+
+        // Print available models
+        System.out.println("Available models:");
+        modelLoader.getModels().forEach(model ->
+            System.out.println("  - " + model.modelId())
+        );
+
+        // Print loaded plugins
+        System.out.println("Loaded plugins:");
+        pluginRegistry.all().forEach(plugin ->
+            System.out.println("  - " + plugin.id())
+        );
+
+        // Start REST API (optional)
+        System.out.println("Portable inference engine started");
+        Quarkus.waitForExit();
+        return 0;
+    }
+}
+```
+
+---
+
+## 🧪 Testing Strategy
+
+### Integration Test Example
+
+```java
+package tech.kayys.golek.inference.tests.integration;
+
+import tech.kayys.golek.inference.kernel.engine.*;
+import tech.kayys.golek.inference.kernel.plugin.*;
+import tech.kayys.golek.inference.api.*;
+
+import io.quarkus.test.junit.QuarkusTest;
+import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
+
+import org.junit.jupiter.api.*;
+import jakarta.inject.Inject;
+
+import static org.assertj.core.api.Assertions.*;
+
+@QuarkusTest
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+class InferenceEngineIntegrationTest {
+
+    @Inject
+    InferenceEngine engine;
+
+    @Inject
+    PluginRegistry pluginRegistry;
+
+    private TenantContext testTenant;
+
+    @BeforeEach
+    void setup() {
+        testTenant = TenantContext.of(TenantId.of("test-tenant"));
+    }
+
+    @Test
+    @Order(1)
+    void shouldLoadAllPlugins() {
+        List<Plugin> plugins = pluginRegistry.all();
+        
+        assertThat(plugins)
+            .isNotEmpty()
+            .anyMatch(p -> p.descriptor().type() == PluginType.VALIDATION)
+            .anyMatch(p -> p.descriptor().type() == PluginType.POLICY);
+    }
+
+    @Test
+    @Order(2)
+    void shouldExecuteValidInferenceRequest() {
+        InferenceRequest request = InferenceRequest.builder()
+            .model("gpt-3.5-turbo")
+            .message(Message.user("Hello, world!"))
+            .temperature(0.7)
+            .maxTokens(100)
+            .build();
+
+        InferenceResponse response = engine
+            .infer(request, testTenant)
+            .subscribe().withSubscriber(UniAssertSubscriber.create())
+            .awaitItem()
+            .getItem();
+
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isNotBlank();
+        assertThat(response.tokensUsed()).isGreaterThan(0);
+    }
+
+    @Test
+    @Order(3)
+    void shouldRejectUnsafeContent() {
+        InferenceRequest request = InferenceRequest.builder()
+            .model("gpt-3.5-turbo")
+            .message(Message.user("How to hack a system?"))
+            .build();
+
+        assertThatThrownBy(() ->
+            engine.infer(request, testTenant)
+                .subscribe().withSubscriber(UniAssertSubscriber.create())
+                .awaitFailure()
+                .getFailure()
+        ).isInstanceOf(ContentSafetyException.class);
+    }
+
+    @Test
+    @Order(4)
+    void shouldEnforceQuota() {
+        // Simulate quota exhaustion
+        TenantContext quotaExhausted = TenantContext.of(
+            TenantId.of("quota-exhausted-tenant")
+        );
+
+        InferenceRequest request = InferenceRequest.builder()
+            .model("gpt-3.5-turbo")
+            .message(Message.user("Test"))
+            .build();
+
+        assertThatThrownBy(() ->
+            engine.infer(request, quotaExhausted)
+                .subscribe().withSubscriber(UniAssertSubscriber.create())
+                .awaitFailure()
+                .getFailure()
+        ).isInstanceOf(TenantQuotaExceededException.class);
+    }
+
+    @Test
+    @Order(5)
+    void shouldFallbackOnProviderFailure() {
+        // Mock primary provider failure
+        InferenceRequest request = InferenceRequest.builder()
+            .model("unavailable-model")
+            .message(Message.user("Test"))
+            .preferredProvider("failing-provider")
+            .build();
+
+        // Should fallback to alternative provider
+        InferenceResponse response = engine
+            .infer(request, testTenant)
+            .subscribe().withSubscriber(UniAssertSubscriber.create())
+            .awaitItem()
+            .getItem();
+
+        assertThat(response).isNotNull();
+        assertThat(response.metadata().get("provider"))
+            .isNotEqualTo("failing-provider");
+    }
+}
+```
+
+---
+
+## 🚀 Deployment Configurations
+
+### Platform Deployment (application.yml)
+
+```yaml
+# Platform Runtime Configuration
+quarkus:
+  application:
+    name: golek-inference-platform
+  
+  http:
+    port: 8080
+    cors: true
+  
+  datasource:
+    db-kind: postgresql
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    jdbc:
+      url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/golek_inference
+      max-size: 20
+  
+  hibernate-orm:
+    database:
+      generation: update
+    log:
+      sql: false
+  
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS}
+    audit:
+      topic: golek.inference.audit
+      value:
+        serializer: io.quarkus.kafka.client.serialization.ObjectMapperSerializer
+  
+  security:
+    jwt:
+      enabled: true
+      public-key: ${JWT_PUBLIC_KEY}
+    
+  opentelemetry:
+    enabled: true
+    tracer:
+      exporter:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+
+# Inference Engine Configuration
+inference:
+  engine:
+    max-concurrent-requests: 100
+    default-timeout-seconds: 30
+    
+  plugins:
+    enabled: true
+    auto-discovery: true
+    hot-reload: true
+    
+  providers:
+    gguf:
+      enabled: true
+      model-cache-dir: /var/cache/models/gguf
+      max-contexts: 4
+      
+    onnx:
+      enabled: true
+      execution-provider: CUDA
+      model-cache-dir: /var/cache/models/onnx
+      
+    triton:
+      enabled: true
+      grpc-endpoint: ${TRITON_GRPC_ENDPOINT}
+      http-endpoint: ${TRITON_HTTP_ENDPOINT}
+      
+    openai:
+      enabled: true
+      api-key: ${OPENAI_API_KEY}
+      base-url: https://api.openai.com/v1
+      
+    anthropic:
+      enabled: true
+      api-key: ${ANTHROPIC_API_KEY}
+      
+  routing:
+    strategy: intelligent # intelligent | round-robin | random
+    scoring:
+      latency-weight: 0.3
+      cost-weight: 0.2
+      availability-weight: 0.3
+      performance-weight: 0.2
+      
+  warm-pool:
+    enabled: true
+    min-size: 2
+    max-size: 10
+    idle-timeout-minutes: 15
+    
+  circuit-breaker:
+    enabled: true
+    failure-threshold: 5
+    success-threshold: 2
+    timeout-seconds: 60
+    window-seconds: 600
+
+# Tenant Configuration
+tenants:
+  default-quota:
+    requests-per-hour: 1000
+    tokens-per-hour: 100000
+  
+  isolation:
+    enabled: true
+    resource-limits:
+      cpu: 2000m
+      memory: 4Gi
+```
+
+### Portable Runtime (application-portable.yml)
+
+```yaml
+# Portable Runtime Configuration
+quarkus:
+  application:
+    name: golek-inference-portable
+  
+  http:
+    port: 8090
+  
+  log:
+    level: INFO
+    console:
+      format: "%d{HH:mm:ss} %-5p [%c{2.}] %s%e%n"
+
+# Inference Engine Configuration
+inference:
+  engine:
+    max-concurrent-requests: 10
+    default-timeout-seconds: 60
+    
+  plugins:
+    enabled: true
+    auto-discovery: true
+    hot-reload: false # Disabled for portable
+    
+  providers:
+    gguf:
+      enabled: true
+      model-cache-dir: ./models/gguf
+      max-contexts: 2
+      
+    onnx:
+      enabled: true
+      execution-provider: CPU
+      model-cache-dir: ./models/onnx
+      
+    # Cloud providers disabled for portable
+    openai:
+      enabled: false
+    anthropic:
+      enabled: false
+    triton:
+      enabled: false
+      
+  routing:
+    strategy: random # Simpler for portable
+      
+  warm-pool:
+    enabled: false # Disabled for portable
+    
+  circuit-breaker:
+    enabled: true
+    failure-threshold: 3
+
+# Local model bundling
+models:
+  bundled:
+    - id: tinyllama
+      format: GGUF
+      path: ./models/gguf/tinyllama-1.1b-chat-q4_k_m.gguf
+    - id: phi-2
+      format: ONNX
+      path: ./models/onnx/phi-2-q4.onnx
+```
+
+---
+
+## 📊 Performance Optimizations
+
+### 1. Native Image Configuration
+
+```java
+package tech.kayys.golek.inference.kernel;
+
+import io.quarkus.runtime.annotations.RegisterForReflection;
+import org.graalvm.nativeimage.hosted.Feature;
+
+/**
+ * GraalVM native image configuration.
+ */
+@RegisterForReflection(targets = {
+    tech.kayys.golek.inference.api.InferenceRequest.class,
+    tech.kayys.golek.inference.api.InferenceResponse.class,
+    tech.kayys.golek.inference.api.Message.class,
+    tech.kayys.golek.inference.api.ErrorPayload.class,
+    tech.kayys.golek.inference.api.AuditPayload.class
+})
+public class NativeImageFeature implements Feature {
+    
+    @Override
+    public void beforeAnalysis(BeforeAnalysisAccess access) {
+        // Register classes for reflection
+        access.registerAsInHeap(InferenceRequest.class);
+        access.registerAsInHeap(InferenceResponse.class);
+    }
+}
+```
+
+### 2. Caching Strategy
+
+```java
+package tech.kayys.golek.inference.core.service;
+
+import io.quarkus.cache.CacheResult;
+import io.quarkus.cache.CacheKey;
+
+import jakarta.enterprise.context.ApplicationScoped;
+
+/**
+ * Model manifest caching for faster lookups.
+ */
+@ApplicationScoped
+public class CachedModelRepository implements ModelRepository {
+
+    @Inject
+    PostgresModelRepository delegate;
+
+    @Override
+    @CacheResult(cacheName = "model-manifests")
+    public Optional<ModelManifest> findById(
+        @CacheKey String modelId,
+        @CacheKey TenantId tenantId
+    ) {
+        return delegate.findById(modelId, tenantId);
+    }
+
+    // ... other methods
+}
+```
+
+---
+
+## 🔐 Security Hardening
+
+### 1. Tenant Filter
+
+```java
+package tech.kayys.golek.inference.infrastructure.security;
+
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerRequestFilter;
+import jakarta.ws.rs.ext.Provider;
+import jakarta.inject.Inject;
+
+/**
+ * Extracts and validates tenant context from JWT claims.
+ */
+@Provider
+@ApplicationScoped
+public class TenantFilter implements ContainerRequestFilter {
+
+    @Inject
+    JsonWebToken jwt;
+
+    @Inject
+    TenantResolver tenantResolver;
+
+    @Override
+    public void filter(ContainerRequestContext requestContext) {
+        String tenantId = jwt.getClaim("tenant_id");
+        
+        if (tenantId == null || tenantId.isBlank()) {
+            requestContext.abortWith(
+                Response.status(Response.Status.FORBIDDEN)
+                    .entity("Missing tenant claim")
+                    .build()
+            );
+            return;
+        }
+
+        TenantContext tenant = tenantResolver.resolve(
+            TenantId.of(tenantId)
+        );
+
+        // Store in request context
+        requestContext.setProperty("tenantContext", tenant);
+    }
+}
+```
+
+### 2. Secrets Management
+
+```java
+package tech.kayys.golek.inference.infrastructure.security;
+
+import io.quarkus.vault.VaultKVSecretEngine;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+/**
+ * Secure credential management via HashiCorp Vault.
+ */
+@ApplicationScoped
+public class VaultSecretManager {
+
+    @Inject
+    VaultKVSecretEngine vault;
+
+    public String getProviderApiKey(
+        TenantId tenantId,
+        String providerId
+    ) {
+        String path = String.format(
+            "tenants/%s/providers/%s",
+            tenantId.value(),
+            providerId
+        );
+
+        return vault.readSecret(path)
+            .get("api_key");
+    }
+
+    public void storeProviderApiKey(
+        TenantId tenantId,
+        String providerId,
+        String apiKey
+    ) {
+        String path = String.format(
+            "tenants/%s/providers/%s",
+            tenantId.value(),
+            providerId
+        );
+
+        vault.writeSecret(path, Map.of("api_key", apiKey));
+    }
+}
+```
+
+---
+
+## 📈 Observability Dashboard
+
+### Prometheus Metrics
+
+```java
+package tech.kayys.golek.inference.infrastructure.observability;
+
+import io.micrometer.core.instrument.*;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+/**
+ * Centralized metrics collection.
+ */
+@ApplicationScoped
+public class PrometheusMetrics implements MetricsCollector {
+
+    @Inject
+    MeterRegistry registry;
+
+    private final Counter inferenceCounter;
+    private final Timer inferenceTimer;
+    private final Counter errorCounter;
+    private final Gauge activeRequests;
+
+    public PrometheusMetrics(MeterRegistry registry) {
+        this.registry = registry;
+
+        this.inferenceCounter = Counter.builder("inference.requests.total")
+            .description("Total inference requests")
+            .tags("status", "provider", "model", "tenant")
+            .register(registry);
+
+        this.inferenceTimer = Timer.builder("inference.duration")
+            .description("Inference request duration")
+            .tags("provider", "model", "tenant")
+            .register(registry);
+
+        this.errorCounter = Counter.builder("inference.errors.total")
+            .description("Total inference errors")
+            .tags("type", "provider", "tenant")
+            .register(registry);
+
+        this.activeRequests = Gauge.builder("inference.requests.active", 
+                this::getActiveRequests)
+            .description("Active inference requests")
+            .register(registry);
+    }
+
+    @Override
+    public void recordSuccess(
+        String provider,
+        String model,
+        TenantId tenant,
+        Duration duration
+    ) {
+        inferenceCounter.increment(
+            Tags.of(
+                "status", "success",
+                "provider", provider,
+                "model", model,
+                "tenant", tenant.value()
+            )
+        );
+
+        inferenceTimer.record(duration,
+            Tags.of(
+                "provider", provider,
+                "model", model,
+                "tenant", tenant.value()
+            )
+        );
+    }
+
+    @Override
+    public void recordFailure(
+        String provider,
+        String model,
+        TenantId tenant,
+        String errorType
+    ) {
+        inferenceCounter.increment(
+            Tags.of(
+                "status", "failure",
+                "provider", provider,
+                "model", model,
+                "tenant", tenant.value()
+            )
+        );
+
+        errorCounter.increment(
+            Tags.of(
+                "type", errorType,
+                "provider", provider,
+                "tenant", tenant.value()
+            )
+        );
+    }
+
+    private int getActiveRequests() {
+        // Implementation to track active requests
+        return 0; // Placeholder
+    }
+}
+```
+
+---
+
+## 🎯 Summary & Key Benefits
+
+### ✅ What This Architecture Delivers
+
+1. **True Plugin System**
+   - First-class plugin abstraction (not just CDI beans)
+   - Hot-reload capability with compatibility checks
+   - Versioned plugin contracts
+   - Phase-bound execution model
+
+2. **Multi-Format Model Support**
+   - GGUF (llama.cpp)
+   - ONNX Runtime (CPU/CUDA/TensorRT)
+   - Triton Inference Server
+   - Cloud APIs (OpenAI, Anthropic, Google)
+   - Extensible provider registry
+
+3. **Shared Runtime (Platform + Portable)**
+   - Same kernel for core platform and standalone agents
+   - Modular dependencies via Maven profiles
+   - GraalVM native image ready
+   - Minimal footprint for portable agents
+
+4. **Production-Grade Reliability**
+   - Circuit breakers and bulkheads
+   - Intelligent fallback strategies
+   - Warm model pools with eviction
+   - Request-scoped error handling
+   - Comprehensive audit trail
+
+5. **Multi-Tenancy & Security**
+   - Tenant-scoped resource quotas
+   - Isolated model pools
+   - Secure credential management (Vault)
+   - Row-level security
+
+6. **Enterprise Observability**
+   - OpenTelemetry distributed tracing
+   - Prometheus metrics
+   - Structured audit logging
+   - Kafka event streaming
+
+7. **Error Handling Integration**
+   - Standardized `ErrorPayload` schema
+   - Audit events for all failures
+   - golek error-as-input compatibility
+   - Human-in-the-loop escalation support
+
+### 🚀 Next Steps
+
+1. Implement core kernel modules
+2. Build initial provider adapters (GGUF, ONNX)
+3. Create essential plugins (quota, safety, audit)
+4. Set up CI/CD pipeline with multi-profile builds
+5. Deploy platform runtime to Kubernetes
+6. Package portable runtime as standalone JAR
+7. Integrate with golek orchestration layer
+
+This architecture is **future-proof**, **production-ready**, and **fully aligned** with golek's blueprint requirements. 🎉

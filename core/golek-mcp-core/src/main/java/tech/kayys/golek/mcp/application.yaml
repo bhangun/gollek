@@ -1,0 +1,48 @@
+wayang:
+  inference:
+    mcp:
+      enabled: true
+      default-timeout: 30s
+      tools-enabled: true
+      resources-enabled: true
+      prompts-enabled: true
+      
+      cache:
+        enabled: true
+        max-size: 1000
+        ttl: 15m
+      
+      servers:
+        # File system MCP server
+        filesystem:
+          name: "Filesystem Server"
+          transport: stdio
+          command: "npx"
+          args:
+            - "-y"
+            - "@modelcontextprotocol/server-filesystem"
+            - "/Users/workspace"
+          env:
+            NODE_ENV: "production"
+          auto-reconnect: true
+          max-reconnect-attempts: 3
+        
+        # GitHub MCP server
+        github:
+          name: "GitHub Server"
+          transport: stdio
+          command: "npx"
+          args:
+            - "-y"
+            - "@modelcontextprotocol/server-github"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
+          auto-reconnect: true
+          max-reconnect-attempts: 3
+        
+        # Custom MCP server via HTTP
+        custom:
+          name: "Custom Server"
+          transport: http
+          url: "http://localhost:8080/mcp"
+          auto-reconnect: false

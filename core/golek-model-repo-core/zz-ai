@@ -1,0 +1,125 @@
+```java
+// =========================
+// core/domain
+// =========================
+
+
+
+// -------------------------
+
+
+
+// -------------------------
+
+
+// -------------------------
+
+
+```
+
+```java
+// =========================
+// core/ports
+// =========================
+
+
+
+// -------------------------
+
+
+```
+
+```java
+// =========================
+// core/service
+// =========================
+
+
+```
+
+```java
+// =========================
+// adapters/huggingface
+// =========================
+
+
+// -------------------------
+
+package ai.wayang.modelrepo.adapter.hf;
+
+
+```
+
+```java
+// =========================
+// adapters/local
+// =========================
+
+package ai.wayang.modelrepo.adapter.local;
+
+import ai.wayang.modelrepo.domain.*;
+
+
+// -------------------------
+
+
+```
+
+```java
+// =========================
+// bootstrap (Quarkus/SPI friendly)
+// =========================
+
+
+```
+
+```java
+// =========================
+// META-INF/services
+// =========================
+
+// file: META-INF/services/ai.wayang.modelrepo.port.ModelRepositoryProvider
+ai.wayang.modelrepo.adapter.hf.HuggingFaceRepositoryProvider
+ai.wayang.modelrepo.adapter.local.LocalModelRepositoryProvider
+```
+
+```java
+// =========================
+// usage
+// =========================
+
+package ai.wayang.example;
+
+import ai.wayang.modelrepo.bootstrap.Providers;
+import ai.wayang.modelrepo.domain.*;
+import ai.wayang.modelrepo.port.RepositoryContext;
+import ai.wayang.modelrepo.service.ModelRepositoryRegistry;
+
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Map;
+
+public class Example {
+
+    public static void main(String[] args) {
+        var context = new RepositoryContext(
+                Path.of("/var/models"),
+                Duration.ofMinutes(5),
+                Map.of()
+        );
+
+        var registry = new ModelRepositoryRegistry(Providers.load(), context);
+
+        var ref = new ModelRef(
+                "hf",
+                "meta-llama",
+                "Llama-3-8B",
+                "latest",
+                Map.of("format", "gguf")
+        );
+
+        ModelArtifact artifact = registry.load(ref);
+        System.out.println(artifact.path());
+    }
+}
+```
