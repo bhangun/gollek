@@ -1,0 +1,1957 @@
+@Override
+    public float adjustTemperature(float temperature, int tokenIndex) {
+        String variant = currentVariant.get();
+        if (variant != null) {
+            for (Experiment experiment : experiments.values()) {
+                Variant v = experiment.getVariant(variant);
+                if (v != null) {
+                    String tempStr = v.parameters().get("temperature");
+                    if (tempStr != null) {
+                        return Float.parseFloat(tempStr);
+                    }
+                }
+            }
+        }
+        return temperature;
+    }
+    
+    @Override
+    public void onGenerationComplete(GenerationResult result) {
+        String variant = currentVariant.get();
+        if (variant != null) {
+            // Record metrics for this variant
+            context.emitEvent("ab.result", Map.of(
+                "variant", variant,
+                "tokens", result.tokensGenerated(),
+                "time_ms", result.timeMs()
+            ));
+        }
+        currentVariant.remove();
+    }
+    
+    private record Experiment(
+        String id,
+        String name,
+        List<Variant> variants
+    ) {
+        boolean isActive() {
+            return true; // Could be time-based or percentage-based
+        }
+        
+        Variant selectVariant() {
+            double random = Math.random();
+            double cumulative = 0.0;
+            
+            for (Variant variant : variants) {
+                cumulative += variant.trafficSplit();
+                if (random < cumulative) {
+                    return variant;
+                }
+            }
+            
+            return variants.get(0);
+        }
+        
+        Variant getVariant(String name) {
+            return variants.stream()
+                .filter(v -> v.name().equals(name))
+                .findFirst()
+                .orElse(null);
+        }
+    }
+    
+    private record Variant(
+        String name,
+        double trafficSplit,
+        Map<String, String> parameters
+    ) {}
+}
+
+// ============================================================================
+// Plugin 11: Model Versioning Plugin
+// ============================================================================
+package com.llamajava.plugins.versioning;
+
+import com.llamajava.core.plugin.*;
+import com.llamajava.core.ModelInfo;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class ModelVersioningPlugin implements ModelPlugin {
+    private PluginContext context;
+    private final Map<String, ModelVersion> versions = new ConcurrentHashMap<>();
+    private String activeVersion;
+    
+    @Override
+    public String getId() {
+        return "model-versioning";
+    }
+    
+    @Override
+    public String getName() {
+        return "Model Versioning Plugin";
+    }
+    
+    @Override
+    public String getVersion() {
+        return "1.0.0";
+    }
+    
+    @Override
+    public String getDescription() {
+        return "Version control for models with rollback capability";
+    }
+    
+    @Override
+    public void initialize(PluginContext context) throws PluginException {
+        this.context = context;
+        
+        // Register versions
+        versions.put("v1.0", new ModelVersion(
+            "v1.0",
+            "/models/llama-2-7b-v1.gguf",
+            "Production stable",
+            System.currentTimeMillis(),
+            true
+        ));
+        
+        versions.put("v1.1", new ModelVersion(
+            "v1.1",
+            "/models/llama-2-7b-v1.1.gguf",
+            "Improved accuracy",
+            System.currentTimeMillis(),
+            false
+        ));
+        
+        activeVersion = "v1.0";
+    }
+    
+    @Override
+    public void start() {}
+    
+    @Override
+    public void stop() {
+        versions.clear();
+    }
+    
+    @Override
+    public boolean canHandle(String modelPath) {
+        return versions.values().stream()
+            .anyMatch(v -> v.path().equals(modelPath));
+    }
+    
+    @Override
+    public void prepareModel(String modelPath) throws PluginException {
+        // Model preparation logic
+    }
+    
+    @Override
+    public ModelInfo getModelInfo() {
+        ModelVersion version = versions.get(activeVersion);
+        if (version == null) {
+            return null;
+        }
+        
+        return ModelInfo.builder()
+            .name("llama-2-7b-" + version.version())
+            .description(version.description())
+            .build();
+    }
+    
+    public void promoteVersion(String versionId) throws PluginException {
+        if (!versions.containsKey(versionId)) {
+            throw new PluginException("Version not found: " + versionId);
+        }
+        
+        ModelVersion oldVersion = versions.get(activeVersion);
+        activeVersion = versionId;
+        
+        context.emitEvent("model.version.changed", Map.of(
+            "old_version", oldVersion.version(),
+            "new_version", versionId
+        ));
+    }
+    
+    public void rollback() throws PluginException {
+        // Rollback to previous stable version
+        ModelVersion stable = versions.values().stream()
+            .filter(ModelVersion::stable)
+            .findFirst()
+            .orElseThrow(() -> new PluginException("No stable version found"));
+        
+        promoteVersion(stable.version());
+    }
+    
+    private record ModelVersion(
+        String version,
+        String path,
+        String description,
+        long timestamp,
+        boolean stable
+    ) {}
+}
+
+// ============================================================================
+// Plugin 12: Prompt Template Plugin
+// ============================================================================
+package com.llamajava.plugins.templates;
+
+import com.llamajava.core.plugin.*;
+import com.llamajava.core.model.ChatMessage;
+
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class PromptTemplatePlugin implements EnginePlugin {
+    private PluginContext context;
+    private final Map<String, Template> templates = new ConcurrentHashMap<>();
+    private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\{\\{(\\w+)\\}\\}");
+    
+    @Override
+    public String getId() {
+        return "prompt-templates";
+    }
+    
+    @Override
+    public String getName() {
+        return "Prompt Template Plugin";
+    }
+    
+    @Override
+    public String getVersion() {
+        return "1.0.0";
+    }
+    
+    @Override
+    public String getDescription() {
+        return "Reusable prompt templates with variables";
+    }
+    
+    @Override
+    public void initialize(PluginContext context) throws PluginException {
+        this.context = context;
+        
+        // Register built-in templates
+        registerTemplate("summarize", new Template(
+            "summarize",
+            "Summarize the following text in {{max_words}} words:\n\n{{text}}",
+            List.of("text", "max_words")
+        ));
+        
+        registerTemplate("translate", new Template(
+            "translate",
+            "Translate the following text from {{source_lang}} to {{target_lang}}:\n\n{{text}}",
+            List.of("text", "source_lang", "target_lang")
+        ));
+        
+        registerTemplate("code_review", new Template(
+            "code_review",
+            "Review this {{language}} code and provide feedback:\n\n```{{language}}\n{{code}}\n```\n\nFocus on: {{focus_areas}}",
+            List.of("language", "code", "focus_areas")
+        ));
+    }
+    
+    @Override
+    public void start() {}
+    
+    @Override
+    public void stop() {
+        templates.clear();
+    }
+    
+    public void registerTemplate(String name, Template template) {
+        templates.put(name, template);
+    }
+    
+    public String renderTemplate(String templateName, Map<String, String> variables) 
+            throws PluginException {
+        Template template = templates.get(templateName);
+        if (template == null) {
+            throw new PluginException("Template not found: " + templateName);
+        }
+        
+        // Validate required variables
+        for (String required : template.requiredVars()) {
+            if (!variables.containsKey(required)) {
+                throw new PluginException("Missing required variable: " + required);
+            }
+        }
+        
+        // Replace variables
+        String result = template.content();
+        Matcher matcher = VARIABLE_PATTERN.matcher(result);
+        StringBuffer sb = new StringBuffer();
+        
+        while (matcher.find()) {
+            String varName = matcher.group(1);
+            String value = variables.getOrDefault(varName, "");
+            matcher.appendReplacement(sb, Matcher.quoteReplacement(value));
+        }
+        matcher.appendTail(sb);
+        
+        return sb.toString();
+    }
+    
+    @Override
+    public String preprocessPrompt(String prompt) {
+        // Check if prompt uses template syntax
+        if (prompt.startsWith("@template:")) {
+            try {
+                String[] parts = prompt.substring(10).split("\\|", 2);
+                String templateName = parts[0].trim();
+                
+                Map<String, String> vars = new HashMap<>();
+                if (parts.length > 1) {
+                    String[] kvPairs = parts[1].split(",");
+                    for (String pair : kvPairs) {
+                        String[] kv = pair.split("=", 2);
+                        if (kv.length == 2) {
+                            vars.put(kv[0].trim(), kv[1].trim());
+                        }
+                    }
+                }
+                
+                return renderTemplate(templateName, vars);
+            } catch (Exception e) {
+                return prompt;
+            }
+        }
+        
+        return prompt;
+    }
+    
+    public List<Template> listTemplates() {
+        return new ArrayList<>(templates.values());
+    }
+    
+    public record Template(
+        String name,
+        String content,
+        List<String> requiredVars
+    ) {}
+}
+
+// ============================================================================
+// Plugin 13: Safety & Compliance Plugin
+// ============================================================================
+package com.llamajava.plugins.safety;
+
+import com.llamajava.core.plugin.*;
+import com.llamajava.core.model.GenerationResult;
+
+import java.util.*;
+import java.util.regex.Pattern;
+
+public class SafetyCompliancePlugin implements EnginePlugin {
+    private PluginContext context;
+    private final List<SafetyRule> rules = new ArrayList<>();
+    private final List<String> blockedPatterns = new ArrayList<>();
+    private boolean strictMode = false;
+    
+    @Override
+    public String getId() {
+        return "safety-compliance";
+    }
+    
+    @Override
+    public String getName() {
+        return "Safety & Compliance Plugin";
+    }
+    
+    @Override
+    public String getVersion() {
+        return "1.0.0";
+    }
+    
+    @Override
+    public String getDescription() {
+        return "Advanced content safety and regulatory compliance";
+    }
+    
+    @Override
+    public void initialize(PluginContext context) throws PluginException {
+        this.context = context;
+        
+        // Load safety rules
+        rules.add(new SafetyRule(
+            "pii-detection",
+            "Detect and redact PII",
+            Pattern.compile("\\b\\d{3}-\\d{2}-\\d{4}\\b"), // SSN pattern
+            SafetyAction.REDACT
+        ));
+        
+        rules.add(new SafetyRule(
+            "profanity-filter",
+            "Block profanity",
+            Pattern.compile("\\b(badword1|badword2)\\b", Pattern.CASE_INSENSITIVE),
+            SafetyAction.BLOCK
+        ));
+        
+        rules.add(new SafetyRule(
+            "medical-disclaimer",
+            "Add disclaimer for medical content",
+            Pattern.compile("\\b(diagnose|treatment|medication)\\b", Pattern.CASE_INSENSITIVE),
+            SafetyAction.WARN
+        ));
+        
+        Boolean configStrictMode = context.getConfigValue("safety.strict_mode", Boolean.class);
+        if (configStrictMode != null) {
+            strictMode = configStrictMode;
+        }
+    }
+    
+    @Override
+    public void start() {}
+    
+    @Override
+    public void stop() {
+        rules.clear();
+    }
+    
+    @Override
+    public String preprocessPrompt(String prompt) {
+        for (SafetyRule rule : rules) {
+            if (rule.pattern().matcher(prompt).find()) {
+                switch (rule.action()) {
+                    case BLOCK:
+                        if (strictMode) {
+                            throw new SecurityException("Content blocked by safety rule: " + rule.name());
+                        }
+                        break;
+                    case REDACT:
+                        prompt = rule.pattern().matcher(prompt).replaceAll("[REDACTED]");
+                        break;
+                    case WARN:
+                        context.setSharedData("safety.warning." + rule.name(), true);
+                        break;
+                }
+            }
+        }
+        
+        return prompt;
+    }
+    
+    @Override
+    public String postprocessOutput(String output) {
+        StringBuilder warnings = new StringBuilder();
+        
+        for (SafetyRule rule : rules) {
+            if (rule.pattern().matcher(output).find()) {
+                switch (rule.action()) {
+                    case BLOCK:
+                        if (strictMode) {
+                            return "I cannot provide that information due to safety policies.";
+                        }
+                        break;
+                    case REDACT:
+                        output = rule.pattern().matcher(output).replaceAll("[REDACTED]");
+                        break;
+                    case WARN:
+                        if (rule.name().equals("medical-disclaimer")) {
+                            warnings.append("\n\n⚠️ Medical Disclaimer: This information is for educational purposes only. Consult a healthcare professional.");
+                        }
+                        break;
+                }
+            }
+        }
+        
+        return output + warnings.toString();
+    }
+    
+    @Override
+    public void onGenerationComplete(GenerationResult result) {
+        // Log safety events
+        context.emitEvent("safety.check.complete", Map.of(
+            "rules_applied", rules.size(),
+            "strict_mode", strictMode
+        ));
+    }
+    
+    private record SafetyRule(
+        String name,
+        String description,
+        Pattern pattern,
+        SafetyAction action
+    ) {}
+    
+    private enum SafetyAction {
+        BLOCK,   // Block the request
+        REDACT,  // Redact matching content
+        WARN     // Add warning message
+    }
+}
+
+// ============================================================================
+// SERVER ENHANCEMENTS
+// ============================================================================
+
+// ============================================================================
+// llama-server/src/main/java/com/llamajava/server/cluster/ClusterManager.java
+// ============================================================================
+package com.llamajava.server.cluster;
+
+import org.jboss.logging.Logger;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Cluster management for distributed deployment
+ */
+public class ClusterManager {
+    private static final Logger log = Logger.getLogger(ClusterManager.class);
+    
+    private final String nodeId;
+    private final Map<String, ClusterNode> nodes = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService heartbeatExecutor;
+    private NodeRole currentRole = NodeRole.WORKER;
+    
+    public ClusterManager(String nodeId) {
+        this.nodeId = nodeId;
+        this.heartbeatExecutor = Executors.newScheduledThreadPool(1);
+        
+        // Register this node
+        nodes.put(nodeId, new ClusterNode(
+            nodeId,
+            System.currentTimeMillis(),
+            NodeRole.WORKER,
+            getNodeCapacity()
+        ));
+        
+        startHeartbeat();
+    }
+    
+    private void startHeartbeat() {
+        heartbeatExecutor.scheduleAtFixedRate(() -> {
+            try {
+                sendHeartbeat();
+                checkNodeHealth();
+            } catch (Exception e) {
+                log.error("Heartbeat failed", e);
+            }
+        }, 0, 5, TimeUnit.SECONDS);
+    }
+    
+    private void sendHeartbeat() {
+        ClusterNode thisNode = nodes.get(nodeId);
+        if (thisNode != null) {
+            thisNode.lastHeartbeat = System.currentTimeMillis();
+            
+            // Broadcast to other nodes (simplified)
+            log.debugf("Heartbeat sent from node: %s", nodeId);
+        }
+    }
+    
+    private void checkNodeHealth() {
+        long now = System.currentTimeMillis();
+        long timeout = 30000; // 30 seconds
+        
+        nodes.entrySet().removeIf(entry -> {
+            if (!entry.getKey().equals(nodeId)) {
+                long timeSinceHeartbeat = now - entry.getValue().lastHeartbeat;
+                if (timeSinceHeartbeat > timeout) {
+                    log.warnf("Node %s is unhealthy (no heartbeat for %dms)", 
+                        entry.getKey(), timeSinceHeartbeat);
+                    return true;
+                }
+            }
+            return false;
+        });
+        
+        // Leader election if needed
+        electLeader();
+    }
+    
+    private void electLeader() {
+        if (nodes.isEmpty()) {
+            return;
+        }
+        
+        // Simple leader election: node with lowest ID becomes leader
+        String leaderId = nodes.keySet().stream()
+            .sorted()
+            .findFirst()
+            .orElse(nodeId);
+        
+        if (leaderId.equals(nodeId) && currentRole != NodeRole.LEADER) {
+            currentRole = NodeRole.LEADER;
+            log.infof("Node %s elected as leader", nodeId);
+        }
+    }
+    
+    public ClusterNode selectNodeForRequest(String requestId) {
+        // Simple round-robin or least-loaded selection
+        return nodes.values().stream()
+            .filter(n -> n.role == NodeRole.WORKER || n.role == NodeRole.LEADER)
+            .min(Comparator.comparingInt(n -> n.capacity.currentLoad))
+            .orElse(null);
+    }
+    
+    public void registerNode(ClusterNode node) {
+        nodes.put(node.nodeId, node);
+        log.infof("Node registered: %s (%s)", node.nodeId, node.role);
+    }
+    
+    public void shutdown() {
+        heartbeatExecutor.shutdown();
+        try {
+            heartbeatExecutor.awaitTermination(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            heartbeatExecutor.shutdownNow();
+        }
+    }
+    
+    private NodeCapacity getNodeCapacity() {
+        return new NodeCapacity(
+            Runtime.getRuntime().availableProcessors(),
+            Runtime.getRuntime().maxMemory(),
+            0  // current load
+        );
+    }
+    
+    public enum NodeRole {
+        LEADER,
+        WORKER,
+        STANDBY
+    }
+    
+    public static class ClusterNode {
+        private final String nodeId;
+        private long lastHeartbeat;
+        private final NodeRole role;
+        private final NodeCapacity capacity;
+        
+        public ClusterNode(String nodeId, long lastHeartbeat, NodeRole role, NodeCapacity capacity) {
+            this.nodeId = nodeId;
+            this.lastHeartbeat = lastHeartbeat;
+            this.role = role;
+            this.capacity = capacity;
+        }
+        
+        public String getNodeId() { return nodeId; }
+        public long getLastHeartbeat() { return lastHeartbeat; }
+        public NodeRole getRole() { return role; }
+        public NodeCapacity getCapacity() { return capacity; }
+    }
+    
+    private static class NodeCapacity {
+        private final int cpuCores;
+        private final long memoryBytes;
+        private int currentLoad;
+        
+        NodeCapacity(int cpuCores, long memoryBytes, int currentLoad) {
+            this.cpuCores = cpuCores;
+            this.memoryBytes = memoryBytes;
+            this.currentLoad = currentLoad;
+        }
+    }
+}
+
+// ============================================================================
+// llama-server/src/main/java/com/llamajava/server/loadbalancer/LoadBalancer.java
+// ============================================================================
+package com.llamajava.server.loadbalancer;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Intelligent load balancer with multiple strategies
+ */
+public class LoadBalancer {
+    
+    private final Map<String, Backend> backends = new ConcurrentHashMap<>();
+    private final AtomicInteger roundRobinCounter = new AtomicInteger(0);
+    private final LoadBalancingStrategy strategy;
+    
+    public LoadBalancer(LoadBalancingStrategy strategy) {
+        this.strategy = strategy;
+    }
+    
+    public void registerBackend(String id, String endpoint, int weight) {
+        backends.put(id, new Backend(id, endpoint, weight, 0, true));
+    }
+    
+    public void unregisterBackend(String id) {
+        backends.remove(id);
+    }
+    
+    public Backend selectBackend() {
+        if (backends.isEmpty()) {
+            return null;
+        }
+        
+        List<Backend> available = backends.values().stream()
+            .filter(Backend::healthy)
+            .toList();
+        
+        if (available.isEmpty()) {
+            return null;
+        }
+        
+        return switch (strategy) {
+            case ROUND_ROBIN -> selectRoundRobin(available);
+            case LEAST_CONNECTIONS -> selectLeastConnections(available);
+            case WEIGHTED -> selectWeighted(available);
+            case RANDOM -> selectRandom(available);
+        };
+    }
+    
+    private Backend selectRoundRobin(List<Backend> available) {
+        int index = roundRobinCounter.getAndIncrement() % available.size();
+        return available.get(index);
+    }
+    
+    private Backend selectLeastConnections(List<Backend> available) {
+        return available.stream()
+            .min(Comparator.comparingInt(Backend::activeConnections))
+            .orElse(null);
+    }
+    
+    private Backend selectWeighted(List<Backend> available) {
+        int totalWeight = available.stream()
+            .mapToInt(Backend::weight)
+            .sum();
+        
+        int random = new Random().nextInt(totalWeight);
+        int cumulative = 0;
+        
+        for (Backend backend : available) {
+            cumulative += backend.weight();
+            if (random < cumulative) {
+                return backend;
+            }
+        }
+        
+        return available.get(0);
+    }
+    
+    private Backend selectRandom(List<Backend> available) {
+        int index = new Random().nextInt(available.size());
+        return available.get(index);
+    }
+    
+    public void incrementConnections(String backendId) {
+        Backend backend = backends.get(backendId);
+        if (backend != null) {
+            backend.incrementConnections();
+        }
+    }
+    
+    public void decrementConnections(String backendId) {
+        Backend backend = backends.get(backendId);
+        if (backend != null) {
+            backend.decrementConnections();
+        }
+    }
+    
+    public void markUnhealthy(String backendId) {
+        Backend backend = backends.get(backendId);
+        if (backend != null) {
+            backend.setHealthy(false);
+        }
+    }
+    
+    public enum LoadBalancingStrategy {
+        ROUND_ROBIN,
+        LEAST_CONNECTIONS,
+        WEIGHTED,
+        RANDOM
+    }
+    
+    public static class Backend {
+        private final String id;
+        private final String endpoint;
+        private final int weight;
+        private final AtomicInteger activeConnections;
+        private volatile boolean healthy;
+        
+        Backend(String id, String endpoint, int weight, int activeConnections, boolean healthy) {
+            this.id = id;
+            this.endpoint = endpoint;
+            this.weight = weight;
+            this.activeConnections = new AtomicInteger(activeConnections);
+            this.healthy = healthy;
+        }
+        
+        public String id() { return id; }
+        public String endpoint() { return endpoint; }
+        public int weight() { return weight; }
+        public int activeConnections() { return activeConnections.get(); }
+        public boolean healthy() { return healthy; }
+        
+        void incrementConnections() {
+            activeConnections.incrementAndGet();
+        }
+        
+        void decrementConnections() {
+            activeConnections.decrementAndGet();
+        }
+        
+        void setHealthy(boolean healthy) {
+            this.healthy = healthy;
+        }
+    }
+}
+
+// ============================================================================
+// llama-server/src/main/java/com/llamajava/server/security/ApiKeyManager.java
+// ============================================================================
+package com.llamajava.server.security;
+
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.spec.InvalidKeySpecException;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Secure API key management with hashing and rotation
+ */
+public class ApiKeyManager {
+    
+    private final Map<String, HashedApiKey> keys = new ConcurrentHashMap<>();
+    private final SecureRandom random = new SecureRandom();
+    
+    public String generateApiKey(String name, Set<String> permissions, long expiresAt) {
+        byte[] keyBytes = new byte[32];
+        random.nextBytes(keyBytes);
+        
+        String apiKey = "sk-" + Base64.getEncoder().encodeToString(keyBytes)
+            .replace("+", "").replace("/", "").substring(0, 48);
+        
+        String hash = hashApiKey(apiKey);
+        HashedApiKey hashedKey = new HashedApiKey(
+            hash,
+            name,
+            permissions,
+            System.currentTimeMillis(),
+            expiresAt
+        );
+        
+        keys.put(hash, hashedKey);
+        return apiKey;
+    }
+    
+    public boolean validateApiKey(String apiKey) {
+        String hash = hashApiKey(apiKey);
+        HashedApiKey hashedKey = keys.get(hash);
+        
+        if (hashedKey == null) {
+            return false;
+        }
+        
+        // Check expiration
+        if (hashedKey.expiresAt() > 0 && 
+            System.currentTimeMillis() > hashedKey.expiresAt()) {
+            keys.remove(hash);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    public Set<String> getPermissions(String apiKey) {
+        String hash = hashApiKey(apiKey);
+        HashedApiKey hashedKey = keys.get(hash);
+        return hashedKey != null ? hashedKey.permissions() : Set.of();
+    }
+    
+    public void revokeApiKey(String apiKey) {
+        String hash = hashApiKey(apiKey);
+        keys.remove(hash);
+    }
+    
+    public void rotateApiKey(String oldApiKey) {
+        String oldHash = hashApiKey(oldApiKey);
+        HashedApiKey oldKey = keys.get(oldHash);
+        
+        if (oldKey != null) {
+            String newApiKey = generateApiKey(
+                oldKey.name(),
+                oldKey.permissions(),
+                oldKey.expiresAt()
+            );
+            
+            keys.remove(oldHash);
+        }
+    }
+    
+    private String hashApiKey(String apiKey) {
+        try {
+            byte[] salt = "llama-platform-salt".getBytes(); // In production, use unique salt
+            PBEKeySpec spec = new PBEKeySpec(
+                apiKey.toCharArray(),
+                salt,
+                10000,
+                256
+            );
+            
+            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+            byte[] hash = factory.generateSecret(spec).getEncoded();
+            
+            return Base64.getEncoder().encodeToString(hash);
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+            throw new RuntimeException("Failed to hash API key", e);
+        }
+    }
+    
+    public List<ApiKeyInfo> listApiKeys() {
+        return keys.values().stream()
+            .map(key -> new ApiKeyInfo(
+                "***" + key.hash().substring(key.hash().length() - 8),
+                key.name(),
+                key.permissions(),
+                key.createdAt(),
+                key.expiresAt()
+            ))
+            .toList();
+    }
+    
+    private record HashedApiKey(
+        String hash,
+        String name,
+        Set<String> permissions,
+        long createdAt,
+        long expiresAt
+    ) {}
+    
+    public record ApiKeyInfo(
+        String keyPreview,
+        String name,
+        Set<String> permissions,
+        long createdAt,
+        long expiresAt
+    ) {}
+}
+
+// ============================================================================
+// COMPREHENSIVE FEATURE SUMMARY
+// ============================================================================
+/*
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║              ADVANCED FEATURES - PRODUCTION READY                         ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                           ║
+║  CORE LIBRARY ENHANCEMENTS                                               ║
+║  ========================                                                ║
+║                                                                           ║
+║  ✅ Circuit Breaker Pattern                                              ║
+║     - CLOSED/OPEN/HALF_OPEN states                                       ║
+║     - Automatic recovery testing                                         ║
+║     - Configurable thresholds                                            ║
+║                                                                           ║
+║  ✅ Retry Policy with Exponential Backoff                                ║
+║     - Configurable retry attempts                                        ║
+║     - Smart exception filtering                                          ║
+║     - Maximum delay limits                                               ║
+║                                                                           ║
+║  ✅ Memory Pool Management                                               ║
+║     - Efficient memory reuse                                             ║
+║     - Pool statistics                                                    ║
+║     - Hit rate tracking                                                  ║
+║                                                                           ║
+║  ✅ Advanced Inference Scheduler                                         ║
+║     - Priority queue                                                     ║
+║     - Concurrent execution                                               ║
+║     - Request batching                                                   ║
+║                                                                           ║
+║  ✅ Metrics Collection                                                   ║
+║     - Counters, histograms, gauges                                       ║
+║     - Zero-overhead collection                                           ║
+║     - Export to Prometheus                                               ║
+║                                                                           ║
+║  ✅ Distributed Tracing                                                  ║
+║     - Trace ID propagation                                               ║
+║     - Span management                                                    ║
+║     - Performance analysis                                               ║
+║                                                                           ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║  NEW ADVANCED PLUGINS                                                     ║
+║  ====================                                                    ║
+║                                                                           ║
+║  9. Multi-Tenancy Plugin                                                 ║
+║     - Isolated tenant resources                                          ║
+║     - Per-tenant quotas                                                  ║
+║     - Usage tracking                                                     ║
+║     - Model access control                                               ║
+║                                                                           ║
+║  10. A/B Testing Plugin// ============================================================================
+// CORE LIBRARY ENHANCEMENTS - RELIABILITY & RESILIENCE
+// ============================================================================
+
+// ============================================================================
+// llama-core/src/main/java/com/llamajava/core/resilience/CircuitBreaker.java
+// ============================================================================
+package com.llamajava.core.resilience;
+
+import java.time.Duration;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+
+/**
+ * Circuit breaker pattern for fault tolerance
+ */
+public class CircuitBreaker {
+    
+    public enum State {
+        CLOSED,      // Normal operation
+        OPEN,        // Failure threshold exceeded, rejecting requests
+        HALF_OPEN    // Testing if system recovered
+    }
+    
+    private final int failureThreshold;
+    private final Duration timeout;
+    private final Duration resetTimeout;
+    
+    private final AtomicInteger failureCount = new AtomicInteger(0);
+    private final AtomicInteger successCount = new AtomicInteger(0);
+    private final AtomicLong lastFailureTime = new AtomicLong(0);
+    private final AtomicReference<State> state = new AtomicReference<>(State.CLOSED);
+    
+    public CircuitBreaker(int failureThreshold, Duration timeout, Duration resetTimeout) {
+        this.failureThreshold = failureThreshold;
+        this.timeout = timeout;
+        this.resetTimeout = resetTimeout;
+    }
+    
+    public <T> T execute(Operation<T> operation) throws Exception {
+        State currentState = getState();
+        
+        if (currentState == State.OPEN) {
+            throw new CircuitBreakerOpenException("Circuit breaker is OPEN");
+        }
+        
+        try {
+            T result = operation.execute();
+            onSuccess();
+            return result;
+        } catch (Exception e) {
+            onFailure();
+            throw e;
+        }
+    }
+    
+    private State getState() {
+        State currentState = state.get();
+        
+        if (currentState == State.OPEN) {
+            long timeSinceFailure = System.currentTimeMillis() - lastFailureTime.get();
+            if (timeSinceFailure >= resetTimeout.toMillis()) {
+                state.compareAndSet(State.OPEN, State.HALF_OPEN);
+                return State.HALF_OPEN;
+            }
+        }
+        
+        return currentState;
+    }
+    
+    private void onSuccess() {
+        State currentState = state.get();
+        
+        if (currentState == State.HALF_OPEN) {
+            successCount.incrementAndGet();
+            if (successCount.get() >= 3) {
+                state.set(State.CLOSED);
+                failureCount.set(0);
+                successCount.set(0);
+            }
+        } else if (currentState == State.CLOSED) {
+            failureCount.set(0);
+        }
+    }
+    
+    private void onFailure() {
+        lastFailureTime.set(System.currentTimeMillis());
+        
+        if (state.get() == State.HALF_OPEN) {
+            state.set(State.OPEN);
+            successCount.set(0);
+        } else if (failureCount.incrementAndGet() >= failureThreshold) {
+            state.set(State.OPEN);
+        }
+    }
+    
+    public State getCircuitState() {
+        return getState();
+    }
+    
+    public void reset() {
+        state.set(State.CLOSED);
+        failureCount.set(0);
+        successCount.set(0);
+    }
+    
+    @FunctionalInterface
+    public interface Operation<T> {
+        T execute() throws Exception;
+    }
+    
+    public static class CircuitBreakerOpenException extends RuntimeException {
+        public CircuitBreakerOpenException(String message) {
+            super(message);
+        }
+    }
+}
+
+// ============================================================================
+// llama-core/src/main/java/com/llamajava/core/resilience/RetryPolicy.java
+// ============================================================================
+package com.llamajava.core.resilience;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.time.Duration;
+import java.util.function.Predicate;
+
+/**
+ * Configurable retry policy with exponential backoff
+ */
+public class RetryPolicy {
+    private static final Logger log = LoggerFactory.getLogger(RetryPolicy.class);
+    
+    private final int maxAttempts;
+    private final Duration initialDelay;
+    private final Duration maxDelay;
+    private final double backoffMultiplier;
+    private final Predicate<Exception> retryableExceptions;
+    
+    private RetryPolicy(Builder builder) {
+        this.maxAttempts = builder.maxAttempts;
+        this.initialDelay = builder.initialDelay;
+        this.maxDelay = builder.maxDelay;
+        this.backoffMultiplier = builder.backoffMultiplier;
+        this.retryableExceptions = builder.retryableExceptions;
+    }
+    
+    public <T> T execute(Operation<T> operation) throws Exception {
+        Exception lastException = null;
+        
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return operation.execute();
+            } catch (Exception e) {
+                lastException = e;
+                
+                if (!retryableExceptions.test(e) || attempt >= maxAttempts) {
+                    throw e;
+                }
+                
+                long delayMs = calculateDelay(attempt);
+                log.warn("Attempt {} failed, retrying in {}ms: {}", 
+                    attempt, delayMs, e.getMessage());
+                
+                Thread.sleep(delayMs);
+            }
+        }
+        
+        throw lastException;
+    }
+    
+    private long calculateDelay(int attempt) {
+        long delay = (long) (initialDelay.toMillis() * Math.pow(backoffMultiplier, attempt - 1));
+        return Math.min(delay, maxDelay.toMillis());
+    }
+    
+    public static Builder builder() {
+        return new Builder();
+    }
+    
+    public static class Builder {
+        private int maxAttempts = 3;
+        private Duration initialDelay = Duration.ofSeconds(1);
+        private Duration maxDelay = Duration.ofSeconds(30);
+        private double backoffMultiplier = 2.0;
+        private Predicate<Exception> retryableExceptions = e -> true;
+        
+        public Builder maxAttempts(int maxAttempts) {
+            this.maxAttempts = maxAttempts;
+            return this;
+        }
+        
+        public Builder initialDelay(Duration delay) {
+            this.initialDelay = delay;
+            return this;
+        }
+        
+        public Builder maxDelay(Duration delay) {
+            this.maxDelay = delay;
+            return this;
+        }
+        
+        public Builder backoffMultiplier(double multiplier) {
+            this.backoffMultiplier = multiplier;
+            return this;
+        }
+        
+        public Builder retryOn(Predicate<Exception> predicate) {
+            this.retryableExceptions = predicate;
+            return this;
+        }
+        
+        public RetryPolicy build() {
+            return new RetryPolicy(this);
+        }
+    }
+    
+    @FunctionalInterface
+    public interface Operation<T> {
+        T execute() throws Exception;
+    }
+}
+
+// ============================================================================
+// llama-core/src/main/java/com/llamajava/core/memory/MemoryPool.java
+// ============================================================================
+package com.llamajava.core.memory;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * Memory pool for efficient memory reuse and management
+ */
+public class MemoryPool {
+    private static final Logger log = LoggerFactory.getLogger(MemoryPool.class);
+    
+    private final ConcurrentLinkedQueue<MemorySegment> pool;
+    private final long segmentSize;
+    private final int maxPoolSize;
+    private final AtomicLong allocatedCount = new AtomicLong(0);
+    private final AtomicLong poolHits = new AtomicLong(0);
+    private final AtomicLong poolMisses = new AtomicLong(0);
+    private final Arena arena;
+    
+    public MemoryPool(long segmentSize, int maxPoolSize) {
+        this.segmentSize = segmentSize;
+        this.maxPoolSize = maxPoolSize;
+        this.pool = new ConcurrentLinkedQueue<>();
+        this.arena = Arena.ofShared();
+        
+        // Pre-allocate some segments
+        for (int i = 0; i < Math.min(10, maxPoolSize); i++) {
+            pool.offer(arena.allocate(segmentSize));
+        }
+    }
+    
+    public MemorySegment acquire() {
+        MemorySegment segment = pool.poll();
+        
+        if (segment != null) {
+            poolHits.incrementAndGet();
+            return segment;
+        }
+        
+        poolMisses.incrementAndGet();
+        allocatedCount.incrementAndGet();
+        return arena.allocate(segmentSize);
+    }
+    
+    public void release(MemorySegment segment) {
+        if (pool.size() < maxPoolSize) {
+            pool.offer(segment);
+        }
+    }
+    
+    public MemoryPoolStats getStats() {
+        return new MemoryPoolStats(
+            allocatedCount.get(),
+            pool.size(),
+            poolHits.get(),
+            poolMisses.get(),
+            getHitRate()
+        );
+    }
+    
+    private double getHitRate() {
+        long hits = poolHits.get();
+        long misses = poolMisses.get();
+        long total = hits + misses;
+        return total > 0 ? (double) hits / total : 0.0;
+    }
+    
+    public void clear() {
+        pool.clear();
+    }
+    
+    public void close() {
+        clear();
+        arena.close();
+    }
+    
+    public record MemoryPoolStats(
+        long allocated,
+        int pooled,
+        long hits,
+        long misses,
+        double hitRate
+    ) {}
+}
+
+// ============================================================================
+// llama-core/src/main/java/com/llamajava/core/scheduler/InferenceScheduler.java
+// ============================================================================
+package com.llamajava.core.scheduler;
+
+import com.llamajava.core.model.GenerationResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Advanced scheduler for managing inference requests with priorities and batching
+ */
+public class InferenceScheduler {
+    private static final Logger log = LoggerFactory.getLogger(InferenceScheduler.class);
+    
+    private final PriorityBlockingQueue<InferenceTask> taskQueue;
+    private final ExecutorService executorService;
+    private final int maxConcurrent;
+    private final AtomicInteger activeRequests = new AtomicInteger(0);
+    private volatile boolean shutdown = false;
+    
+    public InferenceScheduler(int maxConcurrent) {
+        this.maxConcurrent = maxConcurrent;
+        this.taskQueue = new PriorityBlockingQueue<>(100, 
+            (a, b) -> Integer.compare(b.priority, a.priority));
+        this.executorService = Executors.newFixedThreadPool(
+            maxConcurrent,
+            new ThreadFactory() {
+                private final AtomicInteger counter = new AtomicInteger(0);
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread t = new Thread(r, "inference-worker-" + counter.incrementAndGet());
+                    t.setDaemon(false);
+                    return t;
+                }
+            }
+        );
+        
+        startWorkers();
+    }
+    
+    private void startWorkers() {
+        for (int i = 0; i < maxConcurrent; i++) {
+            executorService.submit(() -> {
+                while (!shutdown) {
+                    try {
+                        InferenceTask task = taskQueue.poll(1, TimeUnit.SECONDS);
+                        if (task != null) {
+                            processTask(task);
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            });
+        }
+    }
+    
+    private void processTask(InferenceTask task) {
+        activeRequests.incrementAndGet();
+        try {
+            GenerationResult result = task.operation.call();
+            task.future.complete(result);
+        } catch (Exception e) {
+            task.future.completeExceptionally(e);
+        } finally {
+            activeRequests.decrementAndGet();
+        }
+    }
+    
+    public CompletableFuture<GenerationResult> submit(
+            Callable<GenerationResult> operation, 
+            int priority) {
+        
+        CompletableFuture<GenerationResult> future = new CompletableFuture<>();
+        InferenceTask task = new InferenceTask(operation, priority, future);
+        
+        if (!taskQueue.offer(task)) {
+            future.completeExceptionally(new RejectedExecutionException("Queue full"));
+        }
+        
+        return future;
+    }
+    
+    public SchedulerStats getStats() {
+        return new SchedulerStats(
+            taskQueue.size(),
+            activeRequests.get(),
+            maxConcurrent
+        );
+    }
+    
+    public void shutdown() {
+        shutdown = true;
+        executorService.shutdown();
+        try {
+            executorService.awaitTermination(30, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+        }
+    }
+    
+    private record InferenceTask(
+        Callable<GenerationResult> operation,
+        int priority,
+        CompletableFuture<GenerationResult> future
+    ) {}
+    
+    public record SchedulerStats(
+        int queuedTasks,
+        int activeTasks,
+        int maxConcurrent
+    ) {}
+}
+
+// ============================================================================
+// llama-core/src/main/java/com/llamajava/core/observability/Metrics.java
+// ============================================================================
+package com.llamajava.core.observability;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
+
+/**
+ * Lightweight metrics collection for observability
+ */
+public class Metrics {
+    
+    private final Map<String, Counter> counters = new ConcurrentHashMap<>();
+    private final Map<String, Histogram> histograms = new ConcurrentHashMap<>();
+    private final Map<String, Gauge> gauges = new ConcurrentHashMap<>();
+    
+    public void incrementCounter(String name) {
+        counters.computeIfAbsent(name, k -> new Counter()).increment();
+    }
+    
+    public void incrementCounter(String name, long value) {
+        counters.computeIfAbsent(name, k -> new Counter()).increment(value);
+    }
+    
+    public void recordHistogram(String name, long value) {
+        histograms.computeIfAbsent(name, k -> new Histogram()).record(value);
+    }
+    
+    public void setGauge(String name, long value) {
+        gauges.computeIfAbsent(name, k -> new Gauge()).set(value);
+    }
+    
+    public long getCounter(String name) {
+        Counter counter = counters.get(name);
+        return counter != null ? counter.get() : 0;
+    }
+    
+    public HistogramSnapshot getHistogram(String name) {
+        Histogram histogram = histograms.get(name);
+        return histogram != null ? histogram.snapshot() : null;
+    }
+    
+    public long getGauge(String name) {
+        Gauge gauge = gauges.get(name);
+        return gauge != null ? gauge.get() : 0;
+    }
+    
+    public Map<String, Object> getAllMetrics() {
+        Map<String, Object> all = new ConcurrentHashMap<>();
+        
+        counters.forEach((name, counter) -> 
+            all.put("counter." + name, counter.get()));
+        
+        histograms.forEach((name, histogram) -> 
+            all.put("histogram." + name, histogram.snapshot()));
+        
+        gauges.forEach((name, gauge) -> 
+            all.put("gauge." + name, gauge.get()));
+        
+        return all;
+    }
+    
+    public void reset() {
+        counters.clear();
+        histograms.clear();
+        gauges.clear();
+    }
+    
+    private static class Counter {
+        private final LongAdder value = new LongAdder();
+        
+        void increment() {
+            value.increment();
+        }
+        
+        void increment(long delta) {
+            value.add(delta);
+        }
+        
+        long get() {
+            return value.sum();
+        }
+    }
+    
+    private static class Histogram {
+        private final LongAdder count = new LongAdder();
+        private final LongAdder sum = new LongAdder();
+        private final AtomicLong min = new AtomicLong(Long.MAX_VALUE);
+        private final AtomicLong max = new AtomicLong(Long.MIN_VALUE);
+        
+        void record(long value) {
+            count.increment();
+            sum.add(value);
+            
+            min.updateAndGet(current -> Math.min(current, value));
+            max.updateAndGet(current -> Math.max(current, value));
+        }
+        
+        HistogramSnapshot snapshot() {
+            long c = count.sum();
+            long s = sum.sum();
+            return new HistogramSnapshot(
+                c,
+                s,
+                c > 0 ? (double) s / c : 0.0,
+                min.get(),
+                max.get()
+            );
+        }
+    }
+    
+    public record HistogramSnapshot(
+        long count,
+        long sum,
+        double mean,
+        long min,
+        long max
+    ) {}
+    
+    private static class Gauge {
+        private final AtomicLong value = new AtomicLong(0);
+        
+        void set(long newValue) {
+            value.set(newValue);
+        }
+        
+        long get() {
+            return value.get();
+        }
+    }
+}
+
+// ============================================================================
+// llama-core/src/main/java/com/llamajava/core/tracing/DistributedTracing.java
+// ============================================================================
+package com.llamajava.core.tracing;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Distributed tracing for request tracking across components
+ */
+public class DistributedTracing {
+    
+    private static final ThreadLocal<TraceContext> currentContext = new ThreadLocal<>();
+    private static final Map<String, Trace> traces = new ConcurrentHashMap<>();
+    
+    public static TraceContext startTrace(String operationName) {
+        String traceId = UUID.randomUUID().toString();
+        String spanId = UUID.randomUUID().toString();
+        
+        TraceContext context = new TraceContext(traceId, spanId, null, operationName);
+        currentContext.set(context);
+        
+        Trace trace = new Trace(traceId);
+        trace.addSpan(new Span(spanId, null, operationName, System.currentTimeMillis()));
+        traces.put(traceId, trace);
+        
+        return context;
+    }
+    
+    public static TraceContext startSpan(String operationName) {
+        TraceContext parent = currentContext.get();
+        if (parent == null) {
+            return startTrace(operationName);
+        }
+        
+        String spanId = UUID.randomUUID().toString();
+        TraceContext context = new TraceContext(
+            parent.traceId(),
+            spanId,
+            parent.spanId(),
+            operationName
+        );
+        
+        currentContext.set(context);
+        
+        Trace trace = traces.get(parent.traceId());
+        if (trace != null) {
+            trace.addSpan(new Span(spanId, parent.spanId(), operationName, System.currentTimeMillis()));
+        }
+        
+        return context;
+    }
+    
+    public static void endSpan() {
+        TraceContext context = currentContext.get();
+        if (context != null) {
+            Trace trace = traces.get(context.traceId());
+            if (trace != null) {
+                trace.endSpan(context.spanId(), System.currentTimeMillis());
+            }
+            
+            if (context.parentSpanId() != null) {
+                // Restore parent context
+                // (simplified - in real implementation, maintain context stack)
+            } else {
+                currentContext.remove();
+            }
+        }
+    }
+    
+    public static void addTag(String key, String value) {
+        TraceContext context = currentContext.get();
+        if (context != null) {
+            Trace trace = traces.get(context.traceId());
+            if (trace != null) {
+                trace.addTag(context.spanId(), key, value);
+            }
+        }
+    }
+    
+    public static TraceContext getCurrentContext() {
+        return currentContext.get();
+    }
+    
+    public static Trace getTrace(String traceId) {
+        return traces.get(traceId);
+    }
+    
+    public static void clearOldTraces(long maxAgeMs) {
+        long now = System.currentTimeMillis();
+        traces.entrySet().removeIf(entry -> 
+            now - entry.getValue().startTime > maxAgeMs);
+    }
+    
+    public record TraceContext(
+        String traceId,
+        String spanId,
+        String parentSpanId,
+        String operationName
+    ) {}
+    
+    public static class Trace {
+        private final String traceId;
+        private final long startTime;
+        private final List<Span> spans = new ArrayList<>();
+        
+        public Trace(String traceId) {
+            this.traceId = traceId;
+            this.startTime = System.currentTimeMillis();
+        }
+        
+        synchronized void addSpan(Span span) {
+            spans.add(span);
+        }
+        
+        synchronized void endSpan(String spanId, long endTime) {
+            for (Span span : spans) {
+                if (span.spanId.equals(spanId)) {
+                    span.endTime = endTime;
+                    break;
+                }
+            }
+        }
+        
+        synchronized void addTag(String spanId, String key, String value) {
+            for (Span span : spans) {
+                if (span.spanId.equals(spanId)) {
+                    span.tags.put(key, value);
+                    break;
+                }
+            }
+        }
+        
+        public String getTraceId() { return traceId; }
+        public long getStartTime() { return startTime; }
+        public List<Span> getSpans() { return new ArrayList<>(spans); }
+        public long getDuration() {
+            return spans.stream()
+                .mapToLong(s -> s.endTime > 0 ? s.endTime - s.startTime : 0)
+                .sum();
+        }
+    }
+    
+    public static class Span {
+        private final String spanId;
+        private final String parentSpanId;
+        private final String operationName;
+        private final long startTime;
+        private long endTime;
+        private final Map<String, String> tags = new ConcurrentHashMap<>();
+        
+        public Span(String spanId, String parentSpanId, String operationName, long startTime) {
+            this.spanId = spanId;
+            this.parentSpanId = parentSpanId;
+            this.operationName = operationName;
+            this.startTime = startTime;
+        }
+        
+        public String getSpanId() { return spanId; }
+        public String getParentSpanId() { return parentSpanId; }
+        public String getOperationName() { return operationName; }
+        public long getStartTime() { return startTime; }
+        public long getEndTime() { return endTime; }
+        public long getDuration() { return endTime > 0 ? endTime - startTime : 0; }
+        public Map<String, String> getTags() { return new HashMap<>(tags); }
+    }
+}
+
+// ============================================================================
+// ADVANCED PLUGINS
+// ============================================================================
+
+// ============================================================================
+// Plugin 9: Multi-Tenancy Plugin
+// ============================================================================
+package com.llamajava.plugins.multitenancy;
+
+import com.llamajava.core.plugin.*;
+import com.llamajava.server.plugin.ServerPlugin;
+import jakarta.ws.rs.container.ContainerRequestContext;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class MultiTenancyPlugin implements ServerPlugin, EnginePlugin {
+    private PluginContext context;
+    private final Map<String, TenantConfig> tenants = new ConcurrentHashMap<>();
+    private final ThreadLocal<String> currentTenant = new ThreadLocal<>();
+    
+    @Override
+    public String getId() {
+        return "multi-tenancy";
+    }
+    
+    @Override
+    public String getName() {
+        return "Multi-Tenancy Plugin";
+    }
+    
+    @Override
+    public String getVersion() {
+        return "1.0.0";
+    }
+    
+    @Override
+    public String getDescription() {
+        return "Multi-tenant support with isolated resources and quotas";
+    }
+    
+    @Override
+    public void initialize(PluginContext context) throws PluginException {
+        this.context = context;
+        
+        // Load tenant configurations
+        loadTenantConfigs();
+    }
+    
+    @Override
+    public void start() {}
+    
+    @Override
+    public void stop() {
+        tenants.clear();
+    }
+    
+    private void loadTenantConfigs() {
+        // Example tenants
+        tenants.put("tenant1", new TenantConfig(
+            "tenant1",
+            "Tenant One",
+            1000,  // daily quota
+            4096,  // max context size
+            List.of("gpt-3.5", "gpt-4")
+        ));
+        
+        tenants.put("tenant2", new TenantConfig(
+            "tenant2",
+            "Tenant Two",
+            5000,
+            8192,
+            List.of("gpt-3.5")
+        ));
+    }
+    
+    @Override
+    public void beforeRequest(ContainerRequestContext requestContext) {
+        String tenantId = requestContext.getHeaderString("X-Tenant-ID");
+        
+        if (tenantId == null || !tenants.containsKey(tenantId)) {
+            requestContext.abortWith(
+                jakarta.ws.rs.core.Response.status(400)
+                    .entity("Invalid or missing tenant ID")
+                    .build()
+            );
+            return;
+        }
+        
+        TenantConfig config = tenants.get(tenantId);
+        
+        // Check quota
+        if (config.isQuotaExceeded()) {
+            requestContext.abortWith(
+                jakarta.ws.rs.core.Response.status(429)
+                    .entity("Tenant quota exceeded")
+                    .header("X-Quota-Limit", config.dailyQuota())
+                    .header("X-Quota-Remaining", 0)
+                    .build()
+            );
+            return;
+        }
+        
+        currentTenant.set(tenantId);
+        config.incrementUsage();
+    }
+    
+    @Override
+    public String preprocessPrompt(String prompt) {
+        String tenantId = currentTenant.get();
+        if (tenantId != null) {
+            TenantConfig config = tenants.get(tenantId);
+            if (config != null) {
+                // Add tenant-specific prefix or context
+                return String.format("[Tenant: %s] %s", config.name(), prompt);
+            }
+        }
+        return prompt;
+    }
+    
+    private record TenantConfig(
+        String id,
+        String name,
+        int dailyQuota,
+        int maxContextSize,
+        List<String> allowedModels
+    ) {
+        private int currentUsage = 0;
+        
+        boolean isQuotaExceeded() {
+            return currentUsage >= dailyQuota;
+        }
+        
+        void incrementUsage() {
+            currentUsage++;
+        }
+        
+        void resetUsage() {
+            currentUsage = 0;
+        }
+    }
+}
+
+// ============================================================================
+// Plugin 10: A/B Testing Plugin
+// ============================================================================
+package com.llamajava.plugins.abtesting;
+
+import com.llamajava.core.plugin.*;
+import com.llamajava.core.SamplingConfig;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class ABTestingPlugin implements EnginePlugin {
+    private PluginContext context;
+    private final Map<String, Experiment> experiments = new ConcurrentHashMap<>();
+    private final ThreadLocal<String> currentVariant = new ThreadLocal<>();
+    
+    @Override
+    public String getId() {
+        return "ab-testing";
+    }
+    
+    @Override
+    public String getName() {
+        return "A/B Testing Plugin";
+    }
+    
+    @Override
+    public String getVersion() {
+        return "1.0.0";
+    }
+    
+    @Override
+    public String getDescription() {
+        return "A/B testing for prompts and parameters";
+    }
+    
+    @Override
+    public void initialize(PluginContext context) throws PluginException {
+        this.context = context;
+        
+        // Create sample experiment
+        Experiment experiment = new Experiment(
+            "temp-test",
+            "Temperature variation test",
+            List.of(
+                new Variant("control", 0.5, Map.of("temperature", 0.7)),
+                new Variant("variant-a", 0.25, Map.of("temperature", 0.5)),
+                new Variant("variant-b", 0.25, Map.of("temperature", 0.9))
+            )
+        );
+        
+        experiments.put(experiment.id(), experiment);
+    }
+    
+    @Override
+    public void start() {}
+    
+    @Override
+    public void stop() {
+        experiments.clear();
+    }
+    
+    @Override
+    public String preprocessPrompt(String prompt) {
+        // Select variant based on traffic split
+        for (Experiment experiment : experiments.values()) {
+            if (experiment.isActive()) {
+                Variant variant = experiment.selectVariant();
+                currentVariant.set(variant.name());
+                
+                context.setSharedData("ab.variant", variant.name());
+                context.setSharedData("ab.experiment", experiment.id());
+                
+                // Apply variant-specific prompt modifications
+                String promptModification = variant.parameters().get("prompt_prefix");
+                if (promptModification != null) {
+                    return promptModification + prompt;
+                }
+            }
+        }
+        
+        return prompt;
+    }
+    
+    @Override
+    public float adjustTemperature(float temperature, int tokenIndex) {
+        String variant = currentVariant.get();

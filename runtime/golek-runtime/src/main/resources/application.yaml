@@ -1,0 +1,206 @@
+quarkus:
+  application:
+    name: inference-platform
+  
+  # HTTP Configuration
+  http:
+    port: 8080
+    cors: true
+    limits:
+      max-body-size: 100M
+  
+  # Native Image Settings
+  native:
+    resources:
+      includes: "**/*.json,**/*.yml"
+  
+  # Logging
+  log:
+    level: INFO
+    category:
+      "com.enterprise.inference":
+        level: DEBUG
+    console:
+      format: "%d{HH:mm:ss} %-5p [%c{2.}] (%t) %s%e%n"
+  
+  # OpenTelemetry
+  otel:
+    enabled: true
+    exporter:
+      otlp:
+        endpoint: http://otel-collector:4317
+  
+  # Security
+  oidc:
+    enabled: true
+    auth-server-url: ${KEYCLOAK_URL:http://keycloak:8080}/realms/inference
+    client-id: inference-platform
+    credentials:
+      secret: ${OIDC_CLIENT_SECRET}
+  
+  # Database (for metadata)
+  datasource:
+    db-kind: postgresql
+    username: ${DB_USER:inference}
+    password: ${DB_PASSWORD}
+    jdbc:
+      url: ${DB_URL:jdbc:postgresql://postgres:5432/inference_metadata}
+      max-size: 20
+      min-size: 5
+  
+  # Flyway for schema migration
+  flyway:
+    migrate-at-start: true
+    baseline-on-migrate: true
+
+# Inference Platform Configuration
+inference:
+  # Model Repository
+  repository:
+    type: s3  # or minio, local
+    s3:
+      endpoint: ${S3_ENDPOINT:https://s3.amazonaws.com}
+      bucket: ${S3_BUCKET:inference-models}
+      region: ${S3_REGION:us-east-1}
+      access-key: ${S3_ACCESS_KEY}
+      secret-key: ${S3_SECRET_KEY}
+    cache:
+      enabled: true
+      max-size-gb: 50
+      eviction-policy: lru
+      base-path: /var/cache/models
+  
+  # Default Runner Selection
+  default-runners: ["onnx", "gguf", "triton"]
+  
+  # Selection Policy
+  selection-policy:
+    type: latency-optimized  # or cost-optimized, balanced
+    scoring:
+      device-match-weight: 50
+      format-match-weight: 30
+      latency-weight: 25
+      availability-weight: 20
+      cost-weight: 10
+  
+  # Fallback Strategy
+  fallback:
+    enabled: true
+    max-retries: 3
+    retry-delay-ms: 1000
+    exponential-backoff: true
+  
+  # Warm Pool
+  warm-pool:
+    enabled: true
+    max-instances: 10
+    idle-timeout-minutes: 15
+    prewarm-on-startup: true
+    prewarm-models:
+      - "gpt-small:1.0"
+      - "bert-base:2.0"
+  
+  # Resource Limits (per tenant)
+  limits:
+    max-concurrent-requests: 100
+    max-queue-size: 1000
+    request-timeout-seconds: 30
+    rate-limit:
+      requests-per-minute: 1000
+      burst-size: 100
+  
+  # Circuit Breaker
+  circuit-breaker:
+    enabled: true
+    failure-threshold: 5
+    success-threshold: 2
+    timeout-seconds: 60
+
+# Runner-Specific Configuration
+runners:
+  gguf:
+    enabled: ${INFERENCE_ADAPTER_GGUF:true}
+    threads: ${GGUF_THREADS:8}
+    use-gpu: ${GGUF_USE_GPU:false}
+    gpu-layers: ${GGUF_GPU_LAYERS:32}
+    warmup:
+      enabled: true
+  
+  onnx:
+    enabled: ${INFERENCE_ADAPTER_ONNX:true}
+    execution-provider: ${ONNX_EP:CPUExecutionProvider}
+    inter-op-threads: 1
+    intra-op-threads: ${ONNX_THREADS:8}
+    optimization-level: all
+    memory-pattern-optimization: true
+  
+  triton:
+    enabled: ${INFERENCE_ADAPTER_TRITON:false}
+    endpoint: ${TRITON_ENDPOINT:triton.svc.cluster.local:8001}
+    timeout-ms: 30000
+    use-ssl: false
+    max-connections: 10
+    connection-timeout-ms: 5000
+  
+  tpu:
+    enabled: ${INFERENCE_ADAPTER_TPU:false}
+    project-id: ${GCP_PROJECT_ID}
+    zone: ${GCP_ZONE:us-central1-a}
+    tpu-name: ${TPU_NAME}
+
+# Multi-Tenancy Configuration
+tenants:
+  resolver:
+    type: jwt  # or header, query-param
+    jwt:
+      claim-name: tenant_id
+  
+  # Default Tenant Configuration
+  default:
+    max-concurrent-requests: 50
+    max-models: 10
+    storage-quota-gb: 100
+    rate-limit:
+      requests-per-minute: 500
+  
+  # Per-Tenant Overrides
+  tenants:
+    tenant-premium:
+      max-concurrent-requests: 200
+      max-models: 50
+      storage-quota-gb: 500
+      rate-limit:
+        requests-per-minute: 5000
+      runners:
+        onnx:
+          execution-provider: CUDAExecutionProvider
+        triton:
+          enabled: true
+
+# Observability
+observability:
+  metrics:
+    enabled: true
+    export:
+      prometheus:
+        enabled: true
+        path: /metrics
+  
+  tracing:
+    enabled: true
+    sampler:
+      probability: 0.1  # 10% sampling
+    exporter:
+      jaeger:
+        endpoint: ${JAEGER_ENDPOINT:http://jaeger:14250}
+  
+  logging:
+    structured: true
+    include-trace-id: true
+    audit:
+      enabled: true
+      events:
+        - model_load
+        - inference_request
+        - inference_failure
+        - quota_exceeded

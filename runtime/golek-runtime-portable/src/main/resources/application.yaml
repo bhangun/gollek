@@ -1,0 +1,61 @@
+quarkus:
+  application:
+    name: golek-inference-portable
+  
+  http:
+    port: 8090
+  
+  log:
+    level: INFO
+    console:
+      format: "%d{HH:mm:ss} %-5p [%c{2.}] %s%e%n"
+
+# Inference Engine Configuration
+inference:
+  engine:
+    max-concurrent-requests: 10
+    default-timeout-seconds: 60
+    
+  plugins:
+    enabled: true
+    auto-discovery: true
+    hot-reload: false # Disabled for portable
+    
+  providers:
+    gguf:
+      enabled: true
+      model-cache-dir: ./models/gguf
+      max-contexts: 2
+      
+    onnx:
+      enabled: true
+      execution-provider: CPU
+      model-cache-dir: ./models/onnx
+      
+    # Cloud providers disabled for portable
+    openai:
+      enabled: false
+    anthropic:
+      enabled: false
+    triton:
+      enabled: false
+      
+  routing:
+    strategy: random # Simpler for portable
+      
+  warm-pool:
+    enabled: false # Disabled for portable
+    
+  circuit-breaker:
+    enabled: true
+    failure-threshold: 3
+
+# Local model bundling
+models:
+  bundled:
+    - id: tinyllama
+      format: GGUF
+      path: ./models/gguf/tinyllama-1.1b-chat-q4_k_m.gguf
+    - id: phi-2
+      format: ONNX
+      path: ./models/onnx/phi-2-q4.onnx
