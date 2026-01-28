@@ -5,13 +5,13 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>tech.kayys.golek</groupId>
-        <artifactId>golek-parent</artifactId>
+        <artifactId>golek-plugin-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <groupId>tech.kayys.golek</groupId>
     <artifactId>golek-plugin-model-router</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -19,6 +19,16 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-plugin-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>tech.kayys.golek</groupId>
             <artifactId>golek-core</artifactId>

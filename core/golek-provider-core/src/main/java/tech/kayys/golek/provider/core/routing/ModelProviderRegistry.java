@@ -5,7 +5,6 @@ import org.jboss.logging.Logger;
 
 import tech.kayys.golek.api.routing.ModelProviderMapping;
 import tech.kayys.golek.api.routing.ModelProviderMapping.ModelType;
-import tech.kayys.golek.api.routing.ProviderPool;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;

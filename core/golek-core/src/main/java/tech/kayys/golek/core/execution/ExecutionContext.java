@@ -1,7 +1,7 @@
 package tech.kayys.golek.core.execution;
 
 import tech.kayys.golek.core.engine.EngineContext;
-import tech.kayys.golek.core.inference.InferencePhase;
+import tech.kayys.golek.api.inference.InferencePhase;
 import tech.kayys.golek.api.tenant.TenantContext;
 
 import java.util.Map;

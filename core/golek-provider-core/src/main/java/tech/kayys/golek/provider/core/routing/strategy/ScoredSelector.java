@@ -55,7 +55,7 @@ public class ScoredSelector implements ProviderSelector {
         }
 
         // 2. Health status (+50 if healthy)
-        ProviderHealth health = provider.health();
+        ProviderHealth health = provider.health().await().atMost(java.time.Duration.ofMillis(500));
         if (health.isHealthy()) {
             score += 50;
         } else if (health.status() == ProviderHealth.Status.DEGRADED) {

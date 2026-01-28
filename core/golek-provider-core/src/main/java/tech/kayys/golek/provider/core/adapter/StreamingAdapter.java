@@ -5,6 +5,7 @@ import io.smallrye.mutiny.Uni;
 import tech.kayys.golek.api.inference.InferenceResponse;
 import tech.kayys.golek.api.provider.ProviderRequest;
 import tech.kayys.golek.api.stream.StreamChunk;
+import tech.kayys.golek.api.tenant.TenantContext;
 import tech.kayys.golek.provider.core.spi.StreamingProvider;
 import tech.kayys.golek.provider.core.streaming.ChunkProcessor;
 import tech.kayys.golek.provider.core.streaming.StreamHandler;
@@ -20,17 +21,16 @@ public abstract class StreamingAdapter extends AbstractProvider implements Strea
     protected ChunkProcessor chunkProcessor;
 
     @Override
-    public Multi<StreamChunk> stream(ProviderRequest request) {
+    public Multi<StreamChunk> stream(ProviderRequest request, TenantContext context) {
         if (!isInitialized()) {
             return Multi.createFrom().failure(
                     new IllegalStateException("Provider not initialized"));
         }
 
-        String tenantId = request.getTenantContext() != null
-                ? request.getTenantContext().getTenantId()
-                : "default";
+        String tenantId = context != null ? context.getTenantId() : "default";
 
-        return checkRateLimit(tenantId)
+        return checkQuota(tenantId)
+                .chain(() -> checkRateLimit(tenantId))
                 .onItem().transformToMulti(v -> doStream(request))
                 .onFailure().transform(this::handleFailure);
     }

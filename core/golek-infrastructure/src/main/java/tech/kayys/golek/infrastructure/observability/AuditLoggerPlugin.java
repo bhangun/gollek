@@ -1,12 +1,21 @@
-package tech.kayys.golek.inference.infrastructure.observability;
+package tech.kayys.golek.infrastructure.observability;
 
-import tech.kayys.golek.inference.kernel.plugin.*;
-import tech.kayys.golek.inference.kernel.engine.*;
-import tech.kayys.golek.inference.kernel.pipeline.*;
+import tech.kayys.golek.api.AuditPayload;
+import tech.kayys.golek.api.inference.*;
+import tech.kayys.golek.core.engine.EngineContext;
+import tech.kayys.golek.core.execution.ExecutionContext;
+import tech.kayys.golek.core.plugin.InferencePhasePlugin;
+import tech.kayys.golek.plugin.api.PluginException;
+import tech.kayys.golek.provider.core.exception.ProviderException;
 import io.smallrye.mutiny.Uni;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Set;
+import java.time.Duration;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.validation.ValidationException;
 
 /**
  * Plugin that logs audit events for all inference requests.
@@ -27,53 +36,59 @@ public class AuditLoggerPlugin implements InferencePhasePlugin {
     }
 
     @Override
-    public PluginDescriptor descriptor() {
-        return new PluginDescriptor(
-            id(),
-            "Audit Logger Plugin",
-            "1.0.0",
-            PluginType.OBSERVABILITY,
-            Set.of(PluginCapability.ASYNC_EXECUTION),
-            SemanticVersion.of("1.0.0"),
-            SemanticVersion.of("2.0.0"),
-            Map.of("category", "audit")
-        );
-    }
-
-    @Override
     public InferencePhase phase() {
         return InferencePhase.AUDIT;
     }
 
     @Override
     public int order() {
-        return 10; // Execute early in audit phase
+        return 10;
     }
 
     @Override
-    public Uni<Void> execute(
-        InferenceContext context,
-        EngineContext engine
-    ) {
-        AuditPayload audit = context.auditBuilder()
-            .event(determineEvent(context))
-            .level(determineLevel(context))
-            .tag("inference")
-            .tag(context.tenantContext().tenantId().value())
-            .metadata("modelId", context.request().model())
-            .metadata("providerId", getProviderId(context))
-            .metadata("duration", getDuration(context))
-            .metadata("tokensUsed", getTokensUsed(context))
-            .contextSnapshot(buildSnapshot(context))
-            .build();
+    public void execute(
+            ExecutionContext context,
+            EngineContext engine) throws PluginException {
 
-        // Store in provenance
-        return provenanceStore.store(audit)
-            // Publish to event bus (Kafka)
-            .chain(() -> publisher.publish(audit));
+        AuditPayload audit = AuditPayload.builder()
+                .runId(context.token().getRequestId())
+                .event(determineEvent(context))
+                .level(determineLevel(context))
+                .tag("inference")
+                .tag(context.tenantContext().getTenantId().value())
+                .metadata("modelId", context.getVariable("request", InferenceRequest.class)
+                        .map(InferenceRequest::getModel).orElse("unknown"))
+                .metadata("providerId", getProviderId(context))
+                .metadata("duration", getDuration(context))
+                .metadata("tokensUsed", getTokensUsed(context))
+                .contextSnapshot(buildSnapshot(context))
+                .build();
+
+        // Store and publish asynchronously (fire and forget for now, or handle
+        // blocking)
+        provenanceStore.store(audit)
+                .chain(() -> publisher.publish(audit))
+                .subscribe().with(
+                        v -> {
+                        },
+                        e -> {
+                        } // Log publisher error
+                );
     }
 
-    private String determineEvent(InferenceContext context) {
+    private Map<String, Object> config = new HashMap<>();
+
+    @Override
+    public void onConfigUpdate(Map<String, Object> newConfig) {
+        this.config = new HashMap<>(newConfig);
+    }
+
+    @Override
+    public Map<String, Object> currentConfig() {
+        return Map.copyOf(config);
+    }
+
+    private String determineEvent(ExecutionContext context) {
         if (context.hasError()) {
             return "INFERENCE_FAILED";
         } else {
@@ -81,9 +96,9 @@ public class AuditLoggerPlugin implements InferencePhasePlugin {
         }
     }
 
-    private String determineLevel(InferenceContext context) {
+    private String determineLevel(ExecutionContext context) {
         if (context.hasError()) {
-            Throwable error = context.error().get();
+            Throwable error = context.getError().get();
             if (error instanceof ValidationException) {
                 return "WARN";
             } else if (error instanceof ProviderException) {
@@ -96,37 +111,43 @@ public class AuditLoggerPlugin implements InferencePhasePlugin {
         }
     }
 
-    private String getProviderId(InferenceContext context) {
-        return context.getAttribute("providerId", String.class)
-            .orElse("unknown");
+    private String getProviderId(ExecutionContext context) {
+        return context.getVariable("providerId", String.class)
+                .orElse("unknown");
     }
 
-    private long getDuration(InferenceContext context) {
-        return context.getAttribute("durationMs", Long.class)
-            .orElse(0L);
+    private long getDuration(ExecutionContext context) {
+        return context.getVariable("durationMs", Long.class)
+                .orElse(0L);
     }
 
-    private int getTokensUsed(InferenceContext context) {
-        return context.response()
-            .map(InferenceResponse::tokensUsed)
-            .orElse(0);
+    private int getTokensUsed(ExecutionContext context) {
+        return context.getVariable("response", InferenceResponse.class)
+                .map(InferenceResponse::getTokensUsed)
+                .orElse(0);
     }
 
-    private Map<String, Object> buildSnapshot(InferenceContext context) {
+    private Map<String, Object> buildSnapshot(ExecutionContext context) {
         Map<String, Object> snapshot = new HashMap<>();
-        snapshot.put("requestId", context.requestId());
-        snapshot.put("tenantId", context.tenantContext().tenantId().value());
-        snapshot.put("model", context.request().model());
-        
-        // Redact sensitive data
-        if (context.response().isPresent()) {
-            snapshot.put("responseStatus", "success");
-            snapshot.put("tokensUsed", context.response().get().tokensUsed());
-        } else if (context.hasError()) {
-            snapshot.put("responseStatus", "error");
-            snapshot.put("errorType", context.error().get().getClass().getSimpleName());
-        }
-        
+        snapshot.put("requestId", context.token().getRequestId());
+        snapshot.put("tenantId", context.tenantContext().getTenantId().value());
+
+        context.getVariable("request", InferenceRequest.class)
+                .ifPresent(req -> snapshot.put("model", req.getModel()));
+
+        context.getVariable("response", InferenceResponse.class)
+                .ifPresentOrElse(
+                        resp -> {
+                            snapshot.put("responseStatus", "success");
+                            snapshot.put("tokensUsed", resp.getTokensUsed());
+                        },
+                        () -> {
+                            if (context.hasError()) {
+                                snapshot.put("responseStatus", "error");
+                                snapshot.put("errorType", context.getError().get().getClass().getSimpleName());
+                            }
+                        });
+
         return snapshot;
     }
 }

@@ -8,8 +8,8 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import tech.kayys.golek.api.inference.InferencePhase;
 import tech.kayys.golek.core.exception.IllegalStateTransitionException;
-import tech.kayys.golek.core.inference.InferencePhase;
 
 /**
  * Immutable execution token representing the current state

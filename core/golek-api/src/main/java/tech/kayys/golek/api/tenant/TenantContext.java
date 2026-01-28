@@ -11,8 +11,8 @@ import java.util.*;
  */
 public final class TenantContext {
 
-    @NotBlank
-    private final String tenantId;
+    @NotNull
+    private final TenantId tenantId;
 
     private final String userId;
     private final Set<String> roles;
@@ -20,7 +20,7 @@ public final class TenantContext {
 
     @JsonCreator
     public TenantContext(
-            @JsonProperty("tenantId") String tenantId,
+            @JsonProperty("tenantId") TenantId tenantId,
             @JsonProperty("userId") String userId,
             @JsonProperty("roles") Set<String> roles,
             @JsonProperty("attributes") Map<String, String> attributes) {
@@ -34,7 +34,7 @@ public final class TenantContext {
                 : Collections.emptyMap();
     }
 
-    public String getTenantId() {
+    public TenantId getTenantId() {
         return tenantId;
     }
 
@@ -59,11 +59,11 @@ public final class TenantContext {
     }
 
     // Factory method
-    public static TenantContext of(String tenantId) {
+    public static TenantContext of(TenantId tenantId) {
         return new TenantContext(tenantId, null, null, null);
     }
 
-    public static TenantContext of(String tenantId, String userId) {
+    public static TenantContext of(TenantId tenantId, String userId) {
         return new TenantContext(tenantId, userId, null, null);
     }
 
@@ -73,13 +73,18 @@ public final class TenantContext {
     }
 
     public static class Builder {
-        private String tenantId;
+        private TenantId tenantId;
         private String userId;
         private final Set<String> roles = new HashSet<>();
         private final Map<String, String> attributes = new HashMap<>();
 
-        public Builder tenantId(String tenantId) {
+        public Builder tenantId(TenantId tenantId) {
             this.tenantId = tenantId;
+            return this;
+        }
+
+        public Builder tenantId(String tenantId) {
+            this.tenantId = new TenantId(tenantId);
             return this;
         }
 

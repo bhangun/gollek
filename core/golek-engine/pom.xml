@@ -12,8 +12,8 @@
     <artifactId>golek-engine</artifactId>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
     </properties>
     <dependencies>
         <!-- Core API -->
@@ -39,7 +39,7 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-model-repo</artifactId>
+            <artifactId>golek-model-repo-core</artifactId>
             <version>${project.version}</version>
         </dependency>
 

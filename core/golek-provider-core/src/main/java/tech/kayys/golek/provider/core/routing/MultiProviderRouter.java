@@ -39,6 +39,9 @@ public class MultiProviderRouter {
     @Inject
     ModelProviderRegistry modelProviderRegistry;
 
+    @Inject
+    tech.kayys.golek.provider.core.quota.ProviderQuotaService providerQuotaService;
+
     private final Map<SelectionStrategy, ProviderSelector> strategies = new ConcurrentHashMap<>();
     private RoutingConfig config = RoutingConfig.defaults();
 
@@ -169,7 +172,12 @@ public class MultiProviderRouter {
 
         // Filter by health
         providers = providers.stream()
-                .filter(p -> p.health().isHealthy())
+                .filter(p -> p.health().await().atMost(java.time.Duration.ofMillis(500)).isHealthy())
+                .collect(Collectors.toList());
+
+        // Filter by quota
+        providers = providers.stream()
+                .filter(p -> providerQuotaService.hasQuota(p.id()))
                 .collect(Collectors.toList());
 
         LOG.debugf("Found %d candidate providers for model %s", providers.size(), modelId);

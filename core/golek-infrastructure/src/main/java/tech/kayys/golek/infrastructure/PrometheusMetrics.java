@@ -3,87 +3,68 @@ package tech.kayys.golek.infrastructure;
 import io.micrometer.core.instrument.*;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import tech.kayys.golek.api.observability.MetricsCollector;
+import tech.kayys.golek.api.tenant.TenantId;
+import java.time.Duration;
 
 /**
- * Centralized metrics collection.
+ * Centralized metrics collection using Micrometer.
  */
 @ApplicationScoped
 public class PrometheusMetrics implements MetricsCollector {
 
-    @Inject
-    MeterRegistry registry;
+        @Inject
+        MeterRegistry registry;
 
-    private final Counter inferenceCounter;
-    private final Timer inferenceTimer;
-    private final Counter errorCounter;
-    private final Gauge activeRequests;
+        public PrometheusMetrics() {
+                // Required for CDI proxying
+        }
 
-    public PrometheusMetrics(MeterRegistry registry) {
-        this.registry = registry;
+        public PrometheusMetrics(MeterRegistry registry) {
+                this.registry = registry;
+        }
 
-        this.inferenceCounter = Counter.builder("inference.requests.total")
-                .description("Total inference requests")
-                .tags("status", "provider", "model", "tenant")
-                .register(registry);
+        @Override
+        public void recordSuccess(
+                        String provider,
+                        String model,
+                        TenantId tenant,
+                        Duration duration) {
 
-        this.inferenceTimer = Timer.builder("inference.duration")
-                .description("Inference request duration")
-                .tags("provider", "model", "tenant")
-                .register(registry);
+                Tags tags = Tags.of(
+                                "status", "success",
+                                "provider", provider,
+                                "model", model,
+                                "tenant", tenant.value());
 
-        this.errorCounter = Counter.builder("inference.errors.total")
-                .description("Total inference errors")
-                .tags("type", "provider", "tenant")
-                .register(registry);
+                registry.counter("inference.requests.total", tags).increment();
+                registry.timer("inference.duration", tags).record(duration);
+        }
 
-        this.activeRequests = Gauge.builder("inference.requests.active",
-                this::getActiveRequests)
-                .description("Active inference requests")
-                .register(registry);
-    }
+        @Override
+        public void recordFailure(
+                        String provider,
+                        String model,
+                        TenantId tenant,
+                        String errorType) {
 
-    @Override
-    public void recordSuccess(
-            String provider,
-            String model,
-            TenantId tenant,
-            Duration duration) {
-        inferenceCounter.increment(
-                Tags.of(
-                        "status", "success",
-                        "provider", provider,
-                        "model", model,
-                        "tenant", tenant.value()));
+                Tags tags = Tags.of(
+                                "status", "failure",
+                                "provider", provider,
+                                "model", model,
+                                "tenant", tenant.value());
 
-        inferenceTimer.record(duration,
-                Tags.of(
-                        "provider", provider,
-                        "model", model,
-                        "tenant", tenant.value()));
-    }
+                registry.counter("inference.requests.total", tags).increment();
 
-    @Override
-    public void recordFailure(
-            String provider,
-            String model,
-            TenantId tenant,
-            String errorType) {
-        inferenceCounter.increment(
-                Tags.of(
-                        "status", "failure",
-                        "provider", provider,
-                        "model", model,
-                        "tenant", tenant.value()));
+                Tags errorTags = Tags.of(
+                                "type", errorType,
+                                "provider", provider,
+                                "tenant", tenant.value());
+                registry.counter("inference.errors.total", errorTags).increment();
+        }
 
-        errorCounter.increment(
-                Tags.of(
-                        "type", errorType,
-                        "provider", provider,
-                        "tenant", tenant.value()));
-    }
-
-    private int getActiveRequests() {
-        // Implementation to track active requests
-        return 0; // Placeholder
-    }
+        private int getActiveRequests() {
+                // Implementation to track active requests if needed
+                return 0;
+        }
 }

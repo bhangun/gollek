@@ -1,196 +1,106 @@
 package tech.kayys.golek.provider.ollama;
 
-import io.smallrye.config.ConfigMapping;
-import io.smallrye.config.WithDefault;
-import io.smallrye.config.WithName;
-import java.time.Duration;
-import java.util.Optional;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
-import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.Tracer;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Retry;
-import org.eclipse.microprofile.faulttolerance.Timeout;
-import org.jboss.logging.Logger;
-import tech.kayys.wayang.inference.api.*;
-import tech.kayys.wayang.inference.kernel.provider.LLMProvider;
-import tech.kayys.wayang.inference.kernel.provider.ProviderCapabilities;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import tech.kayys.wayang.inference.kernel.provider.StreamingLLMProvider;
-import tech.kayys.wayang.inference.providers.openai.exception.OpenAIException;
-import tech.kayys.wayang.inference.providers.openai.mapper.RequestMapper;
-import tech.kayys.wayang.inference.providers.openai.mapper.ResponseMapper;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIRequest;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIResponse;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIStreamChunk;
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.MediaType;
-import org.eclipse.microprofile.rest.client.annotation.RegisterProvider;
-import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIRequest;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIResponse;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIStreamChunk;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.List;
-import java.util.Map;
-import jakarta.enterprise.context.ApplicationScoped;
-import tech.kayys.wayang.inference.api.Message;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIMessage;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIRequest;
-import java.util.stream.Collectors;
-import tech.kayys.wayang.inference.api.ErrorPayload;
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Response;
-import org.eclipse.microprofile.rest.client.ext.ResponseExceptionMapper;
-import tech.kayys.wayang.inference.providers.openai.exception.OpenAIException;
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.mockito.InjectMock;
-import io.smallrye.mutiny.Uni;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
-import tech.kayys.wayang.inference.api.*;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIResponse;
-import java.util.List;
-import org.junit.jupiter.api.Assertions.*;
-import org.mockito.ArgumentMatchers.any;
-import org.mockito.ArgumentMatchers.anyString;
-import org.mockito.Mockito.when;
-import io.smallrye.config.ConfigMapping;
-import io.smallrye.config.WithDefault;
-import io.smallrye.config.WithName;
-import java.time.Duration;
-import java.util.Optional;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.ArrayList;
-import java.util.List;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.ArrayList;
-import java.util.List;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.ArrayList;
-import java.util.List;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.MediaType;
-import org.eclipse.microprofile.rest.client.annotation.RegisterProvider;
-import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
-import tech.kayys.wayang.inference.providers.cerebras.exception.CerebrasClientExceptionMapper;
-import tech.kayys.wayang.inference.providers.cerebras.model.CerebrasRequest;
-import tech.kayys.wayang.inference.providers.cerebras.model.CerebrasResponse;
-import tech.kayys.wayang.inference.providers.cerebras.model.CerebrasStreamChunk;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
-import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.Tracer;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Retry;
-import org.eclipse.microprofile.faulttolerance.Timeout;
-import org.jboss.logging.Logger;
-import tech.kayys.wayang.inference.api.*;
-import tech.kayys.wayang.inference.kernel.provider.ProviderCapabilities;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import tech.kayys.wayang.inference.kernel.provider.StreamingLLMProvider;
-import tech.kayys.wayang.inference.providers.cerebras.exception.CerebrasException;
-import tech.kayys.wayang.inference.providers.cerebras.mapper.RequestMapper;
-import tech.kayys.wayang.inference.providers.cerebras.mapper.ResponseMapper;
-import tech.kayys.wayang.inference.providers.cerebras.model.CerebrasRequest;
-import tech.kayys.wayang.inference.providers.cerebras.model.CerebrasResponse;
-import tech.kayys.wayang.inference.providers.cerebras.model.CerebrasStreamChunk;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import tech.kayys.wayang.inference.api.ErrorPayload;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
-import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.Tracer;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Retry;
-import org.eclipse.microprofile.faulttolerance.Timeout;
-import org.jboss.logging.Logger;
-import tech.kayys.wayang.inference.api.*;
-import tech.kayys.wayang.inference.kernel.provider.ProviderCapabilities;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import tech.kayys.wayang.inference.kernel.provider.StreamingLLMProvider;
-import tech.kayys.wayang.inference.providers.common.config.ProviderConfig;
-import tech.kayys.wayang.inference.providers.common.metrics.ProviderMetrics;
-import tech.kayys.wayang.inference.providers.common.audit.ProviderAuditor;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Tag;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import tech.kayys.wayang.inference.api.InferenceResponse;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import java.time.Duration;
-import java.util.Arrays;
-import jakarta.enterprise.context.ApplicationScoped;
-import org.jboss.logging.Logger;
-import tech.kayys.wayang.inference.api.AuditPayload;
-import tech.kayys.wayang.inference.api.InferenceResponse;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import tech.kayys.wayang.inference.api.ErrorPayload;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import tech.kayys.wayang.inference.api.Message;
-import tech.kayys.wayang.inference.api.StreamChunk;
-import tech.kayys.wayang.inference.api.InferenceResponse;
-import tech.kayys.wayang.inference.api.TenantContext;
-import tech.kayys.wayang.inference.kernel.provider.ProviderCapabilities;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import tech.kayys.wayang.inference.providers.common.AbstractLLMProvider;
-import tech.kayys.wayang.inference.providers.common.config.ProviderConfig;
-import tech.kayys.wayang.inference.providers.ollama.model.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.MediaType;
-import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
-import tech.kayys.wayang.inference.providers.ollama.model.*;
 
+/**
+ * Ollama generation options
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class OllamaOptions {
 
-    @JsonProperty("temperature")
     private Double temperature;
 
     @JsonProperty("top_p")
     private Double topP;
 
+    @JsonProperty("top_k")
+    private Integer topK;
+
     @JsonProperty("num_predict")
     private Integer numPredict;
 
-    // Builder, getters, setters
+    @JsonProperty("num_ctx")
+    private Integer numCtx;
 
+    @JsonProperty("num_gpu")
+    private Integer numGpu;
+
+    @JsonProperty("repeat_penalty")
+    private Double repeatPenalty;
+
+    private Integer seed;
+    private String[] stop;
+
+    public Double getTemperature() {
+        return temperature;
+    }
+
+    public void setTemperature(Double temperature) {
+        this.temperature = temperature;
+    }
+
+    public Double getTopP() {
+        return topP;
+    }
+
+    public void setTopP(Double topP) {
+        this.topP = topP;
+    }
+
+    public Integer getTopK() {
+        return topK;
+    }
+
+    public void setTopK(Integer topK) {
+        this.topK = topK;
+    }
+
+    public Integer getNumPredict() {
+        return numPredict;
+    }
+
+    public void setNumPredict(Integer numPredict) {
+        this.numPredict = numPredict;
+    }
+
+    public Integer getNumCtx() {
+        return numCtx;
+    }
+
+    public void setNumCtx(Integer numCtx) {
+        this.numCtx = numCtx;
+    }
+
+    public Integer getNumGpu() {
+        return numGpu;
+    }
+
+    public void setNumGpu(Integer numGpu) {
+        this.numGpu = numGpu;
+    }
+
+    public Double getRepeatPenalty() {
+        return repeatPenalty;
+    }
+
+    public void setRepeatPenalty(Double repeatPenalty) {
+        this.repeatPenalty = repeatPenalty;
+    }
+
+    public Integer getSeed() {
+        return seed;
+    }
+
+    public void setSeed(Integer seed) {
+        this.seed = seed;
+    }
+
+    public String[] getStop() {
+        return stop;
+    }
+
+    public void setStop(String[] stop) {
+        this.stop = stop;
+    }
 }

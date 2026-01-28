@@ -11,7 +11,7 @@
 
     <groupId>tech.kayys.golek</groupId>
     <artifactId>golek-provider-local-vllm</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>

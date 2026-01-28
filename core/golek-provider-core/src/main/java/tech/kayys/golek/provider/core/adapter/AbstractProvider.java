@@ -41,6 +41,9 @@ public abstract class AbstractProvider implements LLMProvider {
     // Store provider config to access metadata if needed
     protected ProviderConfig providerConfig;
 
+    @jakarta.inject.Inject
+    protected tech.kayys.golek.provider.core.quota.ProviderQuotaService quotaService;
+
     @ConfigProperty(name = "provider.health.cache.duration", defaultValue = "PT30S")
     protected Duration healthCacheDuration;
 
@@ -83,11 +86,26 @@ public abstract class AbstractProvider implements LLMProvider {
                     new ProviderException(id(), "Provider not initialized"));
         }
 
-        String tenantId = context != null ? context.getTenantId() : "default";
+        String tenantId = context != null ? context.getTenantId().value() : "default";
 
-        return checkRateLimit(tenantId)
+        return checkQuota(tenantId)
+                .chain(() -> checkRateLimit(tenantId))
                 .chain(() -> executeWithCircuitBreaker(request, context))
+                .invoke(response -> quotaService.recordUsage(id(), response.getTokensUsed()))
                 .onFailure().transform(this::handleFailure);
+    }
+
+    /**
+     * Check if provider has quota
+     */
+    protected Uni<Void> checkQuota(String tenantId) {
+        return Uni.createFrom().item(() -> {
+            if (!quotaService.hasQuota(id())) {
+                throw new tech.kayys.golek.api.routing.QuotaExhaustedException(id(),
+                        "Provider quota exhausted for: " + id());
+            }
+            return null;
+        });
     }
 
     @Override
@@ -177,7 +195,7 @@ public abstract class AbstractProvider implements LLMProvider {
     protected Uni<InferenceResponse> executeWithCircuitBreaker(
             ProviderRequest request,
             TenantContext context) {
-        String tenantId = context != null ? context.getTenantId() : "default";
+        String tenantId = context != null ? context.getTenantId().value() : "default";
 
         CircuitBreaker circuitBreaker = circuitBreakers.computeIfAbsent(
                 tenantId,

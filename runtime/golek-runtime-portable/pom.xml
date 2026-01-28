@@ -32,17 +32,11 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Core module -->
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-core</artifactId>
-            <version>${project.version}</version>
-        </dependency>
 
         <!-- Provider SPI -->
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-api</artifactId>
+            <artifactId>golek-provider-core</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -67,7 +61,7 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-resteasy-reactive-jackson</artifactId>
+            <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
