@@ -1,5 +1,6 @@
 package tech.kayys.golek.core.inference;
 
+import tech.kayys.golek.api.inference.InferencePhase;
 import tech.kayys.golek.core.execution.ExecutionContext;
 
 /**

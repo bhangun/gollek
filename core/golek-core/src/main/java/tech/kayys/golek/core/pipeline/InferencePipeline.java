@@ -1,8 +1,8 @@
 package tech.kayys.golek.core.pipeline;
 
 import io.smallrye.mutiny.Uni;
+import tech.kayys.golek.api.inference.InferencePhase;
 import tech.kayys.golek.core.execution.ExecutionContext;
-import tech.kayys.golek.core.inference.InferencePhase;
 
 /**
  * Pipeline that executes all phases in order.

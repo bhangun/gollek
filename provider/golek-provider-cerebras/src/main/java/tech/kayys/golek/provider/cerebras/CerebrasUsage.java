@@ -1,28 +1,53 @@
 package tech.kayys.golek.provider.cerebras;
 
-import java.time.Duration;
-import java.util.Optional;
-
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.List;
 
+/**
+ * Cerebras usage DTO
+ */
 public class CerebrasUsage {
 
     @JsonProperty("prompt_tokens")
-    private Integer promptTokens;
+    private int promptTokens;
 
     @JsonProperty("completion_tokens")
-    private Integer completionTokens;
+    private int completionTokens;
 
     @JsonProperty("total_tokens")
-    private Integer totalTokens;
+    private int totalTokens;
 
-    public Integer getPromptTokens() { return promptTokens; 
+    @JsonProperty("time_info")
+    private CerebrasTimeInfo timeInfo;
+
+    public int getPromptTokens() {
+        return promptTokens;
+    }
+
+    public void setPromptTokens(int promptTokens) {
+        this.promptTokens = promptTokens;
+    }
+
+    public int getCompletionTokens() {
+        return completionTokens;
+    }
+
+    public void setCompletionTokens(int completionTokens) {
+        this.completionTokens = completionTokens;
+    }
+
+    public int getTotalTokens() {
+        return totalTokens;
+    }
+
+    public void setTotalTokens(int totalTokens) {
+        this.totalTokens = totalTokens;
+    }
+
+    public CerebrasTimeInfo getTimeInfo() {
+        return timeInfo;
+    }
+
+    public void setTimeInfo(CerebrasTimeInfo timeInfo) {
+        this.timeInfo = timeInfo;
+    }
 }

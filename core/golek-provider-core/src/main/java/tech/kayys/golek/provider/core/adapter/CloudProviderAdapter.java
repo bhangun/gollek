@@ -24,6 +24,31 @@ public abstract class CloudProviderAdapter extends AbstractProvider {
     protected final AtomicLong totalRequests = new AtomicLong();
     protected final AtomicLong totalErrors = new AtomicLong();
 
+    @jakarta.inject.Inject
+    tech.kayys.golek.provider.core.quota.ProviderQuotaService quotaService;
+
+    @Override
+    protected Throwable handleFailure(Throwable ex) {
+        if (ex instanceof jakarta.ws.rs.WebApplicationException) {
+            jakarta.ws.rs.WebApplicationException webEx = (jakarta.ws.rs.WebApplicationException) ex;
+            if (webEx.getResponse().getStatus() == 429) {
+                // Report exhaustion
+                long retryAfter = 60; // Default
+                String retryAfterHeader = webEx.getResponse().getHeaderString("Retry-After");
+                if (retryAfterHeader != null) {
+                    try {
+                        retryAfter = Long.parseLong(retryAfterHeader);
+                    } catch (NumberFormatException e) {
+                        // ignore
+                    }
+                }
+                quotaService.reportExhaustion(id(), retryAfter);
+                return new tech.kayys.golek.api.routing.QuotaExhaustedException(id(), "Provider quota exhausted (429)");
+            }
+        }
+        return super.handleFailure(ex);
+    }
+
     @Override
     protected Uni<Void> doInitialize(Map<String, Object> config, TenantContext tenant) {
         return Uni.createFrom().item(() -> {

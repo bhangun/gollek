@@ -1,189 +1,20 @@
 package tech.kayys.golek.provider.ollama;
 
-import io.smallrye.config.ConfigMapping;
-import io.smallrye.config.WithDefault;
-import io.smallrye.config.WithName;
-import java.time.Duration;
-import java.util.Optional;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
-import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.Tracer;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Retry;
-import org.eclipse.microprofile.faulttolerance.Timeout;
-import org.jboss.logging.Logger;
-import tech.kayys.wayang.inference.api.*;
-import tech.kayys.wayang.inference.kernel.provider.LLMProvider;
-import tech.kayys.wayang.inference.kernel.provider.ProviderCapabilities;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import tech.kayys.wayang.inference.kernel.provider.StreamingLLMProvider;
-import tech.kayys.wayang.inference.providers.openai.exception.OpenAIException;
-import tech.kayys.wayang.inference.providers.openai.mapper.RequestMapper;
-import tech.kayys.wayang.inference.providers.openai.mapper.ResponseMapper;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIRequest;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIResponse;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIStreamChunk;
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.MediaType;
-import org.eclipse.microprofile.rest.client.annotation.RegisterProvider;
-import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIRequest;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIResponse;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIStreamChunk;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.List;
-import java.util.Map;
-import jakarta.enterprise.context.ApplicationScoped;
-import tech.kayys.wayang.inference.api.Message;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIMessage;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIRequest;
-import java.util.stream.Collectors;
-import tech.kayys.wayang.inference.api.ErrorPayload;
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Response;
-import org.eclipse.microprofile.rest.client.ext.ResponseExceptionMapper;
-import tech.kayys.wayang.inference.providers.openai.exception.OpenAIException;
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.mockito.InjectMock;
-import io.smallrye.mutiny.Uni;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
-import tech.kayys.wayang.inference.api.*;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import tech.kayys.wayang.inference.providers.openai.model.OpenAIResponse;
-import java.util.List;
-import org.junit.jupiter.api.Assertions.*;
-import org.mockito.ArgumentMatchers.any;
-import org.mockito.ArgumentMatchers.anyString;
-import org.mockito.Mockito.when;
-import io.smallrye.config.ConfigMapping;
-import io.smallrye.config.WithDefault;
-import io.smallrye.config.WithName;
-import java.time.Duration;
-import java.util.Optional;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.ArrayList;
-import java.util.List;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.ArrayList;
-import java.util.List;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.ArrayList;
-import java.util.List;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.MediaType;
-import org.eclipse.microprofile.rest.client.annotation.RegisterProvider;
-import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
-import tech.kayys.wayang.inference.providers.cerebras.exception.CerebrasClientExceptionMapper;
-import tech.kayys.wayang.inference.providers.cerebras.model.CerebrasRequest;
-import tech.kayys.wayang.inference.providers.cerebras.model.CerebrasResponse;
-import tech.kayys.wayang.inference.providers.cerebras.model.CerebrasStreamChunk;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
-import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.Tracer;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Retry;
-import org.eclipse.microprofile.faulttolerance.Timeout;
-import org.jboss.logging.Logger;
-import tech.kayys.wayang.inference.api.*;
-import tech.kayys.wayang.inference.kernel.provider.ProviderCapabilities;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import tech.kayys.wayang.inference.kernel.provider.StreamingLLMProvider;
-import tech.kayys.wayang.inference.providers.cerebras.exception.CerebrasException;
-import tech.kayys.wayang.inference.providers.cerebras.mapper.RequestMapper;
-import tech.kayys.wayang.inference.providers.cerebras.mapper.ResponseMapper;
-import tech.kayys.wayang.inference.providers.cerebras.model.CerebrasRequest;
-import tech.kayys.wayang.inference.providers.cerebras.model.CerebrasResponse;
-import tech.kayys.wayang.inference.providers.cerebras.model.CerebrasStreamChunk;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import tech.kayys.wayang.inference.api.ErrorPayload;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
-import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.Tracer;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Retry;
-import org.eclipse.microprofile.faulttolerance.Timeout;
-import org.jboss.logging.Logger;
-import tech.kayys.wayang.inference.api.*;
-import tech.kayys.wayang.inference.kernel.provider.ProviderCapabilities;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import tech.kayys.wayang.inference.kernel.provider.StreamingLLMProvider;
-import tech.kayys.wayang.inference.providers.common.config.ProviderConfig;
-import tech.kayys.wayang.inference.providers.common.metrics.ProviderMetrics;
-import tech.kayys.wayang.inference.providers.common.audit.ProviderAuditor;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Tag;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import tech.kayys.wayang.inference.api.InferenceResponse;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import java.time.Duration;
-import java.util.Arrays;
-import jakarta.enterprise.context.ApplicationScoped;
-import org.jboss.logging.Logger;
-import tech.kayys.wayang.inference.api.AuditPayload;
-import tech.kayys.wayang.inference.api.InferenceResponse;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import tech.kayys.wayang.inference.api.ErrorPayload;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import tech.kayys.wayang.inference.api.Message;
-import tech.kayys.wayang.inference.api.StreamChunk;
-import tech.kayys.wayang.inference.api.InferenceResponse;
-import tech.kayys.wayang.inference.api.TenantContext;
-import tech.kayys.wayang.inference.kernel.provider.ProviderCapabilities;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRequest;
-import tech.kayys.wayang.inference.providers.common.AbstractLLMProvider;
-import tech.kayys.wayang.inference.providers.common.config.ProviderConfig;
-import tech.kayys.wayang.inference.providers.ollama.model.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
-import tech.kayys.wayang.inference.providers.ollama.model.*;
 
+/**
+ * REST client for Ollama API
+ */
+@RegisterRestClient(configKey = "ollama-api")
+@Path("/api")
 public interface OllamaClient {
 
     /**
-     * Chat completion (non-streaming)
+     * Chat completion
      */
     @POST
     @Path("/chat")
@@ -192,13 +23,22 @@ public interface OllamaClient {
     Uni<OllamaResponse> chat(OllamaRequest request);
 
     /**
-     * Chat completion (streaming)
+     * Streaming chat completion
      */
     @POST
     @Path("/chat")
     @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON) // Ollama uses newline-delimited JSON
+    @Produces(MediaType.APPLICATION_JSON)
     Multi<OllamaStreamChunk> chatStream(OllamaRequest request);
+
+    /**
+     * Generate embeddings
+     */
+    @POST
+    @Path("/embeddings")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    Uni<OllamaEmbeddingResponse> embeddings(OllamaEmbeddingRequest request);
 
     /**
      * List available models
@@ -209,12 +49,20 @@ public interface OllamaClient {
     Uni<OllamaModelsResponse> listModels();
 
     /**
+     * Show model info
+     */
+    @POST
+    @Path("/show")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    Uni<OllamaModelInfo> showModel(OllamaShowRequest request);
+
+    /**
      * Pull a model
      */
     @POST
     @Path("/pull")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    Multi<OllamaPullResponse> pullModel(OllamaPullRequest request);
-
+    Multi<OllamaPullProgress> pullModel(OllamaPullRequest request);
 }

@@ -36,13 +36,14 @@
         <module>core/golek-core</module>
         <module>core/golek-engine</module>
         <module>core/golek-infrastructure</module>
-        <module>core/golek-mcp-core</module>
-        <module>core/golek-memory-core</module>
+
+        <module>features</module>
+
         <module>core/golek-model-repo-core</module>
         <module>core/golek-plugin-api</module>
         <module>core/golek-provider-core</module>
 
-        <module>runtime/golek-runtime</module>
+        <module>runtime/golek-runtime-distributed</module>
         <module>runtime/golek-runtime-portable</module>
     </modules>
 
