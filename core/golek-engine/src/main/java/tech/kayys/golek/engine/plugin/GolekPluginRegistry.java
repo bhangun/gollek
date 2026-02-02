@@ -1,89 +1,180 @@
 package tech.kayys.golek.engine.plugin;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
-import org.jboss.logging.Logger;
-import tech.kayys.golek.core.plugin.PluginManager;
-import tech.kayys.golek.plugin.api.GolekPlugin;
+import tech.kayys.golek.api.plugin.PluginRegistry;
+import tech.kayys.golek.api.plugin.GolekPlugin;
 
+import org.jboss.logging.Logger;
+
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
- * Registry facade for plugins.
- * Delegates to PluginManager in core.
+ * Concrete implementation of the PluginRegistry.
  */
 @ApplicationScoped
-public class GolekPluginRegistry {
+public class GolekPluginRegistry implements PluginRegistry {
 
     private static final Logger LOG = Logger.getLogger(GolekPluginRegistry.class);
 
     @Inject
-    PluginManager pluginManager;
+    Instance<GolekPlugin> pluginInstances;
 
-    /**
-     * Initialize registry and discover plugins
-     */
+    // Plugin cache: id -> plugin instance
+    private final Map<String, GolekPlugin> pluginCache = new ConcurrentHashMap<>();
+
+    // Initialization flag
+    private volatile boolean initialized = false;
+
+    @Override
     public void initialize() {
-        pluginManager.initialize();
+        if (initialized) {
+            return;
+        }
+
+        synchronized (this) {
+            if (initialized) {
+                return;
+            }
+
+            LOG.info("Initializing plugin registry");
+
+            pluginInstances.stream().forEach(plugin -> {
+                try {
+                    registerPlugin(plugin);
+                } catch (Exception e) {
+                    LOG.errorf(e, "Failed to register plugin: %s", plugin.id());
+                }
+            });
+
+            initialized = true;
+            LOG.infof("Plugin registry initialized with %d plugins",
+                    pluginCache.size());
+        }
     }
 
-    /**
-     * Register a plugin instance
-     */
+    @Override
     public void registerPlugin(GolekPlugin plugin) {
-        pluginManager.registerPlugin(plugin);
+        Objects.requireNonNull(plugin, "plugin cannot be null");
+
+        String id = plugin.id();
+        if (pluginCache.containsKey(id)) {
+            LOG.warnf("Plugin %s already registered, replacing", id);
+        }
+
+        pluginCache.put(id, plugin);
+        LOG.infof("Registered plugin: %s (version: %s, order: %d)",
+                id, plugin.version(), plugin.order());
     }
 
-    /**
-     * Unregister a plugin
-     */
+    @Override
     public void unregisterPlugin(String pluginId) {
-        pluginManager.unregisterPlugin(pluginId);
+        GolekPlugin removed = pluginCache.remove(pluginId);
+        if (removed != null) {
+            LOG.infof("Unregistered plugin: %s", pluginId);
+            try {
+                removed.shutdown();
+            } catch (Exception e) {
+                LOG.errorf(e, "Error shutting down plugin: %s", pluginId);
+            }
+        }
     }
 
-    /**
-     * Get all registered plugins
-     */
+    @Override
     public List<GolekPlugin> all() {
-        return (List<GolekPlugin>) pluginManager.getAllPlugins();
+        ensureInitialized();
+        return new ArrayList<>(pluginCache.values());
     }
 
-    /**
-     * Get plugins by type
-     */
+    @Override
+    @SuppressWarnings("unchecked")
     public <T extends GolekPlugin> List<T> byType(Class<T> type) {
-        return pluginManager.getPluginsByType(type);
+        ensureInitialized();
+        return pluginCache.values().stream()
+                .filter(type::isInstance)
+                .map(p -> (T) p)
+                .sorted(Comparator.comparing(GolekPlugin::order))
+                .collect(Collectors.toList());
     }
 
-    /**
-     * Get plugin by ID
-     */
+    @Override
     public Optional<GolekPlugin> byId(String pluginId) {
-        return pluginManager.getPlugin(pluginId);
+        ensureInitialized();
+        return Optional.ofNullable(pluginCache.get(pluginId));
     }
 
-    /**
-     * Reload a specific plugin
-     */
+    @Override
     public void reload(String pluginId) {
-        // Reload logic would be delegated to PluginManager if supported
-        // For now, we can stop and start if granular reload isn't needed,
-        // or just log that it's not fully supported.
-        LOG.warnf("Reload not fully implemented in facade for %s", pluginId);
+        LOG.infof("Reloading plugin: %s", pluginId);
+
+        Optional<GolekPlugin> existing = byId(pluginId);
+        if (existing.isEmpty()) {
+            LOG.warnf("Plugin %s not found for reload", pluginId);
+            return;
+        }
+
+        GolekPlugin plugin = existing.get();
+
+        try {
+            plugin.shutdown();
+            plugin.initialize(null);
+            LOG.infof("Plugin %s reloaded successfully", pluginId);
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to reload plugin: %s", pluginId);
+            throw new RuntimeException("Failed to reload plugin: " + pluginId, e);
+        }
     }
 
-    /**
-     * Check overall plugin health
-     */
+    @Override
+    public List<GolekPlugin.PluginMetadata> listMetadata() {
+        return all().stream()
+                .map(GolekPlugin::metadata)
+                .sorted(Comparator.comparing(GolekPlugin.PluginMetadata::order))
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public boolean isHealthy() {
         return all().stream().allMatch(GolekPlugin::isHealthy);
     }
 
-    /**
-     * Shutdown all plugins
-     */
+    @Override
+    public List<String> unhealthyPlugins() {
+        return all().stream()
+                .filter(p -> !p.isHealthy())
+                .map(GolekPlugin::id)
+                .collect(Collectors.toList());
+    }
+
+    private void ensureInitialized() {
+        if (!initialized) {
+            initialize();
+        }
+    }
+
+    @Override
     public void shutdownAll() {
-        pluginManager.shutdown();
+        LOG.info("Shutting down all plugins");
+
+        pluginCache.values().forEach(plugin -> {
+            try {
+                plugin.shutdown();
+            } catch (Exception e) {
+                LOG.errorf(e, "Error shutting down plugin: %s", plugin.id());
+            }
+        });
+
+        pluginCache.clear();
+        initialized = false;
+
+        LOG.info("All plugins shut down");
     }
 }

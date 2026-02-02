@@ -2,9 +2,10 @@ package tech.kayys.golek.runtime.security;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.core.SecurityContext;
+import tech.kayys.wayang.tenant.TenantContext;
+
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.jboss.logging.Logger;
-import tech.kayys.golek.api.tenant.TenantContext;
 
 import java.util.Set;
 

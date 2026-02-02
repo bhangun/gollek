@@ -1,11 +1,12 @@
-package tech.kayys.golek.core.inference;
+package tech.kayys.golek.engine.inference;
 
 import io.quarkus.runtime.ShutdownEvent;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import tech.kayys.golek.core.engine.EngineContext;
+import tech.kayys.golek.engine.context.EngineContext;
+import tech.kayys.golek.engine.plugin.PluginLoader;
 
 import org.jboss.logging.Logger;
 

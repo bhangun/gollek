@@ -1,10 +1,18 @@
-package tech.kayys.golek.core.inference;
+package tech.kayys.golek.engine.resource;
 
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
+import tech.kayys.golek.api.Message;
+import tech.kayys.golek.api.context.RequestContext;
+import tech.kayys.golek.api.inference.InferenceRequest;
+import tech.kayys.golek.engine.inference.InferenceOrchestrator;
+import tech.kayys.golek.engine.routing.ModelRouterService;
+import tech.kayys.wayang.tenant.TenantContext;
+
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -13,12 +21,7 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
 import org.jboss.resteasy.reactive.RestStreamElementType;
-import *;
-import tech.kayys.wayang.inference.core.service.InferenceOrchestrator;
-import tech.kayys.wayang.inference.core.service.ModelRouterService;
-import tech.kayys.wayang.inference.platform.rest.dto.*;
-import tech.kayys.wayang.inference.platform.rest.filter.TenantContext;
-
+import tech.kayys.golek.engine.resource.dto.*;
 import java.util.UUID;
 
 /**
@@ -68,7 +71,7 @@ public class InferenceResource {
                                                         .toList())
                                         .parameters(request.parameters())
                                         .streaming(false)
-                                        .timeout(request.timeout())
+                                        .timeout(java.time.Duration.ofMillis(request.timeout()))
                                         .priority(request.priority())
                                         .build();
 

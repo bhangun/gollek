@@ -1,14 +1,13 @@
 package tech.kayys.golek.engine.model;
 
-import tech.kayys.golek.core.provider.LLMProvider;
-
 import java.time.Duration;
 
+import tech.kayys.golek.provider.core.spi.LLMProvider;
+
 public record ProviderCandidate(
-        String providerId,
-        LLMProvider provider,
-        int score,
-        Duration estimatedLatency,
-        double estimatedCost
-) {
+                String providerId,
+                LLMProvider provider,
+                int score,
+                Duration estimatedLatency,
+                double estimatedCost) {
 }

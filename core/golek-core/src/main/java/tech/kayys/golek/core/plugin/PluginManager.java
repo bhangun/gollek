@@ -2,8 +2,8 @@ package tech.kayys.golek.core.plugin;
 
 import io.smallrye.mutiny.Uni;
 import org.jboss.logging.Logger;
-import tech.kayys.golek.plugin.api.GolekPlugin;
-import tech.kayys.golek.plugin.api.PluginContext;
+import tech.kayys.golek.api.plugin.GolekPlugin;
+import tech.kayys.golek.api.plugin.PluginContext;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -36,7 +36,8 @@ public class PluginManager {
         }
 
         synchronized (this) {
-            if (initialized) return;
+            if (initialized)
+                return;
 
             LOG.info("Initializing plugin manager");
 

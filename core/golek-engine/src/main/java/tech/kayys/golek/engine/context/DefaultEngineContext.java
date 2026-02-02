@@ -5,10 +5,12 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
+import tech.kayys.golek.api.context.EngineContext;
+import tech.kayys.golek.api.plugin.PluginRegistry;
+import tech.kayys.golek.api.provider.ProviderRegistry;
 import tech.kayys.golek.core.exception.IllegalStateTransitionException;
-import tech.kayys.golek.core.plugin.GolekPluginRegistry;
-import tech.kayys.golek.core.provider.ProviderRegistry;
-import tech.kayys.golek.core.engine.EngineContext;
+import tech.kayys.golek.engine.plugin.GolekPluginRegistry;
+import tech.kayys.golek.engine.registry.GolekProviderRegistry;
 
 /**
  * Default implementation of engine context.

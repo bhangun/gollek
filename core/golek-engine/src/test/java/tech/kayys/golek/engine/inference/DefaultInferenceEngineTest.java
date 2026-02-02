@@ -13,16 +13,15 @@ import java.util.Map;
 
 import tech.kayys.golek.api.inference.InferenceRequest;
 import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.tenant.TenantContext;
-import tech.kayys.golek.api.tenant.TenantId;
-import tech.kayys.golek.core.engine.EngineContext;
+import tech.kayys.golek.engine.context.EngineContext;
 import tech.kayys.golek.core.engine.EngineMetadata;
-import tech.kayys.golek.core.engine.HealthStatus;
-import tech.kayys.golek.core.execution.ExecutionStateMachine;
-import tech.kayys.golek.core.observability.InferenceMetricsCollector;
+import tech.kayys.golek.api.model.HealthStatus;
+import tech.kayys.golek.engine.execution.ExecutionStateMachine;
 import tech.kayys.golek.core.pipeline.InferencePipeline;
+import tech.kayys.golek.engine.observability.InferenceMetricsCollector;
+import tech.kayys.wayang.tenant.TenantContext;
+import tech.kayys.wayang.tenant.TenantId;
 import tech.kayys.golek.core.execution.ExecutionContext;
-import tech.kayys.golek.core.execution.DefaultExecutionContext;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -57,14 +56,14 @@ class DefaultInferenceEngineTest {
     @BeforeEach
     void setUp() {
         engine = new DefaultInferenceEngine();
-        
+
         // Use reflection or setter methods to inject mocks
         // Since the fields are injected, we'll need to use reflection or powermock
         // For now, let's create a custom constructor or use mockito to inject
-        
+
         // Mock the request
         when(request.requestId()).thenReturn("test-request-id");
-        
+
         // Mock the tenant context
         when(tenantContext.tenantId()).thenReturn(tenantId);
         when(tenantId.value()).thenReturn("test-tenant");
@@ -75,9 +74,9 @@ class DefaultInferenceEngineTest {
         // Arrange
         when(pipeline.execute(any(ExecutionContext.class)))
                 .thenReturn(Uni.createFrom().item(mock(ExecutionContext.class)));
-        
+
         when(stateMachine.next(any(), any())).thenReturn(mock(Object.class));
-        
+
         // Act
         Uni<InferenceResponse> result = engine.infer(request, tenantContext);
 
@@ -107,7 +106,8 @@ class DefaultInferenceEngineTest {
 
     @Test
     void testCalculateBackoff_ExponentialBackoff() {
-        // Use reflection to access the private method or make it package-private for testing
+        // Use reflection to access the private method or make it package-private for
+        // testing
         // For now, we'll skip this test or make the method visible for testing
         // This would require refactoring the DefaultInferenceEngine class
     }

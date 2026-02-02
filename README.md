@@ -1,4 +1,13 @@
 
+### ARCHITECTURE GOLEK INFERENCE SERVER
+
+```mermaid
+flowchart 
+
+```
+
+
+
 ### ✅ What This Architecture Delivers
 
 1. **True Plugin System**

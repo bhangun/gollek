@@ -26,7 +26,14 @@ public class WebSocketStreamHandler implements StreamHandler {
     public WebSocketStreamHandler(Vertx vertx, Duration timeout) {
         this.vertx = vertx;
         this.timeout = timeout;
-        this.httpClient = vertx.createHttpClient();
+
+        // Use the timeout to configure the HTTP client
+        io.vertx.core.http.HttpClientOptions options = new io.vertx.core.http.HttpClientOptions()
+                .setConnectTimeout((int) timeout.toMillis())
+                .setIdleTimeout((int) timeout.getSeconds())
+                .setKeepAlive(true);
+
+        this.httpClient = vertx.createHttpClient(options);
     }
 
     @Override
@@ -45,7 +52,8 @@ public class WebSocketStreamHandler implements StreamHandler {
                     .setHost(uri.getHost())
                     .setPort(uri.getPort() > 0 ? uri.getPort() : 443)
                     .setURI(uri.getPath())
-                    .setSsl("wss".equals(uri.getScheme()));
+                    .setSsl("wss".equals(uri.getScheme()))
+                    .setConnectTimeout((int) timeout.toMillis());
 
             httpClient.webSocket(options)
                     .subscribe().with(

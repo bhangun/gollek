@@ -10,8 +10,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.mockito.Mockito;
-import tech.kayys.golek.core.engine.EngineContext;
-import tech.kayys.golek.provider.core.plugin.*;
+import tech.kayys.golek.engine.context.EngineContext;
+import tech.kayys.golek.engine.inference.InferenceEngineBootstrap;
+import tech.kayys.golek.engine.plugin.DefaultPluginRegistry;
+import tech.kayys.golek.engine.plugin.PluginLoader;
+import tech.kayys.golek.plugin.api.GolekPlugin;
+import tech.kayys.golek.plugin.api.PluginContext;
 
 import java.time.Duration;
 import java.util.*;
@@ -23,7 +27,8 @@ import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for InferenceEngineBootstrap.
- * Tests configuration validation, plugin initialization, error handling, and metrics.
+ * Tests configuration validation, plugin initialization, error handling, and
+ * metrics.
  */
 @QuarkusTest
 @DisplayName("InferenceEngineBootstrap Tests")
@@ -49,10 +54,10 @@ class InferenceEngineBootstrapTest {
     @BeforeEach
     void setUp() {
         startupEvent = mock(StartupEvent.class);
-        
+
         // Reset counters and state
         Mockito.reset(engine, pluginLoader, pluginRegistry, engineContext);
-        
+
         // Default successful mocks
         when(engineContext.initialize()).thenReturn(Uni.createFrom().voidItem());
         when(pluginLoader.loadAll()).thenReturn(Uni.createFrom().item(5));
@@ -123,7 +128,7 @@ class InferenceEngineBootstrapTest {
         // Given - Create mock plugins
         GolekPlugin successPlugin = createMockPlugin("success-plugin", true);
         GolekPlugin failPlugin = createMockPlugin("fail-plugin", false);
-        
+
         when(pluginRegistry.getAllPlugins())
                 .thenReturn(Arrays.asList(successPlugin, failPlugin));
         when(pluginRegistry.count()).thenReturn(1); // Only 1 successful
@@ -133,7 +138,7 @@ class InferenceEngineBootstrapTest {
 
         // Then
         assertThat(bootstrap.isInitialized()).isTrue();
-        
+
         Map<String, Object> stats = bootstrap.getPluginStatistics();
         assertThat(stats.get("successful")).isEqualTo(1);
         assertThat(stats.get("failed")).isEqualTo(1);
@@ -177,7 +182,7 @@ class InferenceEngineBootstrapTest {
         Map<String, PluginHealth> healthMap = new HashMap<>();
         healthMap.put("plugin1", PluginHealth.healthy());
         healthMap.put("plugin2", PluginHealth.unhealthy("Test failure"));
-        
+
         when(pluginLoader.checkAllHealth()).thenReturn(healthMap);
 
         // When
@@ -196,7 +201,7 @@ class InferenceEngineBootstrapTest {
 
         // Then
         assertThat(bootstrap.isInitialized()).isTrue();
-        
+
         Map<String, Object> stats = bootstrap.getPluginStatistics();
         assertThat(stats).containsKeys("total", "successful", "failed");
         assertThat(stats.get("total")).isEqualTo(5);
@@ -219,8 +224,7 @@ class InferenceEngineBootstrapTest {
         DefaultPluginRegistry mockRegistry = mock(DefaultPluginRegistry.class);
         when(mockRegistry.count()).thenReturn(5);
         when(mockRegistry.getStatistics()).thenReturn(
-                new DefaultPluginRegistry.PluginStatistics(5, 3, Collections.emptyMap())
-        );
+                new DefaultPluginRegistry.PluginStatistics(5, 3, Collections.emptyMap()));
 
         // When
         bootstrap.onStart(startupEvent);
@@ -265,15 +269,14 @@ class InferenceEngineBootstrapTest {
         when(plugin.id()).thenReturn(id);
         when(plugin.name()).thenReturn(id);
         when(plugin.order()).thenReturn(100);
-        
+
         if (shouldSucceed) {
             when(plugin.initialize(any())).thenReturn(Uni.createFrom().voidItem());
         } else {
             when(plugin.initialize(any())).thenReturn(
-                    Uni.createFrom().failure(new RuntimeException("Plugin init failed"))
-            );
+                    Uni.createFrom().failure(new RuntimeException("Plugin init failed")));
         }
-        
+
         return plugin;
     }
 }

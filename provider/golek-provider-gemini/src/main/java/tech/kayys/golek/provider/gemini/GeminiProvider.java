@@ -14,9 +14,9 @@ import tech.kayys.golek.api.provider.ProviderHealth;
 import tech.kayys.golek.api.provider.ProviderMetadata;
 import tech.kayys.golek.api.provider.ProviderRequest;
 import tech.kayys.golek.api.stream.StreamChunk;
-import tech.kayys.golek.api.tenant.TenantContext;
 import tech.kayys.golek.provider.core.adapter.CloudProviderAdapter;
 import tech.kayys.golek.provider.core.spi.StreamingProvider;
+import tech.kayys.wayang.tenant.TenantContext;
 
 import java.time.Duration;
 import java.util.List;

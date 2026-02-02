@@ -1,6 +1,5 @@
 package tech.kayys.golek.provider.core.quota;
 
-import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Default;
 

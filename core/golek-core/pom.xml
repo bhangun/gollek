@@ -6,14 +6,15 @@
 
     <parent>
         <groupId>tech.kayys.golek</groupId>
-        <artifactId>golek-parent</artifactId>
+        <artifactId>golek-core-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
     <artifactId>golek-core</artifactId>
     <name>golek Core</name>
 
     <properties>
-
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
     </properties>
 
     <dependencies>

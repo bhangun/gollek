@@ -4,8 +4,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-import tech.kayys.golek.api.tenant.TenantId;
-
 /**
  * Immutable model manifest representing all metadata and artifacts
  * for a specific model version.
@@ -14,7 +12,7 @@ public record ModelManifest(
         String modelId,
         String name,
         String version,
-        TenantId tenantId,
+        String tenantId,
         Map<ModelFormat, ArtifactLocation> artifacts,
         List<SupportedDevice> supportedDevices,
         ResourceRequirements resourceRequirements,

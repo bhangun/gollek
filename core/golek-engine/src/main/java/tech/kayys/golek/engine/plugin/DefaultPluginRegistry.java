@@ -1,6 +1,9 @@
-package tech.kayys.golek.core.plugin;
+package tech.kayys.golek.engine.plugin;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import tech.kayys.golek.api.inference.InferencePhase;
+import tech.kayys.golek.core.plugin.InferencePhasePlugin;
+import tech.kayys.golek.plugin.api.GolekPlugin;
 
 import org.jboss.logging.Logger;
 
@@ -48,7 +51,7 @@ public class DefaultPluginRegistry implements PluginRegistry {
 
     @Override
     public void unregister(String pluginId) {
-        Plugin removed = plugins.remove(pluginId);
+        GolekPlugin removed = plugins.remove(pluginId);
         if (removed != null) {
             LOG.infof("Unregistered plugin: %s", pluginId);
 
@@ -75,7 +78,7 @@ public class DefaultPluginRegistry implements PluginRegistry {
 
     @Override
     @SuppressWarnings("unchecked")
-    public <T extends Plugin> List<T> getPluginsByType(Class<T> type) {
+    public <T extends GolekPlugin> List<T> getPluginsByType(Class<T> type) {
         return plugins.values().stream()
                 .filter(type::isInstance)
                 .map(p -> (T) p)

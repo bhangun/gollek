@@ -1,6 +1,5 @@
 package tech.kayys.golek.api.observability;
 
-import tech.kayys.golek.api.tenant.TenantId;
 import java.time.Duration;
 
 /**
@@ -8,15 +7,15 @@ import java.time.Duration;
  */
 public interface MetricsCollector {
 
-    void recordSuccess(
-            String provider,
-            String model,
-            TenantId tenant,
-            Duration duration);
+        void recordSuccess(
+                        String provider,
+                        String model,
+                        String tenant,
+                        Duration duration);
 
-    void recordFailure(
-            String provider,
-            String model,
-            TenantId tenant,
-            String errorType);
+        void recordFailure(
+                        String provider,
+                        String model,
+                        String tenant,
+                        String errorType);
 }

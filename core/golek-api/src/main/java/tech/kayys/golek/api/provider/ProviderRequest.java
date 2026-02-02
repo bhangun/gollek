@@ -6,8 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.jetbrains.annotations.Nullable;
 import tech.kayys.golek.api.Message;
-import tech.kayys.golek.api.tenant.TenantContext;
 import tech.kayys.golek.api.tool.ToolDefinition;
+import tech.kayys.wayang.tenant.TenantContext;
 
 import java.time.Duration;
 import java.util.*;

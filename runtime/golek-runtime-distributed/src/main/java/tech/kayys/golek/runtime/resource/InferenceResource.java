@@ -22,8 +22,8 @@ import java.util.UUID;
 
 // Import the required classes
 import tech.kayys.golek.api.inference.*;
-import tech.kayys.golek.api.tenant.TenantContext;
 import tech.kayys.golek.runtime.service.PlatformInferenceService;
+import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.runtime.security.TenantContextResolver;
 
 /**

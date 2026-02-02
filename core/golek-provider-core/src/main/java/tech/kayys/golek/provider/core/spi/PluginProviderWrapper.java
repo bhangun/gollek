@@ -7,8 +7,10 @@ import tech.kayys.golek.api.provider.ProviderConfig;
 import tech.kayys.golek.api.provider.ProviderHealth;
 import tech.kayys.golek.api.provider.ProviderMetadata;
 import tech.kayys.golek.api.provider.ProviderRequest;
-import tech.kayys.golek.api.tenant.TenantContext;
-import tech.kayys.golek.plugin.api.GolekPlugin;
+import tech.kayys.wayang.tenant.TenantContext;
+import tech.kayys.golek.api.plugin.GolekPlugin;
+import tech.kayys.golek.api.provider.LLMProvider;
+import tech.kayys.golek.api.exception.ProviderException;
 
 /**
  * Wrapper for providers that come from plugins
@@ -52,7 +54,7 @@ public class PluginProviderWrapper implements LLMProvider {
     }
 
     @Override
-    public void initialize(ProviderConfig config) throws ProviderInitializationException {
+    public void initialize(ProviderConfig config) throws ProviderException.ProviderInitializationException {
         delegate.initialize(config);
     }
 
