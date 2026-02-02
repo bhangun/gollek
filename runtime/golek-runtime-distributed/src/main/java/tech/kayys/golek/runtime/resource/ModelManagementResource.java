@@ -13,8 +13,8 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
 import tech.kayys.golek.runtime.service.ModelManagementService;
+import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.runtime.security.TenantContextResolver;
-import tech.kayys.golek.api.tenant.TenantContext;
 import tech.kayys.golek.api.model.ModelManifest;
 
 /**

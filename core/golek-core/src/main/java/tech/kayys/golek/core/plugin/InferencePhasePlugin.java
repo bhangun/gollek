@@ -1,7 +1,7 @@
 package tech.kayys.golek.core.plugin;
 
 import tech.kayys.golek.api.inference.InferencePhase;
-import tech.kayys.golek.core.engine.EngineContext;
+import tech.kayys.golek.api.context.EngineContext;
 import tech.kayys.golek.core.execution.ExecutionContext;
 import tech.kayys.golek.plugin.api.PluginException;
 

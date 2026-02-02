@@ -11,8 +11,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import tech.kayys.golek.provider.spi.ModelRunner;
 import tech.kayys.golek.provider.spi.exception.ModelLoadException;
+import tech.kayys.golek.provider.core.spi.ModelRunner;
 import tech.kayys.golek.provider.spi.exception.InferenceException;
 import tech.kayys.golek.provider.spi.model.ModelManifest;
 import tech.kayys.golek.provider.spi.model.ModelFormat;
@@ -68,10 +68,9 @@ public class OnnxRuntimeRunner implements ModelRunner {
 
     @Override
     public void initialize(
-        ModelManifest manifest,
-        Map<String, Object> config,
-        RequestContext context
-    ) throws ModelLoadException {
+            ModelManifest manifest,
+            Map<String, Object> config,
+            RequestContext context) throws ModelLoadException {
         try {
             // Validate inputs
             if (manifest == null) {
@@ -80,17 +79,15 @@ public class OnnxRuntimeRunner implements ModelRunner {
 
             if (!manifest.supportedFormats().contains(ModelFormat.ONNX)) {
                 throw new ModelLoadException(
-                    "Model " + manifest.modelId() + " does not support ONNX format"
-                );
+                        "Model " + manifest.modelId() + " does not support ONNX format");
             }
 
             this.manifest = manifest;
 
             // Download ONNX model
             Path modelPath = repository.downloadArtifact(
-                manifest,
-                ModelFormat.ONNX
-            );
+                    manifest,
+                    ModelFormat.ONNX);
 
             if (modelPath == null || !modelPath.toFile().exists()) {
                 throw new ModelLoadException("ONNX model file not found: " + modelPath);
@@ -115,31 +112,27 @@ public class OnnxRuntimeRunner implements ModelRunner {
 
             // Create session
             this.session = environment.createSession(
-                modelPath.toString(),
-                options
-            );
+                    modelPath.toString(),
+                    options);
 
             this.initialized = true;
 
             log.info("Initialized ONNX model {} with provider {}",
-                manifest.modelId(), provider);
+                    manifest.modelId(), provider);
 
         } catch (OrtException e) {
             throw new ModelLoadException(
-                "Failed to initialize ONNX Runtime: " + e.getMessage(), e
-            );
+                    "Failed to initialize ONNX Runtime: " + e.getMessage(), e);
         } catch (Exception e) {
             throw new ModelLoadException(
-                "Unexpected error during ONNX initialization: " + e.getMessage(), e
-            );
+                    "Unexpected error during ONNX initialization: " + e.getMessage(), e);
         }
     }
 
     @Override
     public InferenceResponse infer(
-        InferenceRequest request,
-        RequestContext context
-    ) throws InferenceException {
+            InferenceRequest request,
+            RequestContext context) throws InferenceException {
 
         if (!initialized) {
             throw new IllegalStateException("Runner not initialized");
@@ -166,11 +159,11 @@ public class OnnxRuntimeRunner implements ModelRunner {
             result.close();
 
             return InferenceResponse.builder()
-                .requestId(request.requestId())
-                .modelId(manifest.modelId())
-                .outputs(outputs)
-                .metadata("runner", "onnx")
-                .build();
+                    .requestId(request.requestId())
+                    .modelId(manifest.modelId())
+                    .outputs(outputs)
+                    .metadata("runner", "onnx")
+                    .build();
 
         } catch (OrtException e) {
             throw new InferenceException("ONNX inference failed: " + e.getMessage(), e);
@@ -181,19 +174,16 @@ public class OnnxRuntimeRunner implements ModelRunner {
 
     @Override
     public CompletionStage<InferenceResponse> inferAsync(
-        InferenceRequest request,
-        RequestContext context
-    ) {
+            InferenceRequest request,
+            RequestContext context) {
         return CompletableFuture.supplyAsync(
-            () -> infer(request, context)
-        );
+                () -> infer(request, context));
     }
 
     @Override
     public HealthStatus health() {
-        return initialized ?
-            HealthStatus.builder().up().withDetail("status", "running").build() :
-            HealthStatus.builder().down().withDetail("status", "not initialized").build();
+        return initialized ? HealthStatus.builder().up().withDetail("status", "running").build()
+                : HealthStatus.builder().down().withDetail("status", "not initialized").build();
     }
 
     @Override
@@ -201,8 +191,8 @@ public class OnnxRuntimeRunner implements ModelRunner {
         // ONNX Runtime doesn't expose direct memory metrics
         // Use JVM metrics or system monitoring
         return ResourceMetrics.builder()
-            .memoryUsedMb(estimateMemoryUsage())
-            .build();
+                .memoryUsedMb(estimateMemoryUsage())
+                .build();
     }
 
     @Override
@@ -218,15 +208,14 @@ public class OnnxRuntimeRunner implements ModelRunner {
         }
 
         return RunnerMetadata.builder()
-            .name("onnx")
-            .version(OrtEnvironment.getVersion())
-            .supportedFormats(List.of(ModelFormat.ONNX))
-            .supportedDevices(devices)
-            .executionMode(ExecutionMode.SYNCHRONOUS)
-            .capabilities(Map.of(
-                "execution_providers", providerSelector.getAvailableProviders()
-            ))
-            .build();
+                .name("onnx")
+                .version(OrtEnvironment.getVersion())
+                .supportedFormats(List.of(ModelFormat.ONNX))
+                .supportedDevices(devices)
+                .executionMode(ExecutionMode.SYNCHRONOUS)
+                .capabilities(Map.of(
+                        "execution_providers", providerSelector.getAvailableProviders()))
+                .build();
     }
 
     @Override
@@ -260,17 +249,15 @@ public class OnnxRuntimeRunner implements ModelRunner {
     }
 
     private void configureSessionOptions(
-        OrtSession.SessionOptions options,
-        String provider,
-        Map<String, Object> config
-    ) throws OrtException {
+            OrtSession.SessionOptions options,
+            String provider,
+            Map<String, Object> config) throws OrtException {
 
         // Set thread counts
         options.setInterOpNumThreads(
-            interOpThreads.orElse(1)
-        );
+                interOpThreads.orElse(1));
         options.setIntraOpNumThreads(
-            intraOpThreads.orElse(0) // 0 means use all available processors
+                intraOpThreads.orElse(0) // 0 means use all available processors
         );
 
         // Set execution provider
@@ -294,8 +281,7 @@ public class OnnxRuntimeRunner implements ModelRunner {
 
         // Optimization level
         options.setOptimizationLevel(
-            OrtSession.SessionOptions.OptLevel.ALL_OPT
-        );
+                OrtSession.SessionOptions.OptLevel.ALL_OPT);
 
         // Memory optimization
         options.setMemoryPatternOptimization(true);
@@ -303,8 +289,7 @@ public class OnnxRuntimeRunner implements ModelRunner {
     }
 
     private Map<String, OnnxTensor> convertInputs(
-        InferenceRequest request
-    ) throws OrtException {
+            InferenceRequest request) throws OrtException {
         // Convert request inputs to ONNX tensors
         // Implementation depends on model input schema
         Map<String, OnnxTensor> tensors = new HashMap<>();
@@ -317,34 +302,30 @@ public class OnnxRuntimeRunner implements ModelRunner {
             if (inputValue instanceof long[]) {
                 long[] longArray = (long[]) inputValue;
                 OnnxTensor tensor = OnnxTensor.createTensor(
-                    environment,
-                    LongBuffer.wrap(longArray),
-                    new long[]{1, longArray.length}
-                );
+                        environment,
+                        LongBuffer.wrap(longArray),
+                        new long[] { 1, longArray.length });
                 tensors.put(inputName, tensor);
             } else if (inputValue instanceof float[]) {
                 float[] floatArray = (float[]) inputValue;
                 OnnxTensor tensor = OnnxTensor.createTensor(
-                    environment,
-                    FloatBuffer.wrap(floatArray),
-                    new long[]{1, floatArray.length}
-                );
+                        environment,
+                        FloatBuffer.wrap(floatArray),
+                        new long[] { 1, floatArray.length });
                 tensors.put(inputName, tensor);
             } else if (inputValue instanceof int[]) {
                 int[] intArray = (int[]) inputValue;
                 OnnxTensor tensor = OnnxTensor.createTensor(
-                    environment,
-                    IntBuffer.wrap(intArray),
-                    new long[]{1, intArray.length}
-                );
+                        environment,
+                        IntBuffer.wrap(intArray),
+                        new long[] { 1, intArray.length });
                 tensors.put(inputName, tensor);
             } else if (inputValue instanceof double[]) {
                 double[] doubleArray = (double[]) inputValue;
                 OnnxTensor tensor = OnnxTensor.createTensor(
-                    environment,
-                    DoubleBuffer.wrap(doubleArray),
-                    new long[]{1, doubleArray.length}
-                );
+                        environment,
+                        DoubleBuffer.wrap(doubleArray),
+                        new long[] { 1, doubleArray.length });
                 tensors.put(inputName, tensor);
             } else if (inputValue instanceof List) {
                 // Handle List inputs by converting to appropriate array type
@@ -358,10 +339,9 @@ public class OnnxRuntimeRunner implements ModelRunner {
                             floatArray[i] = ((Number) list.get(i)).floatValue();
                         }
                         OnnxTensor tensor = OnnxTensor.createTensor(
-                            environment,
-                            FloatBuffer.wrap(floatArray),
-                            new long[]{1, floatArray.length}
-                        );
+                                environment,
+                                FloatBuffer.wrap(floatArray),
+                                new long[] { 1, floatArray.length });
                         tensors.put(inputName, tensor);
                     } else if (firstElement instanceof String) {
                         // Handle string inputs differently - this would require a different approach
@@ -370,12 +350,11 @@ public class OnnxRuntimeRunner implements ModelRunner {
                 }
             } else if (inputValue instanceof Number) {
                 // Handle single number by wrapping in array
-                float[] singleValue = new float[]{((Number) inputValue).floatValue()};
+                float[] singleValue = new float[] { ((Number) inputValue).floatValue() };
                 OnnxTensor tensor = OnnxTensor.createTensor(
-                    environment,
-                    FloatBuffer.wrap(singleValue),
-                    new long[]{1, 1}
-                );
+                        environment,
+                        FloatBuffer.wrap(singleValue),
+                        new long[] { 1, 1 });
                 tensors.put(inputName, tensor);
             } else {
                 // For other types, try to convert to float array if possible
@@ -387,8 +366,7 @@ public class OnnxRuntimeRunner implements ModelRunner {
     }
 
     private Map<String, Object> convertOutputs(
-        OrtSession.Result result
-    ) throws OrtException {
+            OrtSession.Result result) throws OrtException {
         Map<String, Object> outputs = new HashMap<>();
 
         for (Map.Entry<String, OnnxValue> entry : result) {

@@ -1,10 +1,12 @@
-package tech.kayys.golek.core.plugin;
+package tech.kayys.golek.engine.plugin;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
-import tech.kayys.golek.core.engine.EngineContext;
+import tech.kayys.golek.engine.context.EngineContext;
+import tech.kayys.golek.plugin.api.GolekPlugin;
+import tech.kayys.golek.plugin.api.PluginContext;
 
 import org.jboss.logging.Logger;
 

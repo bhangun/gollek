@@ -6,9 +6,10 @@ import io.quarkus.test.junit.QuarkusTestProfile;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
-import tech.kayys.golek.core.engine.EngineContext;
-import tech.kayys.golek.provider.core.plugin.PluginLoader;
-import tech.kayys.golek.provider.core.plugin.PluginRegistry;
+import tech.kayys.golek.engine.context.EngineContext;
+import tech.kayys.golek.engine.inference.InferenceEngineBootstrap;
+import tech.kayys.golek.engine.plugin.PluginLoader;
+import tech.kayys.golek.engine.plugin.PluginRegistry;
 
 import java.time.Duration;
 import java.util.Map;
@@ -100,11 +101,11 @@ class InferenceEngineBootstrapIntegrationTest {
         // Then
         assertThat(stats).isNotNull();
         assertThat(stats).containsKeys("total", "successful", "failed");
-        
+
         Integer total = (Integer) stats.get("total");
         Integer successful = (Integer) stats.get("successful");
         Integer failed = (Integer) stats.get("failed");
-        
+
         assertThat(total).isGreaterThanOrEqualTo(0);
         assertThat(successful).isGreaterThanOrEqualTo(0);
         assertThat(failed).isGreaterThanOrEqualTo(0);
@@ -137,8 +138,7 @@ class InferenceEngineBootstrapIntegrationTest {
                     "wayang.inference.engine.enabled", "true",
                     "wayang.inference.engine.startup.timeout", "60s",
                     "wayang.inference.engine.startup.fail-on-plugin-error", "false",
-                    "wayang.inference.engine.startup.min-plugins", "0"
-            );
+                    "wayang.inference.engine.startup.min-plugins", "0");
         }
     }
 }

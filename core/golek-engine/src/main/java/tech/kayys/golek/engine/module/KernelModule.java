@@ -1,9 +1,14 @@
-package tech.kayys.golek.core;
+package tech.kayys.golek.engine.module;
 
 import tech.kayys.golek.core.config.ConfigurationManager;
-import tech.kayys.golek.core.plugin.GolekPluginRegistry;
 import tech.kayys.golek.core.plugin.PluginManager;
 import tech.kayys.golek.core.observability.ObservabilityManager;
+import tech.kayys.golek.api.context.EngineContext;
+import tech.kayys.golek.api.plugin.PluginRegistry;
+import tech.kayys.golek.api.provider.ProviderRegistry;
+import tech.kayys.golek.engine.context.DefaultEngineContext;
+import tech.kayys.golek.engine.plugin.GolekPluginRegistry;
+import tech.kayys.golek.engine.registry.GolekProviderRegistry;
 
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
@@ -27,13 +32,13 @@ public class KernelModule {
     private final PluginManager pluginManager;
     private final ConfigurationManager configurationManager;
     private final ObservabilityManager observabilityManager;
-    private final EnhancedProviderRegistry providerRegistry;
+    private final ProviderRegistry providerRegistry;
     private final GolekPluginRegistry kernelPluginRegistry;
 
     private volatile boolean initialized = false;
     private volatile boolean started = false;
 
-    public KernelModule() {
+    public KernelModule(ProviderRegistry providerRegistry) {
         // Initialize OpenTelemetry SDK
         SdkTracerProvider tracerProvider = SdkTracerProvider.builder().build();
         SdkMeterProvider meterProvider = SdkMeterProvider.builder().build();
@@ -47,7 +52,7 @@ public class KernelModule {
         this.configurationManager = new ConfigurationManager();
         this.observabilityManager = new ObservabilityManager(openTelemetry);
         this.pluginManager = new PluginManager();
-        this.providerRegistry = new EnhancedProviderRegistry(pluginManager);
+        this.providerRegistry = providerRegistry;
         this.kernelPluginRegistry = new GolekPluginRegistry();
     }
 
@@ -68,7 +73,7 @@ public class KernelModule {
 
             // Initialize plugin manager
             LOG.debug("Initializing plugin manager");
-            pluginManager.initialize().await().indefinitely();
+            pluginManager.initialize();
 
             // Initialize kernel plugin registry
             LOG.debug("Initializing kernel plugin registry");
@@ -104,7 +109,7 @@ public class KernelModule {
         try {
             // Start plugin manager
             LOG.debug("Starting plugin manager");
-            pluginManager.start().await().indefinitely();
+            pluginManager.start();
 
             started = true;
             LOG.info("Kernel module started successfully");
@@ -129,7 +134,7 @@ public class KernelModule {
         try {
             // Stop plugin manager
             LOG.debug("Stopping plugin manager");
-            pluginManager.stop().await().indefinitely();
+            pluginManager.stop();
 
             // Shutdown kernel plugin registry
             LOG.debug("Shutting down kernel plugin registry");
@@ -174,9 +179,7 @@ public class KernelModule {
     /**
      * Get the enhanced provider registry
      */
-    @Produces
-    @Singleton
-    public EnhancedProviderRegistry getProviderRegistry() {
+    public ProviderRegistry getProviderRegistry() {
         return providerRegistry;
     }
 

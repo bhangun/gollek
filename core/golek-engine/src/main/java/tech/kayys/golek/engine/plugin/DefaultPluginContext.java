@@ -1,11 +1,13 @@
-package tech.kayys.golek.core.plugin;
+package tech.kayys.golek.engine.plugin;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-import tech.kayys.golek.core.engine.EngineContext;
+import tech.kayys.golek.engine.context.EngineContext;
+import tech.kayys.golek.api.plugin.PluginContext;
+import tech.kayys.golek.api.plugin.PluginRegistry;
 
 /**
  * Default implementation of plugin context.

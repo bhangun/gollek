@@ -1,4 +1,4 @@
-package tech.kayys.golek.core.inference;
+package tech.kayys.golek.engine.inference;
 
 import io.quarkus.runtime.Startup;
 import io.quarkus.runtime.StartupEvent;
@@ -6,15 +6,21 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import tech.kayys.golek.engine.context.EngineContext;
+import tech.kayys.golek.core.inference.InferenceEngine;
+import tech.kayys.golek.engine.plugin.DefaultPluginRegistry;
+import tech.kayys.golek.engine.plugin.PluginLoader;
+import tech.kayys.golek.plugin.api.PluginContext;
+
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
-import tech.kayys.golek.provider.core.plugin.PluginLoader;
+/* import tech.kayys.golek.provider.core.plugin.PluginLoader;
 import tech.kayys.golek.provider.core.plugin.PluginRegistry;
 import tech.kayys.golek.provider.core.plugin.PluginContext;
 import tech.kayys.golek.provider.core.plugin.DefaultPluginContext;
 import tech.kayys.golek.provider.core.plugin.PluginHealth;
 import tech.kayys.golek.provider.core.plugin.DefaultPluginRegistry;
-
+ */
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -88,10 +94,10 @@ public class InferenceEngineBootstrap {
 
             Duration elapsed = Duration.between(start, Instant.now());
             LOG.infof("✓ Inference engine started successfully in %d ms", elapsed.toMillis());
-            
+
             // Log metrics
             collectMetrics();
-            
+
             LOG.info("========================================");
 
             initialized = true;
@@ -196,9 +202,9 @@ public class InferenceEngineBootstrap {
                 .onItem().invoke(() -> {
                     int total = successfulPlugins.get();
                     int failed = failedPlugins.get();
-                    
+
                     if (failed > 0) {
-                        LOG.warnf("  → Initialized %d/%d plugins (%d failed)", 
+                        LOG.warnf("  → Initialized %d/%d plugins (%d failed)",
                                 total, total + failed, failed);
                     } else {
                         LOG.infof("  → Initialized %d plugins", total);
@@ -319,12 +325,12 @@ public class InferenceEngineBootstrap {
     private void collectMetrics() {
         LOG.info("Startup Metrics:");
         LOG.infof("  Total Time: %d ms", Duration.between(startupTime, Instant.now()).toMillis());
-        
+
         phaseTimings.forEach((phase, duration) -> {
             LOG.infof("    %s: %d ms", phase, duration.toMillis());
         });
 
-        LOG.infof("  Plugins: %d successful, %d failed", 
+        LOG.infof("  Plugins: %d successful, %d failed",
                 successfulPlugins.get(), failedPlugins.get());
     }
 
@@ -336,12 +342,12 @@ public class InferenceEngineBootstrap {
         stats.put("total", pluginRegistry.count());
         stats.put("successful", successfulPlugins.get());
         stats.put("failed", failedPlugins.get());
-        
+
         if (pluginRegistry instanceof DefaultPluginRegistry) {
             var registryStats = ((DefaultPluginRegistry) pluginRegistry).getStatistics();
             stats.put("by_phase", registryStats.pluginsPerPhase());
         }
-        
+
         return stats;
     }
 }

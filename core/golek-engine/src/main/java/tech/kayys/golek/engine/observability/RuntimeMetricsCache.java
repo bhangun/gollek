@@ -1,6 +1,5 @@
 package tech.kayys.golek.engine.observability;
 
-import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.time.Duration;
@@ -32,13 +31,29 @@ public class RuntimeMetricsCache {
     }
 
     public double getErrorRate(String providerId, Duration window) {
-        // Simplified implementation
-        return 0.0;
+        // Search for all model metrics for this provider
+        long total = 0;
+        long successful = 0;
+
+        for (Map.Entry<String, ProviderMetrics> entry : providerMetrics.entrySet()) {
+            if (entry.getKey().startsWith(providerId + ":")) {
+                total += entry.getValue().totalRequests;
+                successful += entry.getValue().successfulRequests;
+            }
+        }
+
+        if (total == 0)
+            return 0.0;
+        return (double) (total - successful) / total;
     }
 
     public double getCurrentLoad(String providerId) {
-        // Simplified implementation
-        return 0.0;
+        // In a real implementation, this would track active requests
+        return 0.2; // Low load placeholder
+    }
+
+    public boolean isCircuitBreakerOpen(String providerId) {
+        return getErrorRate(providerId, Duration.ofMinutes(5)) > 0.5;
     }
 
     public static class ProviderMetrics {
@@ -51,7 +66,7 @@ public class RuntimeMetricsCache {
             totalRequests++;
             successfulRequests++;
             totalLatency += durationMs;
-            
+
             // Simple approximation for P95 latency
             p95Latency = (long) (p95Latency * 0.9 + durationMs * 0.1);
         }

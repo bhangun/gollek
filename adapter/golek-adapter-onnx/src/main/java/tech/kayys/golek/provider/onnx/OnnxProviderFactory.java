@@ -1,7 +1,7 @@
 package tech.kayys.golek.provider.onnx;
 
+import tech.kayys.golek.provider.core.spi.ModelRunner;
 import tech.kayys.golek.provider.spi.ProviderFactory;
-import tech.kayys.golek.provider.spi.ModelRunner;
 import tech.kayys.golek.provider.spi.model.ModelManifest;
 import tech.kayys.golek.provider.spi.model.RequestContext;
 

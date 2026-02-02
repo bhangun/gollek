@@ -1,4 +1,4 @@
-package tech.kayys.golek.kernel;
+package tech.kayys.golek.engine.tenant;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Repository for tenant-specific configurations
  */
 @ApplicationScoped
-public class TenantConfigRepository implements tech.kayys.golek.api.tenant.TenantConfigurationService {
+public class TenantConfigRepository implements tech.kayys.wayang.tenant.TenantConfigurationService {
 
     private static final Logger LOG = Logger.getLogger(TenantConfigRepository.class);
 

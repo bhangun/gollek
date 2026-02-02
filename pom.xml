@@ -31,17 +31,7 @@
         <module>adapter</module>
         <module>provider</module>
         <module>plugins</module>
-
-        <module>core/golek-api</module>
-        <module>core/golek-core</module>
-        <module>core/golek-engine</module>
-        <module>core/golek-infrastructure</module>
-
-        <module>features</module>
-
-        <module>core/golek-model-repo-core</module>
-        <module>core/golek-plugin-api</module>
-        <module>core/golek-provider-core</module>
+        <module>core</module>
 
         <module>runtime/golek-runtime-distributed</module>
         <module>runtime/golek-runtime-portable</module>

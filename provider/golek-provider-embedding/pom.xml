@@ -38,6 +38,7 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-smallrye-config</artifactId>
+            <version>${quarkus.platform.version}</version>
         </dependency>
 
         <!-- JSON processing -->

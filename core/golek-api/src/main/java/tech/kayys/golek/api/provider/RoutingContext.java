@@ -7,7 +7,7 @@ import java.util.Set;
 
 import tech.kayys.golek.api.inference.InferenceRequest;
 import tech.kayys.golek.api.routing.SelectionStrategy;
-import tech.kayys.golek.api.tenant.TenantContext;
+import tech.kayys.wayang.tenant.TenantContext;
 
 /**
  * Context for routing decisions.
@@ -29,29 +29,28 @@ public record RoutingContext(
         if (timeout == null) {
             timeout = Duration.ofSeconds(30);
         }
-        excludedProviders = excludedProviders != null 
-            ? Set.copyOf(excludedProviders) 
-            : Collections.emptySet();
+        excludedProviders = excludedProviders != null
+                ? Set.copyOf(excludedProviders)
+                : Collections.emptySet();
     }
 
     /**
      * Create minimal context for simple routing
      */
     public static RoutingContext simple(
-            InferenceRequest request, 
+            InferenceRequest request,
             TenantContext tenant) {
         return new RoutingContext(
-            request,
-            tenant,
-            Optional.empty(),
-            Optional.empty(),
-            Duration.ofSeconds(30),
-            false,
-            0,
-            Optional.empty(),
-            Optional.empty(),
-            Collections.emptySet()
-        );
+                request,
+                tenant,
+                Optional.empty(),
+                Optional.empty(),
+                Duration.ofSeconds(30),
+                false,
+                0,
+                Optional.empty(),
+                Optional.empty(),
+                Collections.emptySet());
     }
 
     /**
@@ -62,17 +61,16 @@ public record RoutingContext(
             TenantContext tenant,
             String providerId) {
         return new RoutingContext(
-            request,
-            tenant,
-            Optional.of(providerId),
-            Optional.empty(),
-            Duration.ofSeconds(30),
-            false,
-            0,
-            Optional.of(SelectionStrategy.USER_SELECTED),
-            Optional.empty(),
-            Collections.emptySet()
-        );
+                request,
+                tenant,
+                Optional.of(providerId),
+                Optional.empty(),
+                Duration.ofSeconds(30),
+                false,
+                0,
+                Optional.of(SelectionStrategy.USER_SELECTED),
+                Optional.empty(),
+                Collections.emptySet());
     }
 
     /**
@@ -82,10 +80,9 @@ public record RoutingContext(
         Set<String> newExcluded = new java.util.HashSet<>(excludedProviders);
         newExcluded.add(providerId);
         return new RoutingContext(
-            request, tenantContext, preferredProvider, deviceHint,
-            timeout, costSensitive, priority, strategyOverride,
-            poolId, newExcluded
-        );
+                request, tenantContext, preferredProvider, deviceHint,
+                timeout, costSensitive, priority, strategyOverride,
+                poolId, newExcluded);
     }
 
     /**
@@ -173,11 +170,9 @@ public record RoutingContext(
 
         public RoutingContext build() {
             return new RoutingContext(
-                request, tenantContext, preferredProvider, deviceHint,
-                timeout, costSensitive, priority, strategyOverride,
-                poolId, excludedProviders
-            );
+                    request, tenantContext, preferredProvider, deviceHint,
+                    timeout, costSensitive, priority, strategyOverride,
+                    poolId, excludedProviders);
         }
     }
 }
-

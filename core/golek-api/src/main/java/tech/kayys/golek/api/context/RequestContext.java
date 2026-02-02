@@ -4,10 +4,9 @@ import java.time.Duration;
 import java.util.Optional;
 
 import tech.kayys.golek.api.model.DeviceType;
-import tech.kayys.golek.api.tenant.TenantId;
 
 public record RequestContext(
-        TenantId tenantId,
+        String tenantId,
         String userId,
         String sessionId,
         String runId,
@@ -26,7 +25,7 @@ public record RequestContext(
 
     public static RequestContext create(String tenantId, String userId, String sessionId) {
         return new RequestContext(
-                new TenantId(tenantId),
+                tenantId,
                 userId,
                 sessionId,
                 null,

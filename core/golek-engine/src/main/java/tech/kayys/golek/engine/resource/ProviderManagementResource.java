@@ -1,4 +1,4 @@
-package tech.kayys.golek.core.resource;
+package tech.kayys.golek.engine.resource;
 
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -6,9 +6,6 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
-import tech.kayys.wayang.inference.kernel.provider.ProviderRegistry;
-import tech.kayys.wayang.inference.platform.rest.dto.ProviderInfoDTO;
-import tech.kayys.wayang.inference.providers.circuit.CircuitBreakerRegistry;
 
 import java.util.List;
 

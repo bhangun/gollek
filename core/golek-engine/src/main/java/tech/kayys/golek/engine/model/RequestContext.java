@@ -1,15 +1,14 @@
 package tech.kayys.golek.engine.model;
 
-import tech.kayys.golek.api.tenant.TenantContext;
-
 import java.time.Duration;
+
+import tech.kayys.wayang.tenant.TenantContext;
 
 public record RequestContext(
         TenantContext tenantContext,
         Duration timeout,
         int priority,
-        String preferredDevice
-) {
+        String preferredDevice) {
     public static Builder builder() {
         return new Builder();
     }

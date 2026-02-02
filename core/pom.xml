@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>tech.kayys.golek</groupId>
+        <artifactId>golek-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>golek-core-parent</artifactId>
+    <packaging>pom</packaging>
+
+    <name>golek-core-parent</name>
+    <description>golek Core</description>
+
+
+    <properties>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+    </properties>
+    <modules>
+        <module>golek-api</module>
+        <module>golek-core</module>
+        <module>golek-engine</module>
+        <module>golek-model-repo-core</module>
+        <module>golek-provider-core</module>
+        <module>golek-infrastructure</module>
+        <module>golek-plugin-api</module>
+    </modules>
+</project>

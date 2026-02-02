@@ -738,7 +738,7 @@ Just **names, roles, and relationships** — so you can *see the whole engine* b
 
 ---
 
-# 🧠 golek / SILAT — **ULTIMATE BIG PICTURE**
+# 🧠 golek / GAMELAN — **ULTIMATE BIG PICTURE**
 
 This model is designed to be:
 

@@ -1,4 +1,4 @@
-package tech.kayys.golek.core.pipeline;
+package tech.kayys.golek.engine.inference;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -7,13 +7,15 @@ import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 import org.jboss.logging.Logger;
 
-import tech.kayys.golek.core.plugin.GolekPluginRegistry;
 import tech.kayys.golek.core.plugin.InferencePhasePlugin;
+import tech.kayys.golek.engine.plugin.GolekPluginRegistry;
+import tech.kayys.golek.api.inference.InferencePhase;
 import tech.kayys.golek.core.execution.ExecutionContext;
-import tech.kayys.golek.core.execution.ExecutionSignal;
-import tech.kayys.golek.core.execution.ExecutionStateMachine;
-import tech.kayys.golek.core.execution.ExecutionStatus;
+import tech.kayys.golek.engine.execution.ExecutionSignal;
+import tech.kayys.golek.engine.execution.ExecutionStateMachine;
+import tech.kayys.golek.engine.execution.ExecutionStatus;
 import tech.kayys.golek.core.inference.InferenceObserver;
+import tech.kayys.golek.core.pipeline.InferencePipeline;
 
 import java.time.Duration;
 import java.util.List;

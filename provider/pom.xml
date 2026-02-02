@@ -30,6 +30,6 @@
         <module>golek-provider-huggingface</module>
         <module>golek-provider-tensorflow</module>
         <module>golek-provider-embedding</module>
-        <module>golek-local-vllm</module>
+        <module>golek-provider-litert</module>
     </modules>
 </project>

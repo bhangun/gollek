@@ -1,17 +1,21 @@
-package tech.kayys.golek.core.module;
+package tech.kayys.golek.engine.module;
 
 import tech.kayys.golek.core.config.EnhancedConfigurationManager;
-import tech.kayys.golek.core.plugin.GolekPluginRegistry;
+import tech.kayys.golek.core.observability.ObservabilityManager;
 import tech.kayys.golek.core.plugin.PluginManager;
-import tech.kayys.golek.core.reliability.ReliabilityManager;
-import tech.kayys.golek.kernel.KernelModule;
-import tech.kayys.golek.kernel.observability.ObservabilityManager;
-import tech.kayys.golek.kernel.provider.EnhancedProviderRegistry;
+import tech.kayys.golek.engine.plugin.GolekPluginRegistry;
+import tech.kayys.golek.engine.execution.ModelRunnerFactory;
+import tech.kayys.golek.engine.model.ReliabilityManager;
+import tech.kayys.golek.api.plugin.PluginRegistry;
+import tech.kayys.golek.api.provider.ProviderRegistry;
+import tech.kayys.golek.engine.registry.GolekProviderRegistry;
+import tech.kayys.golek.engine.model.ModelRepository;
 
 import org.jboss.logging.Logger;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -30,20 +34,27 @@ public class SystemModule {
     private final PluginManager pluginManager;
     private final EnhancedConfigurationManager configurationManager;
     private final ObservabilityManager observabilityManager;
-    private final EnhancedProviderRegistry providerRegistry;
+    private final ProviderRegistry providerRegistry;
     private final GolekPluginRegistry kernelPluginRegistry;
     private final ReliabilityManager reliabilityManager;
     private final ExecutorService executorService;
+    private final ModelRunnerFactory runnerFactory;
+    private final ModelRepository modelRepository;
 
     private volatile boolean initialized = false;
     private volatile boolean started = false;
 
-    public SystemModule() {
+    @Inject
+    public SystemModule(ProviderRegistry providerRegistry,
+            ModelRunnerFactory runnerFactory,
+            ModelRepository modelRepository) {
+        this.providerRegistry = providerRegistry;
+        this.runnerFactory = runnerFactory;
+        this.modelRepository = modelRepository;
         // Initialize core components
-        this.kernelModule = new KernelModule();
+        this.kernelModule = new KernelModule(providerRegistry);
         this.pluginManager = kernelModule.getPluginManager();
         this.observabilityManager = kernelModule.getObservabilityManager();
-        this.providerRegistry = kernelModule.getProviderRegistry();
         this.kernelPluginRegistry = kernelModule.getKernelPluginRegistry();
 
         // Initialize enhanced configuration manager
@@ -85,6 +96,9 @@ public class SystemModule {
             LOG.debug("Initializing kernel module");
             kernelModule.initialize();
 
+            // Register local runner bridges
+            registerLocalRunners();
+
             // Initialize configuration manager
             LOG.debug("Initializing configuration manager");
 
@@ -100,6 +114,19 @@ public class SystemModule {
         } catch (Exception e) {
             LOG.error("Failed to initialize system module", e);
             throw new RuntimeException("System initialization failed", e);
+        }
+    }
+
+    private void registerLocalRunners() {
+        try {
+            for (String runnerName : runnerFactory.getAvailableRunners()) {
+                LOG.infof("Registering bridge provider for local runner: %s", runnerName);
+                var provider = new tech.kayys.golek.engine.provider.adapter.RunnerBridgeProvider(
+                        runnerName, runnerFactory, modelRepository);
+                providerRegistry.register(provider);
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to register local runners", e);
         }
     }
 
@@ -221,15 +248,6 @@ public class SystemModule {
     @Singleton
     public ObservabilityManager getObservabilityManager() {
         return observabilityManager;
-    }
-
-    /**
-     * Get the enhanced provider registry
-     */
-    @Produces
-    @Singleton
-    public EnhancedProviderRegistry getEnhancedProviderRegistry() {
-        return providerRegistry;
     }
 
     /**

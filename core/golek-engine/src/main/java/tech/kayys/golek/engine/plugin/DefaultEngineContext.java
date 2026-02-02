@@ -1,4 +1,4 @@
-package tech.kayys.golek.core.plugin;
+package tech.kayys.golek.engine.plugin;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -6,8 +6,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 
-import tech.kayys.golek.core.engine.EngineContext;
-import tech.kayys.golek.provider.core.registry.ProviderRegistry;
+import tech.kayys.golek.engine.context.EngineContext;
+import tech.kayys.golek.engine.registry.ProviderRegistry;
 
 /**
  * Default implementation of engine context.

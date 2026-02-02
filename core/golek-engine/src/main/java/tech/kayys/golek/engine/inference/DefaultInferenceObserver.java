@@ -1,4 +1,4 @@
-package tech.kayys.golek.core.inference;
+package tech.kayys.golek.engine.inference;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -7,7 +7,9 @@ import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import tech.kayys.golek.provider.core.inference.InferenceObserver;
+import tech.kayys.golek.api.inference.InferencePhase;
+import tech.kayys.golek.core.execution.ExecutionContext;
+import tech.kayys.golek.core.inference.InferenceObserver;
 
 import org.jboss.logging.Logger;
 

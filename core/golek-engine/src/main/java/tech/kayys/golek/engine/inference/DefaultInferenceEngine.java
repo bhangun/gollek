@@ -10,23 +10,25 @@ import jakarta.inject.Inject;
 import jakarta.validation.ValidationException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
+
+import tech.kayys.golek.api.inference.InferencePhase;
 import tech.kayys.golek.api.inference.InferenceRequest;
 import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.tenant.TenantContext;
-import tech.kayys.golek.core.engine.EngineContext;
+import tech.kayys.golek.engine.context.EngineContext;
 import tech.kayys.golek.core.engine.EngineMetadata;
-import tech.kayys.golek.core.engine.HealthStatus;
+import tech.kayys.golek.api.model.HealthStatus;
 import tech.kayys.golek.core.exception.AuthorizationException;
-import tech.kayys.golek.core.exception.InferenceException;
+import tech.kayys.golek.api.exception.InferenceException;
 import tech.kayys.golek.core.exception.TenantQuotaExceededException;
-import tech.kayys.golek.core.execution.DefaultExecutionContext;
 import tech.kayys.golek.core.execution.ExecutionContext;
-import tech.kayys.golek.core.execution.ExecutionSignal;
-import tech.kayys.golek.core.execution.ExecutionStateMachine;
-import tech.kayys.golek.core.execution.ExecutionStatus;
+import tech.kayys.golek.engine.execution.ExecutionSignal;
+import tech.kayys.golek.engine.execution.ExecutionStateMachine;
+import tech.kayys.golek.engine.execution.ExecutionStatus;
 import tech.kayys.golek.core.execution.ExecutionToken;
-import tech.kayys.golek.core.observability.InferenceMetricsCollector;
 import tech.kayys.golek.core.pipeline.InferencePipeline;
+import tech.kayys.golek.engine.execution.DefaultExecutionContext;
+import tech.kayys.golek.engine.observability.InferenceMetricsCollector;
+import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.core.inference.InferenceEngine;
 
 /**
@@ -94,16 +96,17 @@ public class DefaultInferenceEngine implements InferenceEngine {
                 return executeWithStateMachine(execContext)
                                 .onItem().transform(ctx -> {
                                         // Extract response from context
-                                        InferenceResponse response = ctx.getVariable("response", InferenceResponse.class)
+                                        InferenceResponse response = ctx
+                                                        .getVariable("response", InferenceResponse.class)
                                                         .orElseThrow(() -> new InferenceException(
                                                                         "No response generated"));
-                                        
+
                                         // Record success metrics
                                         Duration duration = Duration.between(startTime, Instant.now());
                                         metrics.recordSuccess(duration);
                                         LOG.infof("Inference request %s completed successfully in %d ms",
-                                                request.requestId(), duration.toMillis());
-                                        
+                                                        request.requestId(), duration.toMillis());
+
                                         return response;
                                 })
                                 .onFailure().invoke(error -> {
@@ -111,7 +114,7 @@ public class DefaultInferenceEngine implements InferenceEngine {
                                         Duration duration = Duration.between(startTime, Instant.now());
                                         metrics.recordFailure(error.getClass().getSimpleName(), duration);
                                         LOG.errorf(error, "Inference request %s failed after %d ms",
-                                                request.requestId(), duration.toMillis());
+                                                        request.requestId(), duration.toMillis());
                                 });
         }
 
@@ -139,10 +142,10 @@ public class DefaultInferenceEngine implements InferenceEngine {
                 if (attempt < maxRetryAttempts && isRetryable(error)) {
                         // Record retry attempt
                         metrics.recordRetry(attempt + 1);
-                        
+
                         LOG.warnf("Inference request %s failed (attempt %d/%d), retrying: %s",
-                                context.token().getRequestId(), attempt + 1, maxRetryAttempts,
-                                error.getMessage());
+                                        context.token().getRequestId(), attempt + 1, maxRetryAttempts,
+                                        error.getMessage());
 
                         // Transition to RETRYING
                         ExecutionStatus nextStatus = stateMachine.next(
@@ -167,7 +170,7 @@ public class DefaultInferenceEngine implements InferenceEngine {
                                         });
                 } else {
                         LOG.errorf(error, "Inference request %s failed after %d attempts",
-                                context.token().getRequestId(), attempt);
+                                        context.token().getRequestId(), attempt);
 
                         // Exhausted retries, transition to FAILED
                         ExecutionStatus failedStatus = stateMachine.next(
@@ -189,10 +192,10 @@ public class DefaultInferenceEngine implements InferenceEngine {
                 // Exponential backoff with configured initial and max values
                 long initialMs = initialBackoff.toMillis();
                 long maxMs = maxBackoff.toMillis();
-                
+
                 long backoffMs = initialMs * (long) Math.pow(2, attempt);
                 long cappedMs = Math.min(backoffMs, maxMs);
-                
+
                 return Duration.ofMillis(cappedMs);
         }
 
