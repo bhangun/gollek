@@ -1,10 +1,15 @@
-# Default: clone or update from GitHub
-./build-llama.sh
+# GGUF Adapter (llama.cpp)
 
-# Use existing local llama.cpp directory
-./build-llama.sh -p /path/to/my/llama.cpp
-./build-llama.sh --path /home/user/llama.cpp
+This adapter provides native inference support for GGUF/ggml models via llama.cpp bindings.
 
-# Show help
-./build-llama.sh -h
-./build-llama.sh --help
+## Key Capabilities
+
+* GGUF artifact loading
+* CPU/CUDA support
+* Token generation via llama.cpp
+
+## Key Paths
+
+* Binding: `inference-golek/adapter/golek-adapter-gguf/src/main/java/tech/kayys/golek/inference/gguf/LlamaCppBinding.java`
+* Runner: `inference-golek/adapter/golek-adapter-gguf/src/main/java/tech/kayys/golek/inference/gguf/LlamaCppRunner.java`
+* Config: `inference-golek/adapter/golek-adapter-gguf/src/main/java/tech/kayys/golek/inference/gguf/GGUFConfig.java`
