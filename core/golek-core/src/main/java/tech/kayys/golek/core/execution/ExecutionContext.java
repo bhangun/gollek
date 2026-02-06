@@ -1,8 +1,8 @@
 package tech.kayys.golek.core.execution;
 
-import tech.kayys.golek.api.context.EngineContext;
-import tech.kayys.golek.api.execution.ExecutionStatus;
-import tech.kayys.golek.api.inference.InferencePhase;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.spi.execution.ExecutionStatus;
+import tech.kayys.golek.spi.inference.InferencePhase;
 import tech.kayys.wayang.tenant.TenantContext;
 
 import java.util.Map;

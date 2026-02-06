@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>tech.kayys.golek</groupId>
@@ -14,8 +14,8 @@
     <version>1.0.0-SNAPSHOT</version>
 
     <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -30,7 +30,7 @@
         <!-- Golek Core API -->
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-api</artifactId>
+            <artifactId>golek-spi</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -38,6 +38,13 @@
         <dependency>
             <groupId>tech.kayys.golek</groupId>
             <artifactId>golek-engine</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Golek Model Repository -->
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-model-repo-core</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -64,6 +71,14 @@
             <artifactId>jakarta.validation-api</artifactId>
         </dependency>
 
+        <!-- Lombok for logging -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Testing Dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -76,6 +91,65 @@
             <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Optional Provider Dependencies -->
+        <!-- Users can include only the providers they need -->
+
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-provider-local</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-provider-ollama</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-provider-openai</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-provider-anthropic</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-provider-gemini</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-provider-cerebras</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-provider-huggingface</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-provider-embedding</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
     </dependencies>
 
     <build>
@@ -85,9 +159,9 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
                 <configuration>
-                    <source>21</source>
-                    <target>21</target>
-                    <release>21</release>
+                    <source>25</source>
+                    <target>25</target>
+                    <release>25</release>
                 </configuration>
             </plugin>
             <plugin>

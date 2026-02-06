@@ -7,6 +7,7 @@ import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
 import jakarta.ws.rs.ext.Provider;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
 
@@ -33,14 +34,18 @@ import java.io.IOException;
 @Slf4j
 public class TenantContextFilter implements ContainerRequestFilter {
 
-    @Inject
-    TenantContext tenantContext;
+    @ConfigProperty(name = "wayang.multitenancy.enabled", defaultValue = "false")
+    boolean multitenancyEnabled;
 
     private static final String TENANT_HEADER = "X-Tenant-ID";
     private static final String REQUEST_ID_HEADER = "X-Request-ID";
 
     @Override
     public void filter(ContainerRequestContext requestContext) throws IOException {
+        if (!multitenancyEnabled) {
+            return;
+        }
+
         String path = requestContext.getUriInfo().getPath();
 
         // Skip tenant validation for health checks and metrics
@@ -74,10 +79,6 @@ public class TenantContextFilter implements ContainerRequestFilter {
                     ErrorCode.AUTH_TENANT_SUSPENDED,
                     "Tenant account is " + tenant.status);
         }
-
-        // Set tenant context
-        tenantContext.setCurrentTenant(tenantId);
-        tenantContext.setTenantEntity(tenant);
 
         // Set MDC for logging
         org.slf4j.MDC.put("tenantId", tenantId);

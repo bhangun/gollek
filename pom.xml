@@ -13,15 +13,15 @@
 
 
     <properties>
-        <maven.compiler.release>21</maven.compiler.release>
-        <lombok.version>1.18.30</lombok.version>
+        <maven.compiler.release>25</maven.compiler.release>
+        <lombok.version>1.18.40</lombok.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <compiler-plugin.version>3.13.0</compiler-plugin.version>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
-        <quarkus.platform.version>3.15.1</quarkus.platform.version>
+        <quarkus.platform.version>3.31.1</quarkus.platform.version>
         <grpc.version>1.60.0</grpc.version>
         <protobuf.version>3.25.5</protobuf.version>
         <testcontainers.version>1.19.3</testcontainers.version>
@@ -35,6 +35,8 @@
 
         <module>runtime/golek-runtime-distributed</module>
         <module>runtime/golek-runtime-portable</module>
+        <module>ui/golek-cli</module>
+        <module>sdk</module>
     </modules>
 
 
@@ -120,14 +122,14 @@
             <dependency>
                 <groupId>io.vertx</groupId>
                 <artifactId>vertx-web-client</artifactId>
-                <version>4.4.4</version>
+                <version>4.5.24</version>
             </dependency>
 
             <!-- SmallRye -->
             <dependency>
                 <groupId>io.smallrye.reactive</groupId>
                 <artifactId>mutiny</artifactId>
-                <version>2.6.0</version>
+                <version>3.1.0</version>
             </dependency>
 
             <!-- Caffeine -->
@@ -144,12 +146,7 @@
                 <version>3.0.2</version>
             </dependency>
 
-            <!-- JBoss Logging -->
-            <dependency>
-                <groupId>org.jboss.logging</groupId>
-                <artifactId>jboss-logging</artifactId>
-                <version>3.5.3.Final</version>
-            </dependency>
+
         </dependencies>
     </dependencyManagement>
 

@@ -6,17 +6,16 @@ import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
-import tech.kayys.golek.api.Message;
-import tech.kayys.golek.api.context.RequestContext;
-import tech.kayys.golek.api.inference.InferenceRequest;
+import tech.kayys.golek.spi.Message;
+import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.engine.inference.InferenceOrchestrator;
 import tech.kayys.golek.engine.routing.ModelRouterService;
 import tech.kayys.wayang.tenant.TenantContext;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
-import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
@@ -40,6 +39,9 @@ public class InferenceResource {
 
         @Inject
         ModelRouterService modelRouter;
+
+        @ConfigProperty(name = "wayang.multitenancy.enabled", defaultValue = "false")
+        boolean multitenancyEnabled;
 
         @Context
         SecurityContext securityContext;
@@ -75,15 +77,15 @@ public class InferenceResource {
                                         .priority(request.priority())
                                         .build();
 
-                        // Build tenant context
+                        // Build tenant context (optional when multitenancy is disabled)
                         TenantContext context = buildTenantContext(tenantId);
 
-                        return new RequestContext(inferenceRequest, context);
+                        return new InferenceRequestHolder(inferenceRequest, context);
                 })
                                 .onItem().transformToUni(ctx -> orchestrator.execute(
-                                                ctx.request().getModel(),
-                                                ctx.request(),
-                                                ctx.tenantContext()))
+                                                ctx.request.getModel(),
+                                                ctx.request,
+                                                ctx.tenantContext))
                                 .onItem()
                                 .transform(response -> Response.ok(InferenceResponseDTO.from(response)).build())
                                 .onFailure().recoverWithItem(error -> {
@@ -152,10 +154,31 @@ public class InferenceResource {
                                 ? securityContext.getUserPrincipal().getName()
                                 : "anonymous";
 
+                if (!multitenancyEnabled) {
+                        return TenantContext.builder()
+                                        .tenantId("default")
+                                        .userId(userId)
+                                        .build();
+                }
+
+                if (tenantId == null || tenantId.trim().isEmpty()) {
+                        throw new BadRequestException("Tenant ID header (X-Tenant-ID) is required");
+                }
+
                 return TenantContext.builder()
-                                .tenantId(tenantId != null ? tenantId : "default")
+                                .tenantId(tenantId)
                                 .userId(userId)
                                 .build();
+        }
+
+        private static final class InferenceRequestHolder {
+                private final InferenceRequest request;
+                private final TenantContext tenantContext;
+
+                private InferenceRequestHolder(InferenceRequest request, TenantContext tenantContext) {
+                        this.request = request;
+                        this.tenantContext = tenantContext;
+                }
         }
 
 }

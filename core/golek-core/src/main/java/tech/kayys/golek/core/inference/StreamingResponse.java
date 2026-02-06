@@ -1,7 +1,7 @@
 package tech.kayys.golek.core.inference;
 
-import tech.kayys.golek.api.inference.InferenceResponseInterface;
-import tech.kayys.golek.api.stream.StreamChunk;
+import tech.kayys.golek.spi.inference.InferenceResponseInterface;
+import tech.kayys.golek.spi.stream.StreamChunk;
 import org.reactivestreams.Publisher;
 
 import java.time.Instant;

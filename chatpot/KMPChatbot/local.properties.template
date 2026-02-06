@@ -1,0 +1,12 @@
+## This file must *NOT* be checked into Version Control Systems,
+# as it contains information specific to your local configuration.
+#
+# Location of the Android SDK. For example:
+# sdk.dir=/Users/username/Library/Android/sdk
+# Or on Windows:
+# sdk.dir=C:\\Users\\username\\AppData\\Local\\Android\\sdk
+
+sdk.dir=/path/to/your/android/sdk
+
+# API Key (Better: Use environment variable)
+# anthropic.api.key=your-api-key-here

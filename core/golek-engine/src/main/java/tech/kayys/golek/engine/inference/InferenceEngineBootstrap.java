@@ -6,11 +6,15 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import tech.kayys.golek.engine.context.EngineContext;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.spi.plugin.GolekPlugin;
+import tech.kayys.golek.spi.plugin.PluginContext;
+import tech.kayys.golek.spi.plugin.PluginRegistry;
+import tech.kayys.golek.spi.plugin.PluginHealth;
 import tech.kayys.golek.core.inference.InferenceEngine;
-import tech.kayys.golek.engine.plugin.DefaultPluginRegistry;
 import tech.kayys.golek.engine.plugin.PluginLoader;
-import tech.kayys.golek.plugin.api.PluginContext;
+import tech.kayys.golek.engine.context.DefaultEngineContext;
+import tech.kayys.golek.spi.model.HealthStatus;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
@@ -118,10 +122,11 @@ public class InferenceEngineBootstrap {
                 .onItem().transformToUni(v -> {
                     Instant phaseStart = Instant.now();
                     LOG.info("Step 1/4: Initializing engine context...");
-                    return engineContext.initialize()
-                            .onItem().invoke(() -> {
-                                phaseTimings.put("context_init", Duration.between(phaseStart, Instant.now()));
-                            });
+                    if (engineContext instanceof DefaultEngineContext defaultContext) {
+                        defaultContext.setRunning(true);
+                    }
+                    phaseTimings.put("context_init", Duration.between(phaseStart, Instant.now()));
+                    return Uni.createFrom().voidItem();
                 })
 
                 // Step 2: Load plugins
@@ -161,18 +166,27 @@ public class InferenceEngineBootstrap {
      * Initialize all plugins with proper context
      */
     private Uni<Void> initializePlugins() {
-        PluginContext context = new DefaultPluginContext(
-                engineContext,
-                pluginRegistry);
+        // Create a default plugin context for bootstrap
+        PluginContext context = new PluginContext() {
+            @Override
+            public String getPluginId() {
+                return "system";
+            }
+
+            @Override
+            public Optional<String> getConfig(String key) {
+                return Optional.empty();
+            }
+        };
 
         if (failOnPluginError) {
-            // Fail fast on any plugin initialization error
+            // Fail fast on any plugin initialization
             return pluginLoader.initializeAll(context)
                     .onItem().invoke(() -> {
-                        int total = pluginRegistry.count();
+                        int total = pluginRegistry.all().size();
                         successfulPlugins.set(total);
                         LOG.infof("  → Initialized %d plugins", total);
-                        logPluginSummary();
+                        // logPluginSummary(); // Temporarily disabled until generic stats implemented
                     });
         } else {
             // Graceful degradation: continue even if some plugins fail
@@ -184,8 +198,9 @@ public class InferenceEngineBootstrap {
      * Initialize plugins with graceful degradation
      */
     private Uni<Void> initializePluginsGracefully(PluginContext context) {
-        List<Uni<Void>> initializations = pluginRegistry.getAllPlugins().stream()
-                .map(plugin -> plugin.initialize(context)
+        List<Uni<Void>> initializations = pluginRegistry.all().stream()
+                .map(plugin -> Uni.createFrom().voidItem()
+                        .onItem().invoke(() -> plugin.initialize(context))
                         .onItem().invoke(() -> {
                             successfulPlugins.incrementAndGet();
                             LOG.debugf("✓ Initialized plugin: %s", plugin.id());
@@ -216,8 +231,6 @@ public class InferenceEngineBootstrap {
                                 String.format("Insufficient plugins initialized: %d < %d required",
                                         total, minPluginsRequired));
                     }
-
-                    logPluginSummary();
                 });
     }
 
@@ -250,7 +263,7 @@ public class InferenceEngineBootstrap {
             pluginHealthMap.forEach((id, health) -> {
                 if (!health.isHealthy()) {
                     LOG.warnf("  ⚠ Plugin '%s' is %s: %s",
-                            id, health.getStatus(), health.getMessage());
+                            id, health.status(), health.message());
                 }
             });
 
@@ -262,17 +275,19 @@ public class InferenceEngineBootstrap {
      * Log plugin summary by phase
      */
     private void logPluginSummary() {
-        var stats = ((DefaultPluginRegistry) pluginRegistry).getStatistics();
+        // This method is temporarily disabled as phase-bound statistics are not yet
+        // generic.
+        // var stats = ((DefaultPluginRegistry) pluginRegistry).getStatistics();
 
-        LOG.info("  Plugin Summary:");
-        LOG.infof("    Total: %d", stats.totalPlugins());
-        LOG.infof("    Phase-bound: %d", stats.phasePlugins());
+        // LOG.info(" Plugin Summary:");
+        // LOG.infof(" Total: %d", stats.totalPlugins());
+        // LOG.infof(" Phase-bound: %d", stats.phasePlugins());
 
-        stats.pluginsPerPhase().forEach((phase, count) -> {
-            if (count > 0) {
-                LOG.infof("      %s: %d", phase.getDisplayName(), count);
-            }
-        });
+        // stats.pluginsPerPhase().forEach((phase, count) -> {
+        // if (count > 0) {
+        // LOG.infof(" %s: %d", phase.getDisplayName(), count);
+        // }
+        // });
     }
 
     /**
@@ -339,14 +354,9 @@ public class InferenceEngineBootstrap {
      */
     public Map<String, Object> getPluginStatistics() {
         Map<String, Object> stats = new HashMap<>();
-        stats.put("total", pluginRegistry.count());
+        stats.put("total", pluginRegistry.all().size());
         stats.put("successful", successfulPlugins.get());
         stats.put("failed", failedPlugins.get());
-
-        if (pluginRegistry instanceof DefaultPluginRegistry) {
-            var registryStats = ((DefaultPluginRegistry) pluginRegistry).getStatistics();
-            stats.put("by_phase", registryStats.pluginsPerPhase());
-        }
 
         return stats;
     }

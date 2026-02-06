@@ -1,6 +1,6 @@
 package tech.kayys.golek.client.model;
 
-import tech.kayys.golek.api.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceRequest;
 
 import java.util.List;
 

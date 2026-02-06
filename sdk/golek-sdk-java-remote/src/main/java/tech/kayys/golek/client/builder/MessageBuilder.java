@@ -1,7 +1,7 @@
 package tech.kayys.golek.client.builder;
 
-import tech.kayys.golek.api.Message;
-import tech.kayys.golek.api.tool.ToolCall;
+import tech.kayys.golek.spi.Message;
+import tech.kayys.golek.spi.tool.ToolCall;
 
 import java.util.List;
 

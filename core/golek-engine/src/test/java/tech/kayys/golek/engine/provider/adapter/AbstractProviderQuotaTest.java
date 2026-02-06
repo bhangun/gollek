@@ -5,13 +5,13 @@ import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions;
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.provider.ProviderCapabilities;
-import tech.kayys.golek.api.provider.ProviderConfig;
-import tech.kayys.golek.api.provider.ProviderHealth;
-import tech.kayys.golek.api.provider.ProviderMetadata;
-import tech.kayys.golek.api.provider.ProviderRequest;
-import tech.kayys.golek.api.Message;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.provider.ProviderCapabilities;
+import tech.kayys.golek.spi.provider.ProviderConfig;
+import tech.kayys.golek.spi.provider.ProviderHealth;
+import tech.kayys.golek.spi.provider.ProviderMetadata;
+import tech.kayys.golek.spi.provider.ProviderRequest;
+import tech.kayys.golek.spi.Message;
 import tech.kayys.golek.provider.core.quota.ProviderQuotaService;
 import tech.kayys.wayang.tenant.TenantContext;
 
@@ -79,7 +79,7 @@ public class AbstractProviderQuotaTest {
         provider.infer(request, context)
                 .subscribe().withSubscriber(UniAssertSubscriber.create())
                 .awaitFailure()
-                .assertFailedWith(tech.kayys.golek.api.routing.QuotaExhaustedException.class);
+                .assertFailedWith(tech.kayys.golek.spi.routing.QuotaExhaustedException.class);
 
         verify(quotaService).hasQuota(eq("test-provider"));
         verify(quotaService, never()).recordUsage(any(), anyInt());

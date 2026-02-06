@@ -6,8 +6,8 @@ import tech.kayys.golek.core.plugin.PluginManager;
 import tech.kayys.golek.engine.plugin.GolekPluginRegistry;
 import tech.kayys.golek.engine.execution.ModelRunnerFactory;
 import tech.kayys.golek.engine.model.ReliabilityManager;
-import tech.kayys.golek.api.plugin.PluginRegistry;
-import tech.kayys.golek.api.provider.ProviderRegistry;
+import tech.kayys.golek.spi.plugin.PluginRegistry;
+import tech.kayys.golek.spi.provider.ProviderRegistry;
 import tech.kayys.golek.engine.registry.GolekProviderRegistry;
 import tech.kayys.golek.engine.model.ModelRepository;
 

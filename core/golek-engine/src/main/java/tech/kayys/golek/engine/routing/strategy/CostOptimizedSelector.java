@@ -1,8 +1,8 @@
 package tech.kayys.golek.engine.routing.strategy;
 
-import tech.kayys.golek.api.provider.RoutingContext;
-import tech.kayys.golek.api.routing.RoutingConfig;
-import tech.kayys.golek.api.provider.LLMProvider;
+import tech.kayys.golek.spi.provider.RoutingContext;
+import tech.kayys.golek.spi.routing.RoutingConfig;
+import tech.kayys.golek.spi.provider.LLMProvider;
 
 import java.util.Comparator;
 import java.util.List;

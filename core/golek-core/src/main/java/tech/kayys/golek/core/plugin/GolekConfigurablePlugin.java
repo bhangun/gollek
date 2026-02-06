@@ -1,6 +1,6 @@
 package tech.kayys.golek.core.plugin;
 
-import tech.kayys.golek.plugin.api.GolekPlugin;
+import tech.kayys.golek.spi.plugin.GolekPlugin;
 
 import java.util.Map;
 

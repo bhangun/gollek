@@ -1,8 +1,8 @@
 package tech.kayys.golek.engine.provider.adapter;
 
 import io.smallrye.mutiny.Uni;
-import tech.kayys.golek.api.provider.ProviderCapabilities;
-import tech.kayys.golek.api.provider.ProviderHealth;
+import tech.kayys.golek.spi.provider.ProviderCapabilities;
+import tech.kayys.golek.spi.provider.ProviderHealth;
 import tech.kayys.golek.engine.loader.ModelLoader;
 import tech.kayys.golek.engine.session.SessionManager;
 import tech.kayys.wayang.tenant.TenantContext;

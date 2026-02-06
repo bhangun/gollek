@@ -4,8 +4,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
-import tech.kayys.golek.api.model.ModelManifest;
-import tech.kayys.golek.api.exception.InferenceException;
+import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.exception.InferenceException;
 import tech.kayys.golek.engine.model.ModelRunner;
 import tech.kayys.golek.engine.model.RunnerConfiguration;
 

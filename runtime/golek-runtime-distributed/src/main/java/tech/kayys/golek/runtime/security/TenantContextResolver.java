@@ -4,6 +4,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.core.SecurityContext;
 import tech.kayys.wayang.tenant.TenantContext;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.jboss.logging.Logger;
 
@@ -17,7 +18,20 @@ public class TenantContextResolver {
 
     private static final Logger LOG = Logger.getLogger(TenantContextResolver.class);
 
+    @ConfigProperty(name = "wayang.multitenancy.enabled", defaultValue = "false")
+    boolean multitenancyEnabled;
+
     public TenantContext resolve(SecurityContext securityContext) {
+        if (!multitenancyEnabled) {
+            String userId = securityContext != null && securityContext.getUserPrincipal() != null
+                    ? securityContext.getUserPrincipal().getName()
+                    : "anonymous";
+            return TenantContext.builder()
+                    .tenantId("default")
+                    .userId(userId)
+                    .build();
+        }
+
         if (securityContext.getUserPrincipal() == null) {
             throw new UnauthorizedException("No user principal found");
         }

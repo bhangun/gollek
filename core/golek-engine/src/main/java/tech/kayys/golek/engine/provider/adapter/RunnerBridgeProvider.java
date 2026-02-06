@@ -1,14 +1,14 @@
 package tech.kayys.golek.engine.provider.adapter;
 
 import io.smallrye.mutiny.Uni;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.model.ModelManifest;
-import tech.kayys.golek.api.provider.ProviderCapabilities;
-import tech.kayys.golek.api.provider.ProviderConfig;
-import tech.kayys.golek.api.provider.ProviderHealth;
-import tech.kayys.golek.api.provider.ProviderMetadata;
-import tech.kayys.golek.api.provider.ProviderRequest;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.provider.ProviderCapabilities;
+import tech.kayys.golek.spi.provider.ProviderConfig;
+import tech.kayys.golek.spi.provider.ProviderHealth;
+import tech.kayys.golek.spi.provider.ProviderMetadata;
+import tech.kayys.golek.spi.provider.ProviderRequest;
 import tech.kayys.golek.engine.execution.ModelRunnerFactory;
 import tech.kayys.golek.engine.model.ModelRunner;
 import tech.kayys.golek.model.exception.ModelNotFoundException;
@@ -16,7 +16,7 @@ import tech.kayys.golek.engine.model.ModelRepository;
 import tech.kayys.golek.provider.core.spi.LLMProvider;
 import tech.kayys.golek.provider.core.spi.StreamingProvider;
 import tech.kayys.wayang.tenant.TenantContext;
-import tech.kayys.golek.api.stream.StreamChunk;
+import tech.kayys.golek.spi.stream.StreamChunk;
 import io.smallrye.mutiny.Multi;
 
 /**
@@ -81,10 +81,11 @@ public class RunnerBridgeProvider implements LLMProvider, StreamingProvider {
 
     @Override
     public boolean supports(String modelId, TenantContext tenantContext) {
+        TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
         // We need to check if the underlying runner supports the model's format.
         // This requires looking up the model manifest.
         try {
-            ModelManifest manifest = modelRepository.findById(modelId, tenantContext.getTenantId())
+            ModelManifest manifest = modelRepository.findById(modelId, effectiveTenantContext.getTenantId())
                     .orElse(null);
 
             if (manifest == null) {
@@ -120,6 +121,7 @@ public class RunnerBridgeProvider implements LLMProvider, StreamingProvider {
     public Uni<InferenceResponse> infer(ProviderRequest request, TenantContext context) {
         return Uni.createFrom().item(() -> {
             try {
+                TenantContext effectiveTenantContext = ensureTenantContext(context);
                 // translate ProviderRequest to InferenceRequest (Engine's internal format)
                 // Note: ProviderRequest and InferenceRequest are very similar.
                 // We might need a converter. For now, assuming manual mapping.
@@ -138,7 +140,7 @@ public class RunnerBridgeProvider implements LLMProvider, StreamingProvider {
                         .build();
 
                 // Get Manifest
-                ModelManifest manifest = modelRepository.findById(request.getModel(), context.getTenantId())
+                ModelManifest manifest = modelRepository.findById(request.getModel(), effectiveTenantContext.getTenantId())
                         .orElseThrow(() -> new ModelNotFoundException(request.getModel()));
 
                 // Get Runner
@@ -184,5 +186,9 @@ public class RunnerBridgeProvider implements LLMProvider, StreamingProvider {
             return runnerName.substring(0, dashIndex);
         }
         return runnerName;
+    }
+
+    private TenantContext ensureTenantContext(TenantContext tenantContext) {
+        return tenantContext != null ? tenantContext : TenantContext.of("default");
     }
 }

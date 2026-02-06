@@ -7,8 +7,8 @@ import tech.kayys.golek.core.execution.ExecutionContext;
 import tech.kayys.golek.core.execution.ExecutionToken;
 import tech.kayys.golek.engine.execution.ExecutionStatus;
 import tech.kayys.wayang.tenant.TenantContext;
-import tech.kayys.golek.api.inference.InferencePhase;
-import tech.kayys.golek.engine.context.EngineContext;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.spi.inference.InferencePhase;
 
 /**
  * Default implementation of execution context.
@@ -25,7 +25,7 @@ public class DefaultExecutionContext implements ExecutionContext {
             TenantContext tenantContext,
             ExecutionToken initialToken) {
         this.engineContext = engineContext;
-        this.tenantContext = tenantContext;
+        this.tenantContext = tenantContext != null ? tenantContext : TenantContext.of("default");
         this.tokenRef = new AtomicReference<>(initialToken);
         this.errorRef = new AtomicReference<>();
     }

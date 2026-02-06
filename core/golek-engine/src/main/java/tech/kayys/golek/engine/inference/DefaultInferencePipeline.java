@@ -9,7 +9,7 @@ import org.jboss.logging.Logger;
 
 import tech.kayys.golek.core.plugin.InferencePhasePlugin;
 import tech.kayys.golek.engine.plugin.GolekPluginRegistry;
-import tech.kayys.golek.api.inference.InferencePhase;
+import tech.kayys.golek.spi.inference.InferencePhase;
 import tech.kayys.golek.core.execution.ExecutionContext;
 import tech.kayys.golek.engine.execution.ExecutionSignal;
 import tech.kayys.golek.engine.execution.ExecutionStateMachine;

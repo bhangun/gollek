@@ -3,7 +3,7 @@ package tech.kayys.golek.runtime.security;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import tech.kayys.golek.api.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.wayang.tenant.TenantContext;
 
 import org.jboss.logging.Logger;

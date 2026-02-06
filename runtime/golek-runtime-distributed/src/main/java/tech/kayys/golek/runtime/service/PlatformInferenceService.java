@@ -8,7 +8,7 @@ import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
 import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 import org.jboss.logging.Logger;
-import tech.kayys.golek.api.inference.*;
+import tech.kayys.golek.spi.inference.*;
 import tech.kayys.golek.runtime.InferenceEngine;
 import tech.kayys.golek.runtime.audit.AuditService;
 import tech.kayys.golek.runtime.metrics.InferenceMetrics;

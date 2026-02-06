@@ -1,6 +1,6 @@
 package tech.kayys.golek.engine.resource.dto;
 
-import tech.kayys.golek.api.inference.InferenceResponse;
+import tech.kayys.golek.spi.inference.InferenceResponse;
 import java.time.Instant;
 
 public record InferenceResponseDTO(

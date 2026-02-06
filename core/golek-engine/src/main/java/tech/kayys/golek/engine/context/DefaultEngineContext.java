@@ -5,19 +5,16 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
-import tech.kayys.golek.api.context.EngineContext;
-import tech.kayys.golek.api.plugin.PluginRegistry;
-import tech.kayys.golek.api.provider.ProviderRegistry;
-import tech.kayys.golek.core.exception.IllegalStateTransitionException;
-import tech.kayys.golek.engine.plugin.GolekPluginRegistry;
-import tech.kayys.golek.engine.registry.GolekProviderRegistry;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.spi.plugin.PluginRegistry;
+import tech.kayys.golek.spi.provider.ProviderRegistry;
 
 /**
  * Default implementation of engine context.
  */
 public class DefaultEngineContext implements EngineContext {
 
-    private final GolekPluginRegistry pluginRegistry;
+    private final PluginRegistry pluginRegistry;
     private final ProviderRegistry providerRegistry;
     private final ExecutorService executorService;
     private final Map<String, Object> config;
@@ -36,7 +33,7 @@ public class DefaultEngineContext implements EngineContext {
     }
 
     @Override
-    public GolekPluginRegistry pluginRegistry() {
+    public PluginRegistry pluginRegistry() {
         return pluginRegistry;
     }
 
@@ -103,14 +100,14 @@ public class DefaultEngineContext implements EngineContext {
     }
 
     public static class Builder {
-        private GolekPluginRegistry pluginRegistry;
+        private PluginRegistry pluginRegistry;
         private ProviderRegistry providerRegistry;
         private ExecutorService executorService;
         private Map<String, Object> config = Map.of();
         private Instant startTime = Instant.now();
         private String version = "1.0.0";
 
-        public Builder pluginRegistry(GolekPluginRegistry pluginRegistry) {
+        public Builder pluginRegistry(PluginRegistry pluginRegistry) {
             this.pluginRegistry = pluginRegistry;
             return this;
         }

@@ -157,10 +157,11 @@ public class TensorFlowProvider implements LLMProvider {
     }
 
     private TFModel loadModel(String modelId, TenantContext context) {
+        TenantContext effectiveContext = ensureTenantContext(context);
         return modelCache.computeIfAbsent(modelId, id -> {
             LOG.infof("Loading TensorFlow model: %s", id);
 
-            String modelPath = resolveModelPath(id, context);
+            String modelPath = resolveModelPath(id, effectiveContext);
             TFModel model = new TFModel(modelPath);
             model.load();
 
@@ -193,6 +194,10 @@ public class TensorFlowProvider implements LLMProvider {
     private String resolveModelPath(String modelId, TenantContext context) {
         String basePath = config.getString("models.path", "./models");
         return basePath + "/" + context.getTenantId() + "/" + modelId;
+    }
+
+    private TenantContext ensureTenantContext(TenantContext context) {
+        return context != null ? context : TenantContext.of("default");
     }
 
     private void initializeTensorFlow() {

@@ -6,8 +6,8 @@ import java.util.Optional;
 
 import tech.kayys.golek.engine.model.ModelArtifact;
 import tech.kayys.golek.engine.model.ModelDescriptor;
-import tech.kayys.golek.api.model.ModelFormat;
-import tech.kayys.golek.api.model.ModelManifest;
+import tech.kayys.golek.spi.model.ModelFormat;
+import tech.kayys.golek.spi.model.ModelManifest;
 import tech.kayys.golek.engine.model.ModelRef;
 import tech.kayys.golek.model.core.Pageable;
 import tech.kayys.golek.model.exception.ArtifactDownloadException;

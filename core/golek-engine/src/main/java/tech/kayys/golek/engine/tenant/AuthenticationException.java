@@ -1,14 +1,11 @@
 package tech.kayys.golek.engine.tenant;
 
-public class AuthenticationException extends RuntimeException {
-    private final ErrorCode errorCode;
+import tech.kayys.golek.engine.exception.InferenceException;
+import tech.kayys.golek.spi.error.ErrorCode;
+
+public class AuthenticationException extends InferenceException {
 
     public AuthenticationException(ErrorCode errorCode, String message) {
-        super(message);
-        this.errorCode = errorCode;
-    }
-
-    public ErrorCode getErrorCode() {
-        return errorCode;
+        super(errorCode, message);
     }
 }

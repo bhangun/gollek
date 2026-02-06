@@ -18,8 +18,8 @@ import org.junit.jupiter.api.Test;
 
 import io.quarkus.runtime.configuration.MemorySize;
 import jakarta.enterprise.inject.Instance;
-import tech.kayys.golek.api.context.RequestContext;
-import tech.kayys.golek.api.model.*;
+import tech.kayys.golek.spi.context.RequestContext;
+import tech.kayys.golek.spi.model.*;
 import tech.kayys.wayang.tenant.TenantId;
 
 public class SelectionPolicyTest {

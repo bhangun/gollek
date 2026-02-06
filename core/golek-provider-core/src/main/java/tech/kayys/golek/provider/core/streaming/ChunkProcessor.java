@@ -1,6 +1,6 @@
 package tech.kayys.golek.provider.core.streaming;
 
-import tech.kayys.golek.api.stream.StreamChunk;
+import tech.kayys.golek.spi.stream.StreamChunk;
 
 /**
  * Processes raw chunks into StreamChunk objects

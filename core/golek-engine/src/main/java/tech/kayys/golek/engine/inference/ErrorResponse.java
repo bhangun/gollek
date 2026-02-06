@@ -2,7 +2,7 @@ package tech.kayys.golek.engine.inference;
 
 import lombok.Builder;
 import lombok.Data;
-import tech.kayys.golek.api.exception.InferenceException;
+import tech.kayys.golek.spi.exception.InferenceException;
 
 import java.time.Instant;
 

@@ -4,15 +4,15 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
-import tech.kayys.golek.api.context.RequestContext;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.model.DeviceType;
-import tech.kayys.golek.api.model.HealthStatus;
-import tech.kayys.golek.api.model.ModelManifest;
-import tech.kayys.golek.api.model.ResourceMetrics;
-import tech.kayys.golek.api.model.RunnerMetadata;
-import tech.kayys.golek.api.exception.InferenceException;
+import tech.kayys.golek.spi.context.RequestContext;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.model.DeviceType;
+import tech.kayys.golek.spi.model.HealthStatus;
+import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.model.ResourceMetrics;
+import tech.kayys.golek.spi.model.RunnerMetadata;
+import tech.kayys.golek.spi.exception.InferenceException;
 import tech.kayys.golek.engine.exception.RunnerInitializationException;
 
 /**
@@ -136,7 +136,7 @@ public interface ModelRunner extends AutoCloseable {
      * @param request Inference request with inputs
      * @param context Request context with timeout, priority, etc.
      * @return Inference response with outputs
-     * @throws tech.kayys.golek.api.exception.InferenceException if execution fails
+     * @throws tech.kayys.golek.spi.exception.InferenceException if execution fails
      */
     InferenceResponse infer(
             InferenceRequest request,

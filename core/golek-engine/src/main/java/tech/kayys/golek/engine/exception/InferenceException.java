@@ -1,6 +1,6 @@
 package tech.kayys.golek.engine.exception;
 
-import tech.kayys.golek.api.error.ErrorCode;
+import tech.kayys.golek.spi.error.ErrorCode;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -11,12 +11,12 @@ public class InferenceException extends RuntimeException {
 
     public InferenceException(ErrorCode errorCode, String message) {
         super(message);
-        this.errorCode = errorCode;
+        this.errorCode = errorCode != null ? errorCode : ErrorCode.INTERNAL_ERROR;
     }
 
     public InferenceException(ErrorCode errorCode, String message, Throwable cause) {
         super(message, cause);
-        this.errorCode = errorCode;
+        this.errorCode = errorCode != null ? errorCode : ErrorCode.INTERNAL_ERROR;
     }
 
     public InferenceException addContext(String key, Object value) {
@@ -26,6 +26,14 @@ public class InferenceException extends RuntimeException {
 
     public ErrorCode getErrorCode() {
         return errorCode;
+    }
+
+    public int getHttpStatusCode() {
+        return errorCode.getHttpStatus();
+    }
+
+    public boolean isRetryable() {
+        return errorCode.isRetryable();
     }
 
     public Map<String, Object> getContext() {

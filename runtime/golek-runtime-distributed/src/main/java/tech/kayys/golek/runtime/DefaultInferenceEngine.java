@@ -6,9 +6,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.inference.StreamChunk;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.inference.StreamChunk;
 import tech.kayys.golek.runtime.service.ModelRunnerFactory;
 
 /**
@@ -32,13 +32,13 @@ public class DefaultInferenceEngine implements InferenceEngine {
     @Override
     public void initialize() {
         LOG.info("Initializing inference engine...");
-        
+
         // Initialize model runners
         runnerFactory.initialize();
-        
+
         initialized = true;
         healthy = true;
-        
+
         LOG.info("Inference engine initialized successfully");
     }
 
@@ -95,13 +95,13 @@ public class DefaultInferenceEngine implements InferenceEngine {
     @Override
     public void shutdown() {
         LOG.info("Shutting down inference engine...");
-        
+
         // Shutdown model runners
         runnerFactory.closeAll();
-        
+
         initialized = false;
         healthy = false;
-        
+
         LOG.info("Inference engine shutdown complete");
     }
 
@@ -114,13 +114,12 @@ public class DefaultInferenceEngine implements InferenceEngine {
     public EngineStats getStats() {
         double avgLatency = totalInferences > 0 ? totalLatency / totalInferences : 0.0;
         String status = healthy ? "HEALTHY" : "UNHEALTHY";
-        
+
         return new EngineStats(
                 activeInferences,
                 totalInferences,
                 failedInferences,
                 avgLatency,
-                status
-        );
+                status);
     }
 }

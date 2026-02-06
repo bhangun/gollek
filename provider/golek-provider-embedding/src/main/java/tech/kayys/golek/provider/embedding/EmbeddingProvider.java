@@ -7,14 +7,14 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.provider.ProviderCapabilities;
-import tech.kayys.golek.api.provider.ProviderConfig;
-import tech.kayys.golek.api.provider.ProviderHealth;
-import tech.kayys.golek.api.provider.ProviderMetadata;
-import tech.kayys.golek.api.provider.ProviderRequest;
-import tech.kayys.golek.api.stream.StreamChunk;
-import tech.kayys.golek.api.tenant.TenantContext;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.provider.ProviderCapabilities;
+import tech.kayys.golek.spi.provider.ProviderConfig;
+import tech.kayys.golek.spi.provider.ProviderHealth;
+import tech.kayys.golek.spi.provider.ProviderMetadata;
+import tech.kayys.golek.spi.provider.ProviderRequest;
+import tech.kayys.golek.spi.stream.StreamChunk;
+import tech.kayys.golek.spi.tenant.TenantContext;
 import tech.kayys.golek.provider.core.adapter.LocalProviderAdapter;
 
 import java.time.Duration;
@@ -139,7 +139,8 @@ public class EmbeddingProvider extends LocalProviderAdapter {
 
     @Override
     protected Uni<Void> doInitialize(Map<String, Object> config, TenantContext tenant) {
-        LOG.infof("Initializing Embedding provider for tenant: %s", tenant.getTenantId());
+        TenantContext effectiveTenant = tenant != null ? tenant : TenantContext.of("default");
+        LOG.infof("Initializing Embedding provider for tenant: %s", effectiveTenant.getTenantId());
         return Uni.createFrom().voidItem();
     }
 

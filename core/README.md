@@ -1,14 +1,11 @@
-# Module Organization Guide for Golek Core
+# Golek Core — Module Guide
 
+This directory contains the core building blocks for Golek. Each module has a focused scope and clear dependency direction.
 
----
+## Module Structure
 
-##  Module Structure
-
-### **golek-api** (Interfaces & Contracts)
+### **golek-spi** (Interfaces & Contracts)
 **Purpose**: Public APIs, interfaces, and value objects that other modules depend on
-
-
 
 **Key Principle**: Only interfaces, DTOs, and exceptions. No implementations.
 
@@ -32,22 +29,12 @@
 ### **golek-provider-core** (Provider SPI)
 **Purpose**: Service Provider Interface for pluggable model runners
 
-**Package Structure**:
-```
-
-```
-
 **Key Principle**: Clean separation between model repository (metadata) and provider (execution)
 
 ---
 
 ### **golek-engine** (Inference Engine Implementation)
 **Purpose**: Concrete implementations of inference pipeline and orchestration
-
-**Package Structure**:
-```
-
-```
 
 **Key Principle**: Framework-specific implementations (Jakarta CDI, Quarkus), orchestration logic
 
@@ -56,11 +43,6 @@
 ### **golek-infrastructure** (Infrastructure & Integration)
 **Purpose**: Framework integration, REST resources, persistence
 
-**Package Structure**:
-```
-
-```
-
 **Key Principle**: All infrastructure concerns - HTTP, persistence, monitoring, plugin loading
 
 ---
@@ -68,14 +50,27 @@
 ### **golek-plugin-api** (Plugin Development API)
 **Purpose**: API for third-party plugin developers
 
-**Package Structure**:
-```
-
-```
-
 **Key Principle**: Everything a plugin developer needs, isolated from internal implementation
 
 ---
+
+## Capability Map (Quick)
+
+* **API Contracts**: `inference-golek/core/golek-spi/`
+* **Domain + Policy**: `inference-golek/core/golek-core/`
+* **Engine Orchestration**: `inference-golek/core/golek-engine/`
+* **Model Registry & Artifacts**: `inference-golek/core/golek-model-repo-core/`
+* **Provider SPI**: `inference-golek/core/golek-provider-core/`
+* **Infrastructure**: `inference-golek/core/golek-infrastructure/`
+* **Plugin API**: `inference-golek/core/golek-plugin-api/`
+
+## Error Codes
+
+Generate docs for the centralized error codes:
+
+```bash
+./scripts/generate-error-codes.sh
+```
 
 ## Dependency Flow
 
@@ -83,7 +78,7 @@ The modules should depend on each other in this order (no circular dependencies)
 
 ```mermaid
 graph TD
-    A[golek-api] 
+    A[golek-spi] 
     B[golek-plugin-api]
     C[golek-core]
     D[golek-model-repo-core]
@@ -121,7 +116,7 @@ graph TD
 ```
 
 **Legend**:
-- **Blue** (golek-api, golek-plugin-api): **Contracts & APIs** - Stable interfaces, minimal dependencies
+- **Blue** (golek-spi, golek-plugin-api): **Contracts & APIs** - Stable interfaces, minimal dependencies
 - **Yellow** (golek-core, model-repo, provider-core): **Domain Layer** - Business logic & SPI definitions
 - **Red** (golek-engine): **Application Layer** - Orchestration, reliability patterns, implementation
 - **Purple** (golek-infrastructure): **Infrastructure Layer** - Framework integration (Quarkus/REST), adapters
@@ -142,7 +137,7 @@ graph TD
 
 ### 3. **Stable Dependencies Principle**
 - Depend on modules that change less frequently
-- `golek-api` should be the most stable (rarely changes)
+- `golek-spi` should be the most stable (rarely changes)
 - `golek-infrastructure` can change frequently
 
 ### 4. **Interface Segregation**
@@ -156,5 +151,3 @@ graph TD
 - **DTOs**: Suffix based on purpose (`Request`, `Response`, `Metadata`)
 
 ---
-
-

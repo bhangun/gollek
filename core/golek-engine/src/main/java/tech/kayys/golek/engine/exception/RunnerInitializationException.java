@@ -1,6 +1,6 @@
 package tech.kayys.golek.engine.exception;
 
-import tech.kayys.golek.api.error.ErrorCode;
+import tech.kayys.golek.spi.error.ErrorCode;
 
 /**
  * Exception thrown during runner initialization.

@@ -1,6 +1,6 @@
 package tech.kayys.golek.core.plugin;
 
-import tech.kayys.golek.api.plugin.PluginContext;
+import tech.kayys.golek.spi.plugin.PluginContext;
 import java.util.Optional;
 
 /**

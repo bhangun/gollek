@@ -1,202 +1,37 @@
+# Golek Provider Core (SPI)
 
+This module defines the **provider SPI** and shared contracts used by all model providers (cloud and local).
 
-```
-inference-providers-spi/
-├── pom.xml
-└── src/main/java/tech/kayys/wayang/inference/providers/
-    ├── core/
-    │   ├── LLMProvider.java
-    │   ├── ProviderCapabilities.java
-    │   ├── ProviderRequest.java
-    │   ├── ProviderResponse.java
-    │   ├── ProviderContext.java
-    │   ├── ProviderException.java
-    │   └── ProviderMetrics.java
-    ├── streaming/
-    │   ├── StreamingProvider.java
-    │   ├── StreamChunk.java
-    │   └── StreamingResponse.java
-    ├── circuit/
-    │   ├── CircuitBreaker.java
-    │   ├── CircuitBreakerConfig.java
-    │   └── CircuitBreakerOpenException.java
-    └── registry/
-        ├── ProviderRegistry.java
-        └── ProviderDescriptor.java
-```
+## Key Capabilities
 
+* Provider interfaces for sync and streaming inference
+* Health, metrics, and capability reporting
+* Provider registry + discovery hooks
+* Common rate‑limit and audit helpers
 
+## Core Interfaces (Current Paths)
 
-## 📋 Summary
+* `inference-golek/core/golek-provider-core/src/main/java/tech/kayys/golek/provider/core/spi/LLMProvider.java`
+* `inference-golek/core/golek-provider-core/src/main/java/tech/kayys/golek/provider/core/spi/StreamingProvider.java`
+* `inference-golek/core/golek-provider-core/src/main/java/tech/kayys/golek/provider/core/spi/ProviderContext.java`
+* `inference-golek/core/golek-provider-core/src/main/java/tech/kayys/golek/provider/core/spi/ProviderCandidate.java`
 
-This implementation provides:
+## Streaming Helpers
 
-### ✅ **Provider System**
-- Clean SPI with `LLMProvider` interface
-- `ProviderRegistry` for discovery and management
-- Streaming support via `StreamingLLMProvider`
-- Health checks and metrics
-- Tenant-aware isolation
+* `inference-golek/core/golek-provider-core/src/main/java/tech/kayys/golek/provider/core/streaming/StreamHandler.java`
+* `inference-golek/core/golek-provider-core/src/main/java/tech/kayys/golek/provider/core/streaming/SSEStreamHandler.java`
+* `inference-golek/core/golek-provider-core/src/main/java/tech/kayys/golek/provider/core/streaming/WebSocketStreamHandler.java`
 
-### ✅ **Observability**
-- `InferenceObserver` for lifecycle hooks
-- Metrics via Micrometer
-- Distributed tracing via OpenTelemetry
-- Structured logging
+## Observability & Reliability
 
-### ✅ **Safety**
-- `SafetyPlugin` interface
-- Content moderation implementation
-- Configurable patterns
-- Violation tracking
+* `inference-golek/core/golek-provider-core/src/main/java/tech/kayys/golek/provider/core/ratelimit/RateLimiter.java`
+* `inference-golek/core/golek-provider-core/src/main/java/tech/kayys/golek/provider/core/quota/ProviderQuotaService.java`
+* `inference-golek/core/golek-provider-core/src/main/java/tech/kayys/golek/provider/core/audit/AuditLoggingPlugin.java`
 
+## Notes
 
-
-### ✅ **PyTorch Provider**
-- `.pt`, `.pth`, TorchScript support
-- CUDA acceleration
-- Streaming generation
-- Dynamic quantization
-
-### ✅ **TensorFlow Provider**
-- SavedModel format
-- TensorRT optimization
-- Batch inference
-- Signature-based serving
-
-### ✅ **HuggingFace Provider**
-- Cloud API integration
-- Serverless inference
-- Streaming support
-- Model Hub access
-
-### ✅ **Embedding Provider**
-- Sentence transformers
-- Batch embedding
-- Normalized vectors
-- Multiple pooling strategies
-
-### 🎯 **Key Features**
-- Multi-tenant isolation
-- Health checks
-- Metrics integration
-- Graceful degradation
-- Model caching
-- Format auto-detection
-
-
-# Multi-Provider System Enhancement
-
-## Overview
-
-Enhance the Golek inference server's multi-provider system to support:
-- **Provider pools** for grouping cloud vs local providers
-- **Selection strategies** (round-robin, weighted, random, cost-optimized, user-selected)
-- **Automatic failover** when quota limits are reached
-- **Load balancing** across healthy providers
-- **User-selectable routing** with configurable auto-switching
-
-## Current State
-
-The existing infrastructure includes:
-- **[ModelRouterService](inference-golek/core/golek-engine/src/main/java/tech/kayys/golek/engine/model/ModelRouterService.java#53-558)** (engine): Multi-factor scoring with quota/circuit-breaker penalties
-- **[ProviderRegistry](inference-golek/core/golek-provider-core/src/main/java/tech/kayys/golek/provider/core/registry/ProviderRegistry.java#27-258)**: CDI-based provider discovery and versioning
-- **[RoutingContext](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/provider/RoutingContext.java#12-21)**: Captures `preferredProvider`, `costSensitive`, `priority` hints
-
-### Existing Providers
-
-| Type | Providers |
-|------|-----------|
-| Cloud | `gemini`, `openai`, `anthropic`, `huggingface`, `cerebras` |
-| Local | `ollama`, `local` (CPU-optimized), `local-vllm` (production) |
-
----
-
-## Proposed Changes
-
-### 1. Provider Pool System (`golek-api`)
-
-#### [NEW] [ProviderPool.java](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/routing/ProviderPool.java)
-
-```java
-public record ProviderPool(
-    String poolId,
-    String displayName,
-    PoolType type,
-    List<String> providerIds,
-    SelectionStrategy defaultStrategy,
-    int priority
-) {
-    public enum PoolType { CLOUD, LOCAL, HYBRID }
-}
-```
-
-#### [NEW] [SelectionStrategy.java](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/routing/SelectionStrategy.java)
-
-```java
-public enum SelectionStrategy {
-    ROUND_ROBIN,      // Cycle through providers sequentially
-    RANDOM,           // Random selection with equal weight
-    WEIGHTED_RANDOM,  // Random with configurable weights
-    LEAST_LOADED,     // Prefer providers with lowest current load
-    COST_OPTIMIZED,   // Prefer cheapest (local > cloud)
-    LATENCY_OPTIMIZED,// Prefer fastest based on P95
-    USER_SELECTED,    // Use explicit user preference
-    FAILOVER          // Try primary, fallback on quota/error
-}
-```
-
----
-
-### 2. Routing Configuration (`golek-api`)
-
-#### [NEW] [RoutingConfig.java](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/routing/RoutingConfig.java)
-
-```java
-public record RoutingConfig(
-    SelectionStrategy defaultStrategy,
-    List<ProviderPool> pools,
-    Map<String, Integer> providerWeights,
-    boolean autoFailover,
-    int maxRetries,
-    Duration retryDelay
-) {}
-```
-
-#### [MODIFY] [RoutingContext.java](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/provider/RoutingContext.java)
-
-Add:
-- `Optional<SelectionStrategy> strategyOverride`
-- `Optional<String> poolId` (restrict to specific pool)
-- `Set<String> excludedProviders` (blacklist quota-exhausted)
-
----
-
-### 3. Multi-Provider Router (`golek-provider-core`)
-
-#### [NEW] [MultiProviderRouter.java] golek-provider-core/src/main/java/tech/kayys/golek/provider/core/routing/MultiProviderRouter.java)
-
-Core routing service that:
-1. Resolves `ProviderPool` for the request
-2. Filters by model compatibility and health
-3. Applies `SelectionStrategy` to pick provider
-4. Handles quota exhaustion with automatic failover
-
-```java
-@ApplicationScoped
-public class MultiProviderRouter {
-
-    Uni<LLMProvider> selectProvider(
-        String modelId, 
-        RoutingContext context, 
-        RoutingConfig config);
-    
-    List<LLMProvider> getCandidates(
-        String modelId, 
-        ProviderPool pool, 
-        RoutingContext context);
-}
-```
+* Cloud/local providers live under `inference-golek/provider/`
+* Routing policies are implemented in `golek-engine` (see `ModelRouterService`)
 
 #### [NEW] Strategy Implementations
 
@@ -291,21 +126,21 @@ Implemented a comprehensive multi-provider routing system for the Golek inferenc
 
 ## Changes Made
 
-### Phase 1: API Types (`golek-api/routing`)
+### Phase 1: API Types (`golek-spi/routing`)
 
 | File | Description |
 |------|-------------|
-| [SelectionStrategy.java](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/routing/SelectionStrategy.java) | Enum with 9 selection strategies |
-| [ProviderPool.java](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/routing/ProviderPool.java) | Record for grouping providers by type |
-| [RoutingConfig.java](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/routing/RoutingConfig.java) | Configuration for pools, weights, failover |
-| [RoutingDecision.java](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/routing/RoutingDecision.java) | Result of routing with fallback info |
-| [QuotaExhaustedException.java](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/routing/QuotaExhaustedException.java) | Exception triggering failover |
+| [SelectionStrategy.java](inference-golek/core/golek-spi/src/main/java/tech/kayys/golek/api/routing/SelectionStrategy.java) | Enum with 9 selection strategies |
+| [ProviderPool.java](inference-golek/core/golek-spi/src/main/java/tech/kayys/golek/api/routing/ProviderPool.java) | Record for grouping providers by type |
+| [RoutingConfig.java](inference-golek/core/golek-spi/src/main/java/tech/kayys/golek/api/routing/RoutingConfig.java) | Configuration for pools, weights, failover |
+| [RoutingDecision.java](inference-golek/core/golek-spi/src/main/java/tech/kayys/golek/api/routing/RoutingDecision.java) | Result of routing with fallback info |
+| [QuotaExhaustedException.java](inference-golek/core/golek-spi/src/main/java/tech/kayys/golek/api/routing/QuotaExhaustedException.java) | Exception triggering failover |
 
 ### Enhanced Existing
 
 | File | Changes |
 |------|---------|
-| [RoutingContext.java](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/provider/RoutingContext.java) | Added `strategyOverride`, [poolId](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/routing/ProviderPool.java#114-118), [excludedProviders](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/provider/RoutingContext.java#169-173) |
+| [RoutingContext.java](inference-golek/core/golek-spi/src/main/java/tech/kayys/golek/api/provider/RoutingContext.java) | Added `strategyOverride`, [poolId](inference-golek/core/golek-spi/src/main/java/tech/kayys/golek/api/routing/ProviderPool.java#114-118), [excludedProviders](inference-golek/core/golek-spi/src/main/java/tech/kayys/golek/api/provider/RoutingContext.java#169-173) |
 
 ---
 
@@ -337,7 +172,7 @@ Implemented a comprehensive multi-provider routing system for the Golek inferenc
 
 | File | Description |
 |------|-------------|
-| [ModelProviderMapping.java](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/routing/ModelProviderMapping.java) | Record mapping models to providers |
+| [ModelProviderMapping.java](inference-golek/core/golek-spi/src/main/java/tech/kayys/golek/api/routing/ModelProviderMapping.java) | Record mapping models to providers |
 | [ModelProviderRegistry.java](inference-golek/core/golek-provider-core/src/main/java/tech/kayys/golek/provider/core/routing/ModelProviderRegistry.java) | Registry with default mappings |
 
 **Default Model Mappings:**
@@ -347,9 +182,9 @@ Implemented a comprehensive multi-provider routing system for the Golek inferenc
 | `gpt-4`, `gpt-4-turbo`, `gpt-3.5-turbo` | `openai`, `azure-openai` |
 | `claude-3-opus`, `claude-3-sonnet` | `anthropic` |
 | `gemini-pro`, `gemini-ultra` | `gemini` |
-| `llama-3-8b`, `mistral-7b`, `phi-3` | `ollama`, [local](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/routing/ProviderPool.java#85-98), `local-vllm` |
+| `llama-3-8b`, `mistral-7b`, `phi-3` | `ollama`, [local](inference-golek/core/golek-spi/src/main/java/tech/kayys/golek/api/routing/ProviderPool.java#85-98), `local-vllm` |
 | `llama-3-70b` | `local-vllm` (large model) |
-| `codellama-13b` | `ollama`, [local](inference-golek/core/golek-api/src/main/java/tech/kayys/golek/api/routing/ProviderPool.java#85-98) |
+| `codellama-13b` | `ollama`, [local](inference-golek/core/golek-spi/src/main/java/tech/kayys/golek/api/routing/ProviderPool.java#85-98) |
 
 ---
 

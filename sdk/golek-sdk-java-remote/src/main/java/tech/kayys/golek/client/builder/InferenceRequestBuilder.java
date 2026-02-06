@@ -1,8 +1,8 @@
 package tech.kayys.golek.client.builder;
 
-import tech.kayys.golek.api.Message;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.tool.ToolDefinition;
+import tech.kayys.golek.spi.Message;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.tool.ToolDefinition;
 
 import java.time.Duration;
 import java.util.ArrayList;

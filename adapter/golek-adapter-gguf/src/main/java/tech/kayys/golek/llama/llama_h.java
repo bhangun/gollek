@@ -35822,7 +35822,7 @@ public class llama_h extends llama_h_1 {
      */
     public static MemorySegment __DARWIN_SUF_64_BIT_INO_T() {
         class Holder {
-            static final MemorySegment __DARWIN_SUF_64_BIT_INO_T = llama_h.LIBRARY_ARENA.allocateUtf8String("$INODE64");
+            static final MemorySegment __DARWIN_SUF_64_BIT_INO_T = llama_h.LIBRARY_ARENA.allocateFrom("$INODE64");
         }
         return Holder.__DARWIN_SUF_64_BIT_INO_T;
     }
@@ -35833,7 +35833,7 @@ public class llama_h extends llama_h_1 {
      */
     public static MemorySegment __DARWIN_SUF_1050() {
         class Holder {
-            static final MemorySegment __DARWIN_SUF_1050 = llama_h.LIBRARY_ARENA.allocateUtf8String("$1050");
+            static final MemorySegment __DARWIN_SUF_1050 = llama_h.LIBRARY_ARENA.allocateFrom("$1050");
         }
         return Holder.__DARWIN_SUF_1050;
     }
@@ -35844,7 +35844,7 @@ public class llama_h extends llama_h_1 {
      */
     public static MemorySegment __DARWIN_SUF_EXTSN() {
         class Holder {
-            static final MemorySegment __DARWIN_SUF_EXTSN = llama_h.LIBRARY_ARENA.allocateUtf8String("$DARWIN_EXTSN");
+            static final MemorySegment __DARWIN_SUF_EXTSN = llama_h.LIBRARY_ARENA.allocateFrom("$DARWIN_EXTSN");
         }
         return Holder.__DARWIN_SUF_EXTSN;
     }
@@ -37106,7 +37106,7 @@ public class llama_h extends llama_h_1 {
     public static MemorySegment __AVAILABILITY_VERSIONS_VERSION_STRING() {
         class Holder {
             static final MemorySegment __AVAILABILITY_VERSIONS_VERSION_STRING = llama_h.LIBRARY_ARENA
-                    .allocateUtf8String("Local");
+                    .allocateFrom("Local");
         }
         return Holder.__AVAILABILITY_VERSIONS_VERSION_STRING;
     }
@@ -37118,7 +37118,7 @@ public class llama_h extends llama_h_1 {
     public static MemorySegment __AVAILABILITY_FILE() {
         class Holder {
             static final MemorySegment __AVAILABILITY_FILE = llama_h.LIBRARY_ARENA
-                    .allocateUtf8String("AvailabilityVersions.h");
+                    .allocateFrom("AvailabilityVersions.h");
         }
         return Holder.__AVAILABILITY_FILE;
     }
@@ -37189,7 +37189,7 @@ public class llama_h extends llama_h_1 {
      */
     public static MemorySegment P_tmpdir() {
         class Holder {
-            static final MemorySegment P_tmpdir = llama_h.LIBRARY_ARENA.allocateUtf8String("/var/tmp/");
+            static final MemorySegment P_tmpdir = llama_h.LIBRARY_ARENA.allocateFrom("/var/tmp/");
         }
         return Holder.P_tmpdir;
     }

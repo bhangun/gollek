@@ -1,1 +1,1 @@
-// This file is now redundant and has been moved to golek-api
+// This file is now redundant and has been moved to golek-spi

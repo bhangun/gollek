@@ -24,14 +24,14 @@ import tech.kayys.golek.client.GolekClient;
 GolekClient client = GolekClient.builder()
     .baseUrl("https://api.golek.example.com")
     .apiKey("your-api-key")
-    .defaultTenantId("your-tenant-id")
+    .defaultTenantId("default")
     .build();
 ```
 
 ### Simple Inference
 
 ```java
-import tech.kayys.golek.api.Message;
+import tech.kayys.golek.spi.Message;
 import tech.kayys.golek.client.builder.InferenceRequestBuilder;
 
 var request = InferenceRequestBuilder.builder()
@@ -49,7 +49,7 @@ System.out.println("Response: " + response.getContent());
 
 ```java
 import io.smallrye.mutiny.Multi;
-import tech.kayys.golek.api.stream.StreamChunk;
+import tech.kayys.golek.spi.stream.StreamChunk;
 
 Multi<StreamChunk> stream = client.streamCompletion(request);
 
@@ -97,9 +97,13 @@ The client supports various configuration options:
 
 - `baseUrl`: The base URL of the Golek API
 - `apiKey`: Your API key for authentication
-- `defaultTenantId`: The default tenant ID to use
+- `defaultTenantId`: The default tenant ID to use (only required when multi-tenancy is enabled)
 - `connectTimeout`: Connection timeout duration
 - `sslContext`: Custom SSL context for HTTPS connections
+
+## Multi-Tenancy Note
+
+Golek is single-tenant by default. Multi-tenancy is enabled only when `tenant-golek-ext` is added or `wayang.multitenancy.enabled=true` is set. In single-tenant mode, `defaultTenantId` can remain `"default"` and the API does not require `X-Tenant-ID`.
 
 ## Error Handling
 
@@ -131,7 +135,7 @@ try {
 ### Tool Usage
 
 ```java
-import tech.kayys.golek.api.tool.ToolDefinition;
+import tech.kayys.golek.spi.tool.ToolDefinition;
 
 var tool = ToolDefinition.builder()
     .name("get_weather")
@@ -159,6 +163,64 @@ var request = InferenceRequestBuilder.builder()
     .parameter("repetition_penalty", 1.1)
     .maxTokens(500)
     .build();
+```
+
+### Model Operations
+
+#### List Available Models
+
+```java
+import tech.kayys.golek.sdk.core.model.ModelInfo;
+
+// List all models
+List<ModelInfo> models = client.listModels();
+models.forEach(model ->
+    System.out.println("Model: " + model.getId() + ", Size: " + model.getSize()));
+
+// List models with pagination
+List<ModelInfo> pagedModels = client.listModels(0, 10);
+```
+
+#### Get Model Information
+
+```java
+import java.util.Optional;
+import tech.kayys.golek.sdk.core.model.ModelInfo;
+
+Optional<ModelInfo> modelInfo = client.getModelInfo("llama3:latest");
+if (modelInfo.isPresent()) {
+    System.out.println("Model: " + modelInfo.get().getId());
+    System.out.println("Size: " + modelInfo.get().getSize());
+    System.out.println("Description: " + modelInfo.get().getDescription());
+} else {
+    System.out.println("Model not found");
+}
+```
+
+#### Pull a Model
+
+```java
+import tech.kayys.golek.sdk.core.model.PullProgress;
+
+// Pull a model with progress tracking
+client.pullModel("llama3:8b", progress -> {
+    System.out.printf("Progress: %.2f%% - Status: %s%n",
+        progress.getPercentage(),
+        progress.getStatus());
+    System.out.println("Message: " + progress.getMessage());
+});
+```
+
+#### Delete a Model
+
+```java
+// Delete a model
+try {
+    client.deleteModel("llama3:old-version");
+    System.out.println("Model deleted successfully");
+} catch (GolekClientException e) {
+    System.err.println("Failed to delete model: " + e.getMessage());
+}
 ```
 
 ## Best Practices

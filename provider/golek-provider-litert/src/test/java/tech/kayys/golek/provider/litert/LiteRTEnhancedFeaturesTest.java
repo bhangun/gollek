@@ -1,9 +1,9 @@
 package tech.kayys.golek.provider.litert;
 
 import org.junit.jupiter.api.*;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.model.ModelManifest;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.model.ModelManifest;
 import tech.kayys.golek.provider.core.spi.RunnerConfiguration;
 
 import java.nio.file.Paths;
@@ -27,22 +27,22 @@ class LiteRTEnhancedFeaturesTest {
     void setUp() {
         // Create a test model manifest
         manifest = ModelManifest.builder()
-            .name("test-model")
-            .version("1.0")
-            .framework("litert")
-            .storageUri("file://" + System.getProperty("user.dir") + "/src/test/resources/test-model.tflite")
-            .build();
+                .name("test-model")
+                .version("1.0")
+                .framework("litert")
+                .storageUri("file://" + System.getProperty("user.dir") + "/src/test/resources/test-model.tflite")
+                .build();
 
         // Create configuration with all features enabled
         config = RunnerConfiguration.builder()
-            .parameter("useGpu", false)
-            .parameter("useNpu", false)
-            .parameter("useBatching", true)
-            .parameter("useMemoryPooling", true)
-            .parameter("useErrorHandling", true)
-            .parameter("useMonitoring", true)
-            .parameter("numThreads", 2)
-            .build();
+                .parameter("useGpu", false)
+                .parameter("useNpu", false)
+                .parameter("useBatching", true)
+                .parameter("useMemoryPooling", true)
+                .parameter("useErrorHandling", true)
+                .parameter("useMonitoring", true)
+                .parameter("numThreads", 2)
+                .build();
     }
 
     @AfterEach
@@ -71,7 +71,7 @@ class LiteRTEnhancedFeaturesTest {
         runner.initialize(manifest, config);
 
         var capabilities = runner.capabilities();
-        
+
         assertTrue(capabilities.isSupportsBatching());
         assertTrue(capabilities.isSupportsQuantization());
         assertTrue(capabilities.isSupportsGpuAcceleration());
@@ -83,7 +83,7 @@ class LiteRTEnhancedFeaturesTest {
         assertTrue(capabilities.isSupportsComprehensiveMonitoring());
         assertTrue(capabilities.isSupportsHealthChecks());
         assertTrue(capabilities.isSupportsPerformanceMetrics());
-        
+
         assertEquals(128, capabilities.getMaxBatchSize());
         assertEquals(3, capabilities.getMaxRetries());
     }
@@ -99,7 +99,7 @@ class LiteRTEnhancedFeaturesTest {
             var field = runner.getClass().getDeclaredField("delegateManager");
             field.setAccessible(true);
             var delegateManager = (LiteRTDelegateManager) field.get(runner);
-            
+
             assertNotNull(delegateManager);
             assertEquals(0, delegateManager.getDelegateCount());
             assertFalse(delegateManager.getDelegateInfo().isEmpty());
@@ -111,26 +111,26 @@ class LiteRTEnhancedFeaturesTest {
     void testTensorUtilities() {
         // Test tensor validation
         assertTrue(LiteRTTensorUtils.validateShapeCompatibility(
-            new long[]{1, 224, 224, 3}, 
-            new long[]{1, 224, 224, 3}));
+                new long[] { 1, 224, 224, 3 },
+                new long[] { 1, 224, 224, 3 }));
 
         assertFalse(LiteRTTensorUtils.validateShapeCompatibility(
-            new long[]{1, 224, 224}, 
-            new long[]{1, 224, 224, 3}));
+                new long[] { 1, 224, 224 },
+                new long[] { 1, 224, 224, 3 }));
 
         // Test element count calculation
-        assertEquals(150528, LiteRTTensorUtils.calculateElementCount(new long[]{1, 224, 224, 3}));
+        assertEquals(150528, LiteRTTensorUtils.calculateElementCount(new long[] { 1, 224, 224, 3 }));
 
         // Test byte size calculation
         assertEquals(150528 * 4, LiteRTTensorUtils.calculateByteSize(
-            LiteRTNativeBindings.TfLiteType.FLOAT32, 
-            new long[]{1, 224, 224, 3}));
+                LiteRTNativeBindings.TfLiteType.FLOAT32,
+                new long[] { 1, 224, 224, 3 }));
 
         // Test data validation
-        float[] floatData = {1.0f, 2.0f, 3.0f};
+        float[] floatData = { 1.0f, 2.0f, 3.0f };
         byte[] floatBytes = LiteRTTensorUtils.floatArrayToBytes(floatData);
-        assertTrue(LiteRTTensorUtils.validateTensorData(floatBytes, 
-            LiteRTNativeBindings.TfLiteType.FLOAT32, floatBytes.length));
+        assertTrue(LiteRTTensorUtils.validateTensorData(floatBytes,
+                LiteRTNativeBindings.TfLiteType.FLOAT32, floatBytes.length));
     }
 
     @Test
@@ -144,7 +144,7 @@ class LiteRTEnhancedFeaturesTest {
             var field = runner.getClass().getDeclaredField("batchingManager");
             field.setAccessible(true);
             var batchingManager = (LiteRTBatchingManager) field.get(runner);
-            
+
             assertNotNull(batchingManager);
             assertTrue(batchingManager.isHealthy());
             assertEquals(0, batchingManager.getQueueSize());
@@ -163,17 +163,17 @@ class LiteRTEnhancedFeaturesTest {
             var field = runner.getClass().getDeclaredField("memoryPool");
             field.setAccessible(true);
             var memoryPool = (LiteRTMemoryPool) field.get(runner);
-            
+
             assertNotNull(memoryPool);
             assertTrue(memoryPool.isHealthy());
-            
+
             // Test allocation and release
             var segment = memoryPool.allocate(1024);
             assertNotNull(segment);
             assertEquals(1024, segment.byteSize());
-            
+
             memoryPool.release(segment);
-            
+
             var stats = memoryPool.getStatistics();
             assertTrue(stats.getTotalAllocations() > 0);
             assertTrue(stats.getTotalReuses() >= 0);
@@ -191,18 +191,17 @@ class LiteRTEnhancedFeaturesTest {
             var field = runner.getClass().getDeclaredField("errorHandler");
             field.setAccessible(true);
             var errorHandler = (LiteRTErrorHandler) field.get(runner);
-            
+
             assertNotNull(errorHandler);
-            
+
             // Test error handling
             var strategy = errorHandler.handleError(
-                new RuntimeException("Test error"), 
-                "test_operation"
-            );
-            
+                    new RuntimeException("Test error"),
+                    "test_operation");
+
             assertNotNull(strategy);
             assertFalse(strategy.shouldRetry()); // Unknown errors should not retry
-            
+
             var stats = errorHandler.getStatistics();
             assertEquals(1, stats.getTotalErrors());
             assertEquals(0, stats.getRecoverableErrors());
@@ -221,20 +220,20 @@ class LiteRTEnhancedFeaturesTest {
             var field = runner.getClass().getDeclaredField("monitoring");
             field.setAccessible(true);
             var monitoring = (LiteRTMonitoring) field.get(runner);
-            
+
             assertNotNull(monitoring);
-            
+
             // Test recording metrics
             monitoring.recordSuccess("test_operation", 100, 50);
             monitoring.recordMemoryAllocation(1024);
-            
+
             var stats = monitoring.getStatistics();
             assertEquals(1, stats.getTotalRequests());
             assertEquals(1, stats.getSuccessfulRequests());
             assertEquals(0, stats.getFailedRequests());
             assertEquals(100.0, stats.getAverageLatency(), 0.01);
             assertEquals(1024, stats.getCurrentMemoryUsage());
-            
+
             // Test health check
             var healthStatus = monitoring.performHealthCheck();
             assertEquals(LiteRTMonitoring.HealthStatus.HEALTHY, healthStatus);
@@ -249,9 +248,9 @@ class LiteRTEnhancedFeaturesTest {
 
         // Create a simple test request
         var request = InferenceRequest.builder()
-            .requestId("test-request-1")
-            .modelId("test-model:1.0")
-            .build();
+                .requestId("test-request-1")
+                .modelId("test-model:1.0")
+                .build();
 
         // Test inference execution
         assertDoesNotThrow(() -> {
@@ -269,18 +268,18 @@ class LiteRTEnhancedFeaturesTest {
         runner.initialize(manifest, config);
 
         var request = InferenceRequest.builder()
-            .requestId("test-async-request")
-            .modelId("test-model:1.0")
-            .build();
+                .requestId("test-async-request")
+                .modelId("test-model:1.0")
+                .build();
 
         CompletableFuture<InferenceResponse> future = runner.inferAsync(request);
-        
+
         assertNotNull(future);
         assertFalse(future.isDone());
-        
+
         // Wait for completion
         InferenceResponse response = future.get(5, TimeUnit.SECONDS);
-        
+
         assertNotNull(response);
         assertEquals("test-async-request", response.getRequestId());
         assertTrue(response.getLatencyMs() >= 0);
@@ -304,7 +303,7 @@ class LiteRTEnhancedFeaturesTest {
         runner.initialize(manifest, config);
 
         var metrics = runner.metrics();
-        
+
         assertNotNull(metrics);
         assertTrue(metrics.getTotalRequests() >= 0);
         assertTrue(metrics.getFailedRequests() >= 0);
@@ -315,11 +314,11 @@ class LiteRTEnhancedFeaturesTest {
     @DisplayName("Runner should handle missing model gracefully")
     void testMissingModelHandling() {
         var invalidManifest = ModelManifest.builder()
-            .name("missing-model")
-            .version("1.0")
-            .framework("litert")
-            .storageUri("file:///nonexistent/model.tflite")
-            .build();
+                .name("missing-model")
+                .version("1.0")
+                .framework("litert")
+                .storageUri("file:///nonexistent/model.tflite")
+                .build();
 
         var exception = assertThrows(Exception.class, () -> {
             runner = new LiteRTCpuRunner();
@@ -334,8 +333,8 @@ class LiteRTEnhancedFeaturesTest {
     void testConfigurationFlexibility() {
         // Test with minimal configuration
         var minimalConfig = RunnerConfiguration.builder()
-            .parameter("numThreads", 1)
-            .build();
+                .parameter("numThreads", 1)
+                .build();
 
         assertDoesNotThrow(() -> {
             runner = new LiteRTCpuRunner();
@@ -365,14 +364,14 @@ class LiteRTEnhancedFeaturesTest {
     private String findTestLibrary() {
         String os = System.getProperty("os.name").toLowerCase();
         String libName = os.contains("linux") ? "libtensorflowlite_c.so"
-                : os.contains("mac") ? "libtensorflowlite_c.dylib" 
-                : "tensorflowlite_c.dll";
+                : os.contains("mac") ? "libtensorflowlite_c.dylib"
+                        : "tensorflowlite_c.dll";
 
         String[] paths = {
-            "/usr/local/lib/" + libName,
-            "/usr/lib/" + libName,
-            "./lib/" + libName,
-            "target/test-libs/" + libName
+                "/usr/local/lib/" + libName,
+                "/usr/lib/" + libName,
+                "./lib/" + libName,
+                "target/test-libs/" + libName
         };
 
         for (String path : paths) {
