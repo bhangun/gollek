@@ -1,0 +1,146 @@
+{
+  "info": {
+    "name": "KMP Chatbot API",
+    "description": "API collection for KMP Chatbot Server",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Chat",
+      "item": [
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Hello, how are you?\",\n  \"session_id\": \"test-session-123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/chat/message",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "chat", "message"]
+            }
+          }
+        },
+        {
+          "name": "Get History",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/api/chat/history/test-session-123",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "chat", "history", "test-session-123"]
+            }
+          }
+        },
+        {
+          "name": "Get All Conversations",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/api/chat/conversations",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "chat", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Get Conversation",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/api/chat/conversation/test-session-123",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "chat", "conversation", "test-session-123"]
+            }
+          }
+        },
+        {
+          "name": "Delete Conversation",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "http://localhost:8080/api/chat/conversation/test-session-123",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "chat", "conversation", "test-session-123"]
+            }
+          }
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/api/chat/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "chat", "health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/q/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["q", "health"]
+            }
+          }
+        },
+        {
+          "name": "Ready",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/q/health/ready",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["q", "health", "ready"]
+            }
+          }
+        },
+        {
+          "name": "Live",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/q/health/live",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["q", "health", "live"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

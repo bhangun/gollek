@@ -1,28 +1,21 @@
 package tech.kayys.golek.engine.exception;
 
-import tech.kayys.golek.api.error.ErrorCode;
+import tech.kayys.golek.spi.error.ErrorCode;
 
 /**
  * Exception thrown for model-related errors in the Golek Engine.
  */
-public class ModelException extends RuntimeException {
-    private final ErrorCode errorCode;
+public class ModelException extends InferenceException {
     private final String modelId;
 
     public ModelException(ErrorCode errorCode, String message, String modelId) {
-        super(message);
-        this.errorCode = errorCode;
+        super(errorCode, message);
         this.modelId = modelId;
     }
 
     public ModelException(ErrorCode errorCode, String message, String modelId, Throwable cause) {
-        super(message, cause);
-        this.errorCode = errorCode;
+        super(errorCode, message, cause);
         this.modelId = modelId;
-    }
-
-    public ErrorCode getErrorCode() {
-        return errorCode;
     }
 
     public String getModelId() {

@@ -3,7 +3,7 @@ package tech.kayys.golek.engine.loader;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import jakarta.enterprise.context.ApplicationScoped;
-import tech.kayys.golek.api.provider.ProviderConfig;
+import tech.kayys.golek.spi.provider.ProviderConfig;
 // import tech.kayys.golek.provider.core.memory.VaultSecretManager;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;

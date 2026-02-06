@@ -15,7 +15,7 @@ import org.jboss.logging.Logger;
 import tech.kayys.golek.runtime.service.ModelManagementService;
 import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.runtime.security.TenantContextResolver;
-import tech.kayys.golek.api.model.ModelManifest;
+import tech.kayys.golek.spi.model.ModelManifest;
 
 /**
  * Model management endpoints for administrative operations

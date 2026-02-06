@@ -12,10 +12,10 @@ import tech.kayys.golek.engine.ratelimit.TokenBucketRateLimiter;
 import tech.kayys.golek.provider.core.spi.LLMProvider;
 import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.wayang.tenant.TenantId;
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.provider.ProviderConfig;
-import tech.kayys.golek.api.provider.ProviderHealth;
-import tech.kayys.golek.api.provider.ProviderRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.provider.ProviderConfig;
+import tech.kayys.golek.spi.provider.ProviderHealth;
+import tech.kayys.golek.spi.provider.ProviderRequest;
 
 import java.time.Duration;
 import java.util.Map;
@@ -102,7 +102,7 @@ public abstract class AbstractProvider implements LLMProvider {
         return Uni.createFrom().item(() -> {
             if (!quotaService.hasQuota(id())) {
                 String tenantId = context != null ? context.getTenantId().value() : "default";
-                throw new tech.kayys.golek.api.routing.QuotaExhaustedException(id(),
+                throw new tech.kayys.golek.spi.routing.QuotaExhaustedException(id(),
                         "Provider quota exhausted for: " + id() + ", tenant: " + tenantId);
             }
             return null;

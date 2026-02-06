@@ -27,8 +27,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
-import tech.kayys.golek.api.model.ModelManifest;
-import tech.kayys.golek.api.exception.InferenceException;
+import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.exception.InferenceException;
 import tech.kayys.golek.model.exception.ModelNotFoundException;
 import tech.kayys.wayang.tenant.TenantConfigurationService;
 import tech.kayys.wayang.tenant.TenantContext;

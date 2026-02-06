@@ -1,6 +1,6 @@
 package tech.kayys.golek.infra.observability;
 
-import tech.kayys.golek.api.AuditPayload;
+import tech.kayys.golek.spi.AuditPayload;
 import io.smallrye.mutiny.Uni;
 
 /**

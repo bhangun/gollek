@@ -5,16 +5,16 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
-import tech.kayys.golek.api.provider.RoutingContext;
-import tech.kayys.golek.api.routing.ModelProviderMapping;
-import tech.kayys.golek.api.routing.ProviderPool;
-import tech.kayys.golek.api.routing.QuotaExhaustedException;
-import tech.kayys.golek.api.routing.RoutingConfig;
-import tech.kayys.golek.api.provider.RoutingDecision;
-import tech.kayys.golek.api.routing.SelectionStrategy;
-import tech.kayys.golek.api.provider.LLMProvider;
-import tech.kayys.golek.api.provider.ProviderCandidate;
-import tech.kayys.golek.api.provider.ProviderRegistry;
+import tech.kayys.golek.spi.provider.RoutingContext;
+import tech.kayys.golek.spi.routing.ModelProviderMapping;
+import tech.kayys.golek.spi.routing.ProviderPool;
+import tech.kayys.golek.spi.routing.QuotaExhaustedException;
+import tech.kayys.golek.spi.routing.RoutingConfig;
+import tech.kayys.golek.spi.provider.RoutingDecision;
+import tech.kayys.golek.spi.routing.SelectionStrategy;
+import tech.kayys.golek.spi.provider.LLMProvider;
+import tech.kayys.golek.spi.provider.ProviderCandidate;
+import tech.kayys.golek.spi.provider.ProviderRegistry;
 import tech.kayys.golek.engine.routing.strategy.*;
 
 import java.util.ArrayList;

@@ -1,6 +1,6 @@
 package tech.kayys.golek.engine.routing.strategy;
 
-import tech.kayys.golek.api.provider.LLMProvider;
+import tech.kayys.golek.spi.provider.LLMProvider;
 
 import java.util.Collections;
 import java.util.List;

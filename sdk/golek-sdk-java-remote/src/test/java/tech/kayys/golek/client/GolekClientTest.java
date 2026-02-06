@@ -5,8 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.inference.InferenceResponse;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.client.exception.GolekClientException;
 
 import java.net.http.HttpClient;
@@ -48,7 +48,7 @@ class GolekClientTest {
         // Arrange
         InferenceRequest request = InferenceRequest.builder()
                 .model("test-model")
-                .message(tech.kayys.golek.api.Message.user("Hello"))
+                .message(tech.kayys.golek.spi.Message.user("Hello"))
                 .build();
         
         InferenceResponse expectedResponse = InferenceResponse.builder()
@@ -83,7 +83,7 @@ class GolekClientTest {
         // Arrange
         InferenceRequest request = InferenceRequest.builder()
                 .model("test-model")
-                .message(tech.kayys.golek.api.Message.user("Hello"))
+                .message(tech.kayys.golek.spi.Message.user("Hello"))
                 .build();
         
         HttpResponse<String> httpResponse = mock(HttpResponse.class);
@@ -106,7 +106,7 @@ class GolekClientTest {
         // Arrange
         InferenceRequest request = InferenceRequest.builder()
                 .model("test-model")
-                .message(tech.kayys.golek.api.Message.user("Hello"))
+                .message(tech.kayys.golek.spi.Message.user("Hello"))
                 .build();
         
         when(httpClient.send(any(HttpRequest.class), any()))

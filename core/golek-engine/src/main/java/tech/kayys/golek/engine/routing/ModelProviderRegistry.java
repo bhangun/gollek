@@ -3,8 +3,8 @@ package tech.kayys.golek.engine.routing;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
-import tech.kayys.golek.api.routing.ModelProviderMapping;
-import tech.kayys.golek.api.routing.ModelProviderMapping.ModelType;
+import tech.kayys.golek.spi.routing.ModelProviderMapping;
+import tech.kayys.golek.spi.routing.ModelProviderMapping.ModelType;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;

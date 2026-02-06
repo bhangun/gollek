@@ -2,9 +2,9 @@ package tech.kayys.golek.engine.plugin;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-import tech.kayys.golek.api.plugin.GolekPlugin;
-import tech.kayys.golek.api.plugin.PluginContext;
-import tech.kayys.golek.api.plugin.PluginState;
+import tech.kayys.golek.spi.plugin.GolekPlugin;
+import tech.kayys.golek.spi.plugin.PluginContext;
+import tech.kayys.golek.spi.plugin.PluginState;
 
 /**
  * Default plugin lifecycle implementation.

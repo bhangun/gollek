@@ -7,8 +7,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.inference.InferenceResponse;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.engine.observability.MetricsPublisher;
 import tech.kayys.golek.engine.routing.ModelRouterService;
 import tech.kayys.wayang.tenant.TenantContext;

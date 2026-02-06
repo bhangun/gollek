@@ -1,0 +1,7 @@
+#!/bin/sh
+# Maven Wrapper Script
+
+MAVEN_PROJECTBASEDIR="${MAVEN_BASEDIR:-"$PWD"}"
+MAVEN_OPTS="$(concat_lines "$MAVEN_PROJECTBASEDIR/.mvn/jvm.config") $MAVEN_OPTS"
+
+exec mvn "$@"

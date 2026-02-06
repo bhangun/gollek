@@ -9,7 +9,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import tech.kayys.golek.api.model.ModelManifest;
+import tech.kayys.golek.spi.model.ModelManifest;
 import tech.kayys.wayang.tenant.TenantId;
 
 public class CachedModelRepositoryTest {

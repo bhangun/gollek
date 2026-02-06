@@ -1,6 +1,6 @@
 package tech.kayys.golek.client.model;
 
-import tech.kayys.golek.api.inference.InferenceResponse;
+import tech.kayys.golek.spi.inference.InferenceResponse;
 
 import java.time.Instant;
 

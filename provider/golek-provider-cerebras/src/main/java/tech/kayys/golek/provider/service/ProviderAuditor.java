@@ -199,7 +199,7 @@ public class ProviderAuditor {
             .actor(AuditPayload.Actor.system(providerId + "-provider"))
             .tag("provider:" + providerId)
             .tag("model:" + request.getModel())
-            .metadata("tenant", request.getTenantContext().getTenantId())
+            .metadata("tenant", (request.getTenantContext() != null ? request.getTenantContext().getTenantId() : "default"))
             .metadata("model", request.getModel())
             .metadata("streaming", request.isStreaming())
             .metadata("message_count", request.getMessages().size())

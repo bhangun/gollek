@@ -3,8 +3,7 @@ package tech.kayys.golek.infra;
 import io.micrometer.core.instrument.*;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import tech.kayys.golek.api.observability.MetricsCollector;
-import tech.kayys.wayang.tenant.TenantId;
+import tech.kayys.golek.spi.observability.MetricsCollector;
 
 import java.time.Duration;
 
@@ -29,14 +28,14 @@ public class PrometheusMetrics implements MetricsCollector {
         public void recordSuccess(
                         String provider,
                         String model,
-                        TenantId tenant,
+                        String tenant,
                         Duration duration) {
 
                 Tags tags = Tags.of(
                                 "status", "success",
                                 "provider", provider,
                                 "model", model,
-                                "tenant", tenant.value());
+                                "tenant", tenant);
 
                 registry.counter("inference.requests.total", tags).increment();
                 registry.timer("inference.duration", tags).record(duration);
@@ -46,21 +45,21 @@ public class PrometheusMetrics implements MetricsCollector {
         public void recordFailure(
                         String provider,
                         String model,
-                        TenantId tenant,
+                        String tenant,
                         String errorType) {
 
                 Tags tags = Tags.of(
                                 "status", "failure",
                                 "provider", provider,
                                 "model", model,
-                                "tenant", tenant.value());
+                                "tenant", tenant);
 
                 registry.counter("inference.requests.total", tags).increment();
 
                 Tags errorTags = Tags.of(
                                 "type", errorType,
                                 "provider", provider,
-                                "tenant", tenant.value());
+                                "tenant", tenant);
                 registry.counter("inference.errors.total", errorTags).increment();
         }
 

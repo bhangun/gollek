@@ -1,18 +1,14 @@
 package tech.kayys.golek.infra.observability;
 
-import tech.kayys.golek.api.AuditPayload;
-import tech.kayys.golek.api.inference.*;
-import tech.kayys.golek.engine.context.EngineContext;
+import tech.kayys.golek.spi.AuditPayload;
+import tech.kayys.golek.spi.inference.*;
+import tech.kayys.golek.spi.context.EngineContext;
 import tech.kayys.golek.core.execution.ExecutionContext;
 import tech.kayys.golek.core.plugin.InferencePhasePlugin;
-import tech.kayys.golek.plugin.api.PluginException;
-import tech.kayys.golek.provider.core.exception.ProviderException;
-import io.smallrye.mutiny.Uni;
+import tech.kayys.golek.spi.plugin.PluginException;
+import tech.kayys.golek.spi.exception.ProviderException;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.Set;
-import java.time.Duration;
-
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.validation.ValidationException;

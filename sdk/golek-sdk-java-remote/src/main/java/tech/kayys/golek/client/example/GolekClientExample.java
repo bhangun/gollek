@@ -1,9 +1,9 @@
 package tech.kayys.golek.client.example;
 
 import io.smallrye.mutiny.Multi;
-import tech.kayys.golek.api.Message;
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.stream.StreamChunk;
+import tech.kayys.golek.spi.Message;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.stream.StreamChunk;
 import tech.kayys.golek.client.GolekClient;
 import tech.kayys.golek.client.builder.InferenceRequestBuilder;
 import tech.kayys.golek.client.exception.AuthenticationException;

@@ -1,8 +1,8 @@
 package tech.kayys.golek.provider.litert;
 
 import lombok.extern.slf4j.Slf4j;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.inference.InferenceResponse;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.provider.core.spi.ErrorCode;
 
 import java.util.*;

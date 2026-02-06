@@ -1,10 +1,10 @@
 package tech.kayys.golek.inference.gguf;
 
 import org.jboss.logging.Logger;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.model.ModelManifest;
-import tech.kayys.golek.api.model.ModelFormat;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.model.ModelFormat;
 import tech.kayys.wayang.tenant.TenantContext;
 import java.lang.foreign.MemorySegment;
 import java.nio.file.Path;
@@ -67,6 +67,7 @@ public class LlamaCppRunner {
             ModelManifest manifest,
             Map<String, Object> runnerConfig,
             TenantContext tenantContext) {
+        TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
 
         if (initialized) {
             log.warnf("Runner already initialized for model %s", manifest.modelId());
@@ -74,11 +75,11 @@ public class LlamaCppRunner {
         }
 
         log.infof("Initializing GGUF runner for model %s (tenant: %s)",
-                manifest.modelId(), tenantContext.getTenantId().value());
+                manifest.modelId(), effectiveTenantContext.getTenantId().value());
 
         try {
             this.manifest = manifest;
-            this.tenantContext = tenantContext;
+            this.tenantContext = effectiveTenantContext;
 
             // Assume model is already at location or resolve it
             // Extract from artifacts map
@@ -116,9 +117,13 @@ public class LlamaCppRunner {
         }
     }
 
+    private TenantContext ensureTenantContext(TenantContext tenantContext) {
+        return tenantContext != null ? tenantContext : TenantContext.of("default");
+    }
+
     public InferenceResponse infer(
             InferenceRequest request,
-            tech.kayys.golek.api.context.RequestContext requestContext) {
+            tech.kayys.golek.spi.context.RequestContext requestContext) {
 
         if (!initialized) {
             throw new IllegalStateException("Runner not initialized");
@@ -151,7 +156,7 @@ public class LlamaCppRunner {
         return List.of(
                 InferenceRequest.builder()
                         .model(manifest != null ? manifest.modelId() : "unknown")
-                        .message(tech.kayys.golek.api.Message.user("warmup"))
+                        .message(tech.kayys.golek.spi.Message.user("warmup"))
                         .parameter("prompt", "Hello")
                         .build());
     }

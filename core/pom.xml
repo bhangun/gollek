@@ -21,7 +21,7 @@
         <maven.compiler.target>25</maven.compiler.target>
     </properties>
     <modules>
-        <module>golek-api</module>
+        <module>golek-spi</module>
         <module>golek-core</module>
         <module>golek-engine</module>
         <module>golek-model-repo-core</module>

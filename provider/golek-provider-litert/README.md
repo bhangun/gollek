@@ -1,5 +1,9 @@
 # ✅ LiteRT Native Bindings - VERIFIED & UPDATED
 
+## Module Summary
+
+Provider for local LiteRT (.tflite) inference with delegate support (CPU/GPU/NNAPI) using Java 21 FFM bindings.
+
 ## Complete Implementation Summary
 
 **Status**: ✅ **PRODUCTION READY**

@@ -14,8 +14,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import tech.kayys.golek.api.provider.*;
-import tech.kayys.golek.api.Message;
+import tech.kayys.golek.spi.provider.*;
+import tech.kayys.golek.spi.Message;
 import tech.kayys.wayang.tenant.TenantContext;
 
 import java.time.Duration;
@@ -97,7 +97,7 @@ class GGUFProviderTest {
         assertThat(capabilities).isNotNull();
         assertThat(capabilities.getMaxContextTokens()).isEqualTo(config.maxContextTokens());
         assertThat(capabilities.getSupportedFormats())
-                .contains(tech.kayys.golek.api.model.ModelFormat.GGUF);
+                .contains(tech.kayys.golek.spi.model.ModelFormat.GGUF);
     }
 
     @Test

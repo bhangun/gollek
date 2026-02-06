@@ -1,8 +1,8 @@
 package tech.kayys.golek.client.builder;
 
 import org.junit.jupiter.api.Test;
-import tech.kayys.golek.api.Message;
-import tech.kayys.golek.api.inference.InferenceRequest;
+import tech.kayys.golek.spi.Message;
+import tech.kayys.golek.spi.inference.InferenceRequest;
 
 import java.util.Map;
 

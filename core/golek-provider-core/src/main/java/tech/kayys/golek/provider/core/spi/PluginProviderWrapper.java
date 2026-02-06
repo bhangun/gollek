@@ -1,16 +1,16 @@
 package tech.kayys.golek.provider.core.spi;
 
 import io.smallrye.mutiny.Uni;
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.provider.ProviderCapabilities;
-import tech.kayys.golek.api.provider.ProviderConfig;
-import tech.kayys.golek.api.provider.ProviderHealth;
-import tech.kayys.golek.api.provider.ProviderMetadata;
-import tech.kayys.golek.api.provider.ProviderRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.provider.ProviderCapabilities;
+import tech.kayys.golek.spi.provider.ProviderConfig;
+import tech.kayys.golek.spi.provider.ProviderHealth;
+import tech.kayys.golek.spi.provider.ProviderMetadata;
+import tech.kayys.golek.spi.provider.ProviderRequest;
 import tech.kayys.wayang.tenant.TenantContext;
-import tech.kayys.golek.api.plugin.GolekPlugin;
-import tech.kayys.golek.api.provider.LLMProvider;
-import tech.kayys.golek.api.exception.ProviderException;
+import tech.kayys.golek.spi.plugin.GolekPlugin;
+import tech.kayys.golek.spi.provider.LLMProvider;
+import tech.kayys.golek.spi.exception.ProviderException;
 
 /**
  * Wrapper for providers that come from plugins

@@ -2,9 +2,10 @@ package tech.kayys.golek.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.smallrye.mutiny.Multi;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.stream.StreamChunk;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.provider.ProviderInfo;
+import tech.kayys.golek.spi.stream.StreamChunk;
 import tech.kayys.golek.client.exception.GolekClientException;
 import tech.kayys.golek.sdk.core.GolekSdk;
 import tech.kayys.golek.sdk.core.exception.SdkException;
@@ -33,11 +34,13 @@ public class GolekClient implements GolekSdk {
     private final String baseUrl;
     private final String apiKey;
     private final String defaultTenantId;
+    private String preferredProvider;
 
     private GolekClient(Builder builder) {
         this.baseUrl = builder.baseUrl;
         this.apiKey = builder.apiKey;
         this.defaultTenantId = builder.defaultTenantId;
+        this.preferredProvider = builder.preferredProvider;
 
         HttpClient.Builder clientBuilder = HttpClient.newBuilder()
                 .connectTimeout(builder.connectTimeout)
@@ -128,9 +131,10 @@ public class GolekClient implements GolekSdk {
 
             return (String) jsonResponse.get("jobId");
         } catch (GolekClientException e) {
-            throw e; // Re-throw client exceptions
+            // Convert GolekClientException to SdkException
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
         } catch (Exception e) {
-            throw new GolekClientException("Failed to submit async job", e);
+            throw new SdkException("Failed to submit async job", e);
         }
     }
 
@@ -156,9 +160,10 @@ public class GolekClient implements GolekSdk {
 
             return handleResponse(response, AsyncJobStatus.class);
         } catch (GolekClientException e) {
-            throw e; // Re-throw client exceptions
+            // Convert GolekClientException to SdkException
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
         } catch (Exception e) {
-            throw new GolekClientException("Failed to get job status", e);
+            throw new SdkException("Failed to get job status", e);
         }
     }
 
@@ -187,11 +192,11 @@ public class GolekClient implements GolekSdk {
                 Thread.sleep(pollInterval.toMillis());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new GolekClientException("Job polling interrupted", e);
+                throw new SdkException("Job polling interrupted", e);
             }
         }
 
-        throw new GolekClientException("Job " + jobId + " did not complete within the specified time");
+        throw new SdkException("Job " + jobId + " did not complete within the specified time");
     }
 
     /**
@@ -221,9 +226,10 @@ public class GolekClient implements GolekSdk {
                 objectMapper.getTypeFactory().constructCollectionType(java.util.List.class, InferenceResponse.class)
             );
         } catch (GolekClientException e) {
-            throw e; // Re-throw client exceptions
+            // Convert GolekClientException to SdkException
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
         } catch (Exception e) {
-            throw new GolekClientException("Failed to perform batch inference", e);
+            throw new SdkException("Failed to perform batch inference", e);
         }
     }
 
@@ -243,7 +249,7 @@ public class GolekClient implements GolekSdk {
             // Convert the Flow.Publisher to Mutiny Multi
             return Multi.createFrom().publisher(helper.createStreamPublisher(requestBody));
         } catch (Exception e) {
-            return Multi.createFrom().failure(new GolekClientException("Failed to initiate streaming completion", e));
+            return Multi.createFrom().failure(new SdkException("Failed to initiate streaming completion", e));
         }
     }
 
@@ -294,12 +300,93 @@ public class GolekClient implements GolekSdk {
     }
 
     /**
+     * Lists all available inference providers.
+     *
+     * @return List of provider information
+     * @throws SdkException if the request fails
+     */
+    @Override
+    public List<ProviderInfo> listAvailableProviders() throws SdkException {
+        try {
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/providers"))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("X-Tenant-ID", defaultTenantId)
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            return handleResponse(response,
+                objectMapper.getTypeFactory().constructCollectionType(java.util.List.class, ProviderInfo.class)
+            );
+        } catch (GolekClientException e) {
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_PROVIDER_LIST", "Failed to list providers", e);
+        }
+    }
+
+    /**
+     * Gets detailed information about a specific provider.
+     *
+     * @param providerId The provider ID
+     * @return Provider information
+     * @throws SdkException if the provider is not found
+     */
+    @Override
+    public ProviderInfo getProviderInfo(String providerId) throws SdkException {
+        try {
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/providers/" + URLEncoder.encode(providerId, StandardCharsets.UTF_8)))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("X-Tenant-ID", defaultTenantId)
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            return handleResponse(response, ProviderInfo.class);
+        } catch (GolekClientException e) {
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_PROVIDER_INFO", "Failed to get provider info", e);
+        }
+    }
+
+    /**
+     * Sets the preferred provider for subsequent requests.
+     *
+     * @param providerId The provider ID
+     * @throws SdkException if the provider is not available
+     */
+    @Override
+    public void setPreferredProvider(String providerId) throws SdkException {
+        // Validate provider exists by fetching its info
+        getProviderInfo(providerId);
+        this.preferredProvider = providerId;
+    }
+
+    /**
+     * Gets the currently preferred provider ID.
+     *
+     * @return The preferred provider ID, or empty if none is set
+     */
+    @Override
+    public java.util.Optional<String> getPreferredProvider() {
+        return java.util.Optional.ofNullable(preferredProvider);
+    }
+
+    /**
      * Builder for creating GolekClient instances.
      */
     public static class Builder {
         private String baseUrl = "http://localhost:8080";
         private String apiKey;
         private String defaultTenantId = "default";
+        private String preferredProvider;
         private Duration connectTimeout = Duration.ofSeconds(30);
         private SSLContext sslContext;
 
@@ -318,6 +405,11 @@ public class GolekClient implements GolekSdk {
             return this;
         }
 
+        public Builder preferredProvider(String preferredProvider) {
+            this.preferredProvider = preferredProvider;
+            return this;
+        }
+
         public Builder connectTimeout(Duration timeout) {
             this.connectTimeout = timeout;
             return this;
@@ -333,6 +425,189 @@ public class GolekClient implements GolekSdk {
                 throw new IllegalArgumentException("API key is required");
             }
             return new GolekClient(this);
+        }
+    }
+
+    // ==================== Model Operations ====================
+
+    @Override
+    public List<tech.kayys.golek.sdk.core.model.ModelInfo> listModels() throws SdkException {
+        try {
+            String url = String.format("%s/v1/models", baseUrl);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("X-Tenant-ID", defaultTenantId)
+                    .header("Content-Type", "application/json")
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            return handleResponse(response,
+                objectMapper.getTypeFactory().constructCollectionType(java.util.List.class, tech.kayys.golek.sdk.core.model.ModelInfo.class)
+            );
+        } catch (GolekClientException e) {
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_MODEL_LIST", "Failed to list models", e);
+        }
+    }
+
+    @Override
+    public List<tech.kayys.golek.sdk.core.model.ModelInfo> listModels(int offset, int limit) throws SdkException {
+        try {
+            String url = String.format("%s/v1/models?offset=%d&limit=%d", baseUrl, offset, limit);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("X-Tenant-ID", defaultTenantId)
+                    .header("Content-Type", "application/json")
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            return handleResponse(response,
+                objectMapper.getTypeFactory().constructCollectionType(java.util.List.class, tech.kayys.golek.sdk.core.model.ModelInfo.class)
+            );
+        } catch (GolekClientException e) {
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_MODEL_LIST", "Failed to list models", e);
+        }
+    }
+
+    @Override
+    public java.util.Optional<tech.kayys.golek.sdk.core.model.ModelInfo> getModelInfo(String modelId) throws SdkException {
+        try {
+            String encodedModelId = URLEncoder.encode(modelId, StandardCharsets.UTF_8);
+            String url = String.format("%s/v1/models/%s", baseUrl, encodedModelId);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("X-Tenant-ID", defaultTenantId)
+                    .header("Content-Type", "application/json")
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 404) {
+                return java.util.Optional.empty(); // Model not found
+            }
+
+            tech.kayys.golek.sdk.core.model.ModelInfo modelInfo = handleResponse(response, tech.kayys.golek.sdk.core.model.ModelInfo.class);
+            return java.util.Optional.of(modelInfo);
+        } catch (GolekClientException e) {
+            if (e.getErrorCode().equals("CLIENT_ERROR") && e.getMessage().contains("404")) {
+                return java.util.Optional.empty(); // Model not found
+            }
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_MODEL_INFO", "Failed to get model info", e);
+        }
+    }
+
+    @Override
+    public void pullModel(String modelSpec, java.util.function.Consumer<tech.kayys.golek.sdk.core.model.PullProgress> progressCallback) throws SdkException {
+        try {
+            // First, try to initiate the model pull
+            java.util.Map<String, Object> requestBodyMap = new java.util.HashMap<>();
+            requestBodyMap.put("model", modelSpec);
+
+            String requestBody = objectMapper.writeValueAsString(requestBodyMap);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/models/pull"))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("X-Tenant-ID", defaultTenantId)
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .timeout(Duration.ofMinutes(5)) // Shorter timeout for initial request
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            // If the server immediately returns success, call the callback
+            if (response.statusCode() == 200) {
+                if (progressCallback != null) {
+                    tech.kayys.golek.sdk.core.model.PullProgress progress = new tech.kayys.golek.sdk.core.model.PullProgress(
+                        modelSpec, "completed", 100.0, "Model pulled successfully"
+                    );
+                    progressCallback.accept(progress);
+                }
+                return;
+            } else if (response.statusCode() == 202) {
+                // Server accepted the request, now we need to stream progress updates
+                StreamingHelper helper = new StreamingHelper(httpClient, objectMapper, baseUrl, apiKey, defaultTenantId);
+
+                // Create a publisher for the streaming progress
+                Publisher<tech.kayys.golek.sdk.core.model.PullProgress> publisher =
+                    helper.createModelPullStreamPublisher(modelSpec, progressCallback);
+
+                // Subscribe to the publisher to process the stream
+                io.reactivex.Flowable.fromPublisher(publisher)
+                    .blockingSubscribe(
+                        progress -> {
+                            // Progress updates are handled by the callback in the publisher
+                        },
+                        error -> {
+                            throw new SdkException("SDK_ERR_MODEL_PULL", "Error during model pull streaming: " + error.getMessage(), error);
+                        },
+                        () -> {
+                            // Completed
+                        }
+                    );
+            } else {
+                // Parse error response
+                java.util.Map<String, Object> errorResponse = handleResponse(response, java.util.Map.class);
+                String errorMessage = (String) errorResponse.getOrDefault("error", "Unknown error during model pull");
+                throw new SdkException("SDK_ERR_MODEL_PULL", "Failed to pull model: " + errorMessage);
+            }
+        } catch (GolekClientException e) {
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_MODEL_PULL", "Failed to pull model", e);
+        }
+    }
+
+    @Override
+    public void deleteModel(String modelId) throws SdkException {
+        try {
+            String encodedModelId = URLEncoder.encode(modelId, StandardCharsets.UTF_8);
+            String url = String.format("%s/v1/models/%s", baseUrl, encodedModelId);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("X-Tenant-ID", defaultTenantId)
+                    .header("Content-Type", "application/json")
+                    .timeout(Duration.ofSeconds(30))
+                    .DELETE()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200 || response.statusCode() == 204) {
+                // Success - model deleted
+                return;
+            } else {
+                // Parse error response
+                java.util.Map<String, Object> errorResponse = handleResponse(response, java.util.Map.class);
+                String errorMessage = (String) errorResponse.getOrDefault("error", "Unknown error during model deletion");
+                throw new SdkException("SDK_ERR_MODEL_DELETE", "Failed to delete model: " + errorMessage);
+            }
+        } catch (GolekClientException e) {
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_MODEL_DELETE", "Failed to delete model", e);
         }
     }
 }

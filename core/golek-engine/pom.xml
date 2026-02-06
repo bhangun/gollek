@@ -21,7 +21,7 @@
         <!-- Core API -->
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-api</artifactId>
+            <artifactId>golek-spi</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -43,8 +43,8 @@
 
         <dependency>
             <groupId>tech.kayys.wayang</groupId>
-            <artifactId>wayang-tenant-core</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <artifactId>wayang-tenant-spi</artifactId>
+            <version>${project.version}</version>
         </dependency>
 
         <!-- Jackson for JSON -->
@@ -93,7 +93,7 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-smallrye-metrics</artifactId>
+            <artifactId>quarkus-micrometer-registry-prometheus</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -116,12 +116,12 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-junit5</artifactId>
+            <artifactId>quarkus-junit</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-junit5-mockito</artifactId>
+            <artifactId>quarkus-junit-mockito</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -133,10 +133,6 @@
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-micrometer-registry-prometheus</artifactId>
         </dependency>
     </dependencies>
 </project>

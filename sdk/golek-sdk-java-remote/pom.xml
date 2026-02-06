@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-          <groupId>tech.kayys.golek</groupId>
-          <artifactId>golek-sdk-parent</artifactId>
-          <version>1.0.0-SNAPSHOT</version>
+        <groupId>tech.kayys.golek</groupId>
+        <artifactId>golek-sdk-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <groupId>tech.kayys.golek</groupId>
@@ -20,10 +20,17 @@
     </properties>
 
     <dependencies>
+        <!-- Golek SDK Core -->
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-sdk-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Golek Core API -->
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-api</artifactId>
+            <artifactId>golek-spi</artifactId>
             <version>${project.version}</version>
         </dependency>
 

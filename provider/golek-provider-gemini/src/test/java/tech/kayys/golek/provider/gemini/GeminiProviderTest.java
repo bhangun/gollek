@@ -7,9 +7,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.provider.ProviderRequest;
-import tech.kayys.golek.api.stream.StreamChunk;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.provider.ProviderRequest;
+import tech.kayys.golek.spi.stream.StreamChunk;
 import tech.kayys.wayang.tenant.TenantContext;
 
 import java.util.Collections;
@@ -65,7 +65,7 @@ class GeminiProviderTest {
     void doInfer() {
         ProviderRequest request = new ProviderRequest();
         request.setModel("gemini-1.5-pro");
-        request.setMessages(Collections.singletonList(new tech.kayys.golek.api.model.Message("user", "Hello")));
+        request.setMessages(Collections.singletonList(new tech.kayys.golek.spi.model.Message("user", "Hello")));
 
         GeminiResponse geminiResponse = new GeminiResponse();
         GeminiCandidate candidate = new GeminiCandidate();
@@ -92,7 +92,7 @@ class GeminiProviderTest {
     void stream() {
         ProviderRequest request = new ProviderRequest();
         request.setModel("gemini-1.5-pro");
-        request.setMessages(Collections.singletonList(new tech.kayys.golek.api.model.Message("user", "Hello")));
+        request.setMessages(Collections.singletonList(new tech.kayys.golek.spi.model.Message("user", "Hello")));
 
         GeminiResponse chunk1 = new GeminiResponse();
         GeminiCandidate candidate1 = new GeminiCandidate();

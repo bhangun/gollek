@@ -6,8 +6,8 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import tech.kayys.golek.engine.context.EngineContext;
-import tech.kayys.golek.api.plugin.PluginContext;
-import tech.kayys.golek.api.plugin.PluginRegistry;
+import tech.kayys.golek.spi.plugin.PluginContext;
+import tech.kayys.golek.spi.plugin.PluginRegistry;
 
 /**
  * Default implementation of plugin context.

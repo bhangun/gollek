@@ -2,8 +2,8 @@ package tech.kayys.golek.engine.model;
 
 import java.util.Map;
 
-import tech.kayys.golek.api.model.ModelManifest;
-import tech.kayys.golek.api.model.RunnerMetadata;
+import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.model.RunnerMetadata;
 import tech.kayys.golek.model.exception.ModelLoadException;
 import tech.kayys.wayang.tenant.TenantContext;
 

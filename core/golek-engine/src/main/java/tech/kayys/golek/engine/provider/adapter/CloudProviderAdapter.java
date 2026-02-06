@@ -1,8 +1,8 @@
 package tech.kayys.golek.engine.provider.adapter;
 
 import io.smallrye.mutiny.Uni;
-import tech.kayys.golek.api.provider.ProviderHealth;
-import tech.kayys.golek.api.provider.ProviderCapabilities;
+import tech.kayys.golek.spi.provider.ProviderHealth;
+import tech.kayys.golek.spi.provider.ProviderCapabilities;
 import tech.kayys.golek.provider.core.ratelimit.RateLimiter;
 import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.engine.ratelimit.SlidingWindowRateLimiter;
@@ -42,7 +42,7 @@ public abstract class CloudProviderAdapter extends AbstractProvider {
                     }
                 }
                 quotaService.reportExhaustion(id(), retryAfter);
-                return new tech.kayys.golek.api.routing.QuotaExhaustedException(id(), "Provider quota exhausted (429)");
+                return new tech.kayys.golek.spi.routing.QuotaExhaustedException(id(), "Provider quota exhausted (429)");
             }
         }
         return super.handleFailure(ex);
@@ -51,7 +51,8 @@ public abstract class CloudProviderAdapter extends AbstractProvider {
     @Override
     protected Uni<Void> doInitialize(Map<String, Object> config, TenantContext tenant) {
         return Uni.createFrom().item(() -> {
-            this.apiKey = extractApiKey(config, tenant);
+            TenantContext effectiveTenant = tenant != null ? tenant : TenantContext.of("default");
+            this.apiKey = extractApiKey(config, effectiveTenant);
             this.baseUrl = getConfigValue("base-url", getDefaultBaseUrl());
             this.requestTimeout = Duration.parse(
                     getConfigValue("request-timeout", "PT30S"));

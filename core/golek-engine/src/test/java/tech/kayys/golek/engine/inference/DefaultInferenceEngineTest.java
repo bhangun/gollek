@@ -11,11 +11,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Duration;
 import java.util.Map;
 
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.inference.InferenceResponse;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.engine.context.EngineContext;
 import tech.kayys.golek.core.engine.EngineMetadata;
-import tech.kayys.golek.api.model.HealthStatus;
+import tech.kayys.golek.spi.model.HealthStatus;
 import tech.kayys.golek.engine.execution.ExecutionStateMachine;
 import tech.kayys.golek.core.pipeline.InferencePipeline;
 import tech.kayys.golek.engine.observability.InferenceMetricsCollector;

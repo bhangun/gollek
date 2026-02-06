@@ -27,7 +27,7 @@
         <!-- Core API -->
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-api</artifactId>
+            <artifactId>golek-spi</artifactId>
             <version>${project.version}</version>
         </dependency>
 

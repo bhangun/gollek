@@ -118,19 +118,19 @@ public class GGUFSessionManager {
             tech.kayys.wayang.tenant.TenantContext tenantContext = tech.kayys.wayang.tenant.TenantContext.of(tenantId);
 
             // Create artifact location
-            tech.kayys.golek.api.model.ArtifactLocation location = new tech.kayys.golek.api.model.ArtifactLocation(
+            tech.kayys.golek.spi.model.ArtifactLocation location = new tech.kayys.golek.spi.model.ArtifactLocation(
                     resolveModelPath(modelId),
                     null,
                     null,
                     null);
 
             // Create model manifest
-            tech.kayys.golek.api.model.ModelManifest manifest = new tech.kayys.golek.api.model.ModelManifest(
+            tech.kayys.golek.spi.model.ModelManifest manifest = new tech.kayys.golek.spi.model.ModelManifest(
                     modelId,
                     modelId,
                     "unknown",
                     tenantId,
-                    Map.of(tech.kayys.golek.api.model.ModelFormat.GGUF, location),
+                    Map.of(tech.kayys.golek.spi.model.ModelFormat.GGUF, location),
                     java.util.Collections.emptyList(),
                     null,
                     java.util.Collections.emptyMap(),

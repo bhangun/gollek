@@ -1,19 +1,20 @@
-package tech.kayys.golek.provider.core.plugin;
+package tech.kayys.golek.adapter.pytorch;
 
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
-import tech.kayys.golek.provider.core.provider.ProviderCapabilities;
-import tech.kayys.golek.provider.core.provider.ProviderConfig;
-import tech.kayys.golek.provider.core.provider.ProviderHealth;
-import tech.kayys.golek.provider.core.provider.ProviderRequest;
-import tech.kayys.wayang.inference.api.InferenceResponse;
-import tech.kayys.wayang.inference.api.Message;
-import tech.kayys.wayang.inference.api.StreamChunk;
-import tech.kayys.wayang.inference.api.TenantContext;
-import tech.kayys.wayang.inference.kernel.provider.*;
+import tech.kayys.golek.spi.provider.*;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.model.Message;
+import tech.kayys.golek.spi.stream.StreamChunk;
+import tech.kayys.wayang.tenant.TenantContext;
+import tech.kayys.golek.spi.exception.ProviderException;
+import tech.kayys.golek.spi.exception.ProviderException.ProviderInitializationException;
+import tech.kayys.golek.spi.model.ModelFormat;
+import tech.kayys.golek.spi.model.DeviceType;
+import tech.kayys.golek.spi.model.HealthStatus;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -23,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * PyTorch/TorchScript model provider.
  * Supports both eager and traced/scripted models.
- * 
+ *
  * Capabilities:
  * - PyTorch (.pt, .pth) models
  * - TorchScript (.pt) models
@@ -32,7 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * - Dynamic quantization
  */
 @ApplicationScoped
-public class PyTorchProvider implements StreamingLLMProvider {
+public class PyTorchProvider implements StreamingProvider {
 
     private static final Logger LOG = Logger.getLogger(PyTorchProvider.class);
 
@@ -58,6 +59,17 @@ public class PyTorchProvider implements StreamingLLMProvider {
     }
 
     @Override
+    public ProviderMetadata metadata() {
+        return ProviderMetadata.builder()
+                .providerId(id())
+                .name(name())
+                .version(version())
+                .vendor("Wayang")
+                .description("PyTorch Inference Provider")
+                .build();
+    }
+
+    @Override
     public ProviderCapabilities capabilities() {
         return ProviderCapabilities.builder()
                 .streaming(true)
@@ -65,12 +77,9 @@ public class PyTorchProvider implements StreamingLLMProvider {
                 .multimodal(true)
                 .embeddings(true)
                 .maxContextTokens(8192)
-                .supportedFormats(Set.of("pt", "pth", "torchscript"))
-                .supportedDevices(Set.of("cpu", "cuda"))
-                .features(Map.of(
-                        "batch_inference", true,
-                        "quantization", true,
-                        "dynamic_shapes", true))
+                .supportedFormats(Set.of(ModelFormat.TORCHSCRIPT))
+                .supportedDevices(Set.of(DeviceType.CPU, DeviceType.CUDA))
+                .features(Set.of("batch_inference", "quantization", "dynamic_shapes"))
                 .build();
     }
 
@@ -154,7 +163,7 @@ public class PyTorchProvider implements StreamingLLMProvider {
     }
 
     @Override
-    public Multi<StreamChunk> stream(
+    public Multi<StreamChunk> inferStream(
             ProviderRequest request,
             TenantContext context) {
         return Multi.createFrom().emitter(emitter -> {
@@ -215,26 +224,28 @@ public class PyTorchProvider implements StreamingLLMProvider {
     }
 
     @Override
-    public ProviderHealth health() {
+    public Uni<ProviderHealth> health() {
         if (!initialized) {
-            return ProviderHealth.unhealthy("Provider not initialized");
+            return Uni.createFrom().item(ProviderHealth.unhealthy("Provider not initialized"));
         }
 
-        try {
-            // Check if we can create a simple tensor
-            testTensorCreation();
+        return Uni.createFrom().item(() -> {
+            try {
+                // Check if we can create a simple tensor
+                testTensorCreation();
 
-            Map<String, Object> diagnostics = new HashMap<>();
-            diagnostics.put("loaded_models", modelCache.size());
-            diagnostics.put("cuda_available", isCudaAvailable());
+                Map<String, Object> diagnostics = new HashMap<>();
+                diagnostics.put("loaded_models", modelCache.size());
+                diagnostics.put("cuda_available", isCudaAvailable());
 
-            return ProviderHealth.healthy("Provider operational");
+                return ProviderHealth.healthy("Provider operational");
 
-        } catch (Exception e) {
-            return ProviderHealth.unhealthy(
-                    "Health check failed: " + e.getMessage(),
-                    Map.of("error", e.getClass().getName()));
-        }
+            } catch (Exception e) {
+                return ProviderHealth.unhealthy(
+                        "Health check failed: " + e.getMessage(),
+                        Map.of("error", e.getClass().getName()));
+            }
+        });
     }
 
     @Override
@@ -253,11 +264,12 @@ public class PyTorchProvider implements StreamingLLMProvider {
      * Load or get cached model
      */
     private PyTorchModel loadModel(String modelId, TenantContext context) {
+        TenantContext effectiveContext = ensureTenantContext(context);
         return modelCache.computeIfAbsent(modelId, id -> {
             LOG.infof("Loading PyTorch model: %s", id);
 
             try {
-                String modelPath = resolveModelPath(id, context);
+                String modelPath = resolveModelPath(id, effectiveContext);
                 String device = config.getString("device", "cpu");
 
                 PyTorchModel model = new PyTorchModel(modelPath, device);
@@ -402,7 +414,11 @@ public class PyTorchProvider implements StreamingLLMProvider {
     private String resolveModelPath(String modelId, TenantContext context) {
         // Resolve path from config or model registry
         String basePath = config.getString("models.path", "./models");
-        return basePath + "/" + context.getTenantId() + "/" + modelId;
+        return basePath + "/" + context.getTenantId().value() + "/" + modelId;
+    }
+
+    private TenantContext ensureTenantContext(TenantContext context) {
+        return context != null ? context : TenantContext.of("default");
     }
 
     private void loadNativeLibrary() {

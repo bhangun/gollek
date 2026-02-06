@@ -8,8 +8,8 @@ import io.quarkus.cache.CacheKey;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import tech.kayys.golek.api.model.ModelFormat;
-import tech.kayys.golek.api.model.ModelManifest;
+import tech.kayys.golek.spi.model.ModelFormat;
+import tech.kayys.golek.spi.model.ModelManifest;
 import tech.kayys.golek.engine.model.ModelRepository;
 import tech.kayys.wayang.tenant.TenantId;
 

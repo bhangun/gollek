@@ -7,7 +7,7 @@ import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import tech.kayys.golek.api.inference.InferencePhase;
+import tech.kayys.golek.spi.inference.InferencePhase;
 import tech.kayys.golek.core.execution.ExecutionContext;
 import tech.kayys.golek.core.inference.InferenceObserver;
 

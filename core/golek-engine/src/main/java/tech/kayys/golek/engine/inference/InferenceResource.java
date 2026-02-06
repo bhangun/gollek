@@ -12,6 +12,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.faulttolerance.*;
 import org.eclipse.microprofile.metrics.annotation.Counted;
 import org.eclipse.microprofile.metrics.annotation.Timed;
@@ -25,9 +26,9 @@ import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import lombok.extern.slf4j.Slf4j;
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.error.ErrorCode;
-import tech.kayys.wayang.tenant.TenantContext;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.error.ErrorCode;
 
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -64,8 +65,8 @@ public class InferenceResource {
         @Inject
         InferenceMetrics metrics;
 
-        @Inject
-        TenantContext tenantContext;
+        @ConfigProperty(name = "wayang.multitenancy.enabled", defaultValue = "false")
+        boolean multitenancyEnabled;
 
         /**
          * Execute synchronous inference.
@@ -97,13 +98,14 @@ public class InferenceResource {
         @CircuitBreaker(requestVolumeThreshold = 20, failureRatio = 0.5, delay = 5000, successThreshold = 2)
         @Bulkhead(value = 100, waitingTaskQueue = 50)
         public Uni<Response> infer(
-                        @Parameter(description = "Tenant identifier", required = true) @HeaderParam("X-Tenant-ID") @NotNull String tenantId,
+                        @Parameter(description = "Tenant identifier") @HeaderParam("X-Tenant-ID") String tenantId,
 
                         @Parameter(description = "Request ID for tracing") @HeaderParam("X-Request-ID") String requestId,
 
                         @Parameter(description = "Inference request payload", required = true) @Valid @NotNull InferenceRequest request,
 
                         @Context SecurityContext securityContext) {
+                String effectiveTenantId = resolveTenantId(tenantId);
 
                 // 1. Prepare Request
                 InferenceRequest effectiveRequest = InferenceRequest.builder()
@@ -113,15 +115,13 @@ public class InferenceResource {
                                 .tools(request.getTools())
                                 .toolChoice(request.getToolChoice())
                                 .parameters(request.getParameters())
-                                .parameter("tenantId", tenantId)
+                                .parameter("tenantId", effectiveTenantId)
                                 .streaming(false)
                                 .priority(request.getPriority())
                                 .build();
 
-                tenantContext.setCurrentTenant(tenantId);
-
                 log.info("Inference request received: requestId={}, tenantId={}, model={}",
-                                requestId, tenantId, request.getModel());
+                                requestId, effectiveTenantId, request.getModel());
 
                 // Execute inference asynchronously
                 return inferenceService.inferAsync(effectiveRequest)
@@ -129,7 +129,7 @@ public class InferenceResource {
                                         log.info("Inference completed: requestId={}, durationMs={}, model={}",
                                                         requestId, response.getDurationMs(), response.getModel());
 
-                                        metrics.recordSuccess(tenantId, request.getModel(),
+                                        metrics.recordSuccess(effectiveTenantId, request.getModel(),
                                                         "unified", response.getDurationMs());
 
                                         return Response.ok(response).build();
@@ -137,7 +137,7 @@ public class InferenceResource {
                                 .onFailure().recoverWithItem(failure -> {
                                         log.error("Inference failed: requestId={}", requestId, failure);
 
-                                        metrics.recordFailure(tenantId, request.getModel(),
+                                        metrics.recordFailure(effectiveTenantId, request.getModel(),
                                                         failure.getClass().getSimpleName());
 
                                         return handleError(failure, requestId);
@@ -154,10 +154,11 @@ public class InferenceResource {
         @Operation(summary = "Submit async inference job", description = "Submit inference request for asynchronous processing")
         @SecurityRequirement(name = "bearer-jwt")
         public Uni<Response> inferAsync(
-                        @HeaderParam("X-Tenant-ID") @NotNull String tenantId,
+                        @HeaderParam("X-Tenant-ID") String tenantId,
                         @HeaderParam("X-Request-ID") String requestId,
                         @Valid @NotNull InferenceRequest request,
                         @Context SecurityContext securityContext) {
+                String effectiveTenantId = resolveTenantId(tenantId);
 
                 if (requestId == null) {
                         requestId = UUID.randomUUID().toString();
@@ -170,7 +171,7 @@ public class InferenceResource {
                                 .tools(request.getTools())
                                 .toolChoice(request.getToolChoice())
                                 .parameters(request.getParameters())
-                                .parameter("tenantId", tenantId)
+                                .parameter("tenantId", effectiveTenantId)
                                 .streaming(false)
                                 .priority(request.getPriority())
                                 .build();
@@ -192,10 +193,11 @@ public class InferenceResource {
         @Operation(summary = "Stream inference results", description = "Execute streaming inference (e.g., for LLMs token generation)")
         @SecurityRequirement(name = "bearer-jwt")
         public Multi<StreamingInferenceChunk> inferStream(
-                        @HeaderParam("X-Tenant-ID") @NotNull String tenantId,
+                        @HeaderParam("X-Tenant-ID") String tenantId,
                         @HeaderParam("X-Request-ID") String requestId,
                         @Valid @NotNull InferenceRequest request,
                         @Context SecurityContext securityContext) {
+                String effectiveTenantId = resolveTenantId(tenantId);
 
                 if (requestId == null) {
                         requestId = UUID.randomUUID().toString();
@@ -208,7 +210,7 @@ public class InferenceResource {
                                 .tools(request.getTools())
                                 .toolChoice(request.getToolChoice())
                                 .parameters(request.getParameters())
-                                .parameter("tenantId", tenantId)
+                                .parameter("tenantId", effectiveTenantId)
                                 .streaming(true)
                                 .priority(request.getPriority())
                                 .build();
@@ -232,9 +234,10 @@ public class InferenceResource {
         @SecurityRequirement(name = "bearer-jwt")
         public Uni<Response> getAsyncJobStatus(
                         @PathParam("jobId") String jobId,
-                        @HeaderParam("X-Tenant-ID") @NotNull String tenantId) {
+                        @HeaderParam("X-Tenant-ID") String tenantId) {
+                String effectiveTenantId = resolveTenantId(tenantId);
 
-                return inferenceService.getJobStatus(jobId, tenantId)
+                return inferenceService.getJobStatus(jobId, effectiveTenantId)
                                 .map(status -> Response.ok(status).build())
                                 .onFailure().recoverWithItem(failure -> handleError(failure, null));
         }
@@ -248,16 +251,29 @@ public class InferenceResource {
         @Operation(summary = "Batch inference", description = "Process multiple inference requests in a single batch")
         @SecurityRequirement(name = "bearer-jwt")
         public Uni<Response> batchInfer(
-                        @HeaderParam("X-Tenant-ID") @NotNull String tenantId,
+                        @HeaderParam("X-Tenant-ID") String tenantId,
                         @Valid @NotNull BatchInferenceRequest batchRequest,
                         @Context SecurityContext securityContext) {
+                String effectiveTenantId = resolveTenantId(tenantId);
 
                 InferenceService.BatchInferenceRequest reactiveBatchRequest = new InferenceService.BatchInferenceRequest(
                                 batchRequest.requests(), batchRequest.maxConcurrent());
 
-                return inferenceService.batchInfer(reactiveBatchRequest, tenantId)
+                return inferenceService.batchInfer(reactiveBatchRequest, effectiveTenantId)
                                 .map(responses -> Response.ok(responses).build())
                                 .onFailure().recoverWithItem(failure -> handleError(failure, null));
+        }
+
+        private String resolveTenantId(String tenantId) {
+                if (!multitenancyEnabled) {
+                        return "default";
+                }
+
+                if (tenantId == null || tenantId.trim().isEmpty()) {
+                        throw new BadRequestException("Tenant ID header (X-Tenant-ID) is required");
+                }
+
+                return tenantId;
         }
 
         /**

@@ -4,9 +4,11 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
-import tech.kayys.golek.engine.context.EngineContext;
-import tech.kayys.golek.plugin.api.GolekPlugin;
-import tech.kayys.golek.plugin.api.PluginContext;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.spi.plugin.GolekPlugin;
+import tech.kayys.golek.spi.plugin.PluginContext;
+import tech.kayys.golek.spi.plugin.PluginRegistry;
+import tech.kayys.golek.spi.plugin.PluginHealth;
 
 import org.jboss.logging.Logger;
 
@@ -38,7 +40,7 @@ public class PluginLoader {
     public Uni<Integer> loadAll() {
         if (loaded) {
             LOG.info("Plugins already loaded");
-            return Uni.createFrom().item(registry.count());
+            return Uni.createFrom().item(registry.all().size());
         }
 
         LOG.info("Loading plugins...");
@@ -67,7 +69,7 @@ public class PluginLoader {
 
         for (GolekPlugin plugin : cdiPlugins) {
             try {
-                registry.register(plugin);
+                registry.registerPlugin(plugin);
                 count++;
             } catch (Exception e) {
                 LOG.errorf(e, "Failed to register CDI plugin: %s", plugin.id());
@@ -87,8 +89,8 @@ public class PluginLoader {
         ServiceLoader<GolekPlugin> loader = ServiceLoader.load(GolekPlugin.class);
         for (GolekPlugin plugin : loader) {
             try {
-                if (!registry.isRegistered(plugin.id())) {
-                    registry.register(plugin);
+                if (registry.byId(plugin.id()).isEmpty()) {
+                    registry.registerPlugin(plugin);
                     count++;
                 }
             } catch (Exception e) {
@@ -106,8 +108,9 @@ public class PluginLoader {
     public Uni<Void> initializeAll(PluginContext context) {
         LOG.info("Initializing all plugins...");
 
-        List<Uni<Void>> initializations = registry.getAllPlugins().stream()
-                .map(plugin -> plugin.initialize(context)
+        List<Uni<Void>> initializations = registry.all().stream()
+                .map(plugin -> Uni.createFrom().voidItem()
+                        .onItem().invoke(() -> plugin.initialize(context))
                         .onItem().invoke(() -> LOG.debugf("Initialized plugin: %s", plugin.id()))
                         .onFailure().invoke(error -> LOG.errorf(error, "Failed to initialize plugin: %s", plugin.id())))
                 .toList();

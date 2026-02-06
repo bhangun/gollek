@@ -1,11 +1,11 @@
 package tech.kayys.golek.core.inference;
 
 import io.smallrye.mutiny.Uni;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.inference.InferenceResponse;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.core.engine.EngineMetadata;
 import tech.kayys.wayang.tenant.TenantContext;
-import tech.kayys.golek.api.model.HealthStatus;
+import tech.kayys.golek.spi.model.HealthStatus;
 
 /**
  * Main entry point for inference requests.

@@ -2,9 +2,9 @@ package tech.kayys.golek.engine.routing;
 
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
-import tech.kayys.golek.api.stream.StreamChunk;
+import tech.kayys.golek.spi.stream.StreamChunk;
 import jakarta.enterprise.context.ApplicationScoped;
-import tech.kayys.golek.api.provider.StreamingProvider;
+import tech.kayys.golek.spi.provider.StreamingProvider;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
@@ -18,21 +18,21 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 // API imports
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.model.ModelManifest;
-//import tech.kayys.golek.api.model.ModelManifest;
-import tech.kayys.golek.api.provider.ProviderCapabilities;
-import tech.kayys.golek.api.provider.ProviderHealth;
-import tech.kayys.golek.api.provider.ProviderRequest;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.model.ModelManifest;
+//import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.provider.ProviderCapabilities;
+import tech.kayys.golek.spi.provider.ProviderHealth;
+import tech.kayys.golek.spi.provider.ProviderRequest;
 // Core engine imports
 import tech.kayys.golek.engine.tenant.TenantConfigRepository;
 import tech.kayys.golek.core.exception.NoCompatibleProviderException;
 
 // Additional imports for model classes
 import tech.kayys.golek.engine.model.RoutingContext;
-import tech.kayys.golek.api.provider.RoutingDecision;
-import tech.kayys.golek.api.provider.ProviderCandidate;
+import tech.kayys.golek.spi.provider.RoutingDecision;
+import tech.kayys.golek.spi.provider.ProviderCandidate;
 import tech.kayys.golek.engine.observability.RuntimeMetricsCache;
 import tech.kayys.golek.model.core.HardwareCapabilities;
 import tech.kayys.golek.model.core.HardwareDetector;
@@ -41,7 +41,7 @@ import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.engine.model.ModelRepository;
 import tech.kayys.golek.engine.registry.ProviderRegistry;
 import tech.kayys.golek.engine.routing.policy.SelectionPolicy;
-import tech.kayys.golek.api.provider.LLMProvider;
+import tech.kayys.golek.spi.provider.LLMProvider;
 
 /**
  * Intelligent model router with multi-factor scoring.
@@ -85,18 +85,19 @@ public class ModelRouterService {
             String modelId,
             InferenceRequest request,
             TenantContext tenantContext) {
+        TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
         return Uni.createFrom().item(() -> {
 
             // Load model manifest
             ModelManifest manifest = modelRepository
-                    .findById(modelId, tenantContext.getTenantId())
+                    .findById(modelId, effectiveTenantContext.getTenantId())
                     .orElseThrow(() -> new ModelNotFoundException(
                             "Model not found: " + modelId));
 
             // Build routing context
             RoutingContext context = buildRoutingContext(
                     request,
-                    tenantContext,
+                    effectiveTenantContext,
                     manifest);
 
             // Select provider
@@ -110,10 +111,10 @@ public class ModelRouterService {
 
             return decision;
         })
-                .onItem().transformToUni(decision -> executeWithProvider(decision, request, tenantContext))
+                .onItem().transformToUni(decision -> executeWithProvider(decision, request, effectiveTenantContext))
                 .onFailure().retry().withBackOff(Duration.ofMillis(100))
                 .atMost(3)
-                .onFailure().recoverWithUni(error -> handleRoutingFailure(modelId, request, tenantContext, error));
+                .onFailure().recoverWithUni(error -> handleRoutingFailure(modelId, request, effectiveTenantContext, error));
     }
 
     /**
@@ -123,17 +124,18 @@ public class ModelRouterService {
             String modelId,
             InferenceRequest request,
             TenantContext tenantContext) {
+        TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
         // Selection logic is the same for sync/async/stream
         // We just need to execute it differently
         return Uni.createFrom().item(() -> {
             ModelManifest manifest = modelRepository
-                    .findById(modelId, tenantContext.getTenantId())
+                    .findById(modelId, effectiveTenantContext.getTenantId())
                     .orElseThrow(() -> new ModelNotFoundException("Model not found: " + modelId));
 
-            RoutingContext context = buildRoutingContext(request, tenantContext, manifest);
+            RoutingContext context = buildRoutingContext(request, effectiveTenantContext, manifest);
             return selectProvider(manifest, context);
         })
-                .onItem().transformToMulti(decision -> executeStreamWithProvider(decision, request, tenantContext));
+                .onItem().transformToMulti(decision -> executeStreamWithProvider(decision, request, effectiveTenantContext));
     }
 
     /**
@@ -436,7 +438,7 @@ public class ModelRouterService {
             TenantContext context) {
         // Check tenant quota
         return tenantConfigRepository.isQuotaExhausted(
-                context.getTenantId(),
+                ensureTenantContext(context).getTenantId(),
                 provider.id());
     }
 
@@ -590,7 +592,11 @@ public class ModelRouterService {
             InferenceRequest request,
             TenantContext context) {
         // Check if tenant has cost-sensitive flag
-        return tenantConfigRepository.isCostSensitive(context.getTenantId());
+        return tenantConfigRepository.isCostSensitive(ensureTenantContext(context).getTenantId());
+    }
+
+    private TenantContext ensureTenantContext(TenantContext tenantContext) {
+        return tenantContext != null ? tenantContext : TenantContext.of("default");
     }
 
     /**

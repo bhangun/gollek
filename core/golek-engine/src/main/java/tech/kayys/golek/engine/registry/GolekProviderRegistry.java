@@ -4,12 +4,12 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
-import tech.kayys.golek.api.plugin.GolekPlugin;
-import tech.kayys.golek.api.provider.ProviderDescriptor;
-import tech.kayys.golek.api.provider.ProviderRegistry;
-import tech.kayys.golek.api.exception.ProviderException;
-import tech.kayys.golek.api.provider.LLMProvider;
-import tech.kayys.golek.api.provider.StreamingProvider;
+import tech.kayys.golek.spi.plugin.GolekPlugin;
+import tech.kayys.golek.spi.provider.ProviderDescriptor;
+import tech.kayys.golek.spi.provider.ProviderRegistry;
+import tech.kayys.golek.spi.exception.ProviderException;
+import tech.kayys.golek.spi.provider.LLMProvider;
+import tech.kayys.golek.spi.provider.StreamingProvider;
 
 import java.util.Collection;
 import java.util.List;

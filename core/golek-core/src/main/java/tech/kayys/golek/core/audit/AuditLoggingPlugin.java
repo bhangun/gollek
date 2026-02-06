@@ -1,14 +1,14 @@
 package tech.kayys.golek.core.audit;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import tech.kayys.golek.api.AuditPayload;
-import tech.kayys.golek.api.inference.InferencePhase;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.inference.InferenceResponse;
+import tech.kayys.golek.spi.AuditPayload;
+import tech.kayys.golek.spi.inference.InferencePhase;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.core.plugin.InferencePhasePlugin;
 import tech.kayys.golek.core.execution.ExecutionContext;
-import tech.kayys.golek.api.context.EngineContext;
-import tech.kayys.golek.plugin.api.PluginContext;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.spi.plugin.PluginContext;
 
 import org.jboss.logging.Logger;
 

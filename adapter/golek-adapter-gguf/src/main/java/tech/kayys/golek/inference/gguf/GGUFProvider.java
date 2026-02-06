@@ -13,14 +13,14 @@ import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 import org.jboss.logging.Logger;
 
-import tech.kayys.golek.api.exception.ProviderException;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.inference.InferenceResponse;
-import tech.kayys.golek.api.model.DeviceType;
-import tech.kayys.golek.api.model.ModelFormat;
-import tech.kayys.golek.api.provider.*;
+import tech.kayys.golek.spi.exception.ProviderException;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.model.DeviceType;
+import tech.kayys.golek.spi.model.ModelFormat;
+import tech.kayys.golek.spi.provider.*;
 import tech.kayys.wayang.tenant.TenantContext;
-import tech.kayys.golek.api.Message;
+import tech.kayys.golek.spi.Message;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -163,9 +163,10 @@ public class GGUFProvider implements LLMProvider {
     public Uni<InferenceResponse> infer(ProviderRequest request, TenantContext context) {
         ensureInitialized();
 
+        TenantContext effectiveContext = ensureTenantContext(context);
         var span = tracer.spanBuilder("gguf.infer")
                 .setAttribute("model", request.getModel())
-                .setAttribute("tenant", context.getTenantId().value())
+                .setAttribute("tenant", effectiveContext.getTenantId().value())
                 .startSpan();
 
         return Uni.createFrom().item(() -> {
@@ -174,12 +175,12 @@ public class GGUFProvider implements LLMProvider {
                 Instant startTime = Instant.now();
 
                 log.debugf("Starting inference for model=%s, tenant=%s",
-                        request.getModel(), context.getTenantId().value());
+                        request.getModel(), effectiveContext.getTenantId().value());
 
                 InferenceRequest inferenceRequest = convertToInferenceRequest(request);
 
                 var sessionContext = sessionManager.getSession(
-                        context.getTenantId().value(),
+                        effectiveContext.getTenantId().value(),
                         request.getModel(),
                         config);
 
@@ -190,7 +191,7 @@ public class GGUFProvider implements LLMProvider {
 
                 InferenceResponse response = sessionContext.runner().infer(
                         inferenceRequest,
-                        createRequestContext(context, request));
+                        createRequestContext(effectiveContext, request));
 
                 long durationMs = Duration.between(startTime, Instant.now()).toMillis();
                 metrics.recordSuccess();
@@ -316,13 +317,19 @@ public class GGUFProvider implements LLMProvider {
                 .build();
     }
 
-    private tech.kayys.golek.api.context.RequestContext createRequestContext(
+    private tech.kayys.golek.spi.context.RequestContext createRequestContext(
             TenantContext tenantContext,
             ProviderRequest request) {
-        return tech.kayys.golek.api.context.RequestContext.create(
-                tenantContext.getTenantId().value(),
+        TenantContext effectiveContext = ensureTenantContext(tenantContext);
+        return tech.kayys.golek.spi.context.RequestContext.create(
+                effectiveContext.getTenantId().value(),
                 "anonymous", // userId
                 "session-" + java.util.UUID.randomUUID().toString());
+    }
+
+    private TenantContext ensureTenantContext(TenantContext tenantContext) {
+        // Single-tenant default when multitenancy is disabled or context is absent.
+        return tenantContext != null ? tenantContext : TenantContext.of("default");
     }
 
     private void recordMicrometerMetrics(String modelId, boolean success, Duration duration) {

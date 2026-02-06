@@ -2,8 +2,8 @@ package tech.kayys.golek.plugin;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
-import tech.kayys.golek.api.InferenceRequest;
-import tech.kayys.golek.api.Message;
+import tech.kayys.golek.spi.InferenceRequest;
+import tech.kayys.golek.spi.Message;
 import tech.kayys.golek.provider.core.plugin.GolekPlugin.PluginMetadata;
 
 import org.jboss.logging.Logger;

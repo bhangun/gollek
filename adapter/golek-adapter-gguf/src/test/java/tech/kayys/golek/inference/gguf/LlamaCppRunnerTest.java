@@ -7,9 +7,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.model.ModelManifest;
-import tech.kayys.golek.api.model.ModelFormat;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.model.ModelFormat;
 import tech.kayys.wayang.tenant.TenantContext;
 
 import java.util.Collections;
@@ -46,7 +46,7 @@ class LlamaCppRunnerTest {
     @Test
     @DisplayName("Runner initialization should check model existence")
     void testInitializationMissingModel() {
-        tech.kayys.golek.api.model.ArtifactLocation location = new tech.kayys.golek.api.model.ArtifactLocation(
+        tech.kayys.golek.spi.model.ArtifactLocation location = new tech.kayys.golek.spi.model.ArtifactLocation(
                 "/path/to/missing/model.gguf",
                 null,
                 null,
@@ -79,9 +79,9 @@ class LlamaCppRunnerTest {
     void testInferenceBeforeInit() {
         InferenceRequest request = InferenceRequest.builder()
                 .model("model.gguf")
-                .message(tech.kayys.golek.api.Message.user("Hello"))
+                .message(tech.kayys.golek.spi.Message.user("Hello"))
                 .build();
-        tech.kayys.golek.api.context.RequestContext ctx = tech.kayys.golek.api.context.RequestContext.create(
+        tech.kayys.golek.spi.context.RequestContext ctx = tech.kayys.golek.spi.context.RequestContext.create(
                 "tenant1", "user1", "session1");
 
         assertThatThrownBy(() -> runner.infer(request, ctx))

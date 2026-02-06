@@ -3,8 +3,8 @@ package tech.kayys.golek.engine.plugin;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
-import tech.kayys.golek.api.plugin.PluginRegistry;
-import tech.kayys.golek.api.plugin.GolekPlugin;
+import tech.kayys.golek.spi.plugin.PluginRegistry;
+import tech.kayys.golek.spi.plugin.GolekPlugin;
 
 import org.jboss.logging.Logger;
 

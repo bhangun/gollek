@@ -3,10 +3,10 @@ package tech.kayys.golek.engine.routing;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.model.ModelManifest;
-import tech.kayys.golek.api.exception.InferenceException;
-import tech.kayys.golek.api.inference.InferenceResponse;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.exception.InferenceException;
+import tech.kayys.golek.spi.inference.InferenceResponse;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 

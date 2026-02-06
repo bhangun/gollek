@@ -14,13 +14,13 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import tech.kayys.golek.api.context.RequestContext;
-import tech.kayys.golek.api.inference.InferenceRequest;
-import tech.kayys.golek.api.model.DeviceType;
-import tech.kayys.golek.api.model.ModelFormat;
-import tech.kayys.golek.api.model.ModelManifest;
-import tech.kayys.golek.api.model.RunnerMetadata;
-import tech.kayys.golek.api.provider.RoutingContext;
+import tech.kayys.golek.spi.context.RequestContext;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.model.DeviceType;
+import tech.kayys.golek.spi.model.ModelFormat;
+import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.model.RunnerMetadata;
+import tech.kayys.golek.spi.provider.RoutingContext;
 import jakarta.enterprise.inject.Instance;
 
 /**

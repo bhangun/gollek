@@ -1,7 +1,7 @@
 package tech.kayys.golek.provider.core.exception;
 
-import tech.kayys.golek.api.exception.InferenceException;
-import tech.kayys.golek.api.error.ErrorCode;
+import tech.kayys.golek.spi.exception.InferenceException;
+import tech.kayys.golek.spi.error.ErrorCode;
 
 /**
  * Exception that indicates the operation can be retried.

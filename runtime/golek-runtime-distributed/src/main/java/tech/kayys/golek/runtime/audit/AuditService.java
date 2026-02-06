@@ -4,7 +4,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
-import tech.kayys.golek.api.inference.*;
+import tech.kayys.golek.spi.inference.*;
 import tech.kayys.golek.runtime.messaging.AuditEventPublisher;
 
 import java.time.Instant;

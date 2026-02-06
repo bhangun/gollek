@@ -18,9 +18,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import jakarta.enterprise.inject.Instance;
-import tech.kayys.golek.api.model.ModelFormat;
-import tech.kayys.golek.api.model.ModelManifest;
-import tech.kayys.golek.api.model.RunnerMetadata;
+import tech.kayys.golek.spi.model.ModelFormat;
+import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.model.RunnerMetadata;
 import tech.kayys.golek.core.model.ModelRunner;
 import tech.kayys.golek.engine.model.ModelRepository;
 import tech.kayys.wayang.tenant.TenantConfigurationService;

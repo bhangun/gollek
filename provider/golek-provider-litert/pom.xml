@@ -18,7 +18,7 @@
 
         <lombok.version>1.18.30</lombok.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <quarkus.version>3.6.4</quarkus.version>
+        <quarkus.version>3.31.1</quarkus.version>
         <compiler-plugin.version>3.11.0</compiler-plugin.version>
         <surefire-plugin.version>3.0.0</surefire-plugin.version>
     </properties>
@@ -49,7 +49,7 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-api</artifactId>
+            <artifactId>golek-spi</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -61,15 +61,15 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-resteasy-reactive</artifactId>
+            <artifactId>quarkus-rest</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-resteasy-reactive-jackson</artifactId>
+            <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-client-reactive-jackson</artifactId>
+            <artifactId>quarkus-rest-client-jackson</artifactId>
         </dependency>
 
         <!-- Jackson for JSON -->

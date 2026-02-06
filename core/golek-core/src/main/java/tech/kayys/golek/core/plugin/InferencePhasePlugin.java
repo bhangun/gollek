@@ -1,9 +1,9 @@
 package tech.kayys.golek.core.plugin;
 
-import tech.kayys.golek.api.inference.InferencePhase;
-import tech.kayys.golek.api.context.EngineContext;
+import tech.kayys.golek.spi.inference.InferencePhase;
+import tech.kayys.golek.spi.context.EngineContext;
 import tech.kayys.golek.core.execution.ExecutionContext;
-import tech.kayys.golek.plugin.api.PluginException;
+import tech.kayys.golek.spi.plugin.PluginException;
 
 /**
  * Plugin that executes during a specific inference phase.
