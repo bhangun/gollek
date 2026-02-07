@@ -5,6 +5,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
 import org.eclipse.microprofile.faulttolerance.Timeout;
+import java.time.temporal.ChronoUnit;
 import org.jboss.logging.Logger;
 
 import tech.kayys.golek.core.plugin.InferencePhasePlugin;
@@ -13,7 +14,7 @@ import tech.kayys.golek.spi.inference.InferencePhase;
 import tech.kayys.golek.core.execution.ExecutionContext;
 import tech.kayys.golek.engine.execution.ExecutionSignal;
 import tech.kayys.golek.engine.execution.ExecutionStateMachine;
-import tech.kayys.golek.engine.execution.ExecutionStatus;
+import tech.kayys.golek.spi.execution.ExecutionStatus;
 import tech.kayys.golek.core.inference.InferenceObserver;
 import tech.kayys.golek.core.pipeline.InferencePipeline;
 
@@ -56,7 +57,7 @@ public class DefaultInferencePipeline implements InferencePipeline {
          * Execute complete pipeline through all phases
          */
         @Override
-        @Timeout(value = 30, unit = java.util.concurrent.TimeUnit.SECONDS)
+        @Timeout(value = 30, unit = ChronoUnit.SECONDS)
         public Uni<ExecutionContext> execute(ExecutionContext context) {
                 LOG.debugf("Starting pipeline execution for request: %s",
                                 context.token().getRequestId());
@@ -236,11 +237,14 @@ public class DefaultInferencePipeline implements InferencePipeline {
          * Get max retries from context metadata or default
          */
         private int getMaxRetries(ExecutionContext context) {
-                return context.metadata()
-                                .getOrDefault("max.retries", 3)
-                                .toString()
-                                .transform(Integer::parseInt)
-                                .orElse(3);
+                String val = context.metadata()
+                                .getOrDefault("max.retries", "3")
+                                .toString();
+                try {
+                        return Integer.parseInt(val);
+                } catch (NumberFormatException e) {
+                        return 3;
+                }
         }
 
         /**

@@ -52,7 +52,7 @@
         <!-- Tenant Management -->
         <dependency>
             <groupId>tech.kayys.wayang</groupId>
-            <artifactId>wayang-tenant-api</artifactId>
+            <artifactId>wayang-tenant-spi</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
     </dependencies>

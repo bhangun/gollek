@@ -1,5 +1,7 @@
 package tech.kayys.golek.engine.execution;
 
+import tech.kayys.golek.spi.execution.ExecutionStatus;
+
 /**
  * Deterministic state machine for execution lifecycle.
  * Pure function: (current state, signal) -> next state

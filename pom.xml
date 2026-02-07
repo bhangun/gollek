@@ -21,7 +21,7 @@
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
-        <quarkus.platform.version>3.31.1</quarkus.platform.version>
+        <quarkus.platform.version>3.31.2</quarkus.platform.version>
         <grpc.version>1.60.0</grpc.version>
         <protobuf.version>3.25.5</protobuf.version>
         <testcontainers.version>1.19.3</testcontainers.version>
@@ -157,6 +157,13 @@
                 <version>${compiler-plugin.version}</version>
                 <configuration>
                     <parameters>true</parameters>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
         </plugins>

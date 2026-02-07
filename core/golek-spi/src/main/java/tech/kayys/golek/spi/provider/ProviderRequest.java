@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import org.jetbrains.annotations.Nullable;
 import tech.kayys.golek.spi.Message;
 import tech.kayys.golek.spi.tool.ToolDefinition;
-import tech.kayys.wayang.tenant.TenantContext;
+// import tech.kayys.wayang.tenant.TenantContext; // Temporarily commented out due to missing dependency
 
 import java.time.Duration;
 import java.util.*;
@@ -33,7 +33,7 @@ public final class ProviderRequest {
     private final Map<String, Object> parameters;
     private final boolean streaming;
     private final Duration timeout;
-    private final TenantContext tenantContext;
+    private final Object tenantContext; // Using Object temporarily due to missing dependency
 
     private final List<ToolDefinition> tools;
 
@@ -49,7 +49,7 @@ public final class ProviderRequest {
             @JsonProperty("toolChoice") Object toolChoice,
             @JsonProperty("streaming") boolean streaming,
             @JsonProperty("timeout") Duration timeout,
-            @JsonProperty("tenantContext") TenantContext tenantContext,
+            @JsonProperty("tenantContext") Object tenantContext,
             @JsonProperty("metadata") Map<String, Object> metadata) {
         this.requestId = Objects.requireNonNull(requestId, "requestId");
         this.model = Objects.requireNonNull(model, "model");
@@ -104,7 +104,7 @@ public final class ProviderRequest {
         return timeout;
     }
 
-    public TenantContext getTenantContext() {
+    public Object getTenantContext() {
         return tenantContext;
     }
 
@@ -152,7 +152,7 @@ public final class ProviderRequest {
         private final Map<String, Object> parameters = new HashMap<>();
         private boolean streaming = false;
         private Duration timeout = Duration.ofSeconds(30);
-        private TenantContext tenantContext;
+        private Object tenantContext; // Using Object temporarily due to missing dependency
         private Map<String, Object> metadata = new HashMap<>();
 
         public Builder requestId(String requestId) {
@@ -210,7 +210,7 @@ public final class ProviderRequest {
             return this;
         }
 
-        public Builder tenantContext(TenantContext tenantContext) {
+        public Builder tenantContext(Object tenantContext) {
             this.tenantContext = tenantContext;
             return this;
         }

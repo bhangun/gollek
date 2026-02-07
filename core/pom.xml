@@ -27,6 +27,6 @@
         <module>golek-model-repo-core</module>
         <module>golek-provider-core</module>
         <module>golek-infrastructure</module>
-        <module>golek-plugin-api</module>
+        <module>golek-plugin-spi</module>
     </modules>
 </project>

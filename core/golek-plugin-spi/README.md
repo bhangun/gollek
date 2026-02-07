@@ -10,4 +10,4 @@ This module defines the plugin interfaces and lifecycle contracts for Golek exte
 
 ## Key Paths
 
-* Plugin API: `inference-golek/core/golek-plugin-api/src/main/java/tech/kayys/golek/plugin/api/`
+* Plugin API: `inference-golek/core/golek-plugin-spi/src/main/java/tech/kayys/golek/plugin/api/`

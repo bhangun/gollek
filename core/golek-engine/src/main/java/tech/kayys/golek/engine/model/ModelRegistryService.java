@@ -225,4 +225,38 @@ public class ModelRegistryService implements tech.kayys.golek.spi.model.ModelReg
 
                 return builder.build();
         }
+
+        // ===== DTOs =====
+
+        public record ModelUploadRequest(
+                        String tenantId,
+                        String modelId,
+                        String version,
+                        String name,
+                        String description,
+                        String framework,
+                        byte[] modelData,
+                        String[] tags,
+                        Map<String, Object> metadata,
+                        Map<String, Object> inputSchema,
+                        Map<String, Object> outputSchema,
+                        String createdBy) {
+        }
+
+        public record ModelStats(
+                        String modelId,
+                        Model.ModelStage stage,
+                        long versionCount,
+                        long totalInferences,
+                        LocalDateTime createdAt,
+                        LocalDateTime updatedAt) {
+        }
+
+        public record ConversionJob(
+                        String jobId,
+                        String modelId,
+                        String sourceFormat,
+                        String targetFormat,
+                        String status) {
+        }
 }
