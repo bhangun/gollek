@@ -13,25 +13,22 @@ import tech.kayys.golek.spi.provider.ProviderConfig;
 import tech.kayys.golek.spi.provider.ProviderHealth;
 import tech.kayys.golek.spi.provider.ProviderMetadata;
 import tech.kayys.golek.spi.provider.ProviderRequest;
+import tech.kayys.golek.spi.provider.StreamingProvider;
 import tech.kayys.golek.spi.stream.StreamChunk;
-import tech.kayys.golek.provider.core.adapter.CloudProviderAdapter;
-import tech.kayys.golek.provider.core.spi.StreamingProvider;
 import tech.kayys.wayang.tenant.TenantContext;
 
-import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
- * OpenAI provider adapter for cloud LLM inference.
- * Supports GPT-4, GPT-3.5-Turbo, and other OpenAI models.
+ * OpenAI provider implementation for cloud LLM inference.
  */
 @ApplicationScoped
-public class OpenAIProvider extends CloudProviderAdapter implements StreamingProvider {
+public class OpenAIProvider implements StreamingProvider {
 
+        private static final Logger log = Logger.getLogger(OpenAIProvider.class);
         private static final String PROVIDER_ID = "openai";
         private static final String PROVIDER_NAME = "OpenAI";
         private static final String VERSION = "1.0.0";
@@ -43,7 +40,38 @@ public class OpenAIProvider extends CloudProviderAdapter implements StreamingPro
         @Inject
         OpenAIConfig config;
 
+        private ProviderConfig providerConfig;
         private final AtomicInteger requestCounter = new AtomicInteger(0);
+
+        @Override
+        public void initialize(ProviderConfig config) {
+                this.providerConfig = config;
+                log.info("OpenAI provider initialized");
+        }
+
+        @Override
+        public void shutdown() {
+                log.info("OpenAI provider shutting down");
+        }
+
+        @Override
+        public Uni<ProviderHealth> health() {
+                String apiKey = getApiKey();
+                if (apiKey == null || apiKey.isEmpty()) {
+                        return Uni.createFrom().item(ProviderHealth.unhealthy("API key is missing"));
+                }
+                return client.listModels("Bearer " + apiKey)
+                                .map(models -> ProviderHealth.healthy("OpenAI is reachable"))
+                                .onFailure().recoverWithItem(
+                                                t -> ProviderHealth.unhealthy("OpenAI unreachable: " + t.getMessage()));
+        }
+
+        private String getApiKey() {
+                if (providerConfig == null)
+                        return null;
+                return providerConfig.getSecret("api.key")
+                                .orElseGet(() -> providerConfig.getString("api_key"));
+        }
 
         @Override
         public String id() {
@@ -61,23 +89,6 @@ public class OpenAIProvider extends CloudProviderAdapter implements StreamingPro
         }
 
         @Override
-        protected String getDefaultBaseUrl() {
-                return "https://api.openai.com";
-        }
-
-        @Override
-        protected String getApiKeyEnvironmentVariable() {
-                return "OPENAI_API_KEY";
-        }
-
-        @Override
-        protected Uni<Boolean> performHealthCheckRequest() {
-                return client.listModels("Bearer " + getApiKey())
-                                .map(models -> true)
-                                .onFailure().recoverWithItem(false);
-        }
-
-        @Override
         public ProviderCapabilities capabilities() {
                 return ProviderCapabilities.builder()
                                 .streaming(true)
@@ -90,17 +101,8 @@ public class OpenAIProvider extends CloudProviderAdapter implements StreamingPro
                                                 "gpt-4o",
                                                 "gpt-4o-mini",
                                                 "gpt-4-turbo",
-                                                "gpt-4-turbo-preview",
-                                                "gpt-4",
-                                                "gpt-4-32k",
-                                                "gpt-3.5-turbo",
-                                                "gpt-3.5-turbo-16k",
-                                                "text-embedding-3-small",
-                                                "text-embedding-3-large",
-                                                "text-embedding-ada-002"))
-                                .supportedLanguages(List.of("en", "zh", "es", "fr", "de", "ja", "ko", "pt", "ru", "ar"))
-                                .toolCalling(true)
-                                .structuredOutputs(true)
+                                                "gpt-3.5-turbo"))
+                                .supportedLanguages(List.of("en", "zh", "es", "fr", "de", "ja", "ko"))
                                 .build();
         }
 
@@ -108,14 +110,11 @@ public class OpenAIProvider extends CloudProviderAdapter implements StreamingPro
         public ProviderMetadata metadata() {
                 return ProviderMetadata.builder()
                                 .providerId(PROVIDER_ID)
-                                .displayName(PROVIDER_NAME)
+                                .name(PROVIDER_NAME)
                                 .description("OpenAI GPT models - industry standard for LLM inference")
                                 .version(VERSION)
                                 .vendor("OpenAI")
-                                .documentationUrl("https://platform.openai.com/docs")
-                                .metadata("deployment", "cloud")
-                                .metadata("requires_api_key", "true")
-                                .metadata("pricing_url", "https://openai.com/pricing")
+                                .homepage("https://platform.openai.com/docs")
                                 .build();
         }
 
@@ -127,16 +126,16 @@ public class OpenAIProvider extends CloudProviderAdapter implements StreamingPro
         }
 
         @Override
-        protected Uni<InferenceResponse> doInfer(ProviderRequest request) {
-                trackRequest();
+        public Uni<InferenceResponse> infer(ProviderRequest request, TenantContext context) {
                 long startTime = System.currentTimeMillis();
                 int requestId = requestCounter.incrementAndGet();
 
                 log.debugf("[%d] OpenAI inference: model=%s", requestId, request.getModel());
 
                 OpenAIRequest openaiRequest = buildOpenAIRequest(request);
+                String apiKey = getApiKey();
 
-                return client.chatCompletions("Bearer " + getApiKey(), openaiRequest)
+                return client.chatCompletions("Bearer " + apiKey, openaiRequest)
                                 .map(response -> {
                                         long duration = System.currentTimeMillis() - startTime;
                                         log.debugf("[%d] OpenAI response in %dms", requestId, duration);
@@ -161,28 +160,19 @@ public class OpenAIProvider extends CloudProviderAdapter implements StreamingPro
                                                                         response.getUsage() != null ? response
                                                                                         .getUsage().getTotalTokens()
                                                                                         : 0)
-                                                        .metadata("finish_reason",
-                                                                        (response.getChoices() != null && !response
-                                                                                        .getChoices().isEmpty())
-                                                                                                        ? response.getChoices()
-                                                                                                                        .get(0)
-                                                                                                                        .getFinishReason()
-                                                                                                        : "unknown")
                                                         .build();
-                                })
-                                .onFailure().invoke(this::trackError)
-                                .onFailure().transform(this::wrapException);
+                                });
         }
 
         @Override
-        public Multi<StreamChunk> stream(ProviderRequest request, TenantContext context) {
-                // trackRequest();
+        public Multi<StreamChunk> inferStream(ProviderRequest request, TenantContext context) {
                 AtomicInteger chunkIndex = new AtomicInteger(0);
 
                 OpenAIRequest openaiRequest = buildOpenAIRequest(request);
                 openaiRequest.setStream(true);
+                String apiKey = getApiKey();
 
-                return client.chatCompletionsStream("Bearer " + getApiKey(), openaiRequest)
+                return client.chatCompletionsStream("Bearer " + apiKey, openaiRequest)
                                 .map(chunk -> {
                                         int index = chunkIndex.getAndIncrement();
                                         String content = "";
@@ -197,25 +187,22 @@ public class OpenAIProvider extends CloudProviderAdapter implements StreamingPro
                                                 isFinal = "stop".equals(choice.getFinishReason());
                                         }
 
-                                        return StreamChunk.builder()
-                                                        .index(index)
-                                                        .delta(content)
-                                                        .model(chunk.getModel())
-                                                        .isFinal(isFinal)
-                                                        .build();
-                                })
-                                .onFailure().invoke(this::trackError)
-                                .onFailure().transform(this::wrapException);
+                                        return isFinal
+                                                        ? StreamChunk.finalChunk(request.getRequestId(), index, content)
+                                                        : StreamChunk.of(request.getRequestId(), index, content);
+                                });
         }
 
         private OpenAIRequest buildOpenAIRequest(ProviderRequest request) {
                 OpenAIRequest openaiRequest = new OpenAIRequest();
                 openaiRequest.setModel(request.getModel());
+                openaiRequest.setStream(request.isStreaming());
 
                 // Convert messages
                 if (request.getMessages() != null) {
                         List<OpenAIMessage> messages = request.getMessages().stream()
-                                        .map(msg -> new OpenAIMessage(msg.getRole(), msg.getContent()))
+                                        .map(msg -> new OpenAIMessage(msg.getRole().name().toLowerCase(),
+                                                        msg.getContent()))
                                         .collect(Collectors.toList());
                         openaiRequest.setMessages(messages);
                 }
@@ -228,22 +215,7 @@ public class OpenAIProvider extends CloudProviderAdapter implements StreamingPro
                 if (request.getParameters().containsKey("max_tokens")) {
                         openaiRequest.setMaxTokens(((Number) request.getParameters().get("max_tokens")).intValue());
                 }
-                if (request.getParameters().containsKey("top_p")) {
-                        openaiRequest.setTopP(((Number) request.getParameters().get("top_p")).doubleValue());
-                }
-                if (request.getParameters().containsKey("frequency_penalty")) {
-                        openaiRequest.setFrequencyPenalty(
-                                        ((Number) request.getParameters().get("frequency_penalty")).doubleValue());
-                }
-                if (request.getParameters().containsKey("presence_penalty")) {
-                        openaiRequest.setPresencePenalty(
-                                        ((Number) request.getParameters().get("presence_penalty")).doubleValue());
-                }
 
                 return openaiRequest;
-        }
-
-        private Throwable wrapException(Throwable ex) {
-                return new RuntimeException("OpenAI request failed: " + ex.getMessage(), ex);
         }
 }

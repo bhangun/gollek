@@ -1,6 +1,6 @@
 package tech.kayys.golek.provider.cerebras;
 
-import tech.kayys.golek.provider.core.exception.ProviderException;
+import tech.kayys.golek.spi.exception.ProviderException;
 
 /**
  * Exception thrown when Cerebras API returns an error.

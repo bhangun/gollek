@@ -25,11 +25,7 @@
             <artifactId>golek-core</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-core</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+        <!-- golek-provider-core dependency removed -->
         <dependency>
             <groupId>tech.kayys.golek</groupId>
             <artifactId>golek-spi</artifactId>

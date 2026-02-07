@@ -13,15 +13,11 @@ import tech.kayys.golek.spi.provider.ProviderConfig;
 import tech.kayys.golek.spi.provider.ProviderHealth;
 import tech.kayys.golek.spi.provider.ProviderMetadata;
 import tech.kayys.golek.spi.provider.ProviderRequest;
+import tech.kayys.golek.spi.provider.StreamingProvider;
 import tech.kayys.golek.spi.stream.StreamChunk;
-import tech.kayys.golek.provider.core.adapter.CloudProviderAdapter;
-import tech.kayys.golek.provider.core.spi.StreamingProvider;
 import tech.kayys.wayang.tenant.TenantContext;
 
-import java.time.Duration;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -30,19 +26,19 @@ import java.util.stream.Collectors;
  * Supports Gemini Pro, Gemini Ultra, and Flash models.
  */
 @ApplicationScoped
-public class GeminiProvider extends CloudProviderAdapter implements StreamingProvider {
+public class GeminiProvider implements StreamingProvider {
 
         private static final String PROVIDER_ID = "gemini";
         private static final String PROVIDER_NAME = "Google Gemini";
         private static final String VERSION = "1.0.0";
 
+        private static final Logger log = Logger.getLogger(GeminiProvider.class);
+
         @Inject
         @RestClient
         GeminiClient client;
 
-        @Inject
-        GeminiConfig config;
-
+        private String apiKey;
         private final AtomicInteger requestCounter = new AtomicInteger(0);
 
         @Override
@@ -56,25 +52,27 @@ public class GeminiProvider extends CloudProviderAdapter implements StreamingPro
         }
 
         @Override
-        public String version() {
-                return VERSION;
+        public void initialize(ProviderConfig config) {
+                // Required parameters
+                String key = config.getString("api.key");
+                if (key == null || key.isBlank()) {
+                        key = config.getRequiredSecret("api.key");
+                }
+                this.apiKey = key;
+                log.info("Gemini provider initialized");
         }
 
         @Override
-        protected String getDefaultBaseUrl() {
-                return "https://generativelanguage.googleapis.com";
+        public void shutdown() {
+                log.info("Gemini provider shutting down");
         }
 
         @Override
-        protected String getApiKeyEnvironmentVariable() {
-                return "GEMINI_API_KEY";
-        }
-
-        @Override
-        protected Uni<Boolean> performHealthCheckRequest() {
-                return client.listModels(getApiKey())
-                                .map(models -> true)
-                                .onFailure().recoverWithItem(false);
+        public Uni<ProviderHealth> health() {
+                if (apiKey == null || apiKey.isBlank()) {
+                        return Uni.createFrom().item(ProviderHealth.unhealthy("API key not configured"));
+                }
+                return Uni.createFrom().item(ProviderHealth.healthy(id()));
         }
 
         @Override
@@ -83,20 +81,7 @@ public class GeminiProvider extends CloudProviderAdapter implements StreamingPro
                                 .streaming(true)
                                 .functionCalling(true)
                                 .multimodal(true)
-                                .embeddings(true)
-                                .maxContextTokens(1000000) // Gemini 1.5 Pro
-                                .maxOutputTokens(8192)
-                                .supportedModels(Set.of(
-                                                "gemini-2.0-flash-exp",
-                                                "gemini-1.5-pro",
-                                                "gemini-1.5-flash",
-                                                "gemini-1.5-flash-8b",
-                                                "gemini-1.0-pro",
-                                                "gemini-pro-vision",
-                                                "text-embedding-004"))
-                                .supportedLanguages(List.of("en", "zh", "es", "fr", "de", "ja", "ko", "pt", "ru", "ar"))
-                                .toolCalling(true)
-                                .structuredOutputs(true)
+                                .maxContextTokens(1000000)
                                 .build();
         }
 
@@ -104,108 +89,76 @@ public class GeminiProvider extends CloudProviderAdapter implements StreamingPro
         public ProviderMetadata metadata() {
                 return ProviderMetadata.builder()
                                 .providerId(PROVIDER_ID)
-                                .displayName(PROVIDER_NAME)
-                                .description("Google Gemini - multimodal AI with 1M token context window")
+                                .name(PROVIDER_NAME)
+                                .description("Google Gemini - multimodal AI with large context window")
                                 .version(VERSION)
                                 .vendor("Google")
-                                .documentationUrl("https://ai.google.dev/docs")
-                                .metadata("deployment", "cloud")
-                                .metadata("requires_api_key", "true")
-                                .metadata("pricing_url", "https://ai.google.dev/pricing")
+                                .homepage("https://ai.google.dev/docs")
                                 .build();
         }
 
         @Override
         public boolean supports(String model, TenantContext context) {
-                return capabilities().getSupportedModels().contains(model) ||
-                                model.startsWith("gemini");
+                return model.startsWith("gemini");
         }
 
         @Override
-        protected Uni<InferenceResponse> doInfer(ProviderRequest request) {
-                trackRequest();
+        public Uni<InferenceResponse> infer(ProviderRequest request, TenantContext context) {
                 long startTime = System.currentTimeMillis();
                 int requestId = requestCounter.incrementAndGet();
 
                 log.debugf("[%d] Gemini inference: model=%s", requestId, request.getModel());
 
                 GeminiRequest geminiRequest = buildGeminiRequest(request);
-                String model = request.getModel();
 
-                return client.generateContent(model, getApiKey(), geminiRequest)
+                return client.generateContent(request.getModel(), apiKey, geminiRequest)
                                 .map(response -> {
                                         long duration = System.currentTimeMillis() - startTime;
-                                        log.debugf("[%d] Gemini response in %dms", requestId, duration);
-
                                         String content = extractContent(response);
 
                                         return InferenceResponse.builder()
-                                                        .requestId(request.getRequestId())
+                                                        .requestId(request.getRequestId() != null
+                                                                        ? request.getRequestId()
+                                                                        : String.valueOf(requestId))
                                                         .content(content)
-                                                        .model(model)
+                                                        .model(request.getModel())
                                                         .durationMs(duration)
-                                                        .metadata("provider", PROVIDER_ID)
-                                                        .metadata("prompt_tokens",
-                                                                        response.getUsageMetadata() != null ? response
-                                                                                        .getUsageMetadata()
-                                                                                        .getPromptTokenCount() : 0)
-                                                        .metadata("completion_tokens",
-                                                                        response.getUsageMetadata() != null ? response
-                                                                                        .getUsageMetadata()
-                                                                                        .getCandidatesTokenCount() : 0)
+                                                        .tokensUsed(response.getUsageMetadata() != null ? response
+                                                                        .getUsageMetadata().getTotalTokenCount() : 0)
                                                         .metadata("total_tokens",
                                                                         response.getUsageMetadata() != null ? response
                                                                                         .getUsageMetadata()
                                                                                         .getTotalTokenCount() : 0)
-                                                        .metadata("finish_reason",
-                                                                        (response.getCandidates() != null && !response
-                                                                                        .getCandidates().isEmpty())
-                                                                                                        ? response.getCandidates()
-                                                                                                                        .get(0)
-                                                                                                                        .getFinishReason()
-                                                                                                        : "unknown")
                                                         .build();
                                 })
-                                .onFailure().invoke(this::trackError)
                                 .onFailure().transform(this::wrapException);
         }
 
         @Override
-        public Multi<StreamChunk> stream(ProviderRequest request, TenantContext context) {
-                // trackRequest();
+        public Multi<StreamChunk> inferStream(ProviderRequest request, TenantContext context) {
                 AtomicInteger chunkIndex = new AtomicInteger(0);
+                String reqId = request.getRequestId() != null ? request.getRequestId()
+                                : String.valueOf(requestCounter.incrementAndGet());
 
                 GeminiRequest geminiRequest = buildGeminiRequest(request);
-                String model = request.getModel();
 
-                return client.streamGenerateContent(model, getApiKey(), geminiRequest)
+                return client.streamGenerateContent(request.getModel(), apiKey, geminiRequest)
                                 .map(chunk -> {
                                         int index = chunkIndex.getAndIncrement();
                                         String content = extractContent(chunk);
-                                        boolean isFinal = chunk.getCandidates() != null &&
-                                                        !chunk.getCandidates().isEmpty() &&
-                                                        "STOP".equals(chunk.getCandidates().get(0).getFinishReason());
-
-                                        return StreamChunk.builder()
-                                                        .index(index)
-                                                        .delta(content)
-                                                        .model(model)
-                                                        .isFinal(isFinal)
-                                                        .build();
+                                        return StreamChunk.of(reqId, index, content);
                                 })
-                                .onFailure().invoke(this::trackError)
                                 .onFailure().transform(this::wrapException);
         }
 
         private GeminiRequest buildGeminiRequest(ProviderRequest request) {
                 GeminiRequest geminiRequest = new GeminiRequest();
 
-                // Convert messages to Gemini format
                 if (request.getMessages() != null) {
                         List<GeminiContent> contents = request.getMessages().stream()
                                         .map(msg -> {
                                                 GeminiContent content = new GeminiContent();
-                                                content.setRole(mapRole(msg.getRole()));
+                                                content.setRole(mapRole(msg.getRole().toString()));
                                                 content.setParts(List.of(new GeminiPart(msg.getContent())));
                                                 return content;
                                         })
@@ -213,19 +166,16 @@ public class GeminiProvider extends CloudProviderAdapter implements StreamingPro
                         geminiRequest.setContents(contents);
                 }
 
-                // Set generation config
                 GeminiGenerationConfig genConfig = new GeminiGenerationConfig();
-                if (request.getParameters().containsKey("temperature")) {
-                        genConfig.setTemperature(((Number) request.getParameters().get("temperature")).doubleValue());
-                }
-                if (request.getParameters().containsKey("max_tokens")) {
-                        genConfig.setMaxOutputTokens(((Number) request.getParameters().get("max_tokens")).intValue());
-                }
-                if (request.getParameters().containsKey("top_p")) {
-                        genConfig.setTopP(((Number) request.getParameters().get("top_p")).doubleValue());
-                }
-                if (request.getParameters().containsKey("top_k")) {
-                        genConfig.setTopK(((Number) request.getParameters().get("top_k")).intValue());
+                if (request.getParameters() != null) {
+                        if (request.getParameters().containsKey("temperature")) {
+                                genConfig.setTemperature(
+                                                ((Number) request.getParameters().get("temperature")).doubleValue());
+                        }
+                        if (request.getParameters().containsKey("max_tokens")) {
+                                genConfig.setMaxOutputTokens(
+                                                ((Number) request.getParameters().get("max_tokens")).intValue());
+                        }
                 }
                 geminiRequest.setGenerationConfig(genConfig);
 

@@ -13,26 +13,22 @@ import tech.kayys.golek.spi.provider.ProviderConfig;
 import tech.kayys.golek.spi.provider.ProviderHealth;
 import tech.kayys.golek.spi.provider.ProviderMetadata;
 import tech.kayys.golek.spi.provider.ProviderRequest;
+import tech.kayys.golek.spi.provider.StreamingProvider;
 import tech.kayys.golek.spi.stream.StreamChunk;
-import tech.kayys.golek.provider.core.adapter.CloudProviderAdapter;
-import tech.kayys.golek.provider.core.spi.StreamingProvider;
 import tech.kayys.wayang.tenant.TenantContext;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
- * Ollama provider adapter for local LLM inference.
- * Connects to Ollama server running locally or on network.
+ * Ollama provider implementation for local LLM inference.
  */
 @ApplicationScoped
-public class OllamaProvider extends CloudProviderAdapter implements StreamingProvider {
+public class OllamaProvider implements StreamingProvider {
 
+        private static final Logger log = Logger.getLogger(OllamaProvider.class);
         private static final String PROVIDER_ID = "ollama";
         private static final String PROVIDER_NAME = "Ollama";
         private static final String VERSION = "1.0.0";
@@ -42,9 +38,29 @@ public class OllamaProvider extends CloudProviderAdapter implements StreamingPro
         OllamaClient client;
 
         @Inject
-        OllamaConfig config; // Keep for now if needed, but CloudProviderAdapter has config too
+        OllamaConfig config;
 
+        private ProviderConfig providerConfig;
         private final AtomicInteger requestCounter = new AtomicInteger(0);
+
+        @Override
+        public void initialize(ProviderConfig config) {
+                this.providerConfig = config;
+                log.info("Ollama provider initialized");
+        }
+
+        @Override
+        public void shutdown() {
+                log.info("Ollama provider shutting down");
+        }
+
+        @Override
+        public Uni<ProviderHealth> health() {
+                return client.listModels()
+                                .map(models -> ProviderHealth.healthy("Ollama is running"))
+                                .onFailure().recoverWithItem(
+                                                t -> ProviderHealth.unhealthy("Ollama unavailable: " + t.getMessage()));
+        }
 
         @Override
         public String id() {
@@ -59,23 +75,6 @@ public class OllamaProvider extends CloudProviderAdapter implements StreamingPro
         @Override
         public String version() {
                 return VERSION;
-        }
-
-        @Override
-        protected String getDefaultBaseUrl() {
-                return config.baseUrl();
-        }
-
-        @Override
-        protected String getApiKeyEnvironmentVariable() {
-                return "OLLAMA_API_KEY";
-        }
-
-        @Override
-        protected Uni<Boolean> performHealthCheckRequest() {
-                return client.listModels()
-                                .map(models -> true)
-                                .onFailure().recoverWithItem(false);
         }
 
         @Override
@@ -111,14 +110,11 @@ public class OllamaProvider extends CloudProviderAdapter implements StreamingPro
         public ProviderMetadata metadata() {
                 return ProviderMetadata.builder()
                                 .providerId(PROVIDER_ID)
-                                .displayName(PROVIDER_NAME)
+                                .name(PROVIDER_NAME)
                                 .description("Local inference via Ollama - supports Llama, Mistral, Phi, Gemma, and more")
                                 .version(VERSION)
                                 .vendor("Ollama")
-                                .documentationUrl("https://ollama.ai/docs")
-                                .metadata("deployment", "local")
-                                .metadata("requires_api_key", "false")
-                                .metadata("base_url", getBaseUrl())
+                                .homepage("https://ollama.ai/docs")
                                 .build();
         }
 
@@ -129,13 +125,11 @@ public class OllamaProvider extends CloudProviderAdapter implements StreamingPro
                                 model.startsWith("mistral") ||
                                 model.startsWith("phi") ||
                                 model.startsWith("gemma") ||
-                                model.startsWith("qwen") ||
-                                model.startsWith("codellama");
+                                model.startsWith("qwen");
         }
 
         @Override
-        protected Uni<InferenceResponse> doInfer(ProviderRequest request) {
-                trackRequest();
+        public Uni<InferenceResponse> infer(ProviderRequest request, TenantContext context) {
                 long startTime = System.currentTimeMillis();
                 int requestId = requestCounter.incrementAndGet();
 
@@ -160,14 +154,11 @@ public class OllamaProvider extends CloudProviderAdapter implements StreamingPro
                                                                         response.getPromptEvalCount()
                                                                                         + response.getEvalCount())
                                                         .build();
-                                })
-                                .onFailure().invoke(this::trackError)
-                                .onFailure().transform(this::wrapException);
+                                });
         }
 
         @Override
-        public Multi<StreamChunk> stream(ProviderRequest request, TenantContext context) {
-                // trackRequest(); // Streaming calls might track differently, but good to track
+        public Multi<StreamChunk> inferStream(ProviderRequest request, TenantContext context) {
                 AtomicInteger chunkIndex = new AtomicInteger(0);
 
                 OllamaRequest ollamaRequest = buildOllamaRequest(request);
@@ -180,16 +171,10 @@ public class OllamaProvider extends CloudProviderAdapter implements StreamingPro
                                                         ? chunk.getMessage().getContent()
                                                         : "";
 
-                                        return StreamChunk.builder()
-                                                        .index(index)
-                                                        .delta(content)
-                                                        .model(chunk.getModel())
-                                                        .isFinal(chunk.isDone())
-                                                        .metadata("eval_count", chunk.getEvalCount())
-                                                        .build();
-                                })
-                                .onFailure().invoke(this::trackError)
-                                .onFailure().transform(this::wrapException);
+                                        return chunk.isDone()
+                                                        ? StreamChunk.finalChunk(request.getRequestId(), index, content)
+                                                        : StreamChunk.of(request.getRequestId(), index, content);
+                                });
         }
 
         private OllamaRequest buildOllamaRequest(ProviderRequest request) {
@@ -200,7 +185,8 @@ public class OllamaProvider extends CloudProviderAdapter implements StreamingPro
                 // Convert messages
                 if (request.getMessages() != null) {
                         List<OllamaMessage> messages = request.getMessages().stream()
-                                        .map(msg -> new OllamaMessage(msg.getRole(), msg.getContent()))
+                                        .map(msg -> new OllamaMessage(msg.getRole().name().toLowerCase(),
+                                                        msg.getContent()))
                                         .collect(Collectors.toList());
                         ollamaRequest.setMessages(messages);
                 }
@@ -208,20 +194,16 @@ public class OllamaProvider extends CloudProviderAdapter implements StreamingPro
                 // Set options
                 OllamaOptions options = new OllamaOptions();
                 if (request.getParameters().containsKey("temperature")) {
-                        options.setTemperature((Double) request.getParameters().get("temperature"));
+                        options.setTemperature(((Number) request.getParameters().get("temperature")).doubleValue());
                 }
                 if (request.getParameters().containsKey("max_tokens")) {
-                        options.setNumPredict((Integer) request.getParameters().get("max_tokens"));
+                        options.setNumPredict(((Number) request.getParameters().get("max_tokens")).intValue());
                 }
                 if (request.getParameters().containsKey("top_p")) {
-                        options.setTopP((Double) request.getParameters().get("top_p"));
+                        options.setTopP(((Number) request.getParameters().get("top_p")).doubleValue());
                 }
                 ollamaRequest.setOptions(options);
 
                 return ollamaRequest;
-        }
-
-        private Throwable wrapException(Throwable ex) {
-                return new RuntimeException("Ollama request failed: " + ex.getMessage(), ex);
         }
 }

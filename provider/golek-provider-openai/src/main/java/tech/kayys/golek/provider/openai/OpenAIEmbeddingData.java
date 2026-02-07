@@ -10,9 +10,11 @@ public class OpenAIEmbeddingData {
     private String object;
     private List<Double> embedding;
 
-    private intindex;
+    private int index;
 
-    public String getObject() { return object; }
+    public String getObject() {
+        return object;
+    }
 
     public void setObject(String object) {
         this.object = object;

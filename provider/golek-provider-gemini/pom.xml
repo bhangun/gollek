@@ -38,11 +38,6 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-core</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
             <artifactId>golek-spi</artifactId>
             <version>${project.version}</version>
         </dependency>

@@ -13,15 +13,11 @@ import tech.kayys.golek.spi.provider.ProviderConfig;
 import tech.kayys.golek.spi.provider.ProviderHealth;
 import tech.kayys.golek.spi.provider.ProviderMetadata;
 import tech.kayys.golek.spi.provider.ProviderRequest;
+import tech.kayys.golek.spi.provider.StreamingProvider;
 import tech.kayys.golek.spi.stream.StreamChunk;
-import tech.kayys.golek.provider.core.adapter.CloudProviderAdapter;
-import tech.kayys.golek.provider.core.spi.StreamingProvider;
 import tech.kayys.wayang.tenant.TenantContext;
 
-import java.time.Duration;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -30,20 +26,23 @@ import java.util.stream.Collectors;
  * Supports Llama 3.1 8B/70B at extreme speeds.
  */
 @ApplicationScoped
-public class CerebrasProvider extends CloudProviderAdapter implements StreamingProvider {
+public class CerebrasProvider implements StreamingProvider {
 
     private static final String PROVIDER_ID = "cerebras";
     private static final String PROVIDER_NAME = "Cerebras";
     private static final String VERSION = "1.0.0";
+
+    private static final Logger log = Logger.getLogger(CerebrasProvider.class);
 
     @Inject
     @RestClient
     CerebrasClient client;
 
     @Inject
-    CerebrasConfig config;
+    CerebrasConfig configDetails; // Renamed to avoid confusion with ProviderConfig
 
     private final AtomicInteger requestCounter = new AtomicInteger(0);
+    private String apiKey;
 
     @Override
     public String id() {
@@ -56,24 +55,19 @@ public class CerebrasProvider extends CloudProviderAdapter implements StreamingP
     }
 
     @Override
-    public String version() {
-        return VERSION;
+    public void initialize(ProviderConfig config) {
+        // Required parameters
+        String key = config.getString("api.key");
+        if (key == null || key.isBlank()) {
+            key = config.getRequiredSecret("api.key");
+        }
+        this.apiKey = key;
+        log.info("Cerebras provider initialized");
     }
 
     @Override
-    protected String getDefaultBaseUrl() {
-        return "https://api.cerebras.ai";
-    }
-
-    @Override
-    protected String getApiKeyEnvironmentVariable() {
-        return "CEREBRAS_API_KEY";
-    }
-
-    @Override
-    protected Uni<Boolean> performHealthCheckRequest() {
-        // Cerebras doesn't have a simple models list in some versions, but let's try
-        return Uni.createFrom().item(true);
+    public void shutdown() {
+        log.info("Cerebras provider shutting down");
     }
 
     @Override
@@ -82,16 +76,7 @@ public class CerebrasProvider extends CloudProviderAdapter implements StreamingP
                 .streaming(true)
                 .functionCalling(true)
                 .multimodal(false)
-                .embeddings(false)
                 .maxContextTokens(128000)
-                .supportedModels(Set.of(
-                        "llama3.1-70b",
-                        "llama3.1-8b",
-                        "llama-3.1-70b-versatile",
-                        "llama-3.1-8b-instant"))
-                .supportedLanguages(List.of("en"))
-                .metadata("speed", "extreme")
-                .toolCalling(true)
                 .build();
     }
 
@@ -99,27 +84,33 @@ public class CerebrasProvider extends CloudProviderAdapter implements StreamingP
     public ProviderMetadata metadata() {
         return ProviderMetadata.builder()
                 .providerId(PROVIDER_ID)
-                .displayName(PROVIDER_NAME)
+                .name(PROVIDER_NAME)
                 .description("Cerebras - The world's fastest inference engine")
                 .version(VERSION)
                 .vendor("Cerebras")
-                .documentationUrl("https://inference.cerebras.ai/docs")
-                .metadata("deployment", "cloud")
-                .metadata("requires_api_key", "true")
-                .metadata("pricing_url", "https://cerebras.ai/pricing")
+                .homepage("https://inference.cerebras.ai/docs")
                 .build();
     }
 
     @Override
     public boolean supports(String model, TenantContext context) {
-        return capabilities().getSupportedModels().contains(model) ||
-                model.contains("cerebras") ||
-                (model.contains("llama") && config.preferForLlama());
+        // Hardcoded support for now, or check config
+        return model.contains("cerebras") ||
+                model.contains("llama3.1-70b") ||
+                model.contains("llama3.1-8b");
     }
 
     @Override
-    protected Uni<InferenceResponse> doInfer(ProviderRequest request) {
-        trackRequest();
+    public Uni<ProviderHealth> health() {
+        // Simple health check: if we have an API key, we assume we're healthy for now.
+        // In a real implementation, we might make a lightweight call to the API.
+        return Uni.createFrom().item(() -> apiKey != null && !apiKey.isBlank()
+                ? ProviderHealth.healthy(id())
+                : ProviderHealth.unhealthy("API key not configured"));
+    }
+
+    @Override
+    public Uni<InferenceResponse> infer(ProviderRequest request, TenantContext context) {
         long startTime = System.currentTimeMillis();
         int requestId = requestCounter.incrementAndGet();
 
@@ -127,65 +118,52 @@ public class CerebrasProvider extends CloudProviderAdapter implements StreamingP
 
         CerebrasRequest cerebrasRequest = buildCerebrasRequest(request);
 
-        return client.chatCompletions("Bearer " + getApiKey(), cerebrasRequest)
+        return client.chatCompletions("Bearer " + apiKey, cerebrasRequest)
                 .map(response -> {
                     long duration = System.currentTimeMillis() - startTime;
                     log.debugf("[%d] Cerebras response in %dms", requestId, duration);
 
-                    String content = response.getChoices().get(0).getMessage().getContent();
+                    String content = "";
+                    if (response.getChoices() != null && !response.getChoices().isEmpty()) {
+                        content = response.getChoices().get(0).getMessage().getContent();
+                    }
 
                     return InferenceResponse.builder()
-                            .requestId(request.getRequestId())
+                            .requestId(String.valueOf(requestId))
                             .content(content)
                             .model(response.getModel())
-                            .durationMs(duration)
-                            .metadata("provider", PROVIDER_ID)
-                            .metadata("prompt_tokens",
-                                    response.getUsage() != null ? response.getUsage().getPromptTokens() : 0)
-                            .metadata("completion_tokens",
-                                    response.getUsage() != null ? response.getUsage().getCompletionTokens() : 0)
-                            .metadata("total_tokens",
-                                    response.getUsage() != null ? response.getUsage().getTotalTokens() : 0)
-                            .metadata("finish_reason",
-                                    (response.getChoices() != null && !response.getChoices().isEmpty())
-                                            ? response.getChoices().get(0).getFinishReason()
-                                            : "unknown")
                             .build();
                 })
-                .onFailure().invoke(this::trackError)
                 .onFailure().transform(this::wrapException);
     }
 
     @Override
-    public Multi<StreamChunk> stream(ProviderRequest request, TenantContext context) {
-        // trackRequest();
+    public Multi<StreamChunk> inferStream(ProviderRequest request, TenantContext context) {
         AtomicInteger chunkIndex = new AtomicInteger(0);
+        // Ensure requestId is available; if request.getRequestId() is null, generate
+        // one?
+        // ProviderRequest usually has one. If not, we can use the atomic counter.
+        String reqId = request.getRequestId() != null ? request.getRequestId()
+                : String.valueOf(requestCounter.incrementAndGet());
 
         CerebrasRequest cerebrasRequest = buildCerebrasRequest(request);
         cerebrasRequest.setStream(true);
 
-        return client.chatCompletionsStream("Bearer " + getApiKey(), cerebrasRequest)
+        return client.chatCompletionsStream("Bearer " + apiKey, cerebrasRequest)
                 .map(chunk -> {
                     int index = chunkIndex.getAndIncrement();
                     String content = "";
-                    boolean isFinal = false;
+                    // boolean isFinal = false; // Unused for now
 
                     if (chunk.getChoices() != null && !chunk.getChoices().isEmpty()) {
                         CerebrasStreamChoice choice = chunk.getChoices().get(0);
                         if (choice.getDelta() != null && choice.getDelta().getContent() != null) {
                             content = choice.getDelta().getContent();
                         }
-                        isFinal = "stop".equals(choice.getFinishReason());
                     }
 
-                    return StreamChunk.builder()
-                            .index(index)
-                            .delta(content)
-                            .model(chunk.getModel())
-                            .isFinal(isFinal)
-                            .build();
+                    return StreamChunk.of(reqId, index, content);
                 })
-                .onFailure().invoke(this::trackError)
                 .onFailure().transform(this::wrapException);
     }
 
@@ -196,20 +174,22 @@ public class CerebrasProvider extends CloudProviderAdapter implements StreamingP
         // Convert messages
         if (request.getMessages() != null) {
             List<CerebrasMessage> messages = request.getMessages().stream()
-                    .map(msg -> new CerebrasMessage(msg.getRole(), msg.getContent()))
+                    .map(msg -> new CerebrasMessage(msg.getRole().toString().toLowerCase(), msg.getContent()))
                     .collect(Collectors.toList());
             cerebrasRequest.setMessages(messages);
         }
 
         // Set parameters
-        if (request.getParameters().containsKey("temperature")) {
-            cerebrasRequest.setTemperature(((Number) request.getParameters().get("temperature")).doubleValue());
-        }
-        if (request.getParameters().containsKey("max_tokens")) {
-            cerebrasRequest.setMaxTokens(((Number) request.getParameters().get("max_tokens")).intValue());
-        }
-        if (request.getParameters().containsKey("top_p")) {
-            cerebrasRequest.setTopP(((Number) request.getParameters().get("top_p")).doubleValue());
+        if (request.getParameters() != null) {
+            if (request.getParameters().containsKey("temperature")) {
+                cerebrasRequest.setTemperature(((Number) request.getParameters().get("temperature")).doubleValue());
+            }
+            if (request.getParameters().containsKey("max_tokens")) {
+                cerebrasRequest.setMaxTokens(((Number) request.getParameters().get("max_tokens")).intValue());
+            }
+            if (request.getParameters().containsKey("top_p")) {
+                cerebrasRequest.setTopP(((Number) request.getParameters().get("top_p")).doubleValue());
+            }
         }
 
         return cerebrasRequest;

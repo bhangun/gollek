@@ -100,3 +100,11 @@ The Maven profile `ci-error-codes` is activated when `CI=true`.
 ```bash
 make ci
 ```
+
+
+### Git Submodules
+
+- To update to the latest version of llama.cpp: git submodule update --remote
+- To pull the latest changes from the parent repository (including submodule updates): git pull 
+   --recurse-submodules
+- To initialize and update submodules when cloning: git clone --recurse-submodules <repository-url>
