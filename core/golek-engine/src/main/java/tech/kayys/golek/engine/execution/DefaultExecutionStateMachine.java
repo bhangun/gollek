@@ -1,5 +1,7 @@
 package tech.kayys.golek.engine.execution;
 
+import tech.kayys.golek.spi.execution.ExecutionStatus;
+
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 

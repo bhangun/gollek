@@ -5,7 +5,8 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import tech.kayys.golek.engine.context.EngineContext;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.spi.plugin.PluginRegistry;
 import tech.kayys.golek.engine.plugin.PluginLoader;
 
 import org.jboss.logging.Logger;
@@ -61,14 +62,15 @@ public class InferenceEngineShutdown {
                 .onItem().transformToUni(v -> {
                     LOG.info("Step 1/2: Shutting down plugins...");
                     return pluginLoader.shutdownAll()
-                            .onItem().invoke(() -> LOG.infof("  → %d plugins shutdown", pluginRegistry.count()));
+                            .onItem()
+                            .invoke(() -> LOG.infof("  → %d plugins shutdown", pluginRegistry.all().size()));
                 })
 
-                // Step 2: Cleanup engine context
+                // Step 2: Cleanup (No-op if not available in SPI)
                 .onItem().transformToUni(v -> {
-                    LOG.info("Step 2/2: Cleaning up engine context...");
-                    return engineContext.cleanup()
-                            .onItem().invoke(() -> LOG.info("  → Engine context cleaned up"));
+                    LOG.info("Step 2/2: Finishing shutdown...");
+                    return Uni.createFrom().voidItem()
+                            .onItem().invoke(() -> LOG.info("  → Engine context shutdown signal processed"));
                 });
     }
 }

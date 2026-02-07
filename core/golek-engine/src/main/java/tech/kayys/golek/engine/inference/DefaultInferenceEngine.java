@@ -11,6 +11,7 @@ import jakarta.validation.ValidationException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
+import tech.kayys.golek.core.inference.StreamingResponse;
 import tech.kayys.golek.spi.inference.InferencePhase;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
@@ -23,7 +24,7 @@ import tech.kayys.golek.core.exception.TenantQuotaExceededException;
 import tech.kayys.golek.core.execution.ExecutionContext;
 import tech.kayys.golek.engine.execution.ExecutionSignal;
 import tech.kayys.golek.engine.execution.ExecutionStateMachine;
-import tech.kayys.golek.engine.execution.ExecutionStatus;
+import tech.kayys.golek.spi.execution.ExecutionStatus;
 import tech.kayys.golek.core.execution.ExecutionToken;
 import tech.kayys.golek.core.pipeline.InferencePipeline;
 import tech.kayys.golek.engine.execution.DefaultExecutionContext;
@@ -67,19 +68,26 @@ public class DefaultInferenceEngine implements InferenceEngine {
         public Uni<InferenceResponse> infer(
                         InferenceRequest request,
                         TenantContext tenantContext) {
-                Instant startTime = Instant.now();
-                LOG.debugf("Starting inference request: %s", request.requestId());
+                LOG.debugf("Starting inference request: %s", request.getRequestId());
 
-                // Create execution token
-                ExecutionToken token = ExecutionToken.builder()
-                                .requestId(request.requestId())
+                return createExecutionToken(request, tenantContext)
+                                .onItem().transformToUni(token -> executeWithRetry(token, request, tenantContext))
+                                .onItem().invoke(response -> LOG.debugf("Completed inference request: %s",
+                                                request.getRequestId()));
+        }
+
+        private Uni<ExecutionToken> createExecutionToken(InferenceRequest request, TenantContext tenantContext) {
+                return Uni.createFrom().item(ExecutionToken.builder()
+                                .requestId(request.getRequestId())
+                                .variable("tenantId", tenantContext.getTenantId().value())
                                 .status(ExecutionStatus.CREATED)
                                 .currentPhase(InferencePhase.PRE_VALIDATE)
-                                .variable("request", request)
-                                .variable("tenantId", tenantContext.tenantId().value())
-                                .variable("startTime", startTime)
-                                .build();
+                                .build());
+        }
 
+        private Uni<InferenceResponse> executeWithRetry(ExecutionToken token, InferenceRequest request,
+                        TenantContext tenantContext) {
+                Instant startTime = Instant.now();
                 // Create execution context
                 ExecutionContext execContext = new DefaultExecutionContext(
                                 engineContext,
@@ -94,9 +102,16 @@ public class DefaultInferenceEngine implements InferenceEngine {
 
                 // Execute pipeline with metrics
                 return executeWithStateMachine(execContext)
-                                .onItem().transform(ctx -> {
+                                .onItem().transformToUni(ctx -> {
+                                        // Final status check
+                                        if (ctx.token().getStatus() == ExecutionStatus.COMPLETED) {
+                                                LOG.infof("Inference complete: %s", ctx.token().getRequestId());
+                                        }
+                                        return Uni.createFrom().item(ctx.token());
+                                })
+                                .onItem().transform(tokenResult -> {
                                         // Extract response from context
-                                        InferenceResponse response = ctx
+                                        InferenceResponse response = execContext
                                                         .getVariable("response", InferenceResponse.class)
                                                         .orElseThrow(() -> new InferenceException(
                                                                         "No response generated"));
@@ -105,7 +120,7 @@ public class DefaultInferenceEngine implements InferenceEngine {
                                         Duration duration = Duration.between(startTime, Instant.now());
                                         metrics.recordSuccess(duration);
                                         LOG.infof("Inference request %s completed successfully in %d ms",
-                                                        request.requestId(), duration.toMillis());
+                                                        request.getRequestId(), duration.toMillis());
 
                                         return response;
                                 })
@@ -114,7 +129,7 @@ public class DefaultInferenceEngine implements InferenceEngine {
                                         Duration duration = Duration.between(startTime, Instant.now());
                                         metrics.recordFailure(error.getClass().getSimpleName(), duration);
                                         LOG.errorf(error, "Inference request %s failed after %d ms",
-                                                        request.requestId(), duration.toMillis());
+                                                        request.getRequestId(), duration.toMillis());
                                 });
         }
 
@@ -203,9 +218,16 @@ public class DefaultInferenceEngine implements InferenceEngine {
         public InferenceResponse inferSync(
                         InferenceRequest request,
                         TenantContext tenantContext) {
-                LOG.debugf("Starting synchronous inference request: %s", request.requestId());
+                LOG.debugf("Starting synchronous inference request: %s", request.getRequestId());
                 return infer(request, tenantContext)
                                 .await().atMost(syncTimeout);
+        }
+
+        @Override
+        public Uni<StreamingResponse> inferStream(
+                        InferenceRequest request,
+                        TenantContext tenantContext) {
+                return Uni.createFrom().failure(new UnsupportedOperationException("Streaming not implemented yet"));
         }
 
         @Override

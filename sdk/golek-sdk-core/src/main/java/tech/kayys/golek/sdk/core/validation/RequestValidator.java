@@ -27,19 +27,20 @@ public class RequestValidator {
             throw new NonRetryableException("VALIDATION_ERROR", "At least one message is required");
         }
         
-        // Validate temperature range
-        if (request.getTemperature() != null) {
-            double temp = request.getTemperature();
-            if (temp < 0.0 || temp > 2.0) {
-                throw new NonRetryableException("VALIDATION_ERROR", 
-                    "Temperature must be between 0.0 and 2.0, got: " + temp);
-            }
-        }
-        
-        // Validate max tokens
-        if (request.getMaxTokens() != null && request.getMaxTokens() <= 0) {
-            throw new NonRetryableException("VALIDATION_ERROR", 
-                "Max tokens must be positive, got: " + request.getMaxTokens());
-        }
-    }
+                // Validate temperature range
+                if (request.getParameters().containsKey("temperature")) {
+                    Double temp = (Double) request.getParameters().get("temperature");
+                    if (temp != null && (temp < 0.0 || temp > 2.0)) {
+                        throw new NonRetryableException("VALIDATION_ERROR",
+                            "Temperature must be between 0.0 and 2.0, got: " + temp);
+                    }
+                }        
+                // Validate max tokens
+                if (request.getParameters().containsKey("max_tokens")) {
+                    Integer maxTokens = (Integer) request.getParameters().get("max_tokens");
+                    if (maxTokens != null && maxTokens <= 0) {
+                        throw new NonRetryableException("VALIDATION_ERROR",
+                            "Max tokens must be positive, got: " + maxTokens);
+                    }
+                }    }
 }

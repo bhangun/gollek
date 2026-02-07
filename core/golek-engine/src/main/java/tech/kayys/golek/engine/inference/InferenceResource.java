@@ -14,8 +14,6 @@ import jakarta.ws.rs.core.SecurityContext;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.faulttolerance.*;
-import org.eclipse.microprofile.metrics.annotation.Counted;
-import org.eclipse.microprofile.metrics.annotation.Timed;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -26,12 +24,19 @@ import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import lombok.extern.slf4j.Slf4j;
+import tech.kayys.wayang.tenant.TenantContext;
+import tech.kayys.golek.engine.tenant.Tenant;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.error.ErrorCode;
+import tech.kayys.golek.spi.exception.InferenceException;
+import tech.kayys.golek.spi.exception.ModelException;
+import tech.kayys.golek.engine.service.AsyncJobManager;
+import tech.kayys.golek.engine.inference.InferenceRequestEntity;
+import tech.kayys.golek.engine.model.ModelVersion;
 
 import java.time.temporal.ChronoUnit;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * REST API endpoint for ML model inference.
@@ -91,8 +96,6 @@ public class InferenceResource {
                         @APIResponse(responseCode = "503", description = "Service unavailable"),
                         @APIResponse(responseCode = "504", description = "Request timeout")
         })
-        @Counted(name = "inference.requests.total", description = "Total inference requests")
-        @Timed(name = "inference.request.duration", description = "Inference request duration")
         @Timeout(value = 30, unit = ChronoUnit.SECONDS)
         @Retry(maxRetries = 2, delay = 100, delayUnit = ChronoUnit.MILLIS)
         @CircuitBreaker(requestVolumeThreshold = 20, failureRatio = 0.5, delay = 5000, successThreshold = 2)
@@ -160,12 +163,10 @@ public class InferenceResource {
                         @Context SecurityContext securityContext) {
                 String effectiveTenantId = resolveTenantId(tenantId);
 
-                if (requestId == null) {
-                        requestId = UUID.randomUUID().toString();
-                }
+                final String finalRequestId = requestId != null ? requestId : UUID.randomUUID().toString();
 
                 InferenceRequest effectiveRequest = InferenceRequest.builder()
-                                .requestId(requestId)
+                                .requestId(finalRequestId)
                                 .model(request.getModel())
                                 .messages(request.getMessages())
                                 .tools(request.getTools())
@@ -178,7 +179,7 @@ public class InferenceResource {
 
                 return inferenceService.submitAsyncJob(effectiveRequest)
                                 .map(jobId -> Response.accepted()
-                                                .entity(new AsyncJobResponse(jobId, requestId))
+                                                .entity(new AsyncJobResponse(jobId, finalRequestId))
                                                 .build());
         }
 
@@ -216,11 +217,11 @@ public class InferenceResource {
                                 .build();
 
                 log.info("Streaming inference request: requestId={}, model={}",
-                                requestId, request.getModel());
+                                finalRequestId, request.getModel());
 
                 return inferenceService.inferStream(effectiveRequest)
                                 .onFailure()
-                                .invoke(failure -> log.error("Streaming inference failed: requestId={}", requestId,
+                                .invoke(failure -> log.error("Streaming inference failed: requestId={}", finalRequestId,
                                                 failure));
         }
 
@@ -274,6 +275,16 @@ public class InferenceResource {
                 }
 
                 return tenantId;
+        }
+
+        // ===== DTOs =====
+
+        public record ConversionJob(
+                        String jobId,
+                        String modelId,
+                        String sourceFormat,
+                        String targetFormat,
+                        String status) {
         }
 
         /**

@@ -21,13 +21,23 @@ import tech.kayys.golek.spi.model.ModelFormat;
 import tech.kayys.golek.spi.model.ModelManifest;
 import tech.kayys.golek.spi.model.RunnerMetadata;
 import tech.kayys.golek.spi.provider.RoutingContext;
+import tech.kayys.golek.spi.provider.ProviderCandidate;
+import tech.kayys.golek.spi.provider.LLMProvider;
+import tech.kayys.golek.model.core.RunnerMetrics;
+import tech.kayys.golek.engine.model.RunnerCandidate;
+import tech.kayys.golek.engine.model.ModelRunnerProvider;
+import tech.kayys.golek.model.core.HardwareDetector;
+import tech.kayys.golek.model.core.HardwareCapabilities;
 import jakarta.enterprise.inject.Instance;
+import org.jboss.logging.Logger;
 
 /**
  * Selection policy implementation with scoring algorithm
  */
 @ApplicationScoped
 public class SelectionPolicy {
+
+    private static final Logger log = Logger.getLogger(SelectionPolicy.class);
 
     @ConfigProperty(name = "inference.routing.selection-policy", defaultValue = "balanced")
     String policyName;
@@ -58,7 +68,7 @@ public class SelectionPolicy {
             return Collections.emptyList();
         }
 
-        log.debug("Ranking {} candidates using {} policy", candidates.size(), policyName);
+        log.debugf("Ranking %d candidates using %s policy", candidates.size(), policyName);
 
         // Select policy strategy
         return switch (policyName.toLowerCase()) {
@@ -67,7 +77,7 @@ public class SelectionPolicy {
             case "memory" -> rankByMemory(candidates);
             case "balanced" -> rankBalanced(candidates, request);
             default -> {
-                log.warn("Unknown policy {}, using balanced", policyName);
+                log.warnf("Unknown policy %s, using balanced", policyName);
                 yield rankBalanced(candidates, request);
             }
         };
@@ -114,7 +124,7 @@ public class SelectionPolicy {
             double totalScore = latencyScore + costScore + availabilityScore;
             scores.put(runner, totalScore);
 
-            log.debug("Runner {} scores: latency={}, cost={}, availability={}, total={}",
+            log.debugf("Runner %s scores: latency=%f, cost=%f, availability=%f, total=%f",
                     runner, latencyScore, costScore, availabilityScore, totalScore);
         }
 

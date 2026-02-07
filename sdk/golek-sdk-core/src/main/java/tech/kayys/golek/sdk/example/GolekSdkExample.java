@@ -26,23 +26,23 @@ public class GolekSdkExample {
         // Example 2: Using the remote SDK (for external applications)
         System.out.println("\n=== Remote SDK Example ===");
         try {
-            GolekSdk remoteSdk = GolekSdkFactory.createRemoteSdk(
-                "http://localhost:8080",  // Replace with your API endpoint
-                "your-api-key",           // Replace with your API key
-                "default"                 // Default tenant ID
-            );
+            // GolekSdk remoteSdk = GolekSdkFactory.createRemoteSdk(
+            //     "http://localhost:8080",  // Replace with your API endpoint
+            //     "your-api-key",           // Replace with your API key
+            //     "default"                 // Default tenant ID
+            // );
             
-            // Create an inference request
-            InferenceRequest request = InferenceRequest.builder()
-                    .model("llama3:latest")
-                    .message(Message.user("What is the capital of France?"))
-                    .temperature(0.7)
-                    .maxTokens(100)
-                    .build();
+            // // Create an inference request
+            // InferenceRequest request = InferenceRequest.builder()
+            //         .model("llama3:latest")
+            //         .message(Message.user("What is the capital of France?"))
+            //         .temperature(0.7)
+            //         .maxTokens(100)
+            //         .build();
             
-            // Execute the request
-            InferenceResponse response = remoteSdk.createCompletion(request);
-            System.out.println("Response: " + response.getContent());
+            // // Execute the request
+            // InferenceResponse response = remoteSdk.createCompletion(request);
+            // System.out.println("Response: " + response.getContent());
             
         } catch (Exception e) {
             System.err.println("Error creating or using remote SDK: " + e.getMessage());
@@ -52,23 +52,23 @@ public class GolekSdkExample {
         // Example 3: Using the remote SDK with async operations
         System.out.println("\n=== Remote SDK Async Example ===");
         try {
-            GolekSdk remoteSdk = GolekSdkFactory.createRemoteSdk(
-                "http://localhost:8080",  // Replace with your API endpoint
-                "your-api-key",           // Replace with your API key
-                "default"                 // Default tenant ID
-            );
+            // GolekSdk remoteSdk = GolekSdkFactory.createRemoteSdk(
+            //     "http://localhost:8080",  // Replace with your API endpoint
+            //     "your-api-key",           // Replace with your API key
+            //     "default"                 // Default tenant ID
+            // );
             
-            InferenceRequest request = InferenceRequest.builder()
-                    .model("llama3:latest")
-                    .message(Message.user("Count from 1 to 10"))
-                    .temperature(0.7)
-                    .maxTokens(100)
-                    .build();
+            // InferenceRequest request = InferenceRequest.builder()
+            //         .model("llama3:latest")
+            //         .message(Message.user("Count from 1 to 10"))
+            //         .temperature(0.7)
+            //         .maxTokens(100)
+            //         .build();
             
-            // Execute asynchronously
-            var future = remoteSdk.createCompletionAsync(request);
-            InferenceResponse response = future.join(); // Wait for completion
-            System.out.println("Async response: " + response.getContent());
+            // // Execute asynchronously
+            // var future = remoteSdk.createCompletionAsync(request);
+            // InferenceResponse response = future.join(); // Wait for completion
+            // System.out.println("Async response: " + response.getContent());
             
         } catch (Exception e) {
             System.err.println("Error with async remote SDK: " + e.getMessage());

@@ -15,10 +15,12 @@ import tech.kayys.golek.engine.model.Model;
 import tech.kayys.golek.engine.model.ModelRegistryService;
 import tech.kayys.golek.engine.tenant.AuthenticationException;
 import tech.kayys.golek.engine.tenant.QuotaEnforcer;
-import tech.kayys.golek.engine.tenant.Tenant;
 import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.spi.error.ErrorCode;
 import tech.kayys.golek.spi.exception.ModelException;
+import tech.kayys.golek.engine.service.AsyncJobManager;
+import tech.kayys.golek.engine.inference.InferenceRequestEntity;
+import tech.kayys.golek.engine.model.ModelVersion;
 
 import org.eclipse.microprofile.faulttolerance.Bulkhead;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
@@ -120,11 +122,13 @@ public class InferenceService {
     public Uni<AsyncJobStatus> getJobStatus(String jobId, String tenantId) {
         AsyncJobStatus status = asyncJobManager.getStatus(jobId);
         if (status == null) {
-            return Uni.createFrom().failure(new InferenceException("Job not found: " + jobId, jobId));
+            return Uni.createFrom().failure(new InferenceException(ErrorCode.INTERNAL_ERROR, "Job not found: " + jobId)
+                    .addContext("jobId", jobId));
         }
 
         if (!status.tenantId().equals(tenantId)) {
-            return Uni.createFrom().failure(new InferenceException("Access denied to job: " + jobId));
+            return Uni.createFrom().failure(
+                    new InferenceException(ErrorCode.AUTH_PERMISSION_DENIED, "Access denied to job: " + jobId));
         }
 
         return Uni.createFrom().item(status);
@@ -203,7 +207,9 @@ public class InferenceService {
 
     private Uni<Tenant> validateTenant(String tenantId) {
         return Tenant.findByTenantId(tenantId)
-                .onItem().ifNull().failWith(() -> new InferenceException("Tenant not found: " + tenantId))
+                .onItem().ifNull()
+                .failWith(
+                        () -> new InferenceException(ErrorCode.AUTH_TENANT_NOT_FOUND, "Tenant not found: " + tenantId))
                 .invoke(tenant -> {
                     if (tenant.status != Tenant.TenantStatus.ACTIVE) {
                         throw new InferenceException("Tenant is not active: " + tenantId);
@@ -220,7 +226,8 @@ public class InferenceService {
     private Uni<Model> validateModel(String tenantId, String modelId) {
         String modelName = modelId.split(":")[0];
         return Model.findByTenantAndModelId(tenantId, modelName)
-                .onItem().ifNull().failWith(() -> new InferenceException("Model not found: " + modelId, modelId));
+                .onItem().ifNull()
+                .failWith(() -> new InferenceException(ErrorCode.MODEL_NOT_FOUND, "Model not found: " + modelId));
     }
 
     @Transactional

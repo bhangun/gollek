@@ -5,7 +5,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import tech.kayys.golek.core.execution.ExecutionContext;
 import tech.kayys.golek.core.execution.ExecutionToken;
-import tech.kayys.golek.engine.execution.ExecutionStatus;
+import tech.kayys.golek.spi.execution.ExecutionStatus;
 import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.spi.context.EngineContext;
 import tech.kayys.golek.spi.inference.InferencePhase;

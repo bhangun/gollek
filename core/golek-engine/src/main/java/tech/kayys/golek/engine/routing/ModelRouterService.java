@@ -30,6 +30,8 @@ import tech.kayys.golek.engine.tenant.TenantConfigRepository;
 import tech.kayys.golek.core.exception.NoCompatibleProviderException;
 
 // Additional imports for model classes
+import tech.kayys.golek.spi.model.DeviceType;
+import tech.kayys.golek.spi.model.ModelFormat;
 import tech.kayys.golek.engine.model.RoutingContext;
 import tech.kayys.golek.spi.provider.RoutingDecision;
 import tech.kayys.golek.spi.provider.ProviderCandidate;
@@ -39,7 +41,7 @@ import tech.kayys.golek.model.core.HardwareDetector;
 import tech.kayys.golek.model.exception.ModelNotFoundException;
 import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.engine.model.ModelRepository;
-import tech.kayys.golek.engine.registry.ProviderRegistry;
+import tech.kayys.golek.spi.provider.ProviderRegistry;
 import tech.kayys.golek.engine.routing.policy.SelectionPolicy;
 import tech.kayys.golek.spi.provider.LLMProvider;
 
@@ -114,7 +116,8 @@ public class ModelRouterService {
                 .onItem().transformToUni(decision -> executeWithProvider(decision, request, effectiveTenantContext))
                 .onFailure().retry().withBackOff(Duration.ofMillis(100))
                 .atMost(3)
-                .onFailure().recoverWithUni(error -> handleRoutingFailure(modelId, request, effectiveTenantContext, error));
+                .onFailure()
+                .recoverWithUni(error -> handleRoutingFailure(modelId, request, effectiveTenantContext, error));
     }
 
     /**
@@ -135,7 +138,8 @@ public class ModelRouterService {
             RoutingContext context = buildRoutingContext(request, effectiveTenantContext, manifest);
             return selectProvider(manifest, context);
         })
-                .onItem().transformToMulti(decision -> executeStreamWithProvider(decision, request, effectiveTenantContext));
+                .onItem()
+                .transformToMulti(decision -> executeStreamWithProvider(decision, request, effectiveTenantContext));
     }
 
     /**
@@ -173,17 +177,17 @@ public class ModelRouterService {
                 winner.score(),
                 candidates.size() - 1);
 
-        return new RoutingDecision(
-                winner.providerId(),
-                winner.provider(),
-                winner.score(),
-                candidates.stream()
+        return RoutingDecision.builder()
+                .providerId(winner.providerId())
+                .provider(winner.provider())
+                .score(winner.score())
+                .fallbackProviders(candidates.stream()
                         .skip(1)
                         .limit(2)
-                        .map(c -> c.providerId())
-                        .collect(Collectors.toList()),
-                manifest,
-                context);
+                        .map(ProviderCandidate::providerId)
+                        .collect(Collectors.toList()))
+                .manifest(manifest)
+                .build();
     }
 
     /**
@@ -247,33 +251,38 @@ public class ModelRouterService {
     private boolean supportsNativeFormat(
             LLMProvider provider,
             ModelManifest manifest) {
-        Set<String> supportedFormats = provider.capabilities()
+        Set<ModelFormat> supportedFormats = provider.capabilities()
                 .getSupportedFormats();
 
         return manifest.artifacts().keySet().stream()
-                .anyMatch(format -> supportedFormats.contains(format.toString()));
+                .anyMatch(format -> supportedFormats.contains(ModelFormat.valueOf(format.toString().toUpperCase())));
     }
 
     private int scoreDeviceCompatibility(
             LLMProvider provider,
             RoutingContext context) {
         HardwareCapabilities hw = hardwareDetector.detect();
-        Set<String> supportedDevices = provider.capabilities()
+        Set<DeviceType> supportedDevices = provider.capabilities()
                 .getSupportedDevices();
 
         // Preferred device match
-        if (context.deviceHint().isPresent() &&
-                supportedDevices.contains(context.deviceHint().get())) {
-            return 40;
+        if (context.deviceHint().isPresent()) {
+            try {
+                DeviceType hint = DeviceType.valueOf(context.deviceHint().get().toUpperCase());
+                if (supportedDevices.contains(hint)) {
+                    return 40;
+                }
+            } catch (IllegalArgumentException ignored) {
+            }
         }
 
         // CUDA available and supported
-        if (hw.hasCUDA() && supportedDevices.contains("cuda")) {
+        if (hw.hasCUDA() && supportedDevices.contains(DeviceType.CUDA)) {
             return 30;
         }
 
         // CPU fallback
-        if (supportedDevices.contains("cpu")) {
+        if (supportedDevices.contains(DeviceType.CPU)) {
             return 10;
         }
 
@@ -310,7 +319,7 @@ public class ModelRouterService {
     }
 
     private int scoreAvailability(LLMProvider provider) {
-        ProviderHealth health = provider.health();
+        ProviderHealth health = provider.health().await().atMost(Duration.ofMillis(500));
 
         if (!health.isHealthy()) {
             return -50; // Heavy penalty for unhealthy
@@ -420,12 +429,11 @@ public class ModelRouterService {
             RoutingContext context) {
         HardwareCapabilities hw = hardwareDetector.detect();
 
-        // Check memory requirements
-        if (manifest.resourceRequirements() != null) {
-            long requiredMemory = manifest.resourceRequirements()
-                    .minMemory().toBytes();
-
-            if (hw.getAvailableMemory() < requiredMemory) {
+        // Resource checks
+        ResourceRequirements requirements = manifest.resourceRequirements();
+        if (requirements != null && requirements.memory() != null) {
+            Long requiredMemoryMb = requirements.memory().minMemoryMb();
+            if (requiredMemoryMb != null && hw.getAvailableMemory() < (requiredMemoryMb * 1024 * 1024)) {
                 return false;
             }
         }
@@ -438,7 +446,7 @@ public class ModelRouterService {
             TenantContext context) {
         // Check tenant quota
         return tenantConfigRepository.isQuotaExhausted(
-                ensureTenantContext(context).getTenantId(),
+                ensureTenantContext(context).getTenantId().value(),
                 provider.id());
     }
 
@@ -515,17 +523,18 @@ public class ModelRouterService {
                     "Provider " + provider.id() + " does not support streaming"));
         }
 
-        ProviderRequest providerRequest = ProviderRequest.builder()
+        ProviderRequest.Builder requestBuilder = ProviderRequest.builder()
                 .model(decision.manifest().modelId())
                 .messages(request.getMessages())
                 .parameters(request.getParameters())
                 .streaming(true)
                 .timeout(decision.context().timeout())
                 .metadata("request_id", request.getRequestId())
-                .metadata("tenant_id", context.getTenantId())
-                .build();
+                .metadata("tenant_id", context.getTenantId());
 
-        return streamingProvider.stream(providerRequest, context)
+        return streamingProvider.inferStream(
+                requestBuilder.build(),
+                context)
                 .onFailure().invoke(error -> {
                     metricsCache.recordFailure(
                             provider.id(),
@@ -549,7 +558,7 @@ public class ModelRouterService {
 
             LOG.infof("Attempting fallback to provider: %s", fallbackId);
 
-            return providerRegistry.get(fallbackId)
+            return providerRegistry.getProvider(fallbackId)
                     .map(provider -> {
                         ProviderRequest providerRequest = ProviderRequest.builder()
                                 .model(modelId)
@@ -592,7 +601,7 @@ public class ModelRouterService {
             InferenceRequest request,
             TenantContext context) {
         // Check if tenant has cost-sensitive flag
-        return tenantConfigRepository.isCostSensitive(ensureTenantContext(context).getTenantId());
+        return tenantConfigRepository.isCostSensitive(ensureTenantContext(context).getTenantId().value());
     }
 
     private TenantContext ensureTenantContext(TenantContext tenantContext) {

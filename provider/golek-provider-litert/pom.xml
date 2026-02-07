@@ -18,7 +18,7 @@
 
         <lombok.version>1.18.30</lombok.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <quarkus.version>3.31.1</quarkus.version>
+        <quarkus.version>3.31.2</quarkus.version>
         <compiler-plugin.version>3.11.0</compiler-plugin.version>
         <surefire-plugin.version>3.0.0</surefire-plugin.version>
     </properties>

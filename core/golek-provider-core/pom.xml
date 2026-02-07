@@ -28,7 +28,7 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-plugin-api</artifactId>
+            <artifactId>golek-plugin-spi</artifactId>
             <version>${project.version}</version>
         </dependency>
 
