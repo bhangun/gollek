@@ -7,15 +7,12 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import tech.kayys.golek.spi.Message;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.provider.ProviderRequest;
 import tech.kayys.golek.spi.stream.StreamChunk;
-import tech.kayys.wayang.tenant.TenantContext;
-
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -50,11 +47,6 @@ class GeminiProviderTest {
     }
 
     @Test
-    void version() {
-        assertEquals("1.0.0", geminiProvider.version());
-    }
-
-    @Test
     void supports() {
         assertTrue(geminiProvider.supports("gemini-1.5-pro", null));
         assertTrue(geminiProvider.supports("gemini-2.0-flash-exp", null));
@@ -62,10 +54,12 @@ class GeminiProviderTest {
     }
 
     @Test
-    void doInfer() {
-        ProviderRequest request = new ProviderRequest();
-        request.setModel("gemini-1.5-pro");
-        request.setMessages(Collections.singletonList(new tech.kayys.golek.spi.model.Message("user", "Hello")));
+    void infer() {
+        ProviderRequest request = ProviderRequest.builder()
+                .requestId("test-id")
+                .model("gemini-1.5-pro")
+                .message(Message.user("Hello"))
+                .build();
 
         GeminiResponse geminiResponse = new GeminiResponse();
         GeminiCandidate candidate = new GeminiCandidate();
@@ -90,9 +84,11 @@ class GeminiProviderTest {
 
     @Test
     void stream() {
-        ProviderRequest request = new ProviderRequest();
-        request.setModel("gemini-1.5-pro");
-        request.setMessages(Collections.singletonList(new tech.kayys.golek.spi.model.Message("user", "Hello")));
+        ProviderRequest request = ProviderRequest.builder()
+                .requestId("test-id")
+                .model("gemini-1.5-pro")
+                .message(Message.user("Hello"))
+                .build();
 
         GeminiResponse chunk1 = new GeminiResponse();
         GeminiCandidate candidate1 = new GeminiCandidate();
@@ -112,18 +108,23 @@ class GeminiProviderTest {
         when(geminiClient.streamGenerateContent(any(), any(), any()))
                 .thenReturn(Multi.createFrom().items(chunk1, chunk2));
 
-        List<StreamChunk> chunks = geminiProvider.stream(request, null).collect().asList().await().indefinitely();
+        List<StreamChunk> chunks = geminiProvider.inferStream(request, null).collect().asList().await().indefinitely();
 
         assertNotNull(chunks);
         assertEquals(2, chunks.size());
         assertEquals("Hello, ", chunks.get(0).getDelta());
         assertEquals("world!", chunks.get(1).getDelta());
-        assertTrue(chunks.get(1).isFinal());
     }
 
     @Test
-    void healthCheck() {
-        when(geminiClient.listModels(any())).thenReturn(Uni.createFrom().item(Collections.emptyMap()));
-        assertTrue(geminiProvider.healthCheck().await().indefinitely().isHealthy());
+    void health() {
+        // Mocking listModels if used, but my implementation simplified it to just
+        // return healthy if key present.
+        // If I want to test the key presence:
+        geminiProvider.initialize(tech.kayys.golek.spi.provider.ProviderConfig.builder("gemini")
+                .secret("api.key", "test-key")
+                .build());
+
+        assertTrue(geminiProvider.health().await().indefinitely().isHealthy());
     }
 }

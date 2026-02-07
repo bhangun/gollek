@@ -82,8 +82,16 @@ public class ProviderException extends RuntimeException {
 
     // Specific exception types
     public static class ProviderInitializationException extends ProviderException {
+        public ProviderInitializationException(String message) {
+            super(null, message, null, ErrorCode.PROVIDER_INIT_FAILED, false);
+        }
+
         public ProviderInitializationException(String message, Throwable cause) {
             super(null, message, cause, ErrorCode.PROVIDER_INIT_FAILED, false);
+        }
+
+        public ProviderInitializationException(String providerId, String message) {
+            super(providerId, message, null, ErrorCode.PROVIDER_INIT_FAILED, false);
         }
 
         public ProviderInitializationException(String providerId, String message, Throwable cause) {

@@ -26,6 +26,9 @@ public class HuggingFaceProvider implements StreamingProvider {
 
     private static final Logger LOG = Logger.getLogger(HuggingFaceProvider.class);
     private static final String API_BASE = "https://api-inference.huggingface.co/models/";
+    private static final String PROVIDER_ID = "huggingface";
+    private static final String PROVIDER_NAME = "HuggingFace";
+    private static final String VERSION = "1.0.0";
 
     private HttpClient httpClient;
     private ProviderConfig config;
@@ -33,21 +36,28 @@ public class HuggingFaceProvider implements StreamingProvider {
 
     @Override
     public String id() {
-        return "tech.kayys/huggingface-provider";
+        return PROVIDER_ID;
     }
 
     @Override
     public String name() {
-        return "HuggingFace Provider";
+        return PROVIDER_NAME;
+    }
+
+    @Override
+    public String version() {
+        return VERSION;
     }
 
     @Override
     public ProviderMetadata metadata() {
         return ProviderMetadata.builder()
-                .id(id())
+                .providerId(id())
                 .name(name())
                 .description("HuggingFace Inference API provider")
                 .vendor("HuggingFace")
+                .version(VERSION)
+                .homepage("https://huggingface.co")
                 .build();
     }
 
@@ -57,6 +67,8 @@ public class HuggingFaceProvider implements StreamingProvider {
                 .streaming(true)
                 .embeddings(true)
                 .maxContextTokens(4096)
+                .maxOutputTokens(2048)
+                .supportedLanguages(List.of("en"))
                 .build();
     }
 
@@ -79,7 +91,12 @@ public class HuggingFaceProvider implements StreamingProvider {
 
                 String apiKey = config.getString("hf.api.key");
                 if (apiKey == null || apiKey.isBlank()) {
-                    throw new ProviderException.ProviderInitializationException("HuggingFace API key not configured");
+                    apiKey = config.getString("hf_api_key");
+                }
+
+                if (apiKey == null || apiKey.isBlank()) {
+                    throw new ProviderException.ProviderInitializationException(id(),
+                            "HuggingFace API key not configured", null);
                 }
 
                 initialized = true;
@@ -110,7 +127,7 @@ public class HuggingFaceProvider implements StreamingProvider {
             String content = extractContent(response);
 
             return InferenceResponse.builder()
-                    .requestId(request.getMetadata("request_id").orElse(UUID.randomUUID().toString()))
+                    .requestId(request.getRequestId())
                     .content(content)
                     .model(modelId)
                     .durationMs(duration)
@@ -127,7 +144,7 @@ public class HuggingFaceProvider implements StreamingProvider {
                 Map<String, Object> requestBody = buildRequestBody(request);
                 requestBody.put("stream", true);
 
-                String requestId = request.getMetadata("request_id").orElse(UUID.randomUUID().toString());
+                String requestId = request.getRequestId();
 
                 streamInferenceAPI(modelId, requestBody, (index, delta) -> {
                     emitter.emit(StreamChunk.of(requestId, index, delta));
@@ -157,6 +174,9 @@ public class HuggingFaceProvider implements StreamingProvider {
     private Map<String, Object> callInferenceAPI(String modelId, Map<String, Object> requestBody) {
         try {
             String apiKey = config.getString("hf.api.key");
+            if (apiKey == null || apiKey.isBlank()) {
+                apiKey = config.getString("hf_api_key");
+            }
             String endpoint = API_BASE + modelId;
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -200,8 +220,6 @@ public class HuggingFaceProvider implements StreamingProvider {
 
     private Map<String, Object> buildRequestBody(ProviderRequest request) {
         Map<String, Object> body = new HashMap<>();
-        // Simplify for now, just use the last message as prompt if needed or all
-        // messages
         String prompt = request.getMessages().get(request.getMessages().size() - 1).getContent();
         body.put("inputs", prompt);
         return body;

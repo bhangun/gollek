@@ -184,8 +184,8 @@ public class AnthropicProvider implements StreamingProvider {
                                         streamChunk = StreamChunk.finalChunk(request.getRequestId(),
                                                 chunkIndex.getAndIncrement(), content);
                                     } else {
-                                        streamChunk = new StreamChunk(request.getRequestId(),
-                                                chunkIndex.getAndIncrement(), content, false, null);
+                                        streamChunk = StreamChunk.of(request.getRequestId(),
+                                                chunkIndex.getAndIncrement(), content);
                                     }
 
                                     emitter.emit(streamChunk);
