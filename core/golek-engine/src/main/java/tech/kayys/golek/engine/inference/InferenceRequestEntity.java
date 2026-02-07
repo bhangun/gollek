@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import com.fasterxml.jackson.annotation.JsonSubTypes.Type;
+import org.hibernate.annotations.Type;
 
 import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
 import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;

@@ -4,10 +4,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import lombok.Builder;
+
 /**
  * Immutable model manifest representing all metadata and artifacts
  * for a specific model version.
  */
+@Builder
 public record ModelManifest(
         String modelId,
         String name,

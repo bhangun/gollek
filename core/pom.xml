@@ -17,8 +17,8 @@
 
 
     <properties>
-        <maven.compiler.source>25</maven.compiler.source>
-        <maven.compiler.target>25</maven.compiler.target>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
     </properties>
     <modules>
         <module>golek-spi</module>
@@ -27,6 +27,5 @@
         <module>golek-model-repo-core</module>
         <module>golek-provider-core</module>
         <module>golek-infrastructure</module>
-        <module>golek-plugin-spi</module>
     </modules>
 </project>

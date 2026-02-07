@@ -108,11 +108,12 @@ public class InferenceResource {
                         @Parameter(description = "Inference request payload", required = true) @Valid @NotNull InferenceRequest request,
 
                         @Context SecurityContext securityContext) {
+                final String finalRequestId = requestId != null ? requestId : UUID.randomUUID().toString();
                 String effectiveTenantId = resolveTenantId(tenantId);
 
                 // 1. Prepare Request
                 InferenceRequest effectiveRequest = InferenceRequest.builder()
-                                .requestId(requestId)
+                                .requestId(finalRequestId)
                                 .model(request.getModel())
                                 .messages(request.getMessages())
                                 .tools(request.getTools())
@@ -124,13 +125,13 @@ public class InferenceResource {
                                 .build();
 
                 log.info("Inference request received: requestId={}, tenantId={}, model={}",
-                                requestId, effectiveTenantId, request.getModel());
+                                finalRequestId, effectiveTenantId, request.getModel());
 
                 // Execute inference asynchronously
                 return inferenceService.inferAsync(effectiveRequest)
                                 .map(response -> {
                                         log.info("Inference completed: requestId={}, durationMs={}, model={}",
-                                                        requestId, response.getDurationMs(), response.getModel());
+                                                        finalRequestId, response.getDurationMs(), response.getModel());
 
                                         metrics.recordSuccess(effectiveTenantId, request.getModel(),
                                                         "unified", response.getDurationMs());
@@ -138,12 +139,12 @@ public class InferenceResource {
                                         return Response.ok(response).build();
                                 })
                                 .onFailure().recoverWithItem(failure -> {
-                                        log.error("Inference failed: requestId={}", requestId, failure);
+                                        log.error("Inference failed: requestId={}", finalRequestId, failure);
 
                                         metrics.recordFailure(effectiveTenantId, request.getModel(),
                                                         failure.getClass().getSimpleName());
 
-                                        return handleError(failure, requestId);
+                                        return handleError(failure, finalRequestId);
                                 });
         }
 
@@ -198,14 +199,11 @@ public class InferenceResource {
                         @HeaderParam("X-Request-ID") String requestId,
                         @Valid @NotNull InferenceRequest request,
                         @Context SecurityContext securityContext) {
+                final String finalRequestId = requestId != null ? requestId : UUID.randomUUID().toString();
                 String effectiveTenantId = resolveTenantId(tenantId);
 
-                if (requestId == null) {
-                        requestId = UUID.randomUUID().toString();
-                }
-
                 InferenceRequest effectiveRequest = InferenceRequest.builder()
-                                .requestId(requestId)
+                                .requestId(finalRequestId)
                                 .model(request.getModel())
                                 .messages(request.getMessages())
                                 .tools(request.getTools())

@@ -48,7 +48,7 @@ mvn archetype:generate \
 ```xml
 <dependency>
   <groupId>tech.kayys.wayang.inference</groupId>
-  <artifactId>golek-plugin-spi</artifactId>
+  <artifactId>golek-spi</artifactId>
   <version>1.0.0</version>
   <scope>provided</scope>
 </dependency>

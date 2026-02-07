@@ -7,7 +7,7 @@ import tech.kayys.golek.spi.provider.ProviderConfig;
 import tech.kayys.golek.spi.provider.ProviderHealth;
 import tech.kayys.golek.spi.provider.ProviderMetadata;
 import tech.kayys.golek.spi.provider.ProviderRequest;
-// import tech.kayys.wayang.tenant.TenantContext; // Temporarily commented out due to missing dependency
+import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.spi.plugin.GolekPlugin;
 import tech.kayys.golek.spi.provider.LLMProvider;
 import tech.kayys.golek.spi.exception.ProviderException;
@@ -59,12 +59,12 @@ public class PluginProviderWrapper implements LLMProvider {
     }
 
     @Override
-    public boolean supports(String modelId, Object tenantContext) { // Using Object temporarily due to missing dependency
+    public boolean supports(String modelId, TenantContext tenantContext) {
         return delegate.supports(modelId, tenantContext);
     }
 
     @Override
-    public Uni<InferenceResponse> infer(ProviderRequest request, Object context) { // Using Object temporarily due to missing dependency
+    public Uni<InferenceResponse> infer(ProviderRequest request, TenantContext context) {
         return delegate.infer(request, context);
     }
 

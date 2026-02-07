@@ -1,3 +1,19 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2026 Kayys.tech
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ *
+ * @author bhangun
+ */
+
 package tech.kayys.golek.model.core;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,6 +24,8 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.error.ErrorCode;
+import tech.kayys.golek.model.exception.InferenceException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -48,7 +66,11 @@ public class LocalModelRepository implements ModelRepository {
                 return objectMapper.readValue(manifestPath.toFile(), ModelManifest.class);
             } catch (IOException e) {
                 LOG.errorf(e, "Failed to read manifest for model %s", modelId);
-                return null;
+                throw new InferenceException(ErrorCode.STORAGE_READ_FAILED,
+                        "Failed to read manifest for model " + modelId, e)
+                        .addContext("modelId", modelId)
+                        .addContext("tenantId", tenantId)
+                        .addContext("path", manifestPath.toString());
             }
         });
     }
@@ -76,6 +98,10 @@ public class LocalModelRepository implements ModelRepository {
                         });
             } catch (IOException e) {
                 LOG.errorf(e, "Failed to list models for tenant %s", tenantId);
+                throw new InferenceException(ErrorCode.STORAGE_READ_FAILED,
+                        "Failed to list models for tenant " + tenantId, e)
+                        .addContext("tenantId", tenantId)
+                        .addContext("path", tenantPath.toString());
             }
 
             // Apply pagination
@@ -98,7 +124,11 @@ public class LocalModelRepository implements ModelRepository {
             try {
                 // Try to acquire lock
                 if (!acquireLock(lockPath)) {
-                    throw new RuntimeException("Could not acquire lock for model: " + manifest.modelId());
+                    throw new InferenceException(ErrorCode.STORAGE_WRITE_FAILED,
+                            "Could not acquire lock for model " + manifest.modelId())
+                            .addContext("modelId", manifest.modelId())
+                            .addContext("tenantId", manifest.tenantId())
+                            .addContext("path", lockPath.toString());
                 }
 
                 try {
@@ -113,7 +143,11 @@ public class LocalModelRepository implements ModelRepository {
                 }
             } catch (IOException e) {
                 LOG.errorf(e, "Failed to save manifest for model %s", manifest.modelId());
-                throw new RuntimeException("Failed to save model manifest", e);
+                throw new InferenceException(ErrorCode.STORAGE_WRITE_FAILED,
+                        "Failed to save model manifest", e)
+                        .addContext("modelId", manifest.modelId())
+                        .addContext("tenantId", manifest.tenantId())
+                        .addContext("path", manifestPath.toString());
             }
         });
     }
@@ -161,7 +195,11 @@ public class LocalModelRepository implements ModelRepository {
                             });
                 } catch (IOException e) {
                     LOG.errorf(e, "Failed to delete model directory %s", modelDir);
-                    throw new RuntimeException("Failed to delete model", e);
+                    throw new InferenceException(ErrorCode.STORAGE_WRITE_FAILED,
+                            "Failed to delete model", e)
+                            .addContext("modelId", modelId)
+                            .addContext("tenantId", tenantId)
+                            .addContext("path", modelDir.toString());
                 }
             }
             return null;
@@ -178,7 +216,9 @@ public class LocalModelRepository implements ModelRepository {
                 Files.createDirectories(path);
             }
         } catch (IOException e) {
-            throw new RuntimeException("Failed to create directory: " + path, e);
+            throw new InferenceException(ErrorCode.STORAGE_WRITE_FAILED,
+                    "Failed to create directory: " + path, e)
+                    .addContext("path", path.toString());
         }
     }
 }

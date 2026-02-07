@@ -10,6 +10,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import tech.kayys.golek.spi.model.ModelFormat;
 import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.model.Pageable;
 import tech.kayys.golek.engine.model.ModelRepository;
 import tech.kayys.wayang.tenant.TenantId;
 

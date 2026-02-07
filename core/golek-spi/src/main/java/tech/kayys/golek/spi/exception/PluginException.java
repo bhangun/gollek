@@ -1,10 +1,10 @@
-package tech.kayys.golek.plugin.api;
+package tech.kayys.golek.spi.exception;
 
 /**
  * Base exception for plugin-related errors.
  */
 public class PluginException extends RuntimeException {
-    
+
     public PluginException(String message) {
         super(message);
     }

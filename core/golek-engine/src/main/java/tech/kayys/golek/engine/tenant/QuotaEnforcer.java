@@ -3,6 +3,7 @@ package tech.kayys.golek.engine.tenant;
 import io.quarkus.redis.datasource.RedisDataSource;
 import io.quarkus.redis.datasource.keys.KeyCommands;
 import io.quarkus.redis.datasource.string.StringCommands;
+import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -71,30 +72,30 @@ public class QuotaEnforcer {
      * @return true if quota available and incremented, false otherwise
      */
     @Transactional
-    public boolean checkAndIncrementQuota(UUID tenantId, String resourceType, long amount) {
+    public Uni<Boolean> checkAndIncrementQuota(UUID tenantId, String resourceType, long amount) {
         // 1. Check database quota (long-term limits)
-        TenantQuota quota = TenantQuota.findByTenantAndResource(tenantId, resourceType);
+        return TenantQuota.findByTenantAndResource(tenantId, resourceType)
+                .onItem().transformToUni(quota -> {
+                    if (quota == null) {
+                        log.warn("No quota found for tenant={}, resource={}", tenantId, resourceType);
+                        return Uni.createFrom().item(!strictMode); // Allow if not in strict mode
+                    }
 
-        if (quota == null) {
-            log.warn("No quota found for tenant={}, resource={}", tenantId, resourceType);
-            return !strictMode; // Allow if not in strict mode
-        }
+                    // 2. Check if quota available
+                    if (!quota.hasQuotaAvailable(amount)) {
+                        log.warn("Quota exceeded: tenant={}, resource={}, used={}, limit={}",
+                                tenantId, resourceType, quota.quotaUsed, quota.quotaLimit);
+                        return Uni.createFrom().item(false);
+                    }
 
-        // 2. Check if quota available
-        if (!quota.hasQuotaAvailable(amount)) {
-            log.warn("Quota exceeded: tenant={}, resource={}, used={}, limit={}",
-                    tenantId, resourceType, quota.quotaUsed, quota.quotaLimit);
-            return false;
-        }
-
-        // 3. Increment usage in database
-        quota.incrementUsage(amount);
-        quota.persist();
-
-        log.debug("Quota incremented: tenant={}, resource={}, amount={}, newUsage={}",
-                tenantId, resourceType, amount, quota.quotaUsed);
-
-        return true;
+                    // 3. Increment usage in database
+                    quota.incrementUsage(amount);
+                    return quota.persist().map(v -> {
+                        log.debug("Quota incremented: tenant={}, resource={}, amount={}, newUsage={}",
+                                tenantId, resourceType, amount, quota.quotaUsed);
+                        return true;
+                    });
+                });
     }
 
     /**

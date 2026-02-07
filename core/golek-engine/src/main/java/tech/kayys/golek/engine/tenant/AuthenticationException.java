@@ -1,6 +1,6 @@
 package tech.kayys.golek.engine.tenant;
 
-import tech.kayys.golek.engine.exception.InferenceException;
+import tech.kayys.golek.spi.exception.InferenceException;
 import tech.kayys.golek.spi.error.ErrorCode;
 
 public class AuthenticationException extends InferenceException {

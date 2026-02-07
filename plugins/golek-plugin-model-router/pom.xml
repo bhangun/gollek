@@ -26,11 +26,6 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-plugin-spi</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
             <artifactId>golek-core</artifactId>
             <version>${project.version}</version>
         </dependency>

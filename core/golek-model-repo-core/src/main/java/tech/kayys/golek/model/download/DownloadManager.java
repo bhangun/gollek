@@ -1,7 +1,25 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2026 Kayys.tech
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ *
+ * @author bhangun
+ */
+
 package tech.kayys.golek.model.download;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
+import tech.kayys.golek.spi.error.ErrorCode;
+import tech.kayys.golek.model.exception.InferenceException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,9 +61,14 @@ public class DownloadManager {
             try {
                 return doDownloadParallel(uri, targetPath, totalBytes, rangeProvider, listener);
             } catch (Exception e) {
-                if (listener != null)
+                if (listener != null) {
                     listener.onError(e);
-                throw new RuntimeException("Parallel download failed", e);
+                }
+                throw new InferenceException(ErrorCode.NETWORK_BAD_RESPONSE,
+                        "Parallel download failed for " + uri, e)
+                        .addContext("uri", uri)
+                        .addContext("targetPath", targetPath.toString())
+                        .addContext("totalBytes", totalBytes);
             }
         }, executor);
     }
@@ -99,7 +122,12 @@ public class DownloadManager {
                         }
                     }
                 } catch (IOException e) {
-                    throw new RuntimeException("Chunk download failed", e);
+                    throw new InferenceException(ErrorCode.NETWORK_BAD_RESPONSE,
+                            "Chunk download failed for " + uri, e)
+                            .addContext("uri", uri)
+                            .addContext("targetPath", tempPath.toString())
+                            .addContext("start", start)
+                            .addContext("end", end);
                 }
             }, executor));
 

@@ -154,8 +154,8 @@ public class ReliabilityManager {
     /**
      * Get all circuit breaker metrics
      */
-    public Map<String, CircuitBreaker.CircuitMetrics> getAllMetrics() {
-        Map<String, CircuitBreaker.CircuitMetrics> metrics = new ConcurrentHashMap<>();
+    public Map<String, CircuitBreaker.CircuitBreakerMetrics> getAllMetrics() {
+        Map<String, CircuitBreaker.CircuitBreakerMetrics> metrics = new ConcurrentHashMap<>();
         circuitBreakers.forEach((name, cb) -> metrics.put(name, cb.getMetrics()));
         return metrics;
     }
