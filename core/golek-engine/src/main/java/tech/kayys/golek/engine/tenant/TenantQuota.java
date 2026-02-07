@@ -87,11 +87,11 @@ public class TenantQuota extends PanacheEntityBase {
     }
 
     // Panache queries
-    public static List<TenantQuota> findByTenant(UUID tenantId) {
+    public static Uni<List<TenantQuota>> findByTenant(UUID tenantId) {
         return list("tenant.id", tenantId);
     }
 
-    public static TenantQuota findByTenantAndResource(UUID tenantId, String resourceType) {
+    public static Uni<TenantQuota> findByTenantAndResource(UUID tenantId, String resourceType) {
         return find("tenant.id = ?1 and resourceType = ?2", tenantId, resourceType).firstResult();
     }
 }

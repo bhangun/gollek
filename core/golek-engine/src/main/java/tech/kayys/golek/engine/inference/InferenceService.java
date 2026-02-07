@@ -13,14 +13,11 @@ import tech.kayys.golek.engine.inference.InferenceResource.StreamingInferenceChu
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.engine.model.Model;
 import tech.kayys.golek.engine.model.ModelRegistryService;
-import tech.kayys.golek.engine.tenant.AuthenticationException;
 import tech.kayys.golek.engine.tenant.QuotaEnforcer;
 import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.spi.error.ErrorCode;
-import tech.kayys.golek.spi.exception.ModelException;
 import tech.kayys.golek.engine.service.AsyncJobManager;
-import tech.kayys.golek.engine.inference.InferenceRequestEntity;
-import tech.kayys.golek.engine.model.ModelVersion;
+import tech.kayys.golek.engine.tenant.Tenant;
 
 import org.eclipse.microprofile.faulttolerance.Bulkhead;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
@@ -32,7 +29,6 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * Core inference service implementation.
@@ -75,27 +71,24 @@ public class InferenceService {
         return validateTenant(tenantId)
                 .chain(tenant -> validateModel(tenantId, request.getModel())
                         .map(model -> new ValidationContext(tenant, model)))
-                .chain(ctx -> {
-                    enforceQuota(ctx.tenant, request);
-
-                    return createAuditRecord(request, ctx.tenant, ctx.model,
-                            InferenceRequestEntity.RequestStatus.PROCESSING)
-                            .chain(auditRecord -> orchestrator
-                                    .executeAsync(request.getModel(), request, TenantContext.of(tenantId))
-                                    .onItem().call(response -> updateAuditRecord(auditRecord, response, null))
-                                    .onItem().invoke(response -> {
-                                        metrics.recordSuccess(tenantId, request.getModel(), "unified",
-                                                response.getDurationMs());
-                                        log.info("Inference completed: requestId={}, durationMs={}, model={}",
-                                                requestId, response.getDurationMs(), response.getModel());
-                                    })
-                                    .onFailure().call(failure -> updateAuditRecord(auditRecord, null, failure))
-                                    .onFailure().invoke(failure -> {
-                                        metrics.recordFailure(tenantId, request.getModel(),
-                                                failure.getClass().getSimpleName());
-                                        log.error("Inference failed: requestId={}", requestId, failure);
-                                    }));
-                });
+                .chain((ValidationContext ctx) -> enforceQuota(ctx.tenant, request)
+                        .chain(() -> createAuditRecord(request, ctx.tenant, ctx.model,
+                                InferenceRequestEntity.RequestStatus.PROCESSING))
+                        .chain(auditRecord -> orchestrator
+                                .executeAsync(request.getModel(), request, TenantContext.of(tenantId))
+                                .onItem().call(response -> updateAuditRecord(auditRecord, response, null))
+                                .onItem().invoke(response -> {
+                                    metrics.recordSuccess(tenantId, request.getModel(), "unified",
+                                            response.getDurationMs());
+                                    log.info("Inference completed: requestId={}, durationMs={}, model={}",
+                                            requestId, response.getDurationMs(), response.getModel());
+                                })
+                                .onFailure().call(failure -> updateAuditRecord(auditRecord, null, failure))
+                                .onFailure().invoke(failure -> {
+                                    metrics.recordFailure(tenantId, request.getModel(),
+                                            failure.getClass().getSimpleName());
+                                    log.error("Inference failed: requestId={}", requestId, failure);
+                                })));
     }
 
     /**
@@ -109,7 +102,7 @@ public class InferenceService {
                 jobId, request.getRequestId(), request.getModel());
 
         return validateTenant(tId)
-                .invoke(tenant -> enforceQuota(tenant, request))
+                .chain(tenant -> enforceQuota(tenant, request).replaceWith(tenant))
                 .map(tenant -> {
                     asyncJobManager.enqueue(jobId, request);
                     return jobId;
@@ -145,11 +138,11 @@ public class InferenceService {
             validateTenant(tId)
                     .chain(tenant -> validateModel(tId, request.getModel())
                             .map(model -> new ValidationContext(tenant, model)))
+                    .chain(ctx -> enforceQuota(ctx.tenant, request).replaceWith(ctx))
                     .subscribe().with(
-                            ctx -> {
+                            (ValidationContext ctx) -> {
                                 try {
-                                    enforceQuota(ctx.tenant, request);
-                                    StreamingSession session = new StreamingSession(requestId, request);
+                                    StreamingSession session = new StreamingSession();
                                     streamingSessions.put(requestId, session);
 
                                     java.util.concurrent.atomic.AtomicInteger sequenceNumber = new java.util.concurrent.atomic.AtomicInteger(
@@ -162,7 +155,7 @@ public class InferenceService {
                                             .subscribe().with(
                                                     chunk -> {
                                                         sequenceNumber.getAndIncrement();
-                                                        emitter.emit(new StreamingInferenceChunk(
+                                                        emitter.emit(new InferenceResource.StreamingInferenceChunk(
                                                                 requestId,
                                                                 sequenceNumber.get(),
                                                                 chunk.getDelta(),
@@ -217,10 +210,14 @@ public class InferenceService {
                 });
     }
 
-    private void enforceQuota(Tenant tenant, InferenceRequest request) {
-        if (!quotaEnforcer.checkAndIncrementQuota(tenant.tenantId, "requests", 1)) {
-            throw new InferenceException("Quota exceeded for tenant: " + tenant.tenantId);
-        }
+    private Uni<Void> enforceQuota(Tenant tenant, InferenceRequest request) {
+        return quotaEnforcer.checkAndIncrementQuota(tenant.id, "requests", 1)
+                .onItem().invoke(allowed -> {
+                    if (!allowed) {
+                        throw new InferenceException("Quota exceeded for tenant: " + tenant.tenantId);
+                    }
+                })
+                .replaceWithVoid();
     }
 
     private Uni<Model> validateModel(String tenantId, String modelId) {
@@ -280,23 +277,7 @@ public class InferenceService {
     }
 
     private static class StreamingSession {
-        private final String requestId;
-        private final InferenceRequest request;
-        private final Instant startTime;
-        private volatile boolean active = true;
-
-        public StreamingSession(String requestId, InferenceRequest request) {
-            this.requestId = requestId;
-            this.request = request;
-            this.startTime = Instant.now();
-        }
-
-        public boolean isActive() {
-            return active;
-        }
-
-        public void cancel() {
-            this.active = false;
+        public StreamingSession() {
         }
     }
 

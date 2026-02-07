@@ -1,3 +1,19 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2026 Kayys.tech
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ *
+ * @author bhangun
+ */
+
 package tech.kayys.golek.model.core;
 
 import io.smallrye.mutiny.Uni;
@@ -7,8 +23,9 @@ import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 import tech.kayys.golek.spi.model.ModelManifest;
 import tech.kayys.golek.model.download.DownloadProgressListener;
+import tech.kayys.golek.spi.error.ErrorCode;
+import tech.kayys.golek.model.exception.InferenceException;
 
-import java.nio.file.Path;
 import java.util.Optional;
 
 /**
@@ -31,7 +48,10 @@ public class ModelSyncService {
     public Uni<ModelManifest> sync(String modelId, String tenantId, String remoteType,
             DownloadProgressListener listener) {
         RemoteModelRepository remoteRepo = findRemoteRepo(remoteType)
-                .orElseThrow(() -> new IllegalArgumentException("Unsupported remote repository type: " + remoteType));
+                .orElseThrow(() -> new InferenceException(
+                        ErrorCode.CONFIG_UNSUPPORTED,
+                        "Unsupported remote repository type: " + remoteType)
+                        .addContext("remoteType", remoteType));
 
         LOG.infof("Starting sync for model %s from %s", modelId, remoteType);
 

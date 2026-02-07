@@ -42,6 +42,17 @@ public interface CircuitBreaker {
     void reset();
 
     /**
+     * Circuit breaker metrics
+     */
+    interface CircuitBreakerMetrics {
+        boolean isCallPermitted();
+
+        int getFailureCount();
+
+        long estimatedRecoveryTimeMs();
+    }
+
+    /**
      * Get circuit metrics
      */
     CircuitBreakerMetrics getMetrics();

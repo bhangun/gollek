@@ -13,8 +13,7 @@
 
 
     <properties>
-        <maven.compiler.source>25</maven.compiler.source>
-        <maven.compiler.target>25</maven.compiler.target>
+
     </properties>
 
     <dependencies>
@@ -22,11 +21,6 @@
         <dependency>
             <groupId>tech.kayys.golek</groupId>
             <artifactId>golek-spi</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-plugin-spi</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

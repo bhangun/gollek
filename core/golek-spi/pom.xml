@@ -13,8 +13,7 @@
 
 
     <properties>
-        <maven.compiler.source>25</maven.compiler.source>
-        <maven.compiler.target>25</maven.compiler.target>
+
         <golek.errorCodes.skip>true</golek.errorCodes.skip>
     </properties>
 
@@ -49,11 +48,16 @@
             <artifactId>mutiny</artifactId>
         </dependency>
 
-        <!-- Tenant Management -->
         <dependency>
             <groupId>tech.kayys.wayang</groupId>
             <artifactId>wayang-tenant-spi</artifactId>
             <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.30</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 

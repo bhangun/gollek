@@ -47,13 +47,6 @@ This directory contains the core building blocks for Golek. Each module has a fo
 
 ---
 
-### **golek-plugin-spi** (Plugin Development API)
-**Purpose**: API for third-party plugin developers
-
-**Key Principle**: Everything a plugin developer needs, isolated from internal implementation
-
----
-
 ## Capability Map (Quick)
 
 * **API Contracts**: `inference-golek/core/golek-spi/`
@@ -62,7 +55,7 @@ This directory contains the core building blocks for Golek. Each module has a fo
 * **Model Registry & Artifacts**: `inference-golek/core/golek-model-repo-core/`
 * **Provider SPI**: `inference-golek/core/golek-provider-core/`
 * **Infrastructure**: `inference-golek/core/golek-infrastructure/`
-* **Plugin API**: `inference-golek/core/golek-plugin-spi/`
+* **Plugin API**: `inference-golek/core/golek-spi/`
 
 ## Error Codes
 
@@ -79,7 +72,6 @@ The modules should depend on each other in this order (no circular dependencies)
 ```mermaid
 graph TD
     A[golek-spi] 
-    B[golek-plugin-spi]
     C[golek-core]
     D[golek-model-repo-core]
     E[golek-provider-core]
@@ -87,12 +79,10 @@ graph TD
     G[golek-infrastructure]
 
     %% Tier 1: Base Contracts
-    B --> A
     C --> A
     
     %% Tier 2: Domain Logic & SPIs
     D --> C
-    D --> B
     E --> C
     E --> B
 
@@ -116,7 +106,7 @@ graph TD
 ```
 
 **Legend**:
-- **Blue** (golek-spi, golek-plugin-spi): **Contracts & APIs** - Stable interfaces, minimal dependencies
+- **Blue** (golek-spi): **Contracts & APIs** - Stable interfaces, minimal dependencies
 - **Yellow** (golek-core, model-repo, provider-core): **Domain Layer** - Business logic & SPI definitions
 - **Red** (golek-engine): **Application Layer** - Orchestration, reliability patterns, implementation
 - **Purple** (golek-infrastructure): **Infrastructure Layer** - Framework integration (Quarkus/REST), adapters

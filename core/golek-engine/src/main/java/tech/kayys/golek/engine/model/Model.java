@@ -6,9 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.hibernate.annotations.Type;
-
-import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -59,11 +58,11 @@ public class Model extends PanacheEntityBase {
     @Column(nullable = false)
     public ModelStage stage;
 
-    @Type(JsonBinaryType.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     public String[] tags;
 
-    @Type(JsonBinaryType.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     public Map<String, Object> metadata;
 

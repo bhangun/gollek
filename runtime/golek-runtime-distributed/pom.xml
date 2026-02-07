@@ -38,13 +38,6 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Plugin API -->
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-plugin-spi</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <!-- Infrastructure -->
         <dependency>
             <groupId>tech.kayys.golek</groupId>

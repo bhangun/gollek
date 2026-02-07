@@ -13,22 +13,21 @@
     <packaging>jar</packaging>
 
     <properties>
-        <maven.compiler.source>25</maven.compiler.source>
-        <maven.compiler.target>25</maven.compiler.target>
-        <lombok.version>1.18.40</lombok.version>
+
         <hypersistence-utils.version>3.8.2</hypersistence-utils.version>
         <quarkus.version>3.31.2</quarkus.version>
     </properties>
     <dependencies>
+        <!-- Logging -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
         <!-- Core API -->
         <dependency>
             <groupId>tech.kayys.golek</groupId>
             <artifactId>golek-spi</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-plugin-spi</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -156,4 +155,21 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

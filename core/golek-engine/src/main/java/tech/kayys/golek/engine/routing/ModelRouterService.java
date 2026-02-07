@@ -32,6 +32,7 @@ import tech.kayys.golek.core.exception.NoCompatibleProviderException;
 // Additional imports for model classes
 import tech.kayys.golek.spi.model.DeviceType;
 import tech.kayys.golek.spi.model.ModelFormat;
+import tech.kayys.golek.spi.model.ResourceRequirements;
 import tech.kayys.golek.engine.model.RoutingContext;
 import tech.kayys.golek.spi.provider.RoutingDecision;
 import tech.kayys.golek.spi.provider.ProviderCandidate;

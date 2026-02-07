@@ -1,3 +1,19 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2026 Kayys.tech
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ *
+ * @author bhangun
+ */
+
 package tech.kayys.golek.core.observability;
 
 import io.opentelemetry.api.OpenTelemetry;
@@ -39,7 +55,8 @@ public class ObservabilityManager implements AutoCloseable {
     /**
      * Creates a new ObservabilityManager with default configuration.
      *
-     * @param openTelemetry the OpenTelemetry instance to use for tracing and metrics
+     * @param openTelemetry the OpenTelemetry instance to use for tracing and
+     *                      metrics
      * @throws NullPointerException if openTelemetry is null
      */
     public ObservabilityManager(OpenTelemetry openTelemetry) {
@@ -49,9 +66,10 @@ public class ObservabilityManager implements AutoCloseable {
     /**
      * Creates a new ObservabilityManager with custom log buffer size.
      *
-     * @param openTelemetry the OpenTelemetry instance to use for tracing and metrics
+     * @param openTelemetry the OpenTelemetry instance to use for tracing and
+     *                      metrics
      * @param maxLogEntries maximum number of log entries to buffer
-     * @throws NullPointerException if openTelemetry is null
+     * @throws NullPointerException     if openTelemetry is null
      * @throws IllegalArgumentException if maxLogEntries is less than 1
      */
     public ObservabilityManager(OpenTelemetry openTelemetry, int maxLogEntries) {
@@ -92,11 +110,11 @@ public class ObservabilityManager implements AutoCloseable {
      * Automatically manages span lifecycle and status.
      *
      * @param operationName name of the operation
-     * @param operation the operation to execute
+     * @param operation     the operation to execute
      * @return the result of the operation
-     * @throws Exception if the operation throws
+     * @throws Exception             if the operation throws
      * @throws IllegalStateException if manager is closed
-     * @throws NullPointerException if operationName or operation is null
+     * @throws NullPointerException  if operationName or operation is null
      */
     public <T> T traced(String operationName, SupplierWithException<T> operation) throws Exception {
         return traced(operationName, SpanKind.INTERNAL, EMPTY_ATTRIBUTES, operation);
@@ -107,10 +125,10 @@ public class ObservabilityManager implements AutoCloseable {
      * Automatically manages span lifecycle and status.
      *
      * @param operationName name of the operation
-     * @param operation the operation to execute
-     * @throws Exception if the operation throws
+     * @param operation     the operation to execute
+     * @throws Exception             if the operation throws
      * @throws IllegalStateException if manager is closed
-     * @throws NullPointerException if operationName or operation is null
+     * @throws NullPointerException  if operationName or operation is null
      */
     public void traced(String operationName, RunnableWithException operation) throws Exception {
         traced(operationName, SpanKind.INTERNAL, EMPTY_ATTRIBUTES, operation);
@@ -120,13 +138,13 @@ public class ObservabilityManager implements AutoCloseable {
      * Create a trace span for an operation with custom span kind and attributes.
      *
      * @param operationName name of the operation
-     * @param kind the span kind
-     * @param attributes span attributes
-     * @param operation the operation to execute
+     * @param kind          the span kind
+     * @param attributes    span attributes
+     * @param operation     the operation to execute
      * @return the result of the operation
-     * @throws Exception if the operation throws
+     * @throws Exception             if the operation throws
      * @throws IllegalStateException if manager is closed
-     * @throws NullPointerException if any required parameter is null
+     * @throws NullPointerException  if any required parameter is null
      */
     public <T> T traced(String operationName, SpanKind kind, Attributes attributes,
             SupplierWithException<T> operation) throws Exception {
@@ -154,15 +172,16 @@ public class ObservabilityManager implements AutoCloseable {
     }
 
     /**
-     * Create a trace span for a runnable operation with custom span kind and attributes.
+     * Create a trace span for a runnable operation with custom span kind and
+     * attributes.
      *
      * @param operationName name of the operation
-     * @param kind the span kind
-     * @param attributes span attributes
-     * @param operation the operation to execute
-     * @throws Exception if the operation throws
+     * @param kind          the span kind
+     * @param attributes    span attributes
+     * @param operation     the operation to execute
+     * @throws Exception             if the operation throws
      * @throws IllegalStateException if manager is closed
-     * @throws NullPointerException if any required parameter is null
+     * @throws NullPointerException  if any required parameter is null
      */
     public void traced(String operationName, SpanKind kind, Attributes attributes,
             RunnableWithException operation) throws Exception {
@@ -192,9 +211,9 @@ public class ObservabilityManager implements AutoCloseable {
      * Record a metric value.
      *
      * @param metricName name of the metric
-     * @param value the value to record
+     * @param value      the value to record
      * @throws IllegalStateException if manager is closed
-     * @throws NullPointerException if metricName is null
+     * @throws NullPointerException  if metricName is null
      */
     public void recordMetric(String metricName, double value) {
         recordMetric(metricName, value, EMPTY_ATTRIBUTES);
@@ -204,10 +223,10 @@ public class ObservabilityManager implements AutoCloseable {
      * Record a metric value with attributes.
      *
      * @param metricName name of the metric
-     * @param value the value to record
+     * @param value      the value to record
      * @param attributes metric attributes
      * @throws IllegalStateException if manager is closed
-     * @throws NullPointerException if metricName or attributes is null
+     * @throws NullPointerException  if metricName or attributes is null
      */
     public void recordMetric(String metricName, double value, Attributes attributes) {
         checkNotClosed();
@@ -225,7 +244,7 @@ public class ObservabilityManager implements AutoCloseable {
      *
      * @param metricName name of the counter
      * @throws IllegalStateException if manager is closed
-     * @throws NullPointerException if metricName is null
+     * @throws NullPointerException  if metricName is null
      */
     public void incrementMetric(String metricName) {
         incrementMetric(metricName, EMPTY_ATTRIBUTES);
@@ -237,7 +256,7 @@ public class ObservabilityManager implements AutoCloseable {
      * @param metricName name of the counter
      * @param attributes metric attributes
      * @throws IllegalStateException if manager is closed
-     * @throws NullPointerException if metricName or attributes is null
+     * @throws NullPointerException  if metricName or attributes is null
      */
     public void incrementMetric(String metricName, Attributes attributes) {
         checkNotClosed();
@@ -254,9 +273,9 @@ public class ObservabilityManager implements AutoCloseable {
      * Add a value to a counter metric.
      *
      * @param metricName name of the counter
-     * @param value the value to add
+     * @param value      the value to add
      * @throws IllegalStateException if manager is closed
-     * @throws NullPointerException if metricName is null
+     * @throws NullPointerException  if metricName is null
      */
     public void addMetric(String metricName, long value) {
         addMetric(metricName, value, EMPTY_ATTRIBUTES);
@@ -266,10 +285,10 @@ public class ObservabilityManager implements AutoCloseable {
      * Add a value to a counter metric with attributes.
      *
      * @param metricName name of the counter
-     * @param value the value to add
+     * @param value      the value to add
      * @param attributes metric attributes
      * @throws IllegalStateException if manager is closed
-     * @throws NullPointerException if metricName or attributes is null
+     * @throws NullPointerException  if metricName or attributes is null
      */
     public void addMetric(String metricName, long value, Attributes attributes) {
         checkNotClosed();
@@ -285,10 +304,10 @@ public class ObservabilityManager implements AutoCloseable {
     /**
      * Add a log entry.
      *
-     * @param level log level
+     * @param level   log level
      * @param message log message
      * @throws IllegalStateException if manager is closed
-     * @throws NullPointerException if level or message is null
+     * @throws NullPointerException  if level or message is null
      */
     public void log(String level, String message) {
         log(level, message, EMPTY_ATTRIBUTES);
@@ -297,11 +316,11 @@ public class ObservabilityManager implements AutoCloseable {
     /**
      * Add a log entry with attributes.
      *
-     * @param level log level
-     * @param message log message
+     * @param level      log level
+     * @param message    log message
      * @param attributes log attributes
      * @throws IllegalStateException if manager is closed
-     * @throws NullPointerException if level, message, or attributes is null
+     * @throws NullPointerException  if level, message, or attributes is null
      */
     public void log(String level, String message, Attributes attributes) {
         checkNotClosed();
@@ -334,12 +353,12 @@ public class ObservabilityManager implements AutoCloseable {
         if (closed.compareAndSet(false, true)) {
             try {
                 logAggregator.clearLogs();
-                
+
                 // Force flush and close OpenTelemetry to ensure metrics and traces are exported
                 if (openTelemetry instanceof io.opentelemetry.sdk.OpenTelemetrySdk) {
                     ((io.opentelemetry.sdk.OpenTelemetrySdk) openTelemetry).close();
                 }
-                
+
                 logger.fine("ObservabilityManager closed successfully");
             } catch (Exception e) {
                 logger.log(Level.WARNING, "Error closing ObservabilityManager", e);
@@ -362,7 +381,7 @@ public class ObservabilityManager implements AutoCloseable {
      * Record an exception in a span with proper error handling.
      *
      * @param span the span to record the exception in
-     * @param e the exception to record
+     * @param e    the exception to record
      */
     private void recordSpanException(Span span, Exception e) {
         try {
@@ -375,7 +394,8 @@ public class ObservabilityManager implements AutoCloseable {
     }
 
     /**
-     * Functional interface for operations that return a result and can throw exceptions.
+     * Functional interface for operations that return a result and can throw
+     * exceptions.
      */
     @FunctionalInterface
     public interface SupplierWithException<T> {
