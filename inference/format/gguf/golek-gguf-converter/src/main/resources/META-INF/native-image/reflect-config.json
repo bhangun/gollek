@@ -1,0 +1,10 @@
+[
+    {
+        "name": "GGUFNative",
+        "allDeclaredMethods": true
+    },
+    {
+        "name": "GGUFConverter",
+        "allDeclaredMethods": true
+    }
+]
