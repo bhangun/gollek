@@ -1,0 +1,192 @@
+# Quarkus GGUF Converter Service Configuration
+# Enterprise Inference Engine - Model Conversion Module
+
+# Application Info
+quarkus:
+  application:
+    name: gguf-converter-service
+    version: 1.0.0
+
+  # HTTP Configuration
+  http:
+    port: 8082
+    host: 0.0.0.0
+    cors:
+      ~: true
+      origins: "*"
+      methods: GET,POST,PUT,DELETE,OPTIONS
+      headers: accept,authorization,content-type,x-tenant-id,x-request-id
+
+  # Logging Configuration
+  log:
+    level: INFO
+    category:
+      "ai.enterprise.inference":
+        level: DEBUG
+      "ai.enterprise.inference.converter.gguf":
+        level: TRACE
+    console:
+      enable: true
+      format: "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{2.}] (%t) %s%e%n"
+      json:
+        ~: false
+        additional-field:
+          "service": "gguf-converter"
+
+  # OpenAPI / Swagger
+  smallrye-openapi:
+    path: /openapi
+    info-title: GGUF Converter API
+    info-version: 1.0.0
+    info-description: Enterprise model conversion service for GGUF format
+    info-contact-name: bhangun
+    info-license-name: Proprietary
+  swagger-ui:
+    always-include: true
+    path: /swagger-ui
+
+  # Health Checks
+  health:
+    openapi:
+      included: true
+
+  # Metrics
+  micrometer:
+    export:
+      prometheus:
+        enabled: true
+        path: /metrics
+    binder:
+      http-server:
+        enabled: true
+      jvm:
+        enabled: true
+      system:
+        enabled: true
+
+  # Native Image (GraalVM)
+  native:
+    enable-all-security-services: true
+    enable-http-url-handler: true
+    resources:
+      includes:
+        - "native-libs/**"
+        - "**/*.so"
+        - "**/*.dylib"
+        - "**/*.dll"
+
+  # Shutdown
+  shutdown:
+    timeout: 30s
+
+# Converter Service Configuration
+converter:
+  storage:
+    # Base path for model storage (tenant-isolated)
+    base-path: ${CONVERTER_STORAGE_PATH:/var/lib/inference/models}
+    
+    # Per-tenant storage quota in GB
+    tenant-quota-gb: ${CONVERTER_TENANT_QUOTA:100}
+    
+    # Temporary directory for conversions
+    temp-path: ${CONVERTER_TEMP_PATH:/tmp/inference/conversions}
+
+  conversion:
+    # Default number of threads (0 = auto-detect)
+    default-threads: ${CONVERTER_DEFAULT_THREADS:0}
+    
+    # Default quantization type
+    default-quantization: f16
+    
+    # Maximum concurrent conversions per tenant
+    max-concurrent-per-tenant: ${CONVERTER_MAX_CONCURRENT:2}
+    
+    # Conversion timeout in minutes
+    timeout-minutes: ${CONVERTER_TIMEOUT:120}
+    
+    # Enable progress streaming
+    enable-progress-stream: true
+
+  native:
+    # Native library path
+    library-path: ${NATIVE_LIBRARY_PATH:/usr/lib/inference}
+    
+    # Enable CUDA support
+    enable-cuda: ${ENABLE_CUDA:false}
+    
+    # Enable Metal support (macOS)
+    enable-metal: ${ENABLE_METAL:false}
+
+# Development Profile
+"%dev":
+  quarkus:
+    log:
+      level: DEBUG
+      console:
+        json: false
+    http:
+      port: 8082
+  converter:
+    storage:
+      base-path: ./target/dev-storage
+      tenant-quota-gb: 10
+    conversion:
+      max-concurrent-per-tenant: 1
+
+# Test Profile
+"%test":
+  quarkus:
+    log:
+      level: INFO
+    http:
+      port: 8083
+      test-port: 8083
+  converter:
+    storage:
+      base-path: ./target/test-storage
+      tenant-quota-gb: 1
+    conversion:
+      timeout-minutes: 5
+
+# Production Profile
+"%prod":
+  quarkus:
+    log:
+      level: INFO
+      console:
+        json: true
+        additional-field:
+          "environment": "production"
+    http:
+      port: 8082
+      access-log:
+        enabled: true
+        pattern: combined
+  converter:
+    storage:
+      base-path: /var/lib/inference/models
+      tenant-quota-gb: 500
+    conversion:
+      max-concurrent-per-tenant: 4
+      timeout-minutes: 240
+
+# Security Configuration
+mp:
+  jwt:
+    verify:
+      publickey:
+        location: ${JWT_PUBLIC_KEY:/etc/inference/jwt-public.pem}
+
+# Reactive Messaging (optional - for async job queue)
+# mp:
+#   messaging:
+#     outgoing:
+#       conversion-jobs:
+#         connector: smallrye-kafka
+#         topic: conversion-jobs
+#         value.serializer: org.apache.kafka.common.serialization.StringSerializer
+#     incoming:
+#       conversion-results:
+#         connector: smallrye-kafka
+#         topic: conversion-results
+#         value.deserializer: org.apache.kafka.common.serialization.StringDeserializer
