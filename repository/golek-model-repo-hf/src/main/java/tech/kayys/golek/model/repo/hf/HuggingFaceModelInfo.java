@@ -1,7 +1,9 @@
-package tech.kayys.golek.model.repository.hf;
+package tech.kayys.golek.model.repo.hf;
+
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.quarkus.runtime.annotations.RegisterForReflection;
 
 import java.time.Instant;
 import java.util.List;
@@ -10,6 +12,7 @@ import java.util.Map;
 /**
  * HuggingFace model metadata
  */
+@RegisterForReflection
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class HuggingFaceModelInfo {
 
@@ -138,6 +141,7 @@ public class HuggingFaceModelInfo {
         this.config = config;
     }
 
+    @RegisterForReflection
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ModelFile {
         @JsonProperty("rfilename")
@@ -178,6 +182,7 @@ public class HuggingFaceModelInfo {
         }
     }
 
+    @RegisterForReflection
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class LFSInfo {
         @JsonProperty("size")

@@ -21,27 +21,27 @@ import java.util.stream.Collectors;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.model.ModelManifest;
-//import tech.kayys.golek.spi.model.ModelManifest;
 import tech.kayys.golek.spi.provider.ProviderCapabilities;
 import tech.kayys.golek.spi.provider.ProviderHealth;
 import tech.kayys.golek.spi.provider.ProviderRequest;
+import tech.kayys.wayang.tenant.TenantConfigRepository;
 // Core engine imports
-import tech.kayys.golek.engine.tenant.TenantConfigRepository;
+
 import tech.kayys.golek.core.exception.NoCompatibleProviderException;
 
 // Additional imports for model classes
 import tech.kayys.golek.spi.model.DeviceType;
 import tech.kayys.golek.spi.model.ModelFormat;
 import tech.kayys.golek.spi.model.ResourceRequirements;
-import tech.kayys.golek.engine.model.RoutingContext;
+import tech.kayys.golek.spi.provider.RoutingContext;
 import tech.kayys.golek.spi.provider.RoutingDecision;
 import tech.kayys.golek.spi.provider.ProviderCandidate;
 import tech.kayys.golek.engine.observability.RuntimeMetricsCache;
 import tech.kayys.golek.model.core.HardwareCapabilities;
 import tech.kayys.golek.model.core.HardwareDetector;
-import tech.kayys.golek.model.exception.ModelNotFoundException;
+import tech.kayys.golek.spi.exception.ModelException;
 import tech.kayys.wayang.tenant.TenantContext;
-import tech.kayys.golek.engine.model.ModelRepository;
+import tech.kayys.golek.engine.model.CachedModelRepository;
 import tech.kayys.golek.spi.provider.ProviderRegistry;
 import tech.kayys.golek.engine.routing.policy.SelectionPolicy;
 import tech.kayys.golek.spi.provider.LLMProvider;
@@ -65,7 +65,7 @@ public class ModelRouterService {
     ProviderRegistry providerRegistry;
 
     @Inject
-    ModelRepository modelRepository;
+    CachedModelRepository modelRepository;
 
     @Inject
     SelectionPolicy selectionPolicy;
@@ -89,32 +89,29 @@ public class ModelRouterService {
             InferenceRequest request,
             TenantContext tenantContext) {
         TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
-        return Uni.createFrom().item(() -> {
 
-            // Load model manifest
-            ModelManifest manifest = modelRepository
-                    .findById(modelId, effectiveTenantContext.getTenantId())
-                    .orElseThrow(() -> new ModelNotFoundException(
-                            "Model not found: " + modelId));
+        return modelRepository.findById(modelId, effectiveTenantContext.getTenantId().value())
+                .onItem().ifNull().failWith(() -> new ModelException(
+                        tech.kayys.golek.spi.error.ErrorCode.MODEL_NOT_FOUND,
+                        "Model not found: " + modelId, modelId))
+                .chain(manifest -> {
+                    // Build routing context
+                    RoutingContext context = buildRoutingContext(
+                            request,
+                            effectiveTenantContext,
+                            manifest);
 
-            // Build routing context
-            RoutingContext context = buildRoutingContext(
-                    request,
-                    effectiveTenantContext,
-                    manifest);
+                    // Select provider
+                    RoutingDecision decision = selectProvider(manifest, context);
 
-            // Select provider
-            RoutingDecision decision = selectProvider(manifest, context);
+                    // Cache decision for debugging
+                    decisionCache.put(request.getRequestId(), decision);
 
-            // Cache decision for debugging
-            decisionCache.put(request.getRequestId(), decision);
+                    LOG.infof("Routing model %s to provider %s (score: %d)",
+                            modelId, decision.providerId(), decision.score());
 
-            LOG.infof("Routing model %s to provider %s (score: %d)",
-                    modelId, decision.providerId(), decision.score());
-
-            return decision;
-        })
-                .onItem().transformToUni(decision -> executeWithProvider(decision, request, effectiveTenantContext))
+                    return executeWithProvider(decision, request, effectiveTenantContext);
+                })
                 .onFailure().retry().withBackOff(Duration.ofMillis(100))
                 .atMost(3)
                 .onFailure()
@@ -129,18 +126,16 @@ public class ModelRouterService {
             InferenceRequest request,
             TenantContext tenantContext) {
         TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
-        // Selection logic is the same for sync/async/stream
-        // We just need to execute it differently
-        return Uni.createFrom().item(() -> {
-            ModelManifest manifest = modelRepository
-                    .findById(modelId, effectiveTenantContext.getTenantId())
-                    .orElseThrow(() -> new ModelNotFoundException("Model not found: " + modelId));
 
-            RoutingContext context = buildRoutingContext(request, effectiveTenantContext, manifest);
-            return selectProvider(manifest, context);
-        })
-                .onItem()
-                .transformToMulti(decision -> executeStreamWithProvider(decision, request, effectiveTenantContext));
+        return modelRepository.findById(modelId, effectiveTenantContext.getTenantId().value())
+                .onItem().ifNull().failWith(() -> new ModelException(
+                        tech.kayys.golek.spi.error.ErrorCode.MODEL_NOT_FOUND,
+                        "Model not found: " + modelId, modelId))
+                .onItem().transformToMulti(manifest -> {
+                    RoutingContext context = buildRoutingContext(request, effectiveTenantContext, manifest);
+                    RoutingDecision decision = selectProvider(manifest, context);
+                    return executeStreamWithProvider(decision, request, effectiveTenantContext);
+                });
     }
 
     /**
@@ -151,6 +146,11 @@ public class ModelRouterService {
             RoutingContext context) {
         // Get all available providers
         List<LLMProvider> providers = new java.util.ArrayList<>(providerRegistry.getAllProviders());
+        LOG.debugf("Selecting provider for model %s from %d providers", manifest.modelId(), providers.size());
+        for (LLMProvider p : providers) {
+            boolean supported = p.supports(manifest.modelId(), context.tenantContext());
+            LOG.debugf("Provider %s support for %s: %b", p.id(), manifest.modelId(), supported);
+        }
 
         // Filter compatible providers
         List<ProviderCandidate> candidates = providers.stream()
@@ -161,6 +161,9 @@ public class ModelRouterService {
                 .collect(Collectors.toList());
 
         if (candidates.isEmpty()) {
+            LOG.warnf("No compatible provider found for model %s. Available providers: %s",
+                    manifest.modelId(),
+                    providers.stream().map(LLMProvider::id).collect(Collectors.joining(", ")));
             throw new NoCompatibleProviderException(
                     "No compatible provider found for model: " + manifest.modelId());
         }
@@ -188,6 +191,7 @@ public class ModelRouterService {
                         .map(ProviderCandidate::providerId)
                         .collect(Collectors.toList()))
                 .manifest(manifest)
+                .context(context)
                 .build();
     }
 
@@ -256,7 +260,7 @@ public class ModelRouterService {
                 .getSupportedFormats();
 
         return manifest.artifacts().keySet().stream()
-                .anyMatch(format -> supportedFormats.contains(ModelFormat.valueOf(format.toString().toUpperCase())));
+                .anyMatch(supportedFormats::contains);
     }
 
     private int scoreDeviceCompatibility(
@@ -320,10 +324,14 @@ public class ModelRouterService {
     }
 
     private int scoreAvailability(LLMProvider provider) {
-        ProviderHealth health = provider.health().await().atMost(Duration.ofMillis(500));
-
-        if (!health.isHealthy()) {
-            return -50; // Heavy penalty for unhealthy
+        try {
+            ProviderHealth health = provider.health().await().atMost(Duration.ofMillis(1000));
+            if (!health.isHealthy()) {
+                return -50; // Heavy penalty for unhealthy
+            }
+        } catch (Exception e) {
+            LOG.warnf("Health check failed for provider %s: %s", provider.id(), e.getMessage());
+            return 0; // Neutral score on failure
         }
 
         // Check recent error rate
@@ -582,14 +590,15 @@ public class ModelRouterService {
         Duration timeout = request.getTimeout()
                 .orElse(Duration.ofSeconds(30));
 
-        return new RoutingContext(
-                request,
-                tenantContext,
-                request.getPreferredProvider(),
-                extractDeviceHint(request),
-                timeout,
-                isCostSensitive(request, tenantContext),
-                request.getPriority());
+        return RoutingContext.builder()
+                .request(request)
+                .tenantContext(tenantContext)
+                .preferredProvider(request.getPreferredProvider().orElse(null))
+                .deviceHint(extractDeviceHint(request).orElse(null))
+                .timeout(timeout)
+                .costSensitive(isCostSensitive(request, tenantContext))
+                .priority(request.getPriority())
+                .build();
     }
 
     private Optional<String> extractDeviceHint(InferenceRequest request) {
@@ -606,7 +615,7 @@ public class ModelRouterService {
     }
 
     private TenantContext ensureTenantContext(TenantContext tenantContext) {
-        return tenantContext != null ? tenantContext : TenantContext.of("default");
+        return tenantContext != null ? tenantContext : TenantContext.of("community");
     }
 
     /**

@@ -11,7 +11,7 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  *
- * @author bhangun
+ * @author Bhangun
  */
 
 package tech.kayys.golek.model.core;
@@ -21,7 +21,7 @@ import java.time.Duration;
 import java.util.Map;
 
 public record RepositoryContext(
-        Path cacheDir,
-        Duration timeout,
-        Map<String, Object> attributes) {
+                Path cacheDir,
+                Duration timeout,
+                Map<String, Object> attributes) {
 }

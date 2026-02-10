@@ -5,6 +5,7 @@ import io.opentelemetry.api.trace.Tracer;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -12,6 +13,7 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 import org.jboss.logging.Logger;
+import tech.kayys.golek.spi.stream.StreamChunk;
 
 import tech.kayys.golek.spi.exception.ProviderException;
 import tech.kayys.golek.spi.inference.InferenceRequest;
@@ -36,10 +38,10 @@ import java.util.stream.Collectors;
  */
 @ApplicationScoped
 
-public class GGUFProvider implements LLMProvider {
+public class GGUFProvider implements StreamingProvider {
 
     private static final Logger log = Logger.getLogger(GGUFProvider.class);
-    private static final String PROVIDER_ID = "gguf-llama-cpp";
+    private static final String PROVIDER_ID = "gguf";
     private static final String PROVIDER_VERSION = "1.1.0";
 
     @Inject
@@ -65,48 +67,64 @@ public class GGUFProvider implements LLMProvider {
     private ProviderCapabilities capabilities;
 
     void onStart(@Observes StartupEvent event) {
+        System.out.println("DEBUG: GGUFProvider.onStart entered");
+        if (!config.enabled()) {
+            System.out.println("DEBUG: GGUF Provider disabled");
+            log.info("GGUF Provider is disabled by configuration");
+            return;
+        }
+
         log.infof("Initializing GGUF Provider v%s", PROVIDER_VERSION);
 
+        // Basic initialization should always happen so the provider is recognized by
+        // the router
+        this.metadata = ProviderMetadata.builder()
+                .providerId(PROVIDER_ID)
+                .name("GGUF Provider (llama.cpp)")
+                .version(PROVIDER_VERSION)
+                .description("Local GGUF model inference using llama.cpp")
+                .vendor("Kayys Tech")
+                .homepage("https://github.com/ggerganov/llama.cpp")
+                .build();
+
+        this.capabilities = ProviderCapabilities.builder()
+                .streaming(true)
+                .functionCalling(false)
+                .multimodal(false)
+                .toolCalling(false)
+                .embeddings(false)
+                .maxContextTokens(config.maxContextTokens())
+                .maxOutputTokens(config.maxContextTokens() / 2)
+                .supportedFormats(Set.of(ModelFormat.GGUF))
+                .supportedDevices(buildSupportedDevices())
+                .supportedLanguages(java.util.List.of("en"))
+                .features(Set.of("local_inference", "cpu_inference",
+                        config.gpuEnabled() ? "gpu_acceleration" : "cpu_only"))
+                .build();
+
         try {
+            System.out.println("DEBUG: calling binding.backendInit()");
             binding.backendInit();
+            System.out.println("DEBUG: backendInit success");
             log.info("llama.cpp native library initialized");
 
             sessionManager.initialize();
 
-            this.metadata = ProviderMetadata.builder()
-                    .providerId(PROVIDER_ID)
-                    .name("GGUF Provider (llama.cpp)")
-                    .version(PROVIDER_VERSION)
-                    .description("Local GGUF model inference using llama.cpp")
-                    .vendor("Kayys Tech")
-                    .homepage("https://github.com/ggerganov/llama.cpp")
-                    .build();
-
-            this.capabilities = ProviderCapabilities.builder()
-                    .streaming(false)
-                    .functionCalling(false)
-                    .multimodal(false)
-                    .toolCalling(false)
-                    .embeddings(false)
-                    .maxContextTokens(config.maxContextTokens())
-                    .maxOutputTokens(config.maxContextTokens() / 2)
-                    .supportedFormats(Set.of(ModelFormat.GGUF))
-                    .supportedDevices(buildSupportedDevices())
-                    .supportedLanguages(java.util.List.of("en"))
-                    .features(Set.of("local_inference", "cpu_inference",
-                            config.gpuEnabled() ? "gpu_acceleration" : "cpu_only"))
-                    .build();
-
             if (config.prewarmEnabled() && config.prewarmModels().isPresent()) {
+                System.out.println("DEBUG: prewarming models");
                 prewarmModels(config.prewarmModels().get());
             }
 
             initialized.set(true);
             log.info("GGUF Provider initialization completed");
 
-        } catch (Exception e) {
-            log.error("Failed to initialize GGUF Provider", e);
-            throw new IllegalStateException("GGUF Provider initialization failed", e);
+        } catch (Throwable t) {
+            System.out.println("DEBUG: GGUFProvider init failed: " + t.getMessage());
+            t.printStackTrace();
+            log.error("Failed to initialize GGUF Provider. The provider will be unavailable.", t);
+            // We don't throw here to allow the application to start even if native
+            // libraries are missing
+            // especially useful in test environments or CI/CD
         }
     }
 
@@ -152,6 +170,8 @@ public class GGUFProvider implements LLMProvider {
     @Override
     public boolean supports(String modelId, TenantContext tenantContext) {
         String modelPath = resolveModelPath(modelId);
+        if (modelPath == null)
+            return false;
         boolean exists = java.nio.file.Files.exists(java.nio.file.Paths.get(modelPath));
         log.debugf("Model support check: %s -> %s (exists=%b)", modelId, modelPath, exists);
         return exists;
@@ -170,6 +190,7 @@ public class GGUFProvider implements LLMProvider {
                 .startSpan();
 
         return Uni.createFrom().item(() -> {
+            GGUFSessionManager.SessionContext sessionContext = null;
             try {
                 metrics.recordRequest();
                 Instant startTime = Instant.now();
@@ -179,7 +200,7 @@ public class GGUFProvider implements LLMProvider {
 
                 InferenceRequest inferenceRequest = convertToInferenceRequest(request);
 
-                var sessionContext = sessionManager.getSession(
+                sessionContext = sessionManager.getSession(
                         effectiveContext.getTenantId().value(),
                         request.getModel(),
                         config);
@@ -214,7 +235,65 @@ public class GGUFProvider implements LLMProvider {
                         e,
                         isRetryable(e));
             } finally {
+                if (sessionContext != null) {
+                    sessionManager.releaseSession(
+                            effectiveContext.getTenantId().value(),
+                            request.getModel(),
+                            sessionContext);
+                }
                 span.end();
+            }
+        })
+                .runSubscriptionOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
+    }
+
+    @Override
+    public Multi<StreamChunk> inferStream(ProviderRequest request, TenantContext context) {
+        ensureInitialized();
+
+        TenantContext effectiveContext = ensureTenantContext(context);
+
+        return Multi.createFrom().deferred(() -> {
+            GGUFSessionManager.SessionContext sessionContext = null;
+            try {
+                metrics.recordRequest();
+
+                log.debugf("Starting streaming inference for model=%s, tenant=%s",
+                        request.getModel(), effectiveContext.getTenantId().value());
+
+                InferenceRequest inferenceRequest = convertToInferenceRequest(request);
+
+                sessionContext = sessionManager.getSession(
+                        effectiveContext.getTenantId().value(),
+                        request.getModel(),
+                        config);
+
+                if (sessionContext == null) {
+                    return Multi.createFrom().failure(new IllegalStateException(
+                            "Failed to acquire session context for model: " + request.getModel()));
+                }
+
+                // Final session context for closure
+                final GGUFSessionManager.SessionContext finalSession = sessionContext;
+
+                return sessionContext.runner().inferStream(
+                        inferenceRequest,
+                        createRequestContext(effectiveContext, request))
+                        .onTermination().invoke(() -> {
+                            sessionManager.releaseSession(
+                                    effectiveContext.getTenantId().value(),
+                                    request.getModel(),
+                                    finalSession);
+                        });
+
+            } catch (Exception e) {
+                metrics.recordFailure();
+                log.errorf(e, "Streaming inference acquisition failed for model=%s", request.getModel());
+                return Multi.createFrom().failure(new ProviderException(
+                        PROVIDER_ID,
+                        "Streaming inference failed: " + e.getMessage(),
+                        e,
+                        isRetryable(e)));
             }
         });
     }
@@ -223,17 +302,20 @@ public class GGUFProvider implements LLMProvider {
     public Uni<ProviderHealth> health() {
         return Uni.createFrom().item(() -> {
             try {
-                var status = ProviderHealth.Status.HEALTHY;
+                var status = initialized.get() ? ProviderHealth.Status.HEALTHY : ProviderHealth.Status.DEGRADED;
                 var details = new java.util.HashMap<String, Object>();
 
                 details.put("initialized", initialized.get());
-                details.put("total_inferences", metrics.getTotalRequests());
-                details.put("failed_inferences", metrics.getFailedRequests());
-                details.put("active_sessions", sessionManager.getActiveSessionCount());
+                if (metadata != null) {
+                    details.put("version", metadata.getVersion());
+                }
 
-                if (!sessionManager.isHealthy()) {
-                    status = ProviderHealth.Status.DEGRADED;
-                    details.put("session_manager", "degraded");
+                if (sessionManager != null) {
+                    details.put("active_sessions", sessionManager.getActiveSessionCount());
+                    if (!sessionManager.isHealthy()) {
+                        status = ProviderHealth.Status.DEGRADED;
+                        details.put("session_manager", "degraded");
+                    }
                 }
 
                 if (config.maxMemoryBytes() > 0) {
@@ -244,7 +326,7 @@ public class GGUFProvider implements LLMProvider {
                     }
                 }
 
-                if (metrics.getTotalRequests() > 10) {
+                if (metrics != null && metrics.getTotalRequests() > 10) {
                     double failureRate = 1.0 - metrics.getSuccessRate();
                     details.put("failure_rate", String.format("%.2f%%", failureRate * 100));
 
@@ -256,13 +338,17 @@ public class GGUFProvider implements LLMProvider {
 
                 return ProviderHealth.builder()
                         .status(status)
-                        .message(status == ProviderHealth.Status.HEALTHY ? "Healthy" : "Degraded/Unhealthy")
                         .details(details)
                         .timestamp(Instant.now())
                         .build();
 
-            } catch (Exception e) {
-                return ProviderHealth.unhealthy("Health check failed: " + e.getMessage());
+            } catch (Throwable t) {
+                log.error("Error checking GGUF Provider health", t);
+                return ProviderHealth.builder()
+                        .status(ProviderHealth.Status.UNHEALTHY)
+                        .details(java.util.Map.of("error", String.valueOf(t.getMessage())))
+                        .timestamp(Instant.now())
+                        .build();
             }
         });
     }
@@ -298,7 +384,32 @@ public class GGUFProvider implements LLMProvider {
     }
 
     private String resolveModelPath(String modelId) {
-        return modelId.startsWith("/") ? modelId : config.modelBasePath() + "/" + modelId;
+        if (modelId == null)
+            return null;
+        if (modelId.startsWith("/"))
+            return modelId;
+
+        String normalizedId = modelId.replace("/", "_");
+        String basePath = config.modelBasePath();
+        java.nio.file.Path modelDir = java.nio.file.Paths.get(basePath);
+
+        // Try variations
+        String[] variations = {
+                normalizedId,
+                normalizedId + "-GGUF",
+                modelId,
+                modelId + "-GGUF"
+        };
+
+        for (String var : variations) {
+            java.nio.file.Path p = modelDir.resolve(var);
+            if (java.nio.file.Files.exists(p)) {
+                return p.toString();
+            }
+        }
+
+        java.nio.file.Path defaultPath = modelDir.resolve(normalizedId);
+        return defaultPath.toAbsolutePath().toString();
     }
 
     private InferenceRequest convertToInferenceRequest(ProviderRequest request) {
@@ -306,7 +417,7 @@ public class GGUFProvider implements LLMProvider {
                 .map(Message::getContent)
                 .collect(Collectors.joining("\n"));
 
-        return InferenceRequest.builder()
+        var builder = InferenceRequest.builder()
                 .model(request.getModel())
                 .messages(request.getMessages())
                 .parameter("prompt", prompt)
@@ -314,7 +425,18 @@ public class GGUFProvider implements LLMProvider {
                 .parameter("temperature", request.getTemperature())
                 .parameter("top_p", request.getTopP())
                 .parameter("top_k", request.getParameter("top_k", Integer.class).orElse(config.defaultTopK()))
-                .build();
+                .parameter("json_mode",
+                        request.getParameter("json_mode", Boolean.class).orElse(config.defaultJsonMode()));
+
+        // Add additional sampling parameters from provider request
+        request.getParameters().forEach((k, v) -> {
+            if (!k.equals("prompt") && !k.equals("max_tokens") && !k.equals("temperature") && !k.equals("top_p")
+                    && !k.equals("top_k")) {
+                builder.parameter(k, v);
+            }
+        });
+
+        return builder.build();
     }
 
     private tech.kayys.golek.spi.context.RequestContext createRequestContext(

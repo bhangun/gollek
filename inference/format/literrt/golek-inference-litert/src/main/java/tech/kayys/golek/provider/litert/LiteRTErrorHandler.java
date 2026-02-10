@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * ✅ Error classification and prioritization
  * ✅ Comprehensive error metrics
  * 
- * @author bhangun
+ * @author Bhangun
  * @since 1.1.0
  */
 @Slf4j

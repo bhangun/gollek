@@ -1,11 +1,13 @@
 package tech.kayys.golek.plugin;
 
-import tech.kayys.golek.inference.kernel.plugin.InferencePhasePlugin;
-import tech.kayys.golek.inference.kernel.plugin.InferencePhasePlugin.PluginException;
-import tech.kayys.golek.inference.kernel.engine.EngineContext;
-import tech.kayys.golek.inference.kernel.execution.ExecutionContext;
-import tech.kayys.golek.inference.kernel.pipeline.InferencePhase;
-import tech.kayys.golek.inference.TenantId;
+import tech.kayys.golek.core.plugin.InferencePhasePlugin;
+import tech.kayys.golek.spi.plugin.PluginException;
+import tech.kayys.golek.spi.plugin.PluginContext;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.core.execution.ExecutionContext;
+import tech.kayys.golek.spi.inference.InferencePhase;
+import tech.kayys.wayang.tenant.TenantId;
+import tech.kayys.golek.core.plugin.GolekConfigurablePlugin;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -33,7 +35,7 @@ public class QuotaCleanupPlugin implements InferencePhasePlugin {
     }
 
     @Override
-    public void initialize(EngineContext context) {
+    public void initialize(PluginContext context) {
         // Initialization logic if needed
         System.out.println("Quota Cleanup Plugin initialized");
     }
@@ -53,23 +55,23 @@ public class QuotaCleanupPlugin implements InferencePhasePlugin {
     public void execute(ExecutionContext context, EngineContext engine) throws PluginException {
         // Check if quota was reserved during the request
         Boolean quotaReserved = context.getVariable("quotaReserved", Boolean.class).orElse(false);
-        
+
         if (Boolean.TRUE.equals(quotaReserved)) {
             // Retrieve the tenant ID and quota ID that were stored during reservation
             Optional<String> tenantIdOpt = context.getVariable("reservedTenantId", String.class);
-            Optional<String> quotaIdOpt = context.getVariable("reservedQuotaId", String.class);
-            
+
             if (tenantIdOpt.isPresent()) {
                 try {
-                    TenantId tenantId = new TenantId(tenantIdOpt.get());
-                    
+                    TenantId tenantId = TenantId.of(tenantIdOpt.get());
+
                     // Release the quota that was reserved for this request
                     quotaService.release(tenantId, 1);
-                    
+
                     // Clean up the variables we stored
-                    context.removeVariable("quotaReserved");
-                    context.removeVariable("reservedQuotaId");
-                    context.removeVariable("reservedTenantId");
+                    // Using null to effectively remove if removeVariable is not available
+                    context.putVariable("quotaReserved", null);
+                    context.putVariable("reservedQuotaId", null);
+                    context.putVariable("reservedTenantId", null);
                 } catch (Exception e) {
                     // Log the error but don't fail the request
                     // Releasing quota is important but shouldn't break the pipeline
@@ -77,5 +79,16 @@ public class QuotaCleanupPlugin implements InferencePhasePlugin {
                 }
             }
         }
+    }
+
+    @Override
+    public void onConfigUpdate(java.util.Map<String, Object> newConfig)
+            throws GolekConfigurablePlugin.ConfigurationException {
+        // No dynamic config for now
+    }
+
+    @Override
+    public java.util.Map<String, Object> currentConfig() {
+        return java.util.Collections.emptyMap();
     }
 }

@@ -193,7 +193,7 @@ public class ModelProviderRegistry {
      * Get models available on local providers
      */
     public List<ModelProviderMapping> getLocalModels() {
-        Set<String> localProviders = Set.of("ollama", "local", "local-vllm");
+        Set<String> localProviders = Set.of("ollama", "local", "local-vllm", "litert");
         return mappings.values().stream()
                 .filter(m -> m.providerIds().stream().anyMatch(localProviders::contains))
                 .collect(Collectors.toList());

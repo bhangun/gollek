@@ -5,8 +5,9 @@ import org.junit.jupiter.api.BeforeEach;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import tech.kayys.golek.inference.kernel.execution.ExecutionContext;
-import tech.kayys.golek.inference.kernel.engine.EngineContext;
+import tech.kayys.golek.core.execution.ExecutionContext;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.spi.inference.InferencePhase;
 
 class ModelRouterPluginTest {
 
@@ -21,8 +22,9 @@ class ModelRouterPluginTest {
         mockRouterService = mock(ModelRouterService.class);
         mockContext = mock(ExecutionContext.class);
         mockEngine = mock(EngineContext.class);
-        
-        // Inject the mock router service (would need reflection or setter in real scenario)
+
+        // Inject the mock router service (would need reflection or setter in real
+        // scenario)
     }
 
     @Test
@@ -32,7 +34,7 @@ class ModelRouterPluginTest {
 
     @Test
     void testPluginPhase() {
-        assertEquals(tech.kayys.golek.inference.kernel.pipeline.InferencePhase.ROUTE, plugin.phase());
+        assertEquals(InferencePhase.ROUTE, plugin.phase());
     }
 
     @Test

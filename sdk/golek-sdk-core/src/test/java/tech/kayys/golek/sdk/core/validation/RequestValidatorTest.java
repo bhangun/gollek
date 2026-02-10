@@ -2,7 +2,7 @@ package tech.kayys.golek.sdk.core.validation;
 
 import org.junit.jupiter.api.Test;
 import tech.kayys.golek.spi.inference.InferenceRequest;
-import tech.kayys.golek.spi.inference.Message;
+import tech.kayys.golek.spi.Message;
 import tech.kayys.golek.sdk.core.exception.NonRetryableException;
 
 import java.util.List;
@@ -19,15 +19,14 @@ class RequestValidatorTest {
                 .temperature(0.7)
                 .maxTokens(100)
                 .build();
-        
+
         assertDoesNotThrow(() -> RequestValidator.validate(request));
     }
 
     @Test
     void testNullRequest() {
-        NonRetryableException exception = assertThrows(NonRetryableException.class, 
-            () -> RequestValidator.validate(null)
-        );
+        NonRetryableException exception = assertThrows(NonRetryableException.class,
+                () -> RequestValidator.validate(null));
         assertTrue(exception.getMessage().contains("cannot be null"));
     }
 
@@ -36,10 +35,9 @@ class RequestValidatorTest {
         InferenceRequest request = InferenceRequest.builder()
                 .messages(List.of(Message.user("Hello")))
                 .build();
-        
-        NonRetryableException exception = assertThrows(NonRetryableException.class, 
-            () -> RequestValidator.validate(request)
-        );
+
+        NonRetryableException exception = assertThrows(NonRetryableException.class,
+                () -> RequestValidator.validate(request));
         assertTrue(exception.getMessage().contains("Model name is required"));
     }
 
@@ -49,10 +47,9 @@ class RequestValidatorTest {
                 .model("llama3:latest")
                 .messages(List.of())
                 .build();
-        
-        NonRetryableException exception = assertThrows(NonRetryableException.class, 
-            () -> RequestValidator.validate(request)
-        );
+
+        NonRetryableException exception = assertThrows(NonRetryableException.class,
+                () -> RequestValidator.validate(request));
         assertTrue(exception.getMessage().contains("At least one message is required"));
     }
 
@@ -63,10 +60,9 @@ class RequestValidatorTest {
                 .messages(List.of(Message.user("Hello")))
                 .temperature(3.0) // Invalid: > 2.0
                 .build();
-        
-        NonRetryableException exception = assertThrows(NonRetryableException.class, 
-            () -> RequestValidator.validate(request)
-        );
+
+        NonRetryableException exception = assertThrows(NonRetryableException.class,
+                () -> RequestValidator.validate(request));
         assertTrue(exception.getMessage().contains("Temperature must be between"));
     }
 
@@ -77,10 +73,9 @@ class RequestValidatorTest {
                 .messages(List.of(Message.user("Hello")))
                 .maxTokens(-1) // Invalid: negative
                 .build();
-        
-        NonRetryableException exception = assertThrows(NonRetryableException.class, 
-            () -> RequestValidator.validate(request)
-        );
+
+        NonRetryableException exception = assertThrows(NonRetryableException.class,
+                () -> RequestValidator.validate(request));
         assertTrue(exception.getMessage().contains("Max tokens must be positive"));
     }
 }

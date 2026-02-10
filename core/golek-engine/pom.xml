@@ -13,9 +13,6 @@
     <packaging>jar</packaging>
 
     <properties>
-
-        <hypersistence-utils.version>3.8.2</hypersistence-utils.version>
-        <quarkus.version>3.31.2</quarkus.version>
     </properties>
     <dependencies>
         <!-- Logging -->
@@ -41,14 +38,24 @@
             <artifactId>golek-model-repo-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-observability</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
-        <!--
+
         <dependency>
             <groupId>tech.kayys.wayang</groupId>
-            <artifactId>wayang-tenant-spi</artifactId>
+            <artifactId>tenant-spi</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
-        -->
+        <dependency>
+            <groupId>tech.kayys.wayang</groupId>
+            <artifactId>tenant-core</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
 
         <!-- Jackson for JSON -->
         <dependency>
@@ -60,19 +67,6 @@
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
 
-        <!-- JSON Support (Hypersistence for JSONB) -->
-        <dependency>
-            <groupId>io.hypersistence</groupId>
-            <artifactId>hypersistence-utils-hibernate-63</artifactId>
-            <version>${hypersistence-utils.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>${lombok.version}</version>
-            <scope>provided</scope>
-        </dependency>
 
         <!-- Validation -->
         <dependency>
@@ -91,11 +85,15 @@
         <!-- Quarkus Core -->
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-smallrye-openapi</artifactId>
+            <artifactId>quarkus-hibernate-reactive-panache</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-hibernate-reactive-panache</artifactId>
+            <artifactId>quarkus-rest</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -115,10 +113,7 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-opentelemetry</artifactId>
         </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-hibernate-orm</artifactId>
-        </dependency>
+
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-smallrye-fault-tolerance</artifactId>
@@ -154,21 +149,20 @@
             <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.14.0</version>
+        </dependency>
+
     </dependencies>
+
+
     <build>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                            <version>${lombok.version}</version>
-                        </path>
-                    </annotationProcessorPaths>
-                </configuration>
             </plugin>
         </plugins>
     </build>

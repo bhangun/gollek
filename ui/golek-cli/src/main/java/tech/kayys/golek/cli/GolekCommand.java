@@ -12,13 +12,16 @@ import tech.kayys.golek.cli.commands.ShowCommand;
 
 @TopCommand
 @Command(name = "golek", mixinStandardHelpOptions = true, version = "1.0.0", description = "Golek Inference CLI - Run local and cloud AI models", subcommands = {
-                RunCommand.class,
-                ChatCommand.class,
-                PullCommand.class,
-                ListCommand.class,
-                ShowCommand.class,
-                ProvidersCommand.class,
-                InfoCommand.class
+        RunCommand.class,
+        ChatCommand.class,
+        PullCommand.class,
+        ListCommand.class,
+        ShowCommand.class,
+        ProvidersCommand.class,
+        InfoCommand.class
 })
 public class GolekCommand {
+    public GolekCommand() {
+        System.out.println("DEBUG: GolekCommand constructor");
+    }
 }

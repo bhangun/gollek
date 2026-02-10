@@ -8,12 +8,12 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class InferenceRequestBuilderTest {
-    
+class InferenceRequestTest {
+
     @Test
     void testBuildInferenceRequest() {
         // Act
-        InferenceRequest request = InferenceRequestBuilder.builder()
+        InferenceRequest request = InferenceRequest.builder()
                 .model("test-model")
                 .userMessage("Hello, world!")
                 .systemMessage("System message")
@@ -22,7 +22,7 @@ class InferenceRequestBuilderTest {
                 .topP(0.9)
                 .parameter("custom_param", "custom_value")
                 .build();
-        
+
         // Assert
         assertNotNull(request);
         assertEquals("test-model", request.getModel());
@@ -34,11 +34,11 @@ class InferenceRequestBuilderTest {
         assertEquals(0.9, request.getParameters().get("top_p"));
         assertEquals("custom_value", request.getParameters().get("custom_param"));
     }
-    
+
     @Test
     void testBuildInferenceRequestWithAllFields() {
         // Act
-        InferenceRequest request = InferenceRequestBuilder.builder()
+        InferenceRequest request = InferenceRequest.builder()
                 .requestId("custom-request-id")
                 .model("test-model")
                 .message(Message.user("Test message"))
@@ -51,7 +51,7 @@ class InferenceRequestBuilderTest {
                 .preferredProvider("specific-provider")
                 .priority(8)
                 .build();
-        
+
         // Assert
         assertNotNull(request);
         assertEquals("custom-request-id", request.getRequestId());
@@ -70,7 +70,7 @@ class InferenceRequestBuilderTest {
 }
 
 class MessageBuilderTest {
-    
+
     @Test
     void testBuildMessage() {
         // Act
@@ -79,14 +79,14 @@ class MessageBuilderTest {
                 .content("Test content")
                 .name("test-user")
                 .build();
-        
+
         // Assert
         assertNotNull(message);
         assertEquals(Message.Role.USER, message.getRole());
         assertEquals("Test content", message.getContent());
         assertEquals("test-user", message.getName());
     }
-    
+
     @Test
     void testConvenienceMethods() {
         // Act
@@ -94,17 +94,17 @@ class MessageBuilderTest {
         Message userMsg = MessageBuilder.user("User message");
         Message assistantMsg = MessageBuilder.assistant("Assistant message");
         Message toolMsg = MessageBuilder.tool("tool-call-id", "Tool response");
-        
+
         // Assert
         assertEquals(Message.Role.SYSTEM, systemMsg.getRole());
         assertEquals("System message", systemMsg.getContent());
-        
+
         assertEquals(Message.Role.USER, userMsg.getRole());
         assertEquals("User message", userMsg.getContent());
-        
+
         assertEquals(Message.Role.ASSISTANT, assistantMsg.getRole());
         assertEquals("Assistant message", assistantMsg.getContent());
-        
+
         assertEquals(Message.Role.TOOL, toolMsg.getRole());
         assertEquals("Tool response", toolMsg.getContent());
         assertEquals("tool-call-id", toolMsg.getToolCallId());

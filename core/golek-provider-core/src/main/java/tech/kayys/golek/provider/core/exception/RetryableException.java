@@ -6,7 +6,7 @@ import tech.kayys.golek.spi.error.ErrorCode;
 /**
  * Exception that indicates the operation can be retried.
  *
- * @author bhangun
+ * @author Bhangun
  * @since 1.0.0
  */
 public class RetryableException extends InferenceException {

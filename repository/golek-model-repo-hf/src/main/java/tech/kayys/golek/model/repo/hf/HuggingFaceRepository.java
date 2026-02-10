@@ -1,15 +1,19 @@
-package tech.kayys.golek.model.repository.hf;
+package tech.kayys.golek.model.repo.hf;
 
-import java.net.URI;
-import java.nio.file.Files;
+
+import io.smallrye.mutiny.Uni;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Collections;
 
-import tech.kayys.golek.model.core.ModelArtifact;
-import tech.kayys.golek.model.core.ModelDescriptor;
-import tech.kayys.golek.model.core.ModelRef;
 import tech.kayys.golek.model.core.ModelRepository;
+import tech.kayys.golek.spi.model.ModelArtifact;
+import tech.kayys.golek.spi.model.ModelDescriptor;
+import tech.kayys.golek.spi.model.ModelRef;
+import tech.kayys.golek.spi.model.ModelFormat;
+import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.model.Pageable;
 
 public final class HuggingFaceRepository implements ModelRepository {
 
@@ -27,7 +31,7 @@ public final class HuggingFaceRepository implements ModelRepository {
 
     @Override
     public boolean supports(ModelRef ref) {
-        return "hf".equalsIgnoreCase(ref.scheme());
+        return "hf".equalsIgnoreCase(ref.scheme()) || "huggingface".equalsIgnoreCase(ref.scheme());
     }
 
     @Override
@@ -42,7 +46,7 @@ public final class HuggingFaceRepository implements ModelRepository {
                         "provider", "huggingface",
                         "repo", artifact.repo(),
                         "revision", artifact.revision(),
-                        "filename", artifact.filename()));
+                        "filename", artifact.filename() != null ? artifact.filename() : ""));
     }
 
     @Override
@@ -52,5 +56,40 @@ public final class HuggingFaceRepository implements ModelRepository {
                 .resolve(descriptor.id().replace("/", "_").replace(":", "_"));
 
         return downloader.download(descriptor, target);
+    }
+
+    @Override
+    public Uni<ModelManifest> findById(String modelId, String tenantId) {
+        return Uni.createFrom().failure(new UnsupportedOperationException("HF findById not yet implemented"));
+    }
+
+    @Override
+    public Uni<List<ModelManifest>> list(String tenantId, Pageable pageable) {
+        return Uni.createFrom().item(Collections.emptyList());
+    }
+
+    @Override
+    public Uni<ModelManifest> save(ModelManifest manifest) {
+        return Uni.createFrom().failure(new UnsupportedOperationException("Cannot save to HuggingFace repository"));
+    }
+
+    @Override
+    public Uni<Void> delete(String modelId, String tenantId) {
+        return Uni.createFrom().failure(new UnsupportedOperationException("Cannot delete from HuggingFace repository"));
+    }
+
+    @Override
+    public Path downloadArtifact(ModelManifest manifest, ModelFormat format) {
+        throw new UnsupportedOperationException("HF downloadArtifact not yet implemented");
+    }
+
+    @Override
+    public boolean isCached(String modelId, ModelFormat format) {
+        return false;
+    }
+
+    @Override
+    public void evictCache(String modelId, ModelFormat format) {
+        // No-op
     }
 }

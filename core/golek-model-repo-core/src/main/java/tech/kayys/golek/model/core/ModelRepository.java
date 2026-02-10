@@ -11,14 +11,19 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  *
- * @author bhangun
+ * @author Bhangun
  */
 package tech.kayys.golek.model.core;
 
-import tech.kayys.golek.spi.model.ModelManifest;
-
 import io.smallrye.mutiny.Uni;
+import tech.kayys.golek.spi.model.ModelArtifact;
+import tech.kayys.golek.spi.model.ModelDescriptor;
+import tech.kayys.golek.spi.model.ModelRef;
+import tech.kayys.golek.spi.model.ModelFormat;
+import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.model.Pageable;
 
+import java.nio.file.Path;
 import java.util.List;
 
 public interface ModelRepository {
@@ -29,4 +34,16 @@ public interface ModelRepository {
     Uni<ModelManifest> save(ModelManifest manifest);
 
     Uni<Void> delete(String modelId, String tenantId);
+
+    ModelDescriptor resolve(ModelRef ref);
+
+    ModelArtifact fetch(ModelDescriptor descriptor);
+
+    boolean supports(ModelRef ref);
+
+    Path downloadArtifact(ModelManifest manifest, ModelFormat format);
+
+    boolean isCached(String modelId, ModelFormat format);
+
+    void evictCache(String modelId, ModelFormat format);
 }

@@ -2,15 +2,11 @@ package tech.kayys.golek.cli.commands;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.InjectMock;
-import io.smallrye.mutiny.Uni;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import jakarta.inject.Inject;
-import tech.kayys.golek.model.core.LocalModelRepository;
-import tech.kayys.golek.model.core.Pageable;
-import tech.kayys.golek.spi.model.ModelManifest;
-
-import java.time.Instant;
+import tech.kayys.golek.sdk.core.GolekSdk;
+import tech.kayys.golek.sdk.core.model.ModelInfo;
 import java.util.Collections;
 import java.util.List;
 
@@ -20,75 +16,62 @@ import static org.mockito.ArgumentMatchers.eq;
 @QuarkusTest
 public class ListCommandTest {
 
-    @Inject
-    ListCommand listCommand;
+        @Inject
+        ListCommand listCommand;
 
-    @InjectMock
-    LocalModelRepository modelRepository;
+        @InjectMock
+        GolekSdk sdk;
 
-    @Test
-    public void testListCommandEmpty() {
-        Mockito.when(modelRepository.list(any(String.class), any(Pageable.class)))
-                .thenReturn(Uni.createFrom().item(Collections.emptyList()));
+        @Test
+        public void testListCommandEmpty() throws Exception {
+                Mockito.when(sdk.listModels(any(Integer.class), any(Integer.class)))
+                                .thenReturn(Collections.emptyList());
 
-        listCommand.tenantId = "default";
-        listCommand.format = "table";
-        listCommand.limit = 50;
+                listCommand.format = "table";
+                listCommand.limit = 50;
 
-        listCommand.run();
+                listCommand.run();
 
-        Mockito.verify(modelRepository).list(eq("default"), any(Pageable.class));
-    }
+                Mockito.verify(sdk).listModels(eq(0), eq(50));
+        }
 
-    @Test
-    public void testListCommandWithModels() {
-        ModelManifest model = new ModelManifest(
-                "test-model",
-                "Test Model",
-                "1.0",
-                "default",
-                Collections.emptyMap(),
-                Collections.emptyList(),
-                null,
-                Collections.emptyMap(),
-                Instant.now(),
-                Instant.now());
+        @Test
+        public void testListCommandWithModels() throws Exception {
+                ModelInfo model = ModelInfo.builder()
+                                .modelId("test-model")
+                                .name("Test Model")
+                                .version("1.0")
+                                .tenantId("default")
+                                .build();
 
-        Mockito.when(modelRepository.list(any(String.class), any(Pageable.class)))
-                .thenReturn(Uni.createFrom().item(List.of(model)));
+                Mockito.when(sdk.listModels(any(Integer.class), any(Integer.class)))
+                                .thenReturn(List.of(model));
 
-        listCommand.tenantId = "default";
-        listCommand.format = "table";
-        listCommand.limit = 50;
+                listCommand.format = "table";
+                listCommand.limit = 50;
 
-        listCommand.run();
+                listCommand.run();
 
-        Mockito.verify(modelRepository).list(eq("default"), any(Pageable.class));
-    }
+                Mockito.verify(sdk).listModels(eq(0), eq(50));
+        }
 
-    @Test
-    public void testListCommandJsonFormat() {
-        ModelManifest model = new ModelManifest(
-                "test-model",
-                "Test Model",
-                "1.0",
-                "default",
-                Collections.emptyMap(),
-                Collections.emptyList(),
-                null,
-                Collections.emptyMap(),
-                Instant.now(),
-                Instant.now());
+        @Test
+        public void testListCommandJsonFormat() throws Exception {
+                ModelInfo model = ModelInfo.builder()
+                                .modelId("test-model")
+                                .name("Test Model")
+                                .version("1.0")
+                                .tenantId("default")
+                                .build();
 
-        Mockito.when(modelRepository.list(any(String.class), any(Pageable.class)))
-                .thenReturn(Uni.createFrom().item(List.of(model)));
+                Mockito.when(sdk.listModels(any(Integer.class), any(Integer.class)))
+                                .thenReturn(List.of(model));
 
-        listCommand.tenantId = "default";
-        listCommand.format = "json";
-        listCommand.limit = 50;
+                listCommand.format = "json";
+                listCommand.limit = 50;
 
-        listCommand.run();
+                listCommand.run();
 
-        Mockito.verify(modelRepository).list(eq("default"), any(Pageable.class));
-    }
+                Mockito.verify(sdk).listModels(eq(0), eq(50));
+        }
 }

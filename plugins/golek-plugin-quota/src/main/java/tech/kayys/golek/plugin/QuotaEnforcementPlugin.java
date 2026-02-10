@@ -1,11 +1,13 @@
 package tech.kayys.golek.plugin;
 
-import tech.kayys.golek.inference.kernel.plugin.InferencePhasePlugin;
-import tech.kayys.golek.inference.kernel.plugin.InferencePhasePlugin.PluginException;
-import tech.kayys.golek.inference.kernel.engine.EngineContext;
-import tech.kayys.golek.inference.kernel.execution.ExecutionContext;
-import tech.kayys.golek.inference.kernel.pipeline.InferencePhase;
-import tech.kayys.golek.inference.TenantId;
+import tech.kayys.golek.core.plugin.InferencePhasePlugin;
+import tech.kayys.golek.core.plugin.GolekConfigurablePlugin;
+import tech.kayys.golek.spi.plugin.PluginContext;
+import tech.kayys.golek.spi.plugin.PluginException;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.core.execution.ExecutionContext;
+import tech.kayys.golek.spi.inference.InferencePhase;
+import tech.kayys.wayang.tenant.TenantId;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -30,7 +32,7 @@ public class QuotaEnforcementPlugin implements InferencePhasePlugin {
     }
 
     @Override
-    public void initialize(EngineContext context) {
+    public void initialize(PluginContext context) {
         // Initialization logic if needed
         System.out.println("Quota Enforcement Plugin initialized");
     }
@@ -48,18 +50,16 @@ public class QuotaEnforcementPlugin implements InferencePhasePlugin {
 
     @Override
     public void execute(ExecutionContext context, EngineContext engine) throws PluginException {
-        String tenantIdStr = context.tenantContext().getTenantId();
-        if (tenantIdStr == null || tenantIdStr.trim().isEmpty()) {
+        TenantId tenantId = context.tenantContext().getTenantId();
+        if (tenantId == null) {
             throw new PluginException("Tenant ID is required for quota enforcement");
         }
-
-        TenantId tenantId = new TenantId(tenantIdStr);
 
         // Check if tenant has capacity
         QuotaInfo quota = quotaService.checkQuota(tenantId);
         if (!quota.hasCapacity()) {
             throw new PluginException(
-                "Tenant " + tenantId.value() + " has exceeded quota: " + quota.getLimit());
+                    "Tenant " + tenantId.value() + " has exceeded quota: " + quota.getLimit());
         }
 
         // Reserve quota for this request
@@ -69,5 +69,16 @@ public class QuotaEnforcementPlugin implements InferencePhasePlugin {
         context.putVariable("quotaReserved", true);
         context.putVariable("reservedQuotaId", quota.getId());
         context.putVariable("reservedTenantId", tenantId.value());
+    }
+
+    @Override
+    public void onConfigUpdate(java.util.Map<String, Object> newConfig)
+            throws GolekConfigurablePlugin.ConfigurationException {
+        // No dynamic config for now
+    }
+
+    @Override
+    public java.util.Map<String, Object> currentConfig() {
+        return java.util.Collections.emptyMap();
     }
 }

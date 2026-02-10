@@ -4,6 +4,8 @@ package tech.kayys.golek.inference.gguf;
 import java.io.InputStream;
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -28,18 +30,40 @@ public class LlamaCppBinding {
     private final MethodHandle llama_load_model_from_file;
     private final MethodHandle llama_new_context_with_model;
     private final MethodHandle llama_free_model;
+    private final MethodHandle llama_kv_cache_clear;
     private final MethodHandle llama_free;
+    private final MethodHandle llama_model_get_vocab;
+    private final MethodHandle llama_model_meta_val_str;
     private final MethodHandle llama_tokenize;
     private final MethodHandle llama_token_to_piece;
     private final MethodHandle llama_decode;
     private final MethodHandle llama_get_logits;
-    private final MethodHandle llama_sample_token_greedy;
-    private final MethodHandle llama_token_eos;
-    private final MethodHandle llama_token_bos;
+    private final MethodHandle llama_get_logits_ith;
+    private final MethodHandle llama_vocab_eos;
+    private final MethodHandle llama_vocab_bos;
     private final MethodHandle llama_batch_init;
     private final MethodHandle llama_batch_free;
     private final MethodHandle llama_n_ctx;
-    private final MethodHandle llama_n_vocab;
+    private final MethodHandle llama_vocab_n_tokens;
+    private final MethodHandle llama_sampler_chain_default_params;
+    private final MethodHandle llama_sampler_chain_init;
+    private final MethodHandle llama_sampler_chain_add;
+    private final MethodHandle llama_sampler_init_greedy;
+    private final MethodHandle llama_sampler_init_top_k;
+    private final MethodHandle llama_sampler_init_top_p;
+    private final MethodHandle llama_sampler_init_min_p;
+    private final MethodHandle llama_sampler_init_temp;
+    private final MethodHandle llama_sampler_init_dist;
+    private final MethodHandle llama_sampler_sample;
+    private final MethodHandle llama_sampler_free;
+
+    // Extended sampler handles
+    private final MethodHandle llama_sampler_init_penalties;
+    private final MethodHandle llama_sampler_init_mirostat;
+    private final MethodHandle llama_sampler_init_mirostat_v2;
+    private final MethodHandle llama_sampler_init_grammar;
+    private final MethodHandle llama_sampler_init_typical;
+    private final MethodHandle llama_vocab_is_eog;
 
     // Struct layouts
     private static final MemoryLayout LLAMA_MODEL_PARAMS_LAYOUT = MemoryLayout.structLayout(
@@ -107,12 +131,17 @@ public class LlamaCppBinding {
             ValueLayout.ADDRESS.withName("seq_id"),
             ValueLayout.ADDRESS.withName("logits")).withName("llama_batch");
 
+    private static final MemoryLayout LLAMA_SAMPLER_CHAIN_PARAMS_LAYOUT = MemoryLayout.structLayout(
+            ValueLayout.JAVA_BOOLEAN.withName("no_perf"));
+
     private LlamaCppBinding(SymbolLookup symbolLookup) {
+        System.out.println("DEBUG: LlamaCppBinding constructor called via NativeLibraryLoader mechanism?");
         this.symbolLookup = symbolLookup;
         this.arena = Arena.ofShared();
 
         // Link function handles
         Linker linker = Linker.nativeLinker();
+        System.out.println("DEBUG: Linker obtained");
 
         this.llama_backend_init = linkFunction(linker, "llama_backend_init",
                 FunctionDescriptor.ofVoid());
@@ -130,33 +159,61 @@ public class LlamaCppBinding {
                 FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, LLAMA_MODEL_PARAMS_LAYOUT));
         this.llama_new_context_with_model = linkFunction(linker, "llama_init_from_model",
                 FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, LLAMA_CONTEXT_PARAMS_LAYOUT));
-        this.llama_free_model = linkFunction(linker, "llama_model_free",
+        this.llama_free_model = linkFunction(linker, "llama_free_model",
                 FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+
+        // Make kv_cache_clear optional as it might not be available in older llama.cpp
+        // builds
+        MethodHandle kvCacheClearHandle = null;
+        try {
+            kvCacheClearHandle = linkFunction(linker, "llama_kv_cache_clear",
+                    FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+        } catch (Exception e) {
+            log.warn("llama_kv_cache_clear symbol not found - cache clearing will be disabled");
+        }
+        this.llama_kv_cache_clear = kvCacheClearHandle;
 
         this.llama_free = linkFunction(linker, "llama_free",
                 FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
 
+        // Get vocab pointer from model (new API)
+        this.llama_model_get_vocab = linkFunction(linker, "llama_model_get_vocab",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+
+        // Metadata API
+        this.llama_model_meta_val_str = linkFunction(linker, "llama_model_meta_val_str",
+                FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
+
+        // Updated tokenize: now takes vocab pointer, not model
+        // llama_tokenize(vocab, text, text_len, tokens, n_tokens_max, add_special,
+        // parse_special)
         this.llama_tokenize = linkFunction(linker, "llama_tokenize",
                 FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
                         ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_BOOLEAN,
                         ValueLayout.JAVA_BOOLEAN));
 
+        // Updated token_to_piece: now takes vocab pointer and has lstrip and special
+        // params
+        // llama_token_to_piece(vocab, token, buf, length, lstrip, special)
         this.llama_token_to_piece = linkFunction(linker, "llama_token_to_piece",
                 FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
-                        ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+                        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_BOOLEAN));
 
         this.llama_decode = linkFunction(linker, "llama_decode",
                 FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, LLAMA_BATCH_LAYOUT));
+
         this.llama_get_logits = linkFunction(linker, "llama_get_logits",
                 FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
-        this.llama_sample_token_greedy = linkFunction(linker, "llama_sample_token_greedy",
-                FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+        this.llama_get_logits_ith = linkFunction(linker, "llama_get_logits_ith",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
 
-        this.llama_token_eos = linkFunction(linker, "llama_token_eos",
+        // Updated token functions: now take vocab pointer
+        this.llama_vocab_eos = linkFunction(linker, "llama_vocab_eos",
                 FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
 
-        this.llama_token_bos = linkFunction(linker, "llama_token_bos",
+        this.llama_vocab_bos = linkFunction(linker, "llama_vocab_bos",
                 FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
 
         this.llama_batch_init = linkFunction(linker, "llama_batch_init",
@@ -169,23 +226,113 @@ public class LlamaCppBinding {
         this.llama_n_ctx = linkFunction(linker, "llama_n_ctx",
                 FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
 
-        this.llama_n_vocab = linkFunction(linker, "llama_n_vocab",
+        // Replaced llama_n_vocab with llama_vocab_n_tokens
+        this.llama_vocab_n_tokens = linkFunction(linker, "llama_vocab_n_tokens",
                 FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+
+        // Sampler API
+        this.llama_sampler_chain_default_params = linkFunction(linker, "llama_sampler_chain_default_params",
+                FunctionDescriptor.of(LLAMA_SAMPLER_CHAIN_PARAMS_LAYOUT));
+
+        this.llama_sampler_chain_init = linkFunction(linker, "llama_sampler_chain_init",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, LLAMA_SAMPLER_CHAIN_PARAMS_LAYOUT));
+
+        this.llama_sampler_chain_add = linkFunction(linker, "llama_sampler_chain_add",
+                FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+
+        this.llama_sampler_init_greedy = linkFunction(linker, "llama_sampler_init_greedy",
+                FunctionDescriptor.of(ValueLayout.ADDRESS));
+
+        this.llama_sampler_init_top_k = linkFunction(linker, "llama_sampler_init_top_k",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+
+        this.llama_sampler_init_top_p = linkFunction(linker, "llama_sampler_init_top_p",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_LONG));
+
+        this.llama_sampler_init_min_p = linkFunction(linker, "llama_sampler_init_min_p",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_LONG));
+
+        this.llama_sampler_init_temp = linkFunction(linker, "llama_sampler_init_temp",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_FLOAT));
+
+        this.llama_sampler_init_dist = linkFunction(linker, "llama_sampler_init_dist",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+
+        this.llama_sampler_sample = linkFunction(linker, "llama_sampler_sample",
+                FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
+                        ValueLayout.JAVA_INT));
+
+        this.llama_sampler_free = linkFunction(linker, "llama_sampler_free",
+                FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+
+        // Extended samplers
+        // llama_sampler_init_penalties(int32_t penalty_last_n, float penalty_repeat,
+        // float penalty_freq, float penalty_present)
+        this.llama_sampler_init_penalties = linkFunction(linker, "llama_sampler_init_penalties",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_FLOAT,
+                        ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT));
+
+        // llama_sampler_init_mirostat(int32_t n_vocab, uint32_t seed, float tau, float
+        // eta, int32_t m)
+        this.llama_sampler_init_mirostat = linkFunction(linker, "llama_sampler_init_mirostat",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+                        ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_INT));
+
+        // llama_sampler_init_mirostat_v2(uint32_t seed, float tau, float eta)
+        this.llama_sampler_init_mirostat_v2 = linkFunction(linker, "llama_sampler_init_mirostat_v2",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_FLOAT,
+                        ValueLayout.JAVA_FLOAT));
+
+        // llama_sampler_init_grammar(const llama_vocab* vocab, const char* grammar_str,
+        // const char* grammar_root)
+        this.llama_sampler_init_grammar = linkFunction(linker, "llama_sampler_init_grammar",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS));
+
+        // llama_sampler_init_typical(float p, size_t min_keep)
+        this.llama_sampler_init_typical = linkFunction(linker, "llama_sampler_init_typical",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_LONG));
+
+        // llama_vocab_is_eog(const llama_vocab* vocab, llama_token token) -> bool
+        this.llama_vocab_is_eog = linkFunction(linker, "llama_vocab_is_eog",
+                FunctionDescriptor.of(ValueLayout.JAVA_BOOLEAN, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     }
 
     private MethodHandle linkFunction(Linker linker, String name, FunctionDescriptor descriptor) {
-        return symbolLookup.find(name)
-                .map(addr -> linker.downcallHandle(addr, descriptor))
-                .orElseGet(() -> {
-                    log.warnf("Native function not found: %s. Some features may be unavailable.", name);
-                    return null;
-                });
+        System.out.println("DEBUG: Linking symbol: " + name);
+        try {
+            return symbolLookup.find(name)
+                    .map(addr -> {
+                        System.out.println("DEBUG: Found symbol: " + name);
+                        return linker.downcallHandle(addr, descriptor);
+                    })
+                    .orElseGet(() -> {
+                        System.out.println("DEBUG: Symbol not found: " + name);
+                        log.warnf("Native function not found: %s. Some features may be unavailable.", name);
+                        return null;
+                    });
+        } catch (Throwable t) {
+            System.out.println("DEBUG: Exception linking " + name + ": " + t.getMessage());
+            t.printStackTrace();
+            throw t;
+        }
     }
 
     /**
-     * Load the native library and create binding instance
+     * Load the native library and create binding instance with default (quiet)
+     * logging.
      */
     public static LlamaCppBinding load() {
+        return load(false);
+    }
+
+    /**
+     * Load the native library and create binding instance.
+     * 
+     * @param verbose if true, show all llama.cpp debug output; if false, suppress
+     *                verbose logs
+     */
+    public static LlamaCppBinding load(boolean verbose) {
         try {
             // Extract and load native library
             Path nativeLib = extractNativeLibrary();
@@ -194,17 +341,84 @@ public class LlamaCppBinding {
             // Create symbol lookup
             SymbolLookup symbolLookup = SymbolLookup.loaderLookup();
 
+            // Suppress verbose native logs BEFORE any llama.cpp calls
+            if (!verbose) {
+                suppressNativeLogsStatic(symbolLookup);
+            }
+
             LlamaCppBinding binding = new LlamaCppBinding(symbolLookup);
 
             // Initialize backend
             binding.backendInit();
 
-            log.infof("Loaded llama.cpp native library: %s", nativeLib);
+            if (!verbose) {
+                log.info("Loaded llama.cpp native library (quiet mode)");
+            } else {
+                log.infof("Loaded llama.cpp native library: %s", nativeLib);
+            }
             return binding;
 
         } catch (Throwable e) {
             throw new RuntimeException("Failed to load llama.cpp library", e);
         }
+    }
+
+    /**
+     * Static method to suppress native logs before binding instance is created.
+     */
+    private static void suppressNativeLogsStatic(SymbolLookup symbolLookup) {
+        try {
+            var logSetAddr = symbolLookup.find("llama_log_set");
+            if (logSetAddr.isPresent()) {
+                Linker nativeLinker = Linker.nativeLinker();
+
+                // Create a no-op callback using upcall stub
+                // Signature: void callback(int level, const char* text, void* user_data)
+                MethodHandle noOpHandler = MethodHandles.lookup().findStatic(
+                        LlamaCppBinding.class,
+                        "noOpLogCallback",
+                        MethodType.methodType(void.class, int.class, MemorySegment.class, MemorySegment.class));
+
+                FunctionDescriptor callbackDesc = FunctionDescriptor.ofVoid(
+                        ValueLayout.JAVA_INT, // enum ggml_log_level (int)
+                        ValueLayout.ADDRESS, // const char* text
+                        ValueLayout.ADDRESS // void* user_data
+                );
+
+                // Create upcall stub in global arena (lives as long as JVM)
+                MemorySegment noOpCallback = nativeLinker.upcallStub(
+                        noOpHandler,
+                        callbackDesc,
+                        Arena.global());
+
+                MethodHandle llama_log_set = nativeLinker.downcallHandle(
+                        logSetAddr.get(),
+                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+
+                // Set our no-op callback
+                llama_log_set.invoke(noOpCallback, MemorySegment.NULL);
+            }
+        } catch (Throwable e) {
+            // Silently ignore - verbose logging is just a convenience
+        }
+    }
+
+    /**
+     * No-op log callback that discards all log messages.
+     */
+    @SuppressWarnings("unused")
+    private static void noOpLogCallback(int level, MemorySegment text, MemorySegment userData) {
+        // Intentionally empty - discards all log output
+    }
+
+    /**
+     * Suppress verbose llama.cpp debug output.
+     * Sets a no-op log callback to silence Metal/CUDA pipeline compilation
+     * messages.
+     */
+    public void suppressNativeLogs() {
+        suppressNativeLogsStatic(symbolLookup);
+        log.debug("Suppressed verbose llama.cpp native logging");
     }
 
     /**
@@ -392,20 +606,29 @@ public class LlamaCppBinding {
     }
 
     public int[] tokenize(MemorySegment model, String text, boolean addBos, boolean special) {
-        try {
-            MemorySegment textSegment = arena.allocateFrom(text);
+        try (Arena localArena = Arena.ofConfined()) {
+            // Get vocab from model (new API)
+            MemorySegment vocab = getVocab(model);
+            MemorySegment textSegment = localArena.allocateFrom(text);
 
-            // First call to get token count
+            // First call to get token count (negative value indicates needed buffer size)
             int tokenCount = (int) llama_tokenize.invoke(
-                    model, textSegment, text.length(),
+                    vocab, textSegment, text.length(),
                     MemorySegment.NULL, 0, addBos, special);
 
+            // Handle negative return value (buffer too small)
+            int bufferSize = tokenCount < 0 ? -tokenCount : tokenCount + 32;
+
             // Allocate buffer and tokenize
-            MemorySegment tokensBuffer = arena.allocate(ValueLayout.JAVA_INT, tokenCount);
+            MemorySegment tokensBuffer = localArena.allocate(ValueLayout.JAVA_INT, bufferSize);
 
             int actualCount = (int) llama_tokenize.invoke(
-                    model, textSegment, text.length(),
-                    tokensBuffer, tokenCount, addBos, special);
+                    vocab, textSegment, text.length(),
+                    tokensBuffer, bufferSize, addBos, special);
+
+            if (actualCount < 0) {
+                throw new RuntimeException("Tokenization failed: buffer too small");
+            }
 
             // Copy to Java array
             int[] tokens = new int[actualCount];
@@ -419,9 +642,12 @@ public class LlamaCppBinding {
     }
 
     public String tokenToPiece(MemorySegment model, int token) {
-        try {
-            MemorySegment buffer = arena.allocate(ValueLayout.JAVA_BYTE, 256);
-            int length = (int) llama_token_to_piece.invoke(model, token, buffer, 256);
+        try (Arena localArena = Arena.ofConfined()) {
+            // Get vocab from model (new API)
+            MemorySegment vocab = getVocab(model);
+            MemorySegment buffer = localArena.allocate(ValueLayout.JAVA_BYTE, 256);
+            // Updated signature: (vocab, token, buf, length, lstrip, special)
+            int length = (int) llama_token_to_piece.invoke(vocab, token, buffer, 256, 0, false);
             if (length < 0) {
                 return "";
             }
@@ -452,17 +678,45 @@ public class LlamaCppBinding {
         }
     }
 
-    public int sampleTokenGreedy(MemorySegment context, MemorySegment logits) {
+    public MemorySegment getLogitsIth(MemorySegment context, int index) {
         try {
-            return (int) llama_sample_token_greedy.invoke(context, logits);
+            return (MemorySegment) llama_get_logits_ith.invoke(context, index);
         } catch (Throwable e) {
-            throw new RuntimeException("Failed to sample token", e);
+            throw new RuntimeException("Failed to get logits at index", e);
+        }
+    }
+
+    /**
+     * Clear the KV cache
+     */
+    public void kvCacheClear(MemorySegment context) {
+        if (llama_kv_cache_clear == null) {
+            log.debug("Skipping KV cache clear (symbol not found)");
+            return;
+        }
+        try {
+            llama_kv_cache_clear.invoke(context);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to clear KV cache", e);
+        }
+    }
+
+    /**
+     * Get vocab pointer from model. Required for tokenization in new API.
+     */
+    public MemorySegment getVocab(MemorySegment model) {
+        try {
+            checkHandle(llama_model_get_vocab, "llama_model_get_vocab");
+            return (MemorySegment) llama_model_get_vocab.invoke(model);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to get vocab from model", e);
         }
     }
 
     public int getEosToken(MemorySegment model) {
         try {
-            return (int) llama_token_eos.invoke(model);
+            MemorySegment vocab = getVocab(model);
+            return (int) llama_vocab_eos.invoke(vocab);
         } catch (Throwable e) {
             throw new RuntimeException("Failed to get EOS token", e);
         }
@@ -470,7 +724,8 @@ public class LlamaCppBinding {
 
     public int getBosToken(MemorySegment model) {
         try {
-            return (int) llama_token_bos.invoke(model);
+            MemorySegment vocab = getVocab(model);
+            return (int) llama_vocab_bos.invoke(vocab);
         } catch (Throwable e) {
             throw new RuntimeException("Failed to get BOS token", e);
         }
@@ -504,10 +759,264 @@ public class LlamaCppBinding {
 
     public int getVocabSize(MemorySegment model) {
         try {
-            return (int) llama_n_vocab.invoke(model);
+            MemorySegment vocab = getVocab(model);
+            return (int) llama_vocab_n_tokens.invoke(vocab);
         } catch (Throwable e) {
             throw new RuntimeException("Failed to get vocab size", e);
         }
+    }
+
+    // Sampler Methods
+
+    public MemorySegment createSamplerChain() {
+        try {
+            MemorySegment params = (MemorySegment) llama_sampler_chain_default_params
+                    .invokeExact((SegmentAllocator) arena);
+            // We need to pass the struct by value.
+            // Since invokeExact with SegmentAllocator returns the struct segment, we can't
+            // use it directly in the next call if it expects by value...
+            // Wait, standard downcall for struct-by-value arg expects a MemorySegment
+            // containing the struct.
+            // For return value struct, it needs an allocator.
+            // Let's use invoke with allocator correctly.
+            // Actually, if we use just invoke on a function returning struct, does it
+            // require allocator?
+            // Yes, standard Linker requires SegmentAllocator as first arg for functions
+            // returning struct.
+
+            // However, we can construct cleaner bindings if we do it manually.
+            // Simplified: manually init params
+            MemorySegment paramsSeg = arena.allocate(LLAMA_SAMPLER_CHAIN_PARAMS_LAYOUT);
+            paramsSeg.set(ValueLayout.JAVA_BOOLEAN, 0, false); // no_perf = false
+
+            return (MemorySegment) llama_sampler_chain_init.invoke(paramsSeg);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to create sampler chain", e);
+        }
+    }
+
+    public void addGreedySampler(MemorySegment chain) {
+        try {
+            MemorySegment greedy = (MemorySegment) llama_sampler_init_greedy.invoke();
+            llama_sampler_chain_add.invoke(chain, greedy);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to add greedy sampler", e);
+        }
+    }
+
+    public void addTopKSampler(MemorySegment chain, int k) {
+        try {
+            MemorySegment sampler = (MemorySegment) llama_sampler_init_top_k.invoke(k);
+            llama_sampler_chain_add.invoke(chain, sampler);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to add top-k sampler", e);
+        }
+    }
+
+    public void addTopPSampler(MemorySegment chain, float p, long minKeep) {
+        try {
+            MemorySegment sampler = (MemorySegment) llama_sampler_init_top_p.invoke(p, minKeep);
+            llama_sampler_chain_add.invoke(chain, sampler);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to add top-p sampler", e);
+        }
+    }
+
+    public void addMinPSampler(MemorySegment chain, float p, long minKeep) {
+        try {
+            MemorySegment sampler = (MemorySegment) llama_sampler_init_min_p.invoke(p, minKeep);
+            llama_sampler_chain_add.invoke(chain, sampler);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to add min-p sampler", e);
+        }
+    }
+
+    public void addTempSampler(MemorySegment chain, float temp) {
+        try {
+            MemorySegment sampler = (MemorySegment) llama_sampler_init_temp.invoke(temp);
+            llama_sampler_chain_add.invoke(chain, sampler);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to add temp sampler", e);
+        }
+    }
+
+    public void addDistSampler(MemorySegment chain, int seed) {
+        try {
+            MemorySegment sampler = (MemorySegment) llama_sampler_init_dist.invoke(seed);
+            llama_sampler_chain_add.invoke(chain, sampler);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to add dist sampler", e);
+        }
+    }
+
+    public int sample(MemorySegment sampler, MemorySegment context, int index) {
+        try {
+            return (int) llama_sampler_sample.invoke(sampler, context, index);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to sample", e);
+        }
+    }
+
+    public void freeSampler(MemorySegment sampler) {
+        try {
+            llama_sampler_free.invoke(sampler);
+        } catch (Throwable e) {
+            log.error("Failed to free sampler", e);
+        }
+    }
+
+    // --- Extended Sampler Methods ---
+
+    /**
+     * Add penalties sampler (repeat, frequency, presence) to the chain.
+     * 
+     * @param penaltyLastN     last n tokens to penalize (0 = disable, -1 = context
+     *                         size)
+     * @param repeatPenalty    1.0 = disabled
+     * @param frequencyPenalty 0.0 = disabled
+     * @param presencePenalty  0.0 = disabled
+     */
+    public void addPenaltiesSampler(MemorySegment chain, int penaltyLastN,
+            float repeatPenalty, float frequencyPenalty, float presencePenalty) {
+        try {
+            checkHandle(llama_sampler_init_penalties, "llama_sampler_init_penalties");
+            MemorySegment sampler = (MemorySegment) llama_sampler_init_penalties.invoke(
+                    penaltyLastN, repeatPenalty, frequencyPenalty, presencePenalty);
+            llama_sampler_chain_add.invoke(chain, sampler);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to add penalties sampler", e);
+        }
+    }
+
+    /**
+     * Add Mirostat v1 sampler to the chain.
+     * 
+     * @param nVocab vocabulary size
+     * @param seed   RNG seed
+     * @param tau    target cross-entropy
+     * @param eta    learning rate
+     * @param m      number of tokens for s_hat estimation
+     */
+    public void addMirostatSampler(MemorySegment chain, int nVocab, int seed,
+            float tau, float eta, int m) {
+        try {
+            checkHandle(llama_sampler_init_mirostat, "llama_sampler_init_mirostat");
+            MemorySegment sampler = (MemorySegment) llama_sampler_init_mirostat.invoke(
+                    nVocab, seed, tau, eta, m);
+            llama_sampler_chain_add.invoke(chain, sampler);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to add mirostat sampler", e);
+        }
+    }
+
+    /**
+     * Add Mirostat v2 sampler to the chain.
+     * 
+     * @param seed RNG seed
+     * @param tau  target cross-entropy
+     * @param eta  learning rate
+     */
+    public void addMirostatV2Sampler(MemorySegment chain, int seed, float tau, float eta) {
+        try {
+            checkHandle(llama_sampler_init_mirostat_v2, "llama_sampler_init_mirostat_v2");
+            MemorySegment sampler = (MemorySegment) llama_sampler_init_mirostat_v2.invoke(seed, tau, eta);
+            llama_sampler_chain_add.invoke(chain, sampler);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to add mirostat v2 sampler", e);
+        }
+    }
+
+    /**
+     * Add grammar (GBNF) sampler to the chain for constrained output.
+     * 
+     * @param model       the model (used to get vocab)
+     * @param grammarStr  GBNF grammar string
+     * @param grammarRoot root rule name (typically "root")
+     */
+    public void addGrammarSampler(MemorySegment chain, MemorySegment model,
+            String grammarStr, String grammarRoot) {
+        try {
+            checkHandle(llama_sampler_init_grammar, "llama_sampler_init_grammar");
+            MemorySegment vocab = getVocab(model);
+            MemorySegment grammarStrSeg = arena.allocateFrom(grammarStr);
+            MemorySegment grammarRootSeg = arena.allocateFrom(grammarRoot);
+            MemorySegment sampler = (MemorySegment) llama_sampler_init_grammar.invoke(
+                    vocab, grammarStrSeg, grammarRootSeg);
+            if (sampler == null || sampler.equals(MemorySegment.NULL)) {
+                throw new RuntimeException(
+                        "Grammar parse failed for: " + grammarStr.substring(0, Math.min(80, grammarStr.length())));
+            }
+            llama_sampler_chain_add.invoke(chain, sampler);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to add grammar sampler", e);
+        }
+    }
+
+    /**
+     * Add typical sampling to the chain.
+     * 
+     * @param p       typical p value
+     * @param minKeep minimum tokens to keep
+     */
+    public void addTypicalSampler(MemorySegment chain, float p, long minKeep) {
+        try {
+            checkHandle(llama_sampler_init_typical, "llama_sampler_init_typical");
+            MemorySegment sampler = (MemorySegment) llama_sampler_init_typical.invoke(p, minKeep);
+            llama_sampler_chain_add.invoke(chain, sampler);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to add typical sampler", e);
+        }
+    }
+
+    /**
+     * Check if a token is an end-of-generation token (EOS, EOT, etc.).
+     */
+    public boolean isEndOfGeneration(MemorySegment model, int tokenId) {
+        try {
+            checkHandle(llama_vocab_is_eog, "llama_vocab_is_eog");
+            MemorySegment vocab = getVocab(model);
+            return (boolean) llama_vocab_is_eog.invoke(vocab, tokenId);
+        } catch (Throwable e) {
+            // Fallback: just check EOS
+            return tokenId == getEosToken(model);
+        }
+    }
+
+    // Batch Manipulation Helpers
+
+    public void setBatchSize(MemorySegment batch, int nTokens) {
+        batch.set(ValueLayout.JAVA_INT, 0, nTokens);
+    }
+
+    public void setBatchToken(MemorySegment batch, int index, int token, int pos, int seqId, boolean outputLogits) {
+        // Access pointers from struct
+        // Offset 8: token pointer (n_tokens 4 bytes + 4 bytes padding)
+        MemorySegment tokenPtr = batch.get(ValueLayout.ADDRESS, 8);
+        tokenPtr = tokenPtr.reinterpret(Long.MAX_VALUE);
+        tokenPtr.setAtIndex(ValueLayout.JAVA_INT, index, token);
+
+        // Offset 24: pos pointer (8 + 8 + 8) -> 0:n_tokens(4+4), 8:token, 16:embd,
+        // 24:pos
+        MemorySegment posPtr = batch.get(ValueLayout.ADDRESS, 24);
+        posPtr = posPtr.reinterpret(Long.MAX_VALUE);
+        posPtr.setAtIndex(ValueLayout.JAVA_INT, index, pos);
+
+        // Offset 32: n_seq_id pointer
+        MemorySegment nSeqIdPtr = batch.get(ValueLayout.ADDRESS, 32);
+        nSeqIdPtr = nSeqIdPtr.reinterpret(Long.MAX_VALUE);
+        nSeqIdPtr.setAtIndex(ValueLayout.JAVA_INT, index, 1); // We assume 1 sequence per token for now
+
+        // Offset 40: seq_id pointer (pointer to pointer)
+        MemorySegment seqIdPtr = batch.get(ValueLayout.ADDRESS, 40);
+        seqIdPtr = seqIdPtr.reinterpret(Long.MAX_VALUE);
+        MemorySegment seqIdsForToken = seqIdPtr.getAtIndex(ValueLayout.ADDRESS, index);
+        seqIdsForToken = seqIdsForToken.reinterpret(Long.MAX_VALUE);
+        seqIdsForToken.setAtIndex(ValueLayout.JAVA_INT, 0, seqId);
+
+        // Offset 48: logits pointer
+        MemorySegment logitsPtr = batch.get(ValueLayout.ADDRESS, 48);
+        logitsPtr = logitsPtr.reinterpret(Long.MAX_VALUE);
+        logitsPtr.setAtIndex(ValueLayout.JAVA_BYTE, index, (byte) (outputLogits ? 1 : 0));
     }
     // ===================================================================
     // Struct Accessors
@@ -579,6 +1088,38 @@ public class LlamaCppBinding {
 
     public Arena getArena() {
         return arena;
+    }
+
+    public String getModelMetadata(MemorySegment model, String key) {
+        try {
+            checkHandle(llama_model_meta_val_str, "llama_model_meta_val_str");
+
+            MemorySegment keySegment = arena.allocateFrom(key);
+
+            // First call to get size (buf_size = 0)
+            int size = (int) llama_model_meta_val_str.invoke(model, keySegment, MemorySegment.NULL, 0L);
+
+            if (size < 0) {
+                // Key not found
+                return null;
+            }
+
+            // Allocate buffer (+1 for null terminator just in case, though size usually
+            // includes it for C strings logic or we handle Java string creation)
+            // llama_model_meta_val_str returns length of string.
+            MemorySegment buf = arena.allocate(size + 1);
+
+            int result = (int) llama_model_meta_val_str.invoke(model, keySegment, buf, (long) (size + 1));
+
+            if (result < 0) {
+                return null;
+            }
+
+            return buf.getString(0);
+        } catch (Throwable e) {
+            log.warnf("Failed to get metadata key %s: %s", key, e.getMessage());
+            return null;
+        }
     }
 
     public void close() {

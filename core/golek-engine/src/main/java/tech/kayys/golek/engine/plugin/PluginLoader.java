@@ -126,9 +126,12 @@ public class PluginLoader {
     public Uni<Void> shutdownAll() {
         LOG.info("Shutting down all plugins...");
 
-        List<Uni<Void>> shutdowns = registry.getAllPlugins().stream()
-                .map(plugin -> plugin.shutdown()
-                        .onItem().invoke(() -> LOG.debugf("Shutdown plugin: %s", plugin.id()))
+        List<Uni<Void>> shutdowns = registry.all().stream()
+                .map(plugin -> Uni.createFrom().voidItem()
+                        .onItem().invoke(() -> {
+                            plugin.shutdown();
+                            LOG.debugf("Shutdown plugin: %s", plugin.id());
+                        })
                         .onFailure().invoke(error -> LOG.errorf(error, "Failed to shutdown plugin: %s", plugin.id())))
                 .toList();
 
@@ -143,9 +146,11 @@ public class PluginLoader {
     public Map<String, PluginHealth> checkAllHealth() {
         Map<String, PluginHealth> healthMap = new HashMap<>();
 
-        registry.getAllPlugins().forEach(plugin -> {
+        registry.all().forEach(plugin -> {
             try {
-                PluginHealth health = plugin.health();
+                boolean isHealthy = plugin.isHealthy();
+                PluginHealth health = isHealthy ? PluginHealth.healthy()
+                        : PluginHealth.unhealthy("Plugin reported unhealthy status");
                 healthMap.put(plugin.id(), health);
             } catch (Exception e) {
                 LOG.errorf(e, "Health check failed for plugin: %s", plugin.id());

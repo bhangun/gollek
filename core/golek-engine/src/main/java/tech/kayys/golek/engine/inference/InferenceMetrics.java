@@ -3,7 +3,8 @@ package tech.kayys.golek.engine.inference;
 import io.micrometer.core.instrument.*;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
@@ -11,7 +12,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Comprehensive metrics collection for inference operations.
- * 
+ *
  * <p>
  * Metrics Categories:
  * <ul>
@@ -22,16 +23,17 @@ import java.util.concurrent.atomic.AtomicLong;
  * <li>Runner metrics (per-runner performance)</li>
  * <li>Tenant metrics (per-tenant usage)</li>
  * </ul>
- * 
+ *
  * <p>
  * All metrics are exported to Prometheus via Micrometer.
- * 
- * @author bhangun
+ *
+ * @author Bhangun
  * @since 1.0.0
  */
 @ApplicationScoped
-@Slf4j
 public class InferenceMetrics {
+
+    private static final Logger log = LoggerFactory.getLogger(InferenceMetrics.class);
 
     @Inject
     MeterRegistry registry;

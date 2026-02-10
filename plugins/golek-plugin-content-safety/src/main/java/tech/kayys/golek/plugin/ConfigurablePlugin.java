@@ -1,49 +1,10 @@
 package tech.kayys.golek.plugin;
 
-import java.util.Map;
-
 /**
- * Plugin that supports dynamic configuration updates.
- * Allows runtime reconfiguration without restart.
+ * @deprecated This interface is redundant and should be deleted.
+ *             It has been superseded by
+ *             tech.kayys.golek.core.plugin.GolekConfigurablePlugin.
  */
-public interface ConfigurablePlugin extends GolekPlugin {
-
-    /**
-     * Update plugin configuration at runtime.
-     * 
-     * @param newConfig New configuration map
-     * @throws ConfigurationException if config is invalid
-     */
-    void onConfigUpdate(Map<String, Object> newConfig)
-            throws ConfigurationException;
-
-    /**
-     * Get current configuration
-     */
-    Map<String, Object> currentConfig();
-
-    /**
-     * Validate configuration without applying
-     */
-    default boolean validateConfig(Map<String, Object> config) {
-        try {
-            onConfigUpdate(config);
-            return true;
-        } catch (ConfigurationException e) {
-            return false;
-        }
-    }
-
-    /**
-     * Configuration exception
-     */
-    class ConfigurationException extends Exception {
-        public ConfigurationException(String message) {
-            super(message);
-        }
-
-        public ConfigurationException(String message, Throwable cause) {
-            super(message, cause);
-        }
-    }
+@Deprecated(since = "1.0.0", forRemoval = true)
+public interface ConfigurablePlugin {
 }

@@ -34,6 +34,7 @@ graph TD
 
 | Provider | Description | API Key Required |
 |----------|-------------|------------------|
+| `litert` | Local LiteRT (TFLite) models | No |
 | `gguf` | Local GGUF models via llama.cpp | No |
 | `ollama` | Ollama local server | No |
 | `gemini` | Google Gemini | Yes |
@@ -62,6 +63,7 @@ Production-ready CLI inspired by Ollama CLI with full provider support.
 
 | Provider | Description | API Key |
 |----------|-------------|---------|
+| `litert` | Local LiteRT (TFLite) | No |
 | `gguf` | Local GGUF via llama.cpp | No |
 | `ollama` | Ollama server | No |
 | `gemini` | Google Gemini | Yes |
@@ -89,6 +91,8 @@ cd inference-golek && mvn clean package -pl ui/golek-cli -am
 # List providers
 java -jar ui/golek-cli/target/quarkus-app/quarkus-run.jar providers
 
+java -jar target/golek-cli-1.0.0-SNAPSHOT-runner.jar run --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct --prompt "Hello"
+
 # Run with different providers
 java -jar ui/golek-cli/target/quarkus-app/quarkus-run.jar run \
   --provider openai --model gpt-4 --prompt "Hello"
@@ -101,6 +105,51 @@ java -jar ui/golek-cli/target/quarkus-app/quarkus-run.jar run \
 ```
 
 
+```bash
+# First run - downloads
+$ golek run --model Qwen/Qwen2.5-0.5B-Instruct --prompt "Hi"
+Checking model: Qwen/Qwen2.5-0.5B-Instruct... not found locally.
+Attempting to download from Hugging Face...
+Downloading: ████████████████████ 100% (468/468 MB)
+✓ Model saved to: /Users/bhangun/.golek/models/gguf/Qwen_Qwen2.5-0.5B-Instruct-GGUF
+Model path: /Users/bhangun/.golek/models/gguf/Qwen_Qwen2.5-0.5B-Instruct-GGUF
+[inference output]
+
+# Second run - uses existing
+$ golek run --model Qwen/Qwen2.5-0.5B-Instruct --prompt "Hi"
+Checking model: Qwen/Qwen2.5-0.5B-Instruct... found local variant: Qwen/Qwen2.5-0.5B-Instruct-GGUF
+Model path: /Users/bhangun/.golek/models/gguf/Qwen_Qwen2.5-0.5B-Instruct-GGUF
+[inference output]
+
+# Using custom path
+$ golek run --model-path /my/models/custom.gguf --prompt "Hi"
+Using model from: /my/models/custom.gguf
+[inference output]
+
+# Ctrl+C - exits immediately
+$ golek run --model Qwen/Qwen2.5-0.5B-Instruct --prompt "Hi"
+Downloading: ████░░░░░░░░░░░░░░░░ 20% (94/468 MB)^C
+✗ Download cancelled
+```
+
+## Build and Run
+```bash
+cd inference-golek
+mvn clean package -pl ui/golek-cli -am -DskipTests
+java -jar ui/golek-cli/target/golek-cli-*-runner.jar chat -m <model> --session
+
+```
+
+```bash
+# Interactive chat with session (KV cache enabled)
+golek chat --model Qwen/Qwen2.5-0.5B-Instruct --session
+
+# Chat with function calling model
+golek chat --model <tool-model> --session
+# Then type: "What's the weather in Jakarta?"
+# Output: [Tool Call] get_weather({"city": "Jakarta"})
+```
+
 ## Proposed Changes
 
 ### Build Configuration
@@ -112,7 +161,7 @@ Add dependencies for all providers and model repository:
 - `golek-provider-ollama` - Ollama provider
 - `golek-provider-gemini` - Gemini provider
 - `golek-provider-huggingface` - HuggingFace for model downloads
-- `golek-adapter-gguf` - Local GGUF inference
+- `golek-inference-gguf` - Local GGUF inference
 
 ---
 
@@ -123,7 +172,7 @@ Update to include all subcommands.
 
 #### [MODIFY] [RunCommand.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/RunCommand.java)
 Enhanced run command with:
-- `--provider` option to select provider (gguf, ollama, gemini)
+- `--provider` option to select provider (litert, gguf, ollama, gemini)
 - `--stream` flag for streaming output
 - `--temperature`, `--max-tokens` options
 
@@ -210,6 +259,7 @@ java -jar ui/golek-cli/target/quarkus-app/quarkus-run.jar run \
 # Run with GGUF
 java -jar ui/golek-cli/target/quarkus-app/quarkus-run.jar run \
   --provider gguf --model /path/to/model.gguf --prompt "Hello"
+  --provider litert --model /path/to/model.tflite --prompt "Hello"
 
 # Pull model from Ollama
 java -jar ui/golek-cli/target/quarkus-app/quarkus-run.jar pull ollama:llama2

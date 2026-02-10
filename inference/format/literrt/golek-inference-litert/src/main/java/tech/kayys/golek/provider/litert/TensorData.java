@@ -8,7 +8,7 @@ import lombok.*;
 /**
  * Platform-agnostic tensor representation.
  * 
- * @author bhangun
+ * @author Bhangun
  * @since 1.0.0
  */
 @Data

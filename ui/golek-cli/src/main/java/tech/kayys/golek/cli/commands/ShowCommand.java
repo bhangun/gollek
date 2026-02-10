@@ -1,5 +1,6 @@
 package tech.kayys.golek.cli.commands;
 
+import io.quarkus.arc.Unremovable;
 import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
@@ -14,8 +15,9 @@ import java.util.Optional;
  * Show model details using GolekSdk.
  * Usage: golek show <model-id>
  */
-@Command(name = "show", description = "Show model details")
 @Dependent
+@Unremovable
+@Command(name = "show", description = "Show details for a specific model")
 public class ShowCommand implements Runnable {
 
     @Inject
@@ -23,9 +25,6 @@ public class ShowCommand implements Runnable {
 
     @Parameters(index = "0", description = "Model ID to show")
     String modelId;
-
-    @Option(names = { "-t", "--tenant" }, description = "Tenant ID", defaultValue = "default")
-    String tenantId;
 
     @Override
     public void run() {
@@ -51,7 +50,6 @@ public class ShowCommand implements Runnable {
         System.out.printf("ID:       %s%n", model.getModelId());
         System.out.printf("Name:     %s%n", model.getName() != null ? model.getName() : "N/A");
         System.out.printf("Version:  %s%n", model.getVersion() != null ? model.getVersion() : "N/A");
-        System.out.printf("Tenant:   %s%n", model.getTenantId() != null ? model.getTenantId() : "default");
         System.out.printf("Format:   %s%n", model.getFormat() != null ? model.getFormat() : "N/A");
         System.out.printf("Size:     %s%n", model.getSizeFormatted());
         if (model.getQuantization() != null) {

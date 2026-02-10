@@ -5,11 +5,12 @@ import io.quarkus.redis.datasource.hash.HashCommands;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.inference.AsyncJobStatus;
 import tech.kayys.golek.engine.inference.InferenceOrchestrator;
-import tech.kayys.golek.engine.inference.InferenceService.AsyncJobStatus;
 import tech.kayys.wayang.tenant.TenantContext;
 
 import java.time.Duration;
@@ -19,7 +20,7 @@ import java.util.concurrent.*;
 
 /**
  * Manager for asynchronous inference jobs.
- * 
+ *
  * <p>
  * Features:
  * <ul>
@@ -29,13 +30,14 @@ import java.util.concurrent.*;
  * <li>Result caching with TTL</li>
  * <li>Automatic cleanup of old jobs</li>
  * </ul>
- * 
- * @author bhangun
+ *
+ * @author Bhangun
  * @since 1.0.0
  */
 @ApplicationScoped
-@Slf4j
 public class AsyncJobManager {
+
+    private static final Logger log = LoggerFactory.getLogger(AsyncJobManager.class);
 
     @Inject
     InferenceOrchestrator orchestrator;
@@ -118,7 +120,7 @@ public class AsyncJobManager {
         AsyncJobStatus status = new AsyncJobStatus(
                 jobId,
                 request.getRequestId(),
-                request.getTenantId(),
+                resolveTenantId(request.getTenantId()),
                 "PENDING",
                 null,
                 null,
@@ -202,13 +204,8 @@ public class AsyncJobManager {
                 try {
                     // Execute inference via orchestrator directly
                     InferenceResponse response = orchestrator
-                            .execute(job.request.getModel(), job.request, TenantContext.of(job.request.getRequestId())); // Using
-                                                                                                                         // requestId
-                                                                                                                         // as
-                                                                                                                         // placeholder
-                                                                                                                         // if
-                                                                                                                         // tenantId
-                                                                                                                         // missing
+                            .execute(job.request.getModel(), job.request,
+                                    TenantContext.of(resolveTenantId(job.request.getTenantId())));
 
                     // Store result
                     updateStatus(job.jobId, "COMPLETED", response, null);
@@ -228,6 +225,10 @@ public class AsyncJobManager {
                 log.error("Worker thread error", e);
             }
         }
+    }
+
+    private String resolveTenantId(String tenantId) {
+        return tenantId != null && !tenantId.trim().isEmpty() ? tenantId : "community";
     }
 
     /**

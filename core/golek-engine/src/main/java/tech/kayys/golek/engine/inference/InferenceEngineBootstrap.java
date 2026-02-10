@@ -7,27 +7,22 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import tech.kayys.golek.spi.context.EngineContext;
-import tech.kayys.golek.spi.plugin.GolekPlugin;
 import tech.kayys.golek.spi.plugin.PluginContext;
 import tech.kayys.golek.spi.plugin.PluginRegistry;
 import tech.kayys.golek.spi.plugin.PluginHealth;
 import tech.kayys.golek.core.inference.InferenceEngine;
 import tech.kayys.golek.engine.plugin.PluginLoader;
 import tech.kayys.golek.engine.context.DefaultEngineContext;
-import tech.kayys.golek.spi.model.HealthStatus;
-
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
-/* import tech.kayys.golek.provider.core.plugin.PluginLoader;
-import tech.kayys.golek.provider.core.plugin.PluginRegistry;
-import tech.kayys.golek.provider.core.plugin.PluginContext;
-import tech.kayys.golek.provider.core.plugin.DefaultPluginContext;
-import tech.kayys.golek.provider.core.plugin.PluginHealth;
-import tech.kayys.golek.provider.core.plugin.DefaultPluginRegistry;
- */
+
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -78,7 +73,9 @@ public class InferenceEngineBootstrap {
      * Bootstrap on application startup
      */
     void onStart(@Observes StartupEvent event) {
+        System.out.println("DEBUG: InferenceEngineBootstrap.onStart entered");
         if (!engineEnabled) {
+            System.out.println("DEBUG: Inference engine disabled");
             LOG.warn("Inference engine is disabled");
             return;
         }
@@ -92,23 +89,35 @@ public class InferenceEngineBootstrap {
 
         try {
             // Validate configuration first
+            System.out.println("DEBUG: Validating configuration");
             validateConfiguration();
 
+            System.out.println("DEBUG: Awaiting bootstrap...");
             bootstrap().await().atMost(startupTimeout);
+            System.out.println("DEBUG: Bootstrap completed");
 
             Duration elapsed = Duration.between(start, Instant.now());
-            LOG.infof("✓ Inference engine started successfully in %d ms", elapsed.toMillis());
+            System.out.println("DEBUG: Calculated elapsed time: " + elapsed.toMillis() + "ms");
+
+            // LOG.infof("✓ Inference engine started successfully in %d ms",
+            // elapsed.toMillis());
+            System.out.println("DEBUG: Logging success message (skipped LOG.infof to avoid hang)");
 
             // Log metrics
+            System.out.println("DEBUG: Calling collectMetrics()");
             collectMetrics();
+            System.out.println("DEBUG: collectMetrics() returned");
 
             LOG.info("========================================");
 
             initialized = true;
-        } catch (Exception e) {
-            LOG.error("========================================");
-            LOG.error("✗ Failed to start inference engine", e);
-            LOG.error("========================================");
+            System.out.println("DEBUG: InferenceEngineBootstrap initialized");
+        } catch (Throwable e) {
+            System.out.println("DEBUG: InferenceEngineBootstrap failed: " + e.getMessage());
+            e.printStackTrace();
+            // LOG.error("========================================");
+            // LOG.error("✗ Failed to start inference engine", e);
+            // LOG.error("========================================");
             throw new RuntimeException("Inference engine startup failed", e);
         }
     }

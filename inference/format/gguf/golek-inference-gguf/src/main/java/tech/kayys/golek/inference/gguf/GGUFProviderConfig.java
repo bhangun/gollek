@@ -17,10 +17,24 @@ import java.util.Optional;
 public interface GGUFProviderConfig {
 
     /**
+     * Enable GGUF provider
+     */
+    @WithName("enabled")
+    @WithDefault("true")
+    boolean enabled();
+
+    /**
+     * Enable verbose native debug logging (Metal/CUDA pipeline info)
+     */
+    @WithName("verbose-logging")
+    @WithDefault("false")
+    boolean verboseLogging();
+
+    /**
      * Base directory for GGUF model files
      */
     @WithName("model.base-path")
-    @WithDefault("/var/lib/golek/models/gguf")
+    @WithDefault("${user.home}/.golek/models/gguf")
     String modelBasePath();
 
     /**
@@ -99,6 +113,20 @@ public interface GGUFProviderConfig {
     @WithName("session.pool.idle-timeout")
     @WithDefault("PT5M")
     Duration sessionPoolIdleTimeout();
+
+    /**
+     * Convenience: session timeout in minutes
+     */
+    default long sessionTimeoutMinutes() {
+        return sessionPoolIdleTimeout().toMinutes();
+    }
+
+    /**
+     * Convenience: max sessions alias
+     */
+    default int maxSessions() {
+        return sessionPoolMaxSize();
+    }
 
     /**
      * Maximum concurrent inference requests
@@ -182,6 +210,13 @@ public interface GGUFProviderConfig {
     @WithName("generation.repeat-penalty")
     @WithDefault("1.1")
     float defaultRepeatPenalty();
+
+    /**
+     * Default for JSON-only mode
+     */
+    @WithName("generation.json-mode")
+    @WithDefault("true")
+    boolean defaultJsonMode();
 
     /**
      * Default repeat last N tokens

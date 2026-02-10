@@ -18,7 +18,7 @@ import java.util.Arrays;
  * ✅ Type-safe tensor conversions
  * ✅ Comprehensive tensor validation
  * 
- * @author bhangun
+ * @author Bhangun
  * @since 1.1.0
  */
 @Slf4j

@@ -4,8 +4,9 @@ import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.provider.ProviderRequest;
+import tech.kayys.golek.spi.provider.StreamingProvider;
 import tech.kayys.golek.spi.stream.StreamChunk;
-import tech.kayys.golek.provider.core.spi.StreamingProvider;
+
 import tech.kayys.golek.provider.core.streaming.ChunkProcessor;
 import tech.kayys.golek.provider.core.streaming.StreamHandler;
 import tech.kayys.wayang.tenant.TenantContext;
@@ -23,13 +24,13 @@ public abstract class StreamingAdapter extends AbstractProvider implements Strea
     protected volatile ChunkProcessor chunkProcessor;
 
     @Override
-    public Multi<StreamChunk> stream(ProviderRequest request, TenantContext context) {
+    public Multi<StreamChunk> inferStream(ProviderRequest request, TenantContext context) {
         if (!isInitialized()) {
             return Multi.createFrom().failure(
                     new IllegalStateException("Provider not initialized"));
         }
 
-        String tenantId = context != null ? context.getTenantId().value() : "default";
+        String tenantId = context != null ? context.getTenantId().value() : "community";
 
         return checkQuota(context)
                 .chain(() -> checkRateLimit(tenantId))

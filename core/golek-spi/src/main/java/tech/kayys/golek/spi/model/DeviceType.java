@@ -8,7 +8,7 @@ package tech.kayys.golek.spi.model;
  * device types, with automatic selection based on availability,
  * cost, and performance requirements.
  * 
- * @author bhangun
+ * @author Bhangun
  * @since 1.0.0
  */
 public enum DeviceType {

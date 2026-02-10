@@ -1,29 +1,74 @@
-# Golek Engine (Execution)
+# Model Storage Service
 
-This module implements the runtime execution engine, routing, and provider orchestration.
+The ModelStorageService provides a unified interface for storing and retrieving model files across multiple storage backends.
 
-## Key Capabilities
+## Features
 
-* Inference orchestration + state machine
-* Model routing and provider selection
-* Optional quota enforcement and tenant isolation
-* Observability + runtime metrics
+- **Multi-Backend Support**: Supports AWS S3, Google Cloud Storage, Azure Blob Storage, and local filesystem
+- **Panache Repository Pattern**: Implements Quarkus Panache repository pattern for database operations
+- **Configuration Driven**: Fully configurable through application properties
+- **Reactive Programming**: Uses Mutiny for reactive operations
+- **Comprehensive Error Handling**: Proper validation and error handling
 
-## Key Paths
+## Storage Providers
 
-* Engine: `inference-golek/core/golek-engine/src/main/java/tech/kayys/golek/engine/inference/`
-* Routing: `inference-golek/core/golek-engine/src/main/java/tech/kayys/golek/engine/routing/`
-* Models: `inference-golek/core/golek-engine/src/main/java/tech/kayys/golek/engine/model/`
-* Quota/Tenant: `inference-golek/core/golek-engine/src/main/java/tech/kayys/golek/engine/tenant/`
-* Observability: `inference-golek/core/golek-engine/src/main/java/tech/kayys/golek/engine/observability/`
+### AWS S3
+- Configurable bucket, region, and credentials
+- S3-compatible services (like MinIO) support
+- Proper AWS SDK integration
 
-## Multi-Tenancy Toggle
+### Google Cloud Storage
+- Full GCS integration with Google Cloud SDK
+- Configurable bucket and project settings
 
-By default, the engine runs in single-tenant mode and does not require `X-Tenant-ID`.
+### Azure Blob Storage
+- Complete Azure Blob Storage implementation
+- Connection string-based authentication
 
-Enable enterprise multi-tenancy by adding the `tenant-golek-ext` dependency or by setting:
+### Local Storage
+- Filesystem-based storage for development
+- Configurable base path
+
+## Repository Pattern
+
+The ModelRepository implements the Panache repository pattern with custom finder methods:
+- `findByTenantAndModelId()` - Find model by tenant and model ID
+- `findByTenant()` - Find models by tenant
+- `findByStage()` - Find models by stage
+- `findById()` - Find model by ID
+
+## Configuration
+
+Configure the storage provider in your application.properties:
+
+```properties
+# Storage provider (local, s3, gcs, azure)
+inference.model-storage.provider=local
+
+# Local storage
+inference.model-storage.local.base-path=/var/lib/inference/models
+
+# S3 configuration
+inference.model-storage.s3.bucket=ml-models
+inference.model-storage.s3.region=us-east-1
+inference.model-storage.s3.path-prefix=models/
+inference.model-storage.s3.access-key-id=your-access-key
+inference.model-storage.s3.secret-access-key=your-secret-key
+inference.model-storage.s3.endpoint=https://s3.amazonaws.com  # For custom S3-compatible services
+
+# GCS configuration
+inference.model-storage.gcs.bucket=ml-models
+inference.model-storage.gcs.project-id=your-project-id
+
+# Azure configuration
+inference.model-storage.azure.container=ml-models
+inference.model-storage.azure.connection-string=your-connection-string
 ```
-wayang.multitenancy.enabled=true
-```
 
-When enabled, API endpoints enforce tenant headers and tenant-specific routing/quota behaviors are activated.
+## Usage
+
+The service provides the following operations:
+- `uploadModel()` - Upload model to storage
+- `downloadModel()` - Download model from storage
+- `deleteModel()` - Delete model from storage
+- `modelExists()` - Check if model exists in storage

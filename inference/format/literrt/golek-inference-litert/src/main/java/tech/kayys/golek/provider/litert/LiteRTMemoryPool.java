@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * ✅ Automatic cleanup
  * ✅ Memory usage tracking
  * 
- * @author bhangun
+ * @author Bhangun
  * @since 1.1.0
  */
 @Slf4j

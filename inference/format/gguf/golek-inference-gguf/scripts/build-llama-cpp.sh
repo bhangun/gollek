@@ -10,7 +10,7 @@ case $0 in
 esac
 
 # Normalize potential relative paths
-VENDOR_DIR="$BASE_DIR/../../vendor/llama-cpp"
+VENDOR_DIR="$BASE_DIR/../vendor/llama-cpp"
 BUILD_DIR="$BASE_DIR/target/llama-cpp-build"
 OUTPUT_DIR="$BASE_DIR/target/llama-cpp/lib"
 

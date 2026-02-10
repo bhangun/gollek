@@ -2,10 +2,19 @@ package tech.kayys.golek.engine.routing;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.engine.model.ModelRegistryService;
+import tech.kayys.golek.engine.model.ModelRunner;
+import tech.kayys.golek.engine.model.ModelRunnerFactory;
+import tech.kayys.golek.engine.routing.policy.SelectionPolicy;
+import tech.kayys.golek.provider.core.exception.RetryableException;
+import tech.kayys.golek.spi.error.ErrorCode;
+import tech.kayys.golek.spi.exception.DeviceException;
 import tech.kayys.golek.spi.exception.InferenceException;
+import tech.kayys.golek.spi.exception.ModelException;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -20,7 +29,7 @@ import java.util.stream.Collectors;
 
 /**
  * Intelligent router for selecting and executing the optimal model runner.
- * 
+ *
  * <p>
  * Routing Strategy:
  * <ul>
@@ -30,13 +39,14 @@ import java.util.stream.Collectors;
  * <li>Implement fallback chain on failure</li>
  * <li>Track performance for future decisions</li>
  * </ul>
- * 
- * @author bhangun
+ *
+ * @author Bhangun
  * @since 1.0.0
  */
 @ApplicationScoped
-@Slf4j
 public class ModelRouter {
+
+    private static final Logger log = LoggerFactory.getLogger(ModelRouter.class);
 
     @Inject
     ModelRunnerFactory runnerFactory;
@@ -65,10 +75,12 @@ public class ModelRouter {
      */
     public InferenceResponse route(InferenceRequest request) throws InferenceException {
         log.info("Routing inference request: modelId={}, requestId={}",
-                request.getModelId(), request.getRequestId());
+                request.getModel(), request.getRequestId());
 
         // 1. Get model manifest
-        ModelManifest manifest = getModelManifest(request.getModelId());
+        // Using tenantId from request, default to "community" if null
+        String tenantId = request.getTenantId() != null ? request.getTenantId() : "community";
+        ModelManifest manifest = getModelManifest(tenantId, request.getModel());
 
         // 2. Select runner candidates
         List<String> candidates = selectRunnerCandidates(request, manifest);
@@ -76,7 +88,7 @@ public class ModelRouter {
         if (candidates.isEmpty()) {
             throw new InferenceException(
                     ErrorCode.RUNTIME_INVALID_STATE,
-                    "No suitable runners found for model: " + request.getModelId());
+                    "No suitable runners found for model: " + request.getModel());
         }
 
         log.debug("Runner candidates: {}", candidates);
@@ -117,7 +129,7 @@ public class ModelRouter {
                 InferenceResponse response = runner.infer(request);
 
                 log.info("Inference successful: runner={}, latencyMs={}",
-                        runnerName, response.getLatencyMs());
+                        runnerName, response.getDurationMs());
 
                 return response;
 
@@ -143,7 +155,7 @@ public class ModelRouter {
         // All runners failed
         throw new InferenceException(
                 ErrorCode.ALL_RUNNERS_FAILED,
-                "All " + attempts + " runner attempts failed for model: " + request.getModelId(),
+                "All " + attempts + " runner attempts failed for model: " + request.getModel(),
                 lastException).addContext("attempts", attempts)
                 .addContext("candidates", candidates);
     }
@@ -152,7 +164,8 @@ public class ModelRouter {
      * Select runner for streaming inference.
      */
     public ModelRunner selectRunner(InferenceRequest request, boolean requiresStreaming) {
-        ModelManifest manifest = getModelManifest(request.getModelId());
+        String tenantId = request.getTenantId() != null ? request.getTenantId() : "community";
+        ModelManifest manifest = getModelManifest(tenantId, request.getModel());
         List<String> candidates = selectRunnerCandidates(request, manifest);
 
         for (String runnerName : candidates) {
@@ -181,8 +194,8 @@ public class ModelRouter {
      */
     private List<String> selectRunnerCandidates(InferenceRequest request, ModelManifest manifest) {
         // 1. Check explicit preference
-        if (request.getPreferredRunner() != null && !request.getPreferredRunner().isEmpty()) {
-            String preferred = request.getPreferredRunner();
+        String preferred = request.getPreferredProvider().orElse(null);
+        if (preferred != null && !preferred.isEmpty()) {
 
             // Validate runner exists and supports model
             if (isRunnerCompatible(preferred, manifest)) {
@@ -202,7 +215,7 @@ public class ModelRouter {
                 return candidates;
             } else {
                 log.warn("Preferred runner {} is not compatible with model {}",
-                        preferred, manifest.getName());
+                        preferred, manifest.name());
             }
         }
 
@@ -217,6 +230,29 @@ public class ModelRouter {
         return selectionPolicy.rankRunners(request, manifest, compatibleRunners);
     }
 
+    // ...
+    /**
+     * Check if runner is compatible with model.
+     */
+    private boolean isRunnerCompatible(String runnerName, ModelManifest manifest) {
+        try {
+            // Extract framework from runner name (e.g., "litert-cpu" -> "litert")
+            String framework = extractFramework(runnerName);
+
+            // Check if manifest supports this framework
+            // Assuming framework string can be matched against keys in artifacts map
+            return manifest.artifacts().keySet().stream()
+                    .anyMatch(format -> framework.equalsIgnoreCase(format.name()));
+        } catch (Exception e) {
+            log.warn("Error checking compatibility for runner {}: {}", runnerName, e.getMessage());
+            return false;
+        }
+    }
+
+    // ...
+    /**
+     * Get runners compatible with model manifest.
+     */
     /**
      * Get runners compatible with model manifest.
      */
@@ -240,23 +276,6 @@ public class ModelRouter {
     }
 
     /**
-     * Check if runner is compatible with model.
-     */
-    private boolean isRunnerCompatible(String runnerName, ModelManifest manifest) {
-        try {
-            // Extract framework from runner name (e.g., "litert-cpu" -> "litert")
-            String framework = extractFramework(runnerName);
-
-            // Check if manifest supports this framework
-            return manifest.getSupportedFormats() != null &&
-                    manifest.getSupportedFormats().contains(framework);
-        } catch (Exception e) {
-            log.warn("Error checking compatibility for runner {}: {}", runnerName, e.getMessage());
-            return false;
-        }
-    }
-
-    /**
      * Extract framework name from runner name.
      */
     private String extractFramework(String runnerName) {
@@ -271,14 +290,14 @@ public class ModelRouter {
     /**
      * Get model manifest from registry.
      */
-    private ModelManifest getModelManifest(String modelId) {
+    private ModelManifest getModelManifest(String tenantId, String modelId) {
         try {
             // Parse model ID (format: "name:version" or just "name")
             String[] parts = modelId.split(":");
             String modelName = parts[0];
             String version = parts.length > 1 ? parts[1] : "latest";
 
-            ModelManifest manifest = registryService.getManifest(modelName, version);
+            ModelManifest manifest = registryService.getManifest(tenantId, modelName, version).await().indefinitely();
 
             if (manifest == null) {
                 throw new ModelException(

@@ -462,7 +462,7 @@ public final class GGUFNative {
 
     /**
      * Request cancellation.
-     * 
+     *
      * @param ctx context handle
      */
     public static void cancel(MemorySegment ctx) {

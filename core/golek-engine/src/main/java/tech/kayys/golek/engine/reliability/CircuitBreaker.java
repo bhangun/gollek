@@ -45,9 +45,17 @@ public interface CircuitBreaker {
      * Circuit breaker metrics
      */
     interface CircuitBreakerMetrics {
+        State state();
+
         boolean isCallPermitted();
 
         int getFailureCount();
+
+        int getSuccessCount();
+
+        int getTotalRequests();
+
+        double failureRate();
 
         long estimatedRecoveryTimeMs();
     }

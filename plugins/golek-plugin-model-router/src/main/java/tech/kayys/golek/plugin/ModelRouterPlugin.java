@@ -1,10 +1,12 @@
 package tech.kayys.golek.plugin;
 
-import tech.kayys.golek.inference.kernel.plugin.InferencePhasePlugin;
-import tech.kayys.golek.inference.kernel.plugin.InferencePhasePlugin.PluginException;
-import tech.kayys.golek.inference.kernel.engine.EngineContext;
-import tech.kayys.golek.inference.kernel.execution.ExecutionContext;
-import tech.kayys.golek.inference.kernel.pipeline.InferencePhase;
+import tech.kayys.golek.core.plugin.InferencePhasePlugin;
+import tech.kayys.golek.core.plugin.GolekConfigurablePlugin;
+import tech.kayys.golek.spi.plugin.PluginContext;
+import tech.kayys.golek.spi.plugin.PluginException;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.core.execution.ExecutionContext;
+import tech.kayys.golek.spi.inference.InferencePhase;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -37,7 +39,7 @@ public class ModelRouterPlugin implements InferencePhasePlugin {
     }
 
     @Override
-    public void initialize(EngineContext context) {
+    public void initialize(PluginContext context) {
         System.out.println("Model Router Plugin initialized");
     }
 
@@ -55,8 +57,8 @@ public class ModelRouterPlugin implements InferencePhasePlugin {
                 throw new PluginException("Model ID is required for routing");
             }
 
-            // Get tenant context
-            String tenantId = context.tenantContext().getTenantId();
+            // Get tenant context - TenantId is a record with value()
+            String tenantId = context.tenantContext().getTenantId().value();
 
             // Extract additional context for routing decisions
             Map<String, Object> requestContext = extractRequestContext(context);
@@ -82,9 +84,6 @@ public class ModelRouterPlugin implements InferencePhasePlugin {
             context.putMetadata("routingScore", routingDecision.getScore());
             context.putMetadata("routingTimestamp", routingDecision.getTimestamp());
 
-            System.out.printf("Model %s routed to provider %s with score %.2f%n",
-                            modelId, selectedProviderId, routingDecision.getScore());
-
         } catch (Exception e) {
             // Log the error but don't expose internal details to the client
             System.err.println("Error during model routing: " + e.getMessage());
@@ -97,9 +96,19 @@ public class ModelRouterPlugin implements InferencePhasePlugin {
         }
     }
 
+    @Override
+    public void onConfigUpdate(Map<String, Object> newConfig) throws GolekConfigurablePlugin.ConfigurationException {
+        // No implementation needed for this plugin yet
+    }
+
+    @Override
+    public Map<String, Object> currentConfig() {
+        return java.util.Collections.emptyMap();
+    }
+
     private String extractModelId(ExecutionContext context) {
         // Try multiple sources for model ID
-        Object modelObj = context.variables().get("modelId");
+        Object modelObj = context.getVariable("modelId", Object.class).orElse(null);
         if (modelObj != null) {
             return modelObj.toString();
         }
@@ -110,7 +119,7 @@ public class ModelRouterPlugin implements InferencePhasePlugin {
         }
 
         // Try to get from a more generic 'model' field
-        modelObj = context.variables().get("model");
+        modelObj = context.getVariable("model", Object.class).orElse(null);
         if (modelObj != null) {
             return modelObj.toString();
         }
@@ -127,23 +136,23 @@ public class ModelRouterPlugin implements InferencePhasePlugin {
         Map<String, Object> requestContext = new java.util.HashMap<>();
 
         // Extract relevant context for routing decisions
-        Object priority = context.variables().get("priority");
+        Object priority = context.getVariable("priority", Object.class).orElse(null);
         if (priority != null) {
             requestContext.put("priority", priority);
         }
 
-        Object maxTokens = context.variables().get("max_tokens");
+        Object maxTokens = context.getVariable("max_tokens", Object.class).orElse(null);
         if (maxTokens != null) {
             requestContext.put("max_tokens", maxTokens);
         }
 
-        Object temperature = context.variables().get("temperature");
+        Object temperature = context.getVariable("temperature", Object.class).orElse(null);
         if (temperature != null) {
             requestContext.put("temperature", temperature);
         }
 
         // Add any other relevant context for routing
-        Object requestSize = context.variables().get("request_size");
+        Object requestSize = context.getVariable("request_size", Object.class).orElse(null);
         if (requestSize != null) {
             requestContext.put("request_size", requestSize);
         }

@@ -37,22 +37,22 @@ public class InferenceOrchestrator {
         /**
          * Execute inference with automatic runner selection and fallback (async)
          */
-    public io.smallrye.mutiny.Uni<InferenceResponse> executeAsync(
-            String modelId,
-            InferenceRequest request,
-            TenantContext tenantContext) {
-        TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
-        var span = Span.current();
-        span.setAttribute("model.id", modelId);
-        span.setAttribute("tenant.id", effectiveTenantContext.getTenantId().value());
+        public io.smallrye.mutiny.Uni<InferenceResponse> executeAsync(
+                        String modelId,
+                        InferenceRequest request,
+                        TenantContext tenantContext) {
+                TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
+                var span = Span.current();
+                span.setAttribute("model.id", modelId);
+                span.setAttribute("tenant.id", effectiveTenantContext.getTenantId().value());
 
-        LOG.infof("Orchestrating inference for model %s (tenant: %s)",
-                        modelId, effectiveTenantContext.getTenantId().value());
+                LOG.infof("Orchestrating inference for model %s (tenant: %s)",
+                                modelId, effectiveTenantContext.getTenantId().value());
 
-        return router.route(modelId, request, effectiveTenantContext)
-                        .onItem().invoke(response -> {
-                                metrics.recordSuccess("unified", modelId, 0); // Latency recorded in router
-                        })
+                return router.route(modelId, request, effectiveTenantContext)
+                                .onItem().invoke(response -> {
+                                        metrics.recordSuccess("unified", modelId, 0); // Latency recorded in router
+                                })
                                 .onFailure().invoke(error -> {
                                         metrics.recordFailure("unified", modelId, error.getClass().getSimpleName());
                                         LOG.errorf(error, "Inference orchestration failed for model %s", modelId);
@@ -62,29 +62,29 @@ public class InferenceOrchestrator {
         /**
          * Execute inference with automatic runner selection and fallback (sync)
          */
-    public InferenceResponse execute(
-            String modelId,
-            InferenceRequest request,
-            TenantContext tenantContext) {
-        LOG.debugf("Starting synchronous inference for model: %s", modelId);
+        public InferenceResponse execute(
+                        String modelId,
+                        InferenceRequest request,
+                        TenantContext tenantContext) {
+                LOG.debugf("Starting synchronous inference for model: %s", modelId);
 
-        return executeAsync(modelId, request, tenantContext)
-                        .await().indefinitely(); // Note: Use with caution in reactive contexts
-    }
+                return executeAsync(modelId, request, tenantContext)
+                                .await().indefinitely(); // Note: Use with caution in reactive contexts
+        }
 
         /**
          * Execute streaming inference with automatic runner selection
          */
-    public Multi<StreamChunk> streamExecute(
-            String modelId,
-            InferenceRequest request,
-            TenantContext tenantContext) {
-        TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
-        LOG.infof("Streaming inference orchestration for model %s", modelId);
-        return router.routeStream(modelId, request, effectiveTenantContext);
-    }
+        public Multi<StreamChunk> streamExecute(
+                        String modelId,
+                        InferenceRequest request,
+                        TenantContext tenantContext) {
+                TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
+                LOG.infof("Streaming inference orchestration for model %s", modelId);
+                return router.routeStream(modelId, request, effectiveTenantContext);
+        }
 
-    private TenantContext ensureTenantContext(TenantContext tenantContext) {
-        return tenantContext != null ? tenantContext : TenantContext.of("default");
-    }
+        private TenantContext ensureTenantContext(TenantContext tenantContext) {
+                return tenantContext != null ? tenantContext : TenantContext.of("community");
+        }
 }

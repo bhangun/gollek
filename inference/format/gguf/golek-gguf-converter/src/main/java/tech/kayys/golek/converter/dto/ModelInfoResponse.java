@@ -170,4 +170,95 @@ public class ModelInfoResponse {
                 .estimatedMemoryGb(info.estimateMemoryGb(null))
                 .build();
     }
+
+    public static ModelInfoResponseBuilder builder() {
+        return new ModelInfoResponseBuilder();
+    }
+
+    public static class ModelInfoResponseBuilder {
+        private String modelType;
+        private String architecture;
+        private String parameterCount;
+        private long parameterCountRaw;
+        private int numLayers;
+        private int hiddenSize;
+        private int vocabSize;
+        private int contextLength;
+        private String quantization;
+        private String fileSize;
+        private long fileSizeBytes;
+        private String format;
+        private double estimatedMemoryGb;
+
+        public ModelInfoResponseBuilder modelType(String modelType) {
+            this.modelType = modelType;
+            return this;
+        }
+
+        public ModelInfoResponseBuilder architecture(String architecture) {
+            this.architecture = architecture;
+            return this;
+        }
+
+        public ModelInfoResponseBuilder parameterCount(String parameterCount) {
+            this.parameterCount = parameterCount;
+            return this;
+        }
+
+        public ModelInfoResponseBuilder parameterCountRaw(long parameterCountRaw) {
+            this.parameterCountRaw = parameterCountRaw;
+            return this;
+        }
+
+        public ModelInfoResponseBuilder numLayers(int numLayers) {
+            this.numLayers = numLayers;
+            return this;
+        }
+
+        public ModelInfoResponseBuilder hiddenSize(int hiddenSize) {
+            this.hiddenSize = hiddenSize;
+            return this;
+        }
+
+        public ModelInfoResponseBuilder vocabSize(int vocabSize) {
+            this.vocabSize = vocabSize;
+            return this;
+        }
+
+        public ModelInfoResponseBuilder contextLength(int contextLength) {
+            this.contextLength = contextLength;
+            return this;
+        }
+
+        public ModelInfoResponseBuilder quantization(String quantization) {
+            this.quantization = quantization;
+            return this;
+        }
+
+        public ModelInfoResponseBuilder fileSize(String fileSize) {
+            this.fileSize = fileSize;
+            return this;
+        }
+
+        public ModelInfoResponseBuilder fileSizeBytes(long fileSizeBytes) {
+            this.fileSizeBytes = fileSizeBytes;
+            return this;
+        }
+
+        public ModelInfoResponseBuilder format(String format) {
+            this.format = format;
+            return this;
+        }
+
+        public ModelInfoResponseBuilder estimatedMemoryGb(double estimatedMemoryGb) {
+            this.estimatedMemoryGb = estimatedMemoryGb;
+            return this;
+        }
+
+        public ModelInfoResponse build() {
+            return new ModelInfoResponse(modelType, architecture, parameterCount, parameterCountRaw, numLayers,
+                    hiddenSize,
+                    vocabSize, contextLength, quantization, fileSize, fileSizeBytes, format, estimatedMemoryGb);
+        }
+    }
 }

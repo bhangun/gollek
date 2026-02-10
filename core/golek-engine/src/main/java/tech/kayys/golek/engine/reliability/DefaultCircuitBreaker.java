@@ -2,10 +2,6 @@ package tech.kayys.golek.engine.reliability;
 
 import org.jboss.logging.Logger;
 
-import tech.kayys.golek.engine.reliability.CircuitBreaker;
-import tech.kayys.golek.engine.observability.CircuitBreakerMetrics;
-import tech.kayys.golek.engine.reliability.CircuitBreakerOpenException;
-
 import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -121,14 +117,15 @@ public class DefaultCircuitBreaker implements CircuitBreaker {
         int total = failures + successes;
         double failureRate = total > 0 ? (double) failures / total : 0.0;
 
-        return new CircuitBreakerMetrics(
+        return new tech.kayys.golek.engine.observability.CircuitBreakerMetrics(
                 currentState,
                 failures,
                 successes,
                 total,
                 failureRate,
                 Duration.ofMillis(System.currentTimeMillis() - stateChangeTime.get()),
-                permitCall());
+                permitCall(),
+                getEstimatedRecoveryTime());
     }
 
     @Override
@@ -305,10 +302,10 @@ public class DefaultCircuitBreaker implements CircuitBreaker {
 
     @Override
     public String toString() {
-        CircuitBreakerMetrics metrics = getMetrics();
+        CircuitBreaker.CircuitBreakerMetrics metrics = getMetrics();
         return String.format(
                 "CircuitBreaker{name='%s', state=%s, failures=%d, successes=%d, rate=%.2f%%}",
-                name, metrics.state(), metrics.failureCount(), metrics.successCount(),
+                name, metrics.state(), metrics.getFailureCount(), metrics.getSuccessCount(),
                 metrics.failureRate() * 100);
     }
 

@@ -132,4 +132,76 @@ public class ConversionResponse {
                 .errorMessage(result.getErrorMessage())
                 .build();
     }
+
+    public static ConversionResponseBuilder builder() {
+        return new ConversionResponseBuilder();
+    }
+
+    public static class ConversionResponseBuilder {
+        private long conversionId;
+        private boolean success;
+        private String tenantId;
+        private String inputPath;
+        private String outputPath;
+        private String outputSize;
+        private String duration;
+        private double compressionRatio;
+        private ModelInfoResponse inputInfo;
+        private String errorMessage;
+
+        public ConversionResponseBuilder conversionId(long conversionId) {
+            this.conversionId = conversionId;
+            return this;
+        }
+
+        public ConversionResponseBuilder success(boolean success) {
+            this.success = success;
+            return this;
+        }
+
+        public ConversionResponseBuilder tenantId(String tenantId) {
+            this.tenantId = tenantId;
+            return this;
+        }
+
+        public ConversionResponseBuilder inputPath(String inputPath) {
+            this.inputPath = inputPath;
+            return this;
+        }
+
+        public ConversionResponseBuilder outputPath(String outputPath) {
+            this.outputPath = outputPath;
+            return this;
+        }
+
+        public ConversionResponseBuilder outputSize(String outputSize) {
+            this.outputSize = outputSize;
+            return this;
+        }
+
+        public ConversionResponseBuilder duration(String duration) {
+            this.duration = duration;
+            return this;
+        }
+
+        public ConversionResponseBuilder compressionRatio(double compressionRatio) {
+            this.compressionRatio = compressionRatio;
+            return this;
+        }
+
+        public ConversionResponseBuilder inputInfo(ModelInfoResponse inputInfo) {
+            this.inputInfo = inputInfo;
+            return this;
+        }
+
+        public ConversionResponseBuilder errorMessage(String errorMessage) {
+            this.errorMessage = errorMessage;
+            return this;
+        }
+
+        public ConversionResponse build() {
+            return new ConversionResponse(conversionId, success, tenantId, inputPath, outputPath, outputSize,
+                    duration, compressionRatio, inputInfo, errorMessage);
+        }
+    }
 }

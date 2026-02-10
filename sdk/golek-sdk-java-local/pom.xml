@@ -14,8 +14,8 @@
     <version>1.0.0-SNAPSHOT</version>
 
     <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -45,6 +45,27 @@
         <dependency>
             <groupId>tech.kayys.golek</groupId>
             <artifactId>golek-model-repo-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- HuggingFace Repo (for direct access) -->
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-model-repo-hf</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Local Model Repo (for direct access) -->
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-model-repo-local</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- GGUF Inference (for conversion service) -->
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-inference-gguf</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -92,15 +113,15 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Optional Provider Dependencies -->
         <!-- Users can include only the providers they need -->
 
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-local-vllm</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
 
         <dependency>
             <groupId>tech.kayys.golek</groupId>
@@ -109,19 +130,6 @@
             <optional>true</optional>
         </dependency>
 
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-openai</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-anthropic</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
 
         <dependency>
             <groupId>tech.kayys.golek</groupId>
@@ -137,31 +145,38 @@
             <optional>true</optional>
         </dependency>
 
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-huggingface</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
 
         <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-embedding</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.14.0</version>
         </dependency>
+
     </dependencies>
 
     <build>
         <plugins>
             <plugin>
+                <groupId>io.smallrye</groupId>
+                <artifactId>jandex-maven-plugin</artifactId>
+                <version>3.1.2</version>
+                <executions>
+                    <execution>
+                        <id>make-index</id>
+                        <goals>
+                            <goal>jandex</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
                 <configuration>
-                    <source>21</source>
-                    <target>21</target>
-                    <release>21</release>
+                    <source>25</source>
+                    <target>25</target>
+                    <release>25</release>
                 </configuration>
             </plugin>
             <plugin>

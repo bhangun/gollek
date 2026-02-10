@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * ✅ Priority-aware batching
  * ✅ Memory-efficient batch processing
  * 
- * @author bhangun
+ * @author Bhangun
  * @since 1.1.0
  */
 @Slf4j

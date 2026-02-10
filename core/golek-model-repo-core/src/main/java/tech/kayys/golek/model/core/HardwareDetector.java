@@ -11,18 +11,16 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  *
- * @author bhangun
+ * @author Bhangun
  */
 
 package tech.kayys.golek.model.core;
 
-import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
  * Hardware capability detector
  */
-@ApplicationScoped
 public class HardwareDetector {
 
     @ConfigProperty(name = "hardware.cuda.enabled", defaultValue = "false")

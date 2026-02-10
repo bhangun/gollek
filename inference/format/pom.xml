@@ -9,11 +9,11 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>golek-provider-parent</artifactId>
+    <artifactId>golek-adapter-parent</artifactId>
     <packaging>pom</packaging>
 
-    <name>golek-provider-parent</name>
-    <description>golek Provider</description>
+    <name>golek-adapter-parent</name>
+    <description>golek Adapter Parent</description>
 
 
     <properties>
@@ -22,6 +22,7 @@
     </properties>
     <modules>
         <module>gguf/golek-inference-gguf</module>
-        <module>litert/golek-inference-litert</module>
+        <module>gguf/golek-gguf-converter</module>
+        <module>literrt/golek-inference-litert</module>
     </modules>
 </project>

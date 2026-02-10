@@ -2,15 +2,14 @@ package tech.kayys.golek.cli.commands;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.InjectMock;
-import io.smallrye.mutiny.Multi;
+
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import jakarta.inject.Inject;
-import tech.kayys.golek.provider.ollama.OllamaClient;
-import tech.kayys.golek.provider.ollama.OllamaPullRequest;
-import tech.kayys.golek.provider.ollama.OllamaPullProgress;
+import tech.kayys.golek.sdk.core.GolekSdk;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 @QuarkusTest
 public class PullCommandTest {
@@ -19,51 +18,35 @@ public class PullCommandTest {
     PullCommand pullCommand;
 
     @InjectMock
-    OllamaClient ollamaClient;
+    GolekSdk sdk;
 
     @Test
-    public void testPullCommandOllama() {
-        OllamaPullProgress progress = new OllamaPullProgress();
-        progress.setStatus("pulling");
-        progress.setTotal(100L);
-        progress.setCompleted(100L);
-
-        Mockito.when(ollamaClient.pullModel(any(OllamaPullRequest.class)))
-                .thenReturn(Multi.createFrom().items(progress));
-
+    public void testPullCommandOllama() throws Exception {
         pullCommand.modelSpec = "llama2";
         pullCommand.insecure = false;
 
         pullCommand.run();
 
-        Mockito.verify(ollamaClient).pullModel(any(OllamaPullRequest.class));
+        Mockito.verify(sdk).pullModel(eq("llama2"), any());
     }
 
     @Test
-    public void testPullCommandOllamaWithPrefix() {
-        OllamaPullProgress progress = new OllamaPullProgress();
-        progress.setStatus("complete");
-
-        Mockito.when(ollamaClient.pullModel(any(OllamaPullRequest.class)))
-                .thenReturn(Multi.createFrom().items(progress));
-
+    public void testPullCommandOllamaWithPrefix() throws Exception {
         pullCommand.modelSpec = "ollama:mistral";
         pullCommand.insecure = false;
 
         pullCommand.run();
 
-        Mockito.verify(ollamaClient).pullModel(any(OllamaPullRequest.class));
+        Mockito.verify(sdk).pullModel(eq("ollama:mistral"), any());
     }
 
     @Test
-    public void testPullCommandHuggingFace() {
-        // HuggingFace pull is not implemented yet, should print error message
+    public void testPullCommandHuggingFace() throws Exception {
         pullCommand.modelSpec = "hf:TheBloke/Llama-2";
         pullCommand.insecure = false;
 
         pullCommand.run();
 
-        // No interaction with ollamaClient expected
-        Mockito.verifyNoInteractions(ollamaClient);
+        Mockito.verify(sdk).pullModel(eq("hf:TheBloke/Llama-2"), any());
     }
 }

@@ -16,7 +16,7 @@ import java.util.Map;
  * ✅ Fallback mechanisms for unsupported devices
  * ✅ Memory-safe delegate management
  * 
- * @author bhangun
+ * @author Bhangun
  * @since 1.1.0
  */
 @Slf4j

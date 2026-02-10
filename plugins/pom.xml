@@ -17,12 +17,26 @@
 
 
     <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
     </properties>
     <modules>
         <module>golek-plugin-content-safety</module>
         <module>golek-plugin-model-router</module>
         <module>golek-plugin-quota</module>
+        <module>golek-plugin-prompt</module>
+        <module>golek-plugin-reasoning</module>
+        <module>golek-plugin-rag</module>
+        <module>golek-plugin-streaming</module>
+        <module>golek-plugin-observability</module>
+        <module>golek-plugin-sampling</module>
+        <module>golek-plugin-tool-execution</module>
+        <module>golek-plugin-memory-integration</module>
+        <module>golek-plugin-tool</module>
+        <module>golek-plugin-memory</module>
+        <module>golek-plugin-vector</module>
+        <module>golek-plugin-storage-s3</module>
+        <module>golek-plugin-storage-gcs</module>
+        <module>golek-plugin-storage-azure</module>
     </modules>
 </project>

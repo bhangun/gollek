@@ -31,6 +31,9 @@ public class GGUFSessionManager {
     @Inject
     LlamaCppBinding binding;
 
+    @Inject
+    GGUFChatTemplateService templateService;
+
     private final Map<String, SessionPool> pools = new ConcurrentHashMap<>();
     private final AtomicInteger totalActiveSessions = new AtomicInteger(0);
     private volatile boolean initialized = false;
@@ -119,7 +122,7 @@ public class GGUFSessionManager {
 
             // Create artifact location
             tech.kayys.golek.spi.model.ArtifactLocation location = new tech.kayys.golek.spi.model.ArtifactLocation(
-                    resolveModelPath(modelId),
+                    resolveModelPath(modelId, config),
                     null,
                     null,
                     null);
@@ -147,7 +150,7 @@ public class GGUFSessionManager {
                     "useMlock", config.mlockEnabled());
 
             // Create and initialize runner
-            LlamaCppRunner runner = new LlamaCppRunner(binding, config);
+            LlamaCppRunner runner = new LlamaCppRunner(binding, config, templateService);
 
             try {
                 runner.initialize(manifest, runnerConfig, tenantContext);
@@ -314,12 +317,32 @@ public class GGUFSessionManager {
         return tenantId + ":" + modelId;
     }
 
-    private String resolveModelPath(String modelId) {
-        // This should match the logic in GGUFProvider
-        if (modelId.startsWith("/")) {
+    private String resolveModelPath(String modelId, GGUFProviderConfig config) {
+        if (modelId == null)
+            return null;
+        if (modelId.startsWith("/"))
             return modelId;
+
+        String normalizedId = modelId.replace("/", "_");
+        String basePath = config.modelBasePath();
+        java.nio.file.Path modelDir = java.nio.file.Paths.get(basePath);
+
+        // Try variations
+        String[] variations = {
+                normalizedId,
+                normalizedId + "-GGUF",
+                modelId,
+                modelId + "-GGUF"
+        };
+
+        for (String var : variations) {
+            java.nio.file.Path p = modelDir.resolve(var);
+            if (java.nio.file.Files.exists(p)) {
+                return p.toString();
+            }
         }
-        return "/var/lib/golek/models/gguf/" + modelId;
+
+        return modelDir.resolve(normalizedId).toString();
     }
 
     private void startCleanupTask() {

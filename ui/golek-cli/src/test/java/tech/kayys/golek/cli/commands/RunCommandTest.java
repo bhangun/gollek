@@ -2,15 +2,18 @@ package tech.kayys.golek.cli.commands;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.InjectMock;
-import io.smallrye.mutiny.Uni;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import jakarta.inject.Inject;
-import tech.kayys.golek.engine.inference.InferenceService;
+import tech.kayys.golek.sdk.core.GolekSdk;
+import tech.kayys.golek.sdk.core.model.ModelInfo;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 
+import java.util.Optional;
+
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 @QuarkusTest
 public class RunCommandTest {
@@ -19,10 +22,10 @@ public class RunCommandTest {
     RunCommand runCommand;
 
     @InjectMock
-    InferenceService inferenceService;
+    GolekSdk sdk;
 
     @Test
-    public void testRunCommand() {
+    public void testRunCommand() throws Exception {
         // Mock response
         InferenceResponse mockResponse = InferenceResponse.builder()
                 .requestId("test-id")
@@ -30,8 +33,11 @@ public class RunCommandTest {
                 .content("Blue like the ocean")
                 .build();
 
-        Mockito.when(inferenceService.inferAsync(any(InferenceRequest.class)))
-                .thenReturn(Uni.createFrom().item(mockResponse));
+        Mockito.when(sdk.createCompletion(any(InferenceRequest.class)))
+                .thenReturn(mockResponse);
+
+        Mockito.when(sdk.getModelInfo(eq("test-model")))
+                .thenReturn(Optional.of(ModelInfo.builder().modelId("test-model").build()));
 
         // Set CLI options directly as they are injected by picocli,
         // but here we are testing the Runnable logic as a bean.
@@ -49,12 +55,11 @@ public class RunCommandTest {
 
         runCommand.modelId = "test-model";
         runCommand.prompt = "Why is the sky blue?";
-        runCommand.tenantId = "test-tenant";
 
         // Execute
         runCommand.run();
 
         // Verify
-        Mockito.verify(inferenceService).inferAsync(any(InferenceRequest.class));
+        Mockito.verify(sdk).createCompletion(any(InferenceRequest.class));
     }
 }

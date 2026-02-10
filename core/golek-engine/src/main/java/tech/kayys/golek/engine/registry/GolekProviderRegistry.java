@@ -35,21 +35,30 @@ public class GolekProviderRegistry implements ProviderRegistry {
     @Inject
     Instance<LLMProvider> providerInstances;
 
+    @jakarta.annotation.PostConstruct
     @Override
     public void discoverProviders() {
         LOG.info("Discovering LLM providers...");
+        System.out.println("DEBUG: GolekProviderRegistry.discoverProviders() entered");
 
         providerInstances.stream().forEach(provider -> {
             try {
+                System.out.println("DEBUG: Processing provider: " + provider.getClass().getName());
                 register(provider);
                 LOG.infof("Registered provider: %s v%s", provider.id(), provider.version());
+                System.out.println("DEBUG: Successfully registered: " + provider.id());
             } catch (Exception e) {
+                System.out.println("DEBUG: Failed to register provider: " + e.getMessage());
                 LOG.errorf(e, "Failed to register provider: %s",
                         provider.getClass().getName());
+            } catch (Throwable t) {
+                System.out.println("DEBUG: Critical failure registering provider: " + t.getMessage());
+                t.printStackTrace();
             }
         });
 
         LOG.infof("Provider discovery complete. Total unique providers: %d", providers.size());
+        System.out.println("DEBUG: GolekProviderRegistry.discoverProviders() completed");
     }
 
     @Override

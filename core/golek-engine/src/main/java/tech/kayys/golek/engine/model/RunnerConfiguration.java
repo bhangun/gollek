@@ -2,29 +2,26 @@ package tech.kayys.golek.engine.model;
 
 import java.util.HashMap;
 import java.util.Map;
-
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import java.util.Objects;
 
 /**
  * Configuration for model runner initialization.
- * 
- * @author bhangun
+ *
+ * @author Bhangun
  * @since 1.0.0
  */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class RunnerConfiguration {
 
     /**
      * Configuration parameters.
      */
-    @Builder.Default
     private Map<String, Object> parameters = new HashMap<>();
+
+    public RunnerConfiguration() {}
+
+    public RunnerConfiguration(Map<String, Object> parameters) {
+        this.parameters = parameters != null ? parameters : new HashMap<>();
+    }
 
     /**
      * Get configuration parameter with type casting.
@@ -61,5 +58,50 @@ public class RunnerConfiguration {
      */
     public Boolean getBooleanParameter(String key, Boolean defaultValue) {
         return getParameter(key, Boolean.class, defaultValue);
+    }
+
+    // Getters
+    public Map<String, Object> getParameters() {
+        return parameters;
+    }
+
+    // Setters
+    public void setParameters(Map<String, Object> parameters) {
+        this.parameters = parameters != null ? parameters : new HashMap<>();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        RunnerConfiguration that = (RunnerConfiguration) o;
+        return Objects.equals(parameters, that.parameters);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(parameters);
+    }
+    
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private Map<String, Object> parameters = new HashMap<>();
+
+        public Builder parameters(Map<String, Object> parameters) {
+            this.parameters = parameters != null ? parameters : new HashMap<>();
+            return this;
+        }
+
+        public Builder putParameter(String key, Object value) {
+            this.parameters.put(key, value);
+            return this;
+        }
+
+        public RunnerConfiguration build() {
+            return new RunnerConfiguration(parameters);
+        }
     }
 }

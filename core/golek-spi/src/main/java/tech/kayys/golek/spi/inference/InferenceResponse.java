@@ -6,8 +6,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -31,6 +33,29 @@ public final class InferenceResponse implements InferenceResponseInterface {
 
     private final Map<String, Object> metadata;
 
+    private final List<ToolCall> toolCalls;
+    private final FinishReason finishReason;
+    private final String sessionId;
+
+    /**
+     * Reason for stopping generation.
+     */
+    public enum FinishReason {
+        STOP, // Normal completion (EOS token)
+        TOOL_CALLS, // Model wants to call tools
+        LENGTH, // Hit max_tokens limit
+        ERROR // Error during generation
+    }
+
+    /**
+     * Represents a tool call from the model.
+     */
+    public record ToolCall(String name, Map<String, Object> arguments) {
+        public ToolCall {
+            arguments = arguments != null ? Map.copyOf(arguments) : Collections.emptyMap();
+        }
+    }
+
     @JsonCreator
     public InferenceResponse(
             @JsonProperty("requestId") String requestId,
@@ -39,7 +64,10 @@ public final class InferenceResponse implements InferenceResponseInterface {
             @JsonProperty("tokensUsed") int tokensUsed,
             @JsonProperty("durationMs") long durationMs,
             @JsonProperty("timestamp") Instant timestamp,
-            @JsonProperty("metadata") Map<String, Object> metadata) {
+            @JsonProperty("metadata") Map<String, Object> metadata,
+            @JsonProperty("toolCalls") List<ToolCall> toolCalls,
+            @JsonProperty("finishReason") FinishReason finishReason,
+            @JsonProperty("sessionId") String sessionId) {
         this.requestId = Objects.requireNonNull(requestId, "requestId");
         this.content = Objects.requireNonNull(content, "content");
         this.model = model;
@@ -49,6 +77,11 @@ public final class InferenceResponse implements InferenceResponseInterface {
         this.metadata = metadata != null
                 ? Collections.unmodifiableMap(new HashMap<>(metadata))
                 : Collections.emptyMap();
+        this.toolCalls = toolCalls != null
+                ? Collections.unmodifiableList(new ArrayList<>(toolCalls))
+                : Collections.emptyList();
+        this.finishReason = finishReason != null ? finishReason : FinishReason.STOP;
+        this.sessionId = sessionId;
     }
 
     // Getters
@@ -87,6 +120,22 @@ public final class InferenceResponse implements InferenceResponseInterface {
         return metadata;
     }
 
+    public List<ToolCall> getToolCalls() {
+        return toolCalls;
+    }
+
+    public FinishReason getFinishReason() {
+        return finishReason;
+    }
+
+    public String getSessionId() {
+        return sessionId;
+    }
+
+    public boolean hasToolCalls() {
+        return toolCalls != null && !toolCalls.isEmpty();
+    }
+
     @Override
     public boolean isStreaming() {
         return false;
@@ -105,6 +154,9 @@ public final class InferenceResponse implements InferenceResponseInterface {
         private long durationMs;
         private Instant timestamp = Instant.now();
         private final Map<String, Object> metadata = new HashMap<>();
+        private final List<ToolCall> toolCalls = new ArrayList<>();
+        private FinishReason finishReason = FinishReason.STOP;
+        private String sessionId;
 
         public Builder requestId(String requestId) {
             this.requestId = requestId;
@@ -146,12 +198,32 @@ public final class InferenceResponse implements InferenceResponseInterface {
             return this;
         }
 
+        public Builder toolCall(ToolCall toolCall) {
+            this.toolCalls.add(toolCall);
+            return this;
+        }
+
+        public Builder toolCalls(List<ToolCall> toolCalls) {
+            this.toolCalls.addAll(toolCalls);
+            return this;
+        }
+
+        public Builder finishReason(FinishReason finishReason) {
+            this.finishReason = finishReason;
+            return this;
+        }
+
+        public Builder sessionId(String sessionId) {
+            this.sessionId = sessionId;
+            return this;
+        }
+
         public InferenceResponse build() {
             Objects.requireNonNull(requestId, "requestId is required");
             Objects.requireNonNull(content, "content is required");
             return new InferenceResponse(
                     requestId, content, model, tokensUsed,
-                    durationMs, timestamp, metadata);
+                    durationMs, timestamp, metadata, toolCalls, finishReason, sessionId);
         }
     }
 

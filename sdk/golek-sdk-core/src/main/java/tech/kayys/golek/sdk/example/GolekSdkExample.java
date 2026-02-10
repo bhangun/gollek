@@ -28,8 +28,7 @@ public class GolekSdkExample {
         try {
             // GolekSdk remoteSdk = GolekSdkFactory.createRemoteSdk(
             //     "http://localhost:8080",  // Replace with your API endpoint
-            //     "your-api-key",           // Replace with your API key
-            //     "default"                 // Default tenant ID
+            //     "your-api-key"            // Replace with your API key (use "community" for standalone)
             // );
             
             // // Create an inference request
@@ -54,8 +53,7 @@ public class GolekSdkExample {
         try {
             // GolekSdk remoteSdk = GolekSdkFactory.createRemoteSdk(
             //     "http://localhost:8080",  // Replace with your API endpoint
-            //     "your-api-key",           // Replace with your API key
-            //     "default"                 // Default tenant ID
+            //     "your-api-key"            // Replace with your API key (use "community" for standalone)
             // );
             
             // InferenceRequest request = InferenceRequest.builder()

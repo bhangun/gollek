@@ -8,7 +8,7 @@ import tech.kayys.golek.spi.error.ErrorCode;
 /**
  * Utility for converting between platform tensors and native tensor formats.
  * 
- * @author bhangun
+ * @author Bhangun
  * @since 1.0.0
  */
 public class TensorConverter {

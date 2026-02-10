@@ -51,7 +51,7 @@ public abstract class CloudProviderAdapter extends AbstractProvider {
     @Override
     protected Uni<Void> doInitialize(Map<String, Object> config, TenantContext tenant) {
         return Uni.createFrom().item(() -> {
-            TenantContext effectiveTenant = tenant != null ? tenant : TenantContext.of("default");
+            TenantContext effectiveTenant = tenant != null ? tenant : TenantContext.of("community");
             this.apiKey = extractApiKey(config, effectiveTenant);
             this.baseUrl = getConfigValue("base-url", getDefaultBaseUrl());
             this.requestTimeout = Duration.parse(

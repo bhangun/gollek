@@ -12,7 +12,7 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  *
- * @author bhangun
+ * @author Bhangun
  */
 
 package tech.kayys.golek.core.plugin;

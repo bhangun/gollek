@@ -1,20 +1,22 @@
 package tech.kayys.golek.cli.commands;
 
-import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import tech.kayys.golek.sdk.core.GolekSdk;
 import tech.kayys.golek.spi.provider.ProviderInfo;
+import io.quarkus.arc.Unremovable;
 
 import java.util.List;
+import jakarta.enterprise.context.Dependent;
 
 /**
  * List available providers using GolekSdk.
  * Usage: golek providers [-v]
  */
-@Command(name = "providers", aliases = "ps", description = "List available inference providers")
 @Dependent
+@Unremovable
+@Command(name = "providers", description = "List available LLM providers and their health")
 public class ProvidersCommand implements Runnable {
 
     @Inject
@@ -37,17 +39,17 @@ public class ProvidersCommand implements Runnable {
             System.out.println("-".repeat(60));
 
             for (ProviderInfo provider : providers) {
-                String status = provider.getHealthStatus() != null
-                        ? provider.getHealthStatus().toString()
+                String status = provider.healthStatus() != null
+                        ? provider.healthStatus().toString()
                         : "UNKNOWN";
 
                 System.out.printf("%-15s %-20s %-10s %-10s%n",
-                        provider.getId(),
-                        truncate(provider.getName(), 20),
-                        provider.getVersion() != null ? provider.getVersion() : "N/A",
+                        provider.id(),
+                        truncate(provider.name(), 20),
+                        provider.version() != null ? provider.version() : "N/A",
                         status);
 
-                if (verbose && provider.getCapabilities() != null) {
+                if (verbose && provider.capabilities() != null) {
                     printCapabilities(provider);
                 }
             }
@@ -59,7 +61,7 @@ public class ProvidersCommand implements Runnable {
     }
 
     private void printCapabilities(ProviderInfo provider) {
-        var caps = provider.getCapabilities();
+        var caps = provider.capabilities();
         System.out.printf("    Streaming: %s, Function Calling: %s, Multimodal: %s%n",
                 caps.isStreaming() ? "✓" : "✗",
                 caps.isFunctionCalling() ? "✓" : "✗",

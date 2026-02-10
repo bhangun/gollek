@@ -5,35 +5,32 @@ import org.junit.jupiter.api.BeforeEach;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import tech.kayys.golek.inference.kernel.execution.ExecutionContext;
-import tech.kayys.golek.inference.kernel.engine.EngineContext;
-import tech.kayys.golek.inference.kernel.plugin.InferencePhasePlugin;
+import tech.kayys.golek.core.execution.ExecutionContext;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.core.plugin.InferencePhasePlugin;
+import tech.kayys.golek.spi.inference.InferencePhase;
 
 class ContentSafetyPluginTest {
 
     private ContentSafetyPlugin plugin;
-    private ContentModerator mockModerator;
     private ExecutionContext mockContext;
     private EngineContext mockEngine;
 
     @BeforeEach
     void setUp() {
         plugin = new ContentSafetyPlugin();
-        mockModerator = mock(ContentModerator.class);
         mockContext = mock(ExecutionContext.class);
         mockEngine = mock(EngineContext.class);
-        
-        // Inject the mock moderator (would need reflection or setter in real scenario)
     }
 
     @Test
     void testPluginId() {
-        assertEquals("tech.kayys.golek.safety.content", plugin.id());
+        assertEquals("tech.kayys/content-safety", plugin.id());
     }
 
     @Test
     void testPluginPhase() {
-        assertEquals(tech.kayys.golek.inference.kernel.pipeline.InferencePhase.VALIDATION, plugin.phase());
+        assertEquals(InferencePhase.VALIDATE, plugin.phase());
     }
 
     @Test

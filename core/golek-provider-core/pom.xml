@@ -12,12 +12,6 @@
     <artifactId>golek-provider-core</artifactId>
 
 
-    <properties>
-
-        <lombok.version>1.18.32</lombok.version>
-    </properties>
-
-
     <dependencies>
         <!-- Core API -->
         <dependency>
@@ -41,12 +35,7 @@
         </dependency>
 
 
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>${lombok.version}</version>
-            <scope>provided</scope>
-        </dependency>
+
 
 
         <!-- Reactive Streams -->
@@ -145,4 +134,22 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.smallrye</groupId>
+                <artifactId>jandex-maven-plugin</artifactId>
+                <version>3.1.2</version>
+                <executions>
+                    <execution>
+                        <id>make-index</id>
+                        <goals>
+                            <goal>jandex</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

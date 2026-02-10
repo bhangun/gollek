@@ -5,10 +5,11 @@ import org.junit.jupiter.api.BeforeEach;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import tech.kayys.golek.inference.TenantId;
-import tech.kayys.golek.inference.kernel.execution.ExecutionContext;
-import tech.kayys.golek.inference.kernel.engine.EngineContext;
-import tech.kayys.golek.inference.api.TenantContext;
+import tech.kayys.wayang.tenant.TenantId;
+import tech.kayys.golek.core.execution.ExecutionContext;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.wayang.tenant.TenantContext;
+import tech.kayys.golek.spi.inference.InferencePhase;
 
 class QuotaEnforcementPluginTest {
 
@@ -25,9 +26,10 @@ class QuotaEnforcementPluginTest {
         mockContext = mock(ExecutionContext.class);
         mockEngine = mock(EngineContext.class);
         mockTenantContext = mock(TenantContext.class);
-        
+
         // Inject the mock service (using reflection or setter if available)
-        // Since we can't directly inject, we'll test the plugin with mocked dependencies conceptually
+        // Since we can't directly inject, we'll test the plugin with mocked
+        // dependencies conceptually
     }
 
     @Test
@@ -37,7 +39,7 @@ class QuotaEnforcementPluginTest {
 
     @Test
     void testPluginPhase() {
-        assertEquals(tech.kayys.golek.inference.kernel.pipeline.InferencePhase.AUTHORIZE, plugin.phase());
+        assertEquals(InferencePhase.AUTHORIZE, plugin.phase());
     }
 
     @Test

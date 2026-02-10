@@ -6,7 +6,7 @@ import java.util.Optional;
 import tech.kayys.golek.spi.model.DeviceType;
 
 public record RequestContext(
-        String tenantId,
+        @Deprecated String tenantId,
         String userId,
         String sessionId,
         String runId,

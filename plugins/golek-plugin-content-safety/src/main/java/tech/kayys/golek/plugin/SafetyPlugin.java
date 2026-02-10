@@ -1,5 +1,7 @@
 package tech.kayys.golek.plugin;
 
+import tech.kayys.golek.core.plugin.InferencePhasePlugin;
+
 /**
  * Base interface for safety plugins.
  * Safety plugins validate content and enforce policies.
@@ -18,11 +20,12 @@ public interface SafetyPlugin extends InferencePhasePlugin {
      * Safety validation result
      */
     record SafetyValidationResult(
-            boolean safe,
+            boolean isSafe,
             String reason,
             double confidence,
             java.util.List<SafetyViolation> violations) {
-        public static SafetyValidationResult safe() {
+
+        public static SafetyValidationResult success() {
             return new SafetyValidationResult(
                     true,
                     "Content is safe",

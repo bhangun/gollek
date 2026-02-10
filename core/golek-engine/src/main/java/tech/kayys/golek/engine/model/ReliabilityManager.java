@@ -3,22 +3,26 @@ package tech.kayys.golek.engine.model;
 import io.smallrye.mutiny.Uni;
 import tech.kayys.golek.core.reliability.FallbackStrategy;
 import tech.kayys.golek.core.reliability.FallbackStrategyRegistry;
+import tech.kayys.golek.engine.registry.CircuitBreakerRegistry;
 import tech.kayys.golek.engine.reliability.CircuitBreaker;
 import tech.kayys.golek.engine.reliability.DefaultCircuitBreaker;
 
 import org.jboss.logging.Logger;
 
+import jakarta.enterprise.context.ApplicationScoped;
+
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
  * Reliability manager providing circuit breakers, retries, and fallback
  * mechanisms
  */
-public class ReliabilityManager {
+@ApplicationScoped
+public class ReliabilityManager implements CircuitBreakerRegistry {
     private static final Logger LOG = Logger.getLogger(ReliabilityManager.class);
 
     private final Map<String, CircuitBreaker> circuitBreakers = new ConcurrentHashMap<>();
@@ -76,8 +80,7 @@ public class ReliabilityManager {
         return executeWithCircuitBreaker(operationName, operation)
                 .onFailure().retry()
                 .withBackOff(delay)
-                .atMost(maxRetries)
-                .expireIn(Duration.ofMinutes(5)); // Expire retry attempts after 5 minutes
+                .atMost(maxRetries);
     }
 
     /**
@@ -127,12 +130,28 @@ public class ReliabilityManager {
     /**
      * Get circuit breaker by name
      */
+    @Override
+    public Optional<CircuitBreaker> get(String name) {
+        return Optional.ofNullable(circuitBreakers.get(name));
+    }
+
+    /**
+     * Get circuit breaker by name (legacy)
+     */
     public CircuitBreaker getCircuitBreaker(String name) {
         return circuitBreakers.get(name);
     }
 
     /**
      * Reset a circuit breaker
+     */
+    @Override
+    public void reset(String name) {
+        resetCircuitBreaker(name);
+    }
+
+    /**
+     * Reset a circuit breaker (legacy)
      */
     public void resetCircuitBreaker(String name) {
         CircuitBreaker cb = circuitBreakers.get(name);

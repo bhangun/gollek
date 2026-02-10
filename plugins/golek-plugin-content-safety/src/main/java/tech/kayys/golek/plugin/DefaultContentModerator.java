@@ -1,11 +1,22 @@
 package tech.kayys.golek.plugin;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.annotation.PostConstruct;
+import org.jboss.logging.Logger;
+import tech.kayys.golek.core.execution.ExecutionContext;
+import tech.kayys.golek.core.plugin.GolekConfigurablePlugin;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.spi.inference.InferencePhase;
+import tech.kayys.golek.spi.plugin.PluginContext;
+import tech.kayys.golek.spi.plugin.PluginException;
 
-import java.util.Set;
+import tech.kayys.golek.plugin.SafetyPlugin.SafetyValidationResult;
+import tech.kayys.golek.plugin.SafetyPlugin.SafetyViolation;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Default implementation of ContentModerator that uses keyword-based detection
@@ -14,112 +25,99 @@ import java.util.stream.Collectors;
 @ApplicationScoped
 public class DefaultContentModerator implements ContentModerator {
 
-    // Configuration
-    private ContentSafetyConfig config;
+    private static final Logger LOG = Logger.getLogger(DefaultContentModerator.class);
 
-    // Common patterns for unsafe content
-    private static final Set<String> ALL_CATEGORIES = Set.of(
-        "hate_speech", "harassment", "violence", "self_harm",
-        "sexual_content", "dangerous_content", "misinformation"
-    );
+    private final Map<String, Object> config = new ConcurrentHashMap<>();
+    private volatile List<Pattern> blockedPatterns = new ArrayList<>();
 
     // Compile regex patterns for performance
-    private static final Pattern HATE_SPEECH_PATTERN =
-        Pattern.compile("\\b(hate|bigotry|rascist|nazi|fascist|slur)\\b", Pattern.CASE_INSENSITIVE);
-    private static final Pattern VIOLENCE_PATTERN =
-        Pattern.compile("\\b(kill|murder|assault|attack|violence|weapon|bomb|explosive)\\b", Pattern.CASE_INSENSITIVE);
-    private static final Pattern SEXUAL_CONTENT_PATTERN =
-        Pattern.compile("\\b(sexual|nude|porn|explicit|adult|nsfw)\\b", Pattern.CASE_INSENSITIVE);
-    private static final Pattern SELF_HARM_PATTERN =
-        Pattern.compile("\\b(suicide|self-harm|kill myself|end my life)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern HATE_SPEECH_PATTERN = Pattern.compile("\\b(hate|bigotry|rascist|nazi|fascist|slur)\\b",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern VIOLENCE_PATTERN = Pattern
+            .compile("\\b(kill|murder|assault|attack|violence|weapon|bomb|explosive)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SEXUAL_CONTENT_PATTERN = Pattern
+            .compile("\\b(sexual|nude|porn|explicit|adult|nsfw)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SELF_HARM_PATTERN = Pattern
+            .compile("\\b(suicide|self-harm|kill myself|end my life)\\b", Pattern.CASE_INSENSITIVE);
 
-    @PostConstruct
-    void init() {
-        // Initialize with default configuration
-        this.config = ContentSafetyConfig.builder().build();
-    }
-
-    public void setConfig(ContentSafetyConfig config) {
-        this.config = config;
+    @Override
+    public String id() {
+        return "tech.kayys/default-content-moderator";
     }
 
     @Override
-    public ModerationResult moderate(String content) {
-        if (!config.isEnabled() || content == null || content.trim().isEmpty()) {
-            return ModerationResult.safe();
-        }
-
-        // Convert to lowercase for case-insensitive matching
-        String lowerContent = content.toLowerCase();
-
-        // Check for prohibited patterns based on enabled categories
-        Set<String> detectedCategories = detectCategories(lowerContent);
-
-        if (!detectedCategories.isEmpty()) {
-            // Calculate confidence based on number of violations and length of content
-            double confidence = Math.min(0.95, 0.7 + (detectedCategories.size() * 0.1));
-
-            return ModerationResult.unsafe(
-                "Content contains potentially unsafe elements",
-                detectedCategories,
-                confidence
-            );
-        }
-
-        return ModerationResult.safe();
+    public InferencePhase phase() {
+        return InferencePhase.VALIDATE;
     }
 
     @Override
-    public ModerationResult moderate(String content, Set<String> categories) {
-        if (!config.isEnabled() || content == null || content.trim().isEmpty()) {
-            return ModerationResult.safe();
+    public void initialize(PluginContext context) {
+        LOG.info("Initializing default content moderator");
+        loadDefaultPatterns();
+    }
+
+    @Override
+    public void execute(ExecutionContext context, EngineContext engine) throws PluginException {
+        Object inputObj = context.variables().get("request");
+        if (inputObj == null) {
+            return;
         }
 
-        // Only check against specified categories
+        String content = inputObj.toString();
+        SafetyValidationResult result = validate(content);
+
+        if (!result.isSafe()) {
+            throw new PluginException("Content safety violation: " + result.reason());
+        }
+    }
+
+    @Override
+    public SafetyValidationResult validate(String content) {
+        if (content == null || content.trim().isEmpty()) {
+            return SafetyValidationResult.success();
+        }
+
+        List<SafetyViolation> violations = new ArrayList<>();
         String lowerContent = content.toLowerCase();
-        Set<String> detectedCategories = categories.stream()
-            .filter(cat -> matchesCategory(lowerContent, cat))
-            .collect(Collectors.toSet());
 
-        if (!detectedCategories.isEmpty()) {
-            double confidence = Math.min(0.95, 0.7 + (detectedCategories.size() * 0.1));
-            return ModerationResult.unsafe(
-                "Content violates specified categories: " + String.join(", ", detectedCategories),
-                detectedCategories,
-                confidence
-            );
+        if (HATE_SPEECH_PATTERN.matcher(lowerContent).find()) {
+            violations.add(new SafetyViolation("hate_speech", "Detected hate speech", 0.9, -1));
+        }
+        if (VIOLENCE_PATTERN.matcher(lowerContent).find()) {
+            violations.add(new SafetyViolation("violence", "Detected violence", 0.9, -1));
+        }
+        if (SEXUAL_CONTENT_PATTERN.matcher(lowerContent).find()) {
+            violations.add(new SafetyViolation("sexual_content", "Detected sexual content", 0.9, -1));
+        }
+        if (SELF_HARM_PATTERN.matcher(lowerContent).find()) {
+            violations.add(new SafetyViolation("self_harm", "Detected self-harm", 0.9, -1));
         }
 
-        return ModerationResult.safe();
+        if (!violations.isEmpty()) {
+            return SafetyValidationResult.unsafe(
+                    "Content contains potentially unsafe elements",
+                    violations);
+        }
+
+        return SafetyValidationResult.success();
     }
 
-    private Set<String> detectCategories(String content) {
-        Set<String> violations = Set.of();
-
-        // Check each enabled category
-        for (String category : config.getEnabledCategories()) {
-            if (matchesCategory(content, category)) {
-                java.util.HashSet<String> newSet = new java.util.HashSet<>(violations);
-                newSet.add(category);
-                violations = newSet;
-            }
-        }
-
-        return violations;
+    @Override
+    public void onConfigUpdate(Map<String, Object> newConfig) throws GolekConfigurablePlugin.ConfigurationException {
+        this.config.putAll(newConfig);
     }
 
-    private boolean matchesCategory(String content, String category) {
-        switch (category.toLowerCase()) {
-            case "hate_speech":
-                return HATE_SPEECH_PATTERN.matcher(content).find();
-            case "violence":
-                return VIOLENCE_PATTERN.matcher(content).find();
-            case "sexual_content":
-                return SEXUAL_CONTENT_PATTERN.matcher(content).find();
-            case "self_harm":
-                return SELF_HARM_PATTERN.matcher(content).find();
-            default:
-                return false;
-        }
+    @Override
+    public Map<String, Object> currentConfig() {
+        return Map.copyOf(config);
+    }
+
+    private void loadDefaultPatterns() {
+        // Already initialized as static constants for simplicity in this implementation
+    }
+
+    @Override
+    public void shutdown() {
+        LOG.info("Shutting down default content moderator");
     }
 }

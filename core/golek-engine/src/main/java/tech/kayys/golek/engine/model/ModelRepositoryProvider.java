@@ -6,5 +6,5 @@ public interface ModelRepositoryProvider {
 
     String scheme(); // hf, local, s3, etc
 
-    ModelRepository create(RepositoryContext context);
+    tech.kayys.golek.model.core.ModelRepository create(RepositoryContext context);
 }

@@ -1,5 +1,6 @@
 package tech.kayys.golek.cli.commands;
 
+import io.quarkus.arc.Unremovable;
 import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
@@ -13,8 +14,9 @@ import java.util.List;
  * List local models using GolekSdk.
  * Usage: golek list [--format table|json] [--limit N]
  */
-@Command(name = "list", aliases = "ls", description = "List local models")
 @Dependent
+@Unremovable
+@Command(name = "list", description = "List available models")
 public class ListCommand implements Runnable {
 
     @Inject
@@ -22,9 +24,6 @@ public class ListCommand implements Runnable {
 
     @Option(names = { "-f", "--format" }, description = "Output format: table, json", defaultValue = "table")
     String format;
-
-    @Option(names = { "-t", "--tenant" }, description = "Tenant ID", defaultValue = "default")
-    String tenantId;
 
     @Option(names = { "-l", "--limit" }, description = "Maximum models to list", defaultValue = "50")
     int limit;
