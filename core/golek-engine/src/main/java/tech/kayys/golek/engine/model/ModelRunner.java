@@ -12,6 +12,9 @@ import tech.kayys.golek.spi.model.HealthStatus;
 import tech.kayys.golek.spi.model.ModelManifest;
 import tech.kayys.golek.spi.model.ResourceMetrics;
 import tech.kayys.golek.spi.model.RunnerMetadata;
+import tech.kayys.golek.spi.inference.StreamingInferenceChunk;
+import io.smallrye.mutiny.Multi;
+
 import tech.kayys.golek.spi.exception.InferenceException;
 import tech.kayys.golek.engine.exception.RunnerInitializationException;
 
@@ -143,6 +146,17 @@ public interface ModelRunner extends AutoCloseable {
             RequestContext context) throws InferenceException;
 
     /**
+     * Execute synchronous inference on the model with default context.
+     *
+     * @param request Inference request with inputs
+     * @return Inference response with outputs
+     * @throws tech.kayys.golek.spi.exception.InferenceException if execution fails
+     */
+    default InferenceResponse infer(InferenceRequest request) throws InferenceException {
+        return infer(request, null);
+    }
+
+    /**
      * Execute asynchronous inference with callback
      * 
      * @param request Inference request
@@ -226,10 +240,9 @@ public interface ModelRunner extends AutoCloseable {
      * @return HealthStatus with detailed metrics
      */
     default HealthStatus healthStatus() {
-        return HealthStatus.builder()
-                .healthy(health())
-                .runnerName(name())
-                .build();
+        return health()
+                ? HealthStatus.healthy("Runner " + name() + " is operational")
+                : HealthStatus.unhealthy("Runner " + name() + " is not operational");
     }
 
     /**
@@ -273,6 +286,19 @@ public interface ModelRunner extends AutoCloseable {
      * Must be idempotent - multiple calls should be safe.
      * Must not throw exceptions - log errors instead.
      */
+    /**
+     * Release all resources held by this runner.
+     */
     @Override
     void close();
+
+    /**
+     * Execute streaming inference
+     * 
+     * @param request The inference request
+     * @return Multi stream of chunks
+     */
+    default Multi<StreamingInferenceChunk> stream(InferenceRequest request) {
+        return Multi.createFrom().failure(new UnsupportedOperationException("Streaming not support for this runner"));
+    }
 }

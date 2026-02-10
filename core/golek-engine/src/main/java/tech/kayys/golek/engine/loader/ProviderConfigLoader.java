@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import jakarta.enterprise.context.ApplicationScoped;
 import tech.kayys.golek.spi.provider.ProviderConfig;
-// import tech.kayys.golek.provider.core.memory.VaultSecretManager;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
@@ -41,7 +40,6 @@ public class ProviderConfigLoader {
 
     private final Map<String, ProviderConfig> configCache = new ConcurrentHashMap<>();
     private final ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
-    private final ObjectMapper jsonMapper = new ObjectMapper();
 
     /**
      * Load all provider configurations
@@ -176,7 +174,6 @@ public class ProviderConfigLoader {
                 .replace('_', '.');
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> castProperties(Map<String, String> properties) {
         return new HashMap<>(properties);
     }

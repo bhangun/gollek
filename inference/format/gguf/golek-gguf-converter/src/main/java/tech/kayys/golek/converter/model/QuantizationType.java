@@ -1,7 +1,5 @@
 package tech.kayys.golek.converter.model;
 
-import lombok.Getter;
-
 /**
  * GGUF quantization types with metadata.
  * 
@@ -12,7 +10,6 @@ import lombok.Getter;
  * @author Bhangun
  * @version 1.0.0
  */
-@Getter
 public enum QuantizationType {
 
         // No quantization
@@ -86,9 +83,29 @@ public enum QuantizationType {
                 this.useCase = useCase;
         }
 
+        public String getNativeName() {
+            return nativeName;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public QualityLevel getQualityLevel() {
+            return qualityLevel;
+        }
+
+        public double getCompressionRatio() {
+            return compressionRatio;
+        }
+
+        public String getUseCase() {
+            return useCase;
+        }
+
         /**
          * Find quantization type by native name.
-         * 
+         *
          * @param nativeName native name (e.g., "q4_k_m")
          * @return quantization type or null if not found
          */
@@ -141,11 +158,14 @@ public enum QuantizationType {
                 MEDIUM_LOW(1.5),
                 LOW(1);
 
-                @Getter
                 private final double score;
 
                 QualityLevel(double score) {
                         this.score = score;
+                }
+                
+                public double getScore() {
+                    return score;
                 }
         }
 }

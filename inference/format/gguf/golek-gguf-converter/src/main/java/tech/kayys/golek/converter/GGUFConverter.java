@@ -3,7 +3,6 @@ package tech.kayys.golek.converter;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
-import lombok.extern.slf4j.Slf4j;
 import tech.kayys.golek.converter.model.ConversionProgress;
 import tech.kayys.golek.converter.model.ConversionResult;
 import tech.kayys.golek.converter.model.GGUFConversionParams;
@@ -15,9 +14,12 @@ import java.lang.foreign.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * High-level GGUF model converter service.
@@ -36,8 +38,9 @@ import java.util.function.Consumer;
  * @version 1.0.0
  */
 @ApplicationScoped
-@Slf4j
 public class GGUFConverter {
+
+    private static final Logger log = LoggerFactory.getLogger(GGUFConverter.class);
 
     private final AtomicLong conversionIdCounter = new AtomicLong(0);
     private final ConcurrentHashMap<Long, ConversionContext> activeConversions = new ConcurrentHashMap<>();
@@ -185,7 +188,7 @@ public class GGUFConverter {
                                     
                                     if (currentProgress >= 0.0f && Math.abs(currentProgress - lastProgress) > 0.01f) {
                                         // Only report if progress has changed significantly
-                                        ConversionProgress progress = ConversionProgress.builder()
+                                        ConversionProgress progress = new ConversionProgress.Builder()
                                                 .conversionId(conversionId)
                                                 .progress(currentProgress)
                                                 .stage("Processing") // This will be updated by native callbacks
@@ -243,7 +246,7 @@ public class GGUFConverter {
 
                     // Report final progress
                     if (progressCallback != null) {
-                        ConversionProgress finalProgress = ConversionProgress.builder()
+                        ConversionProgress finalProgress = new ConversionProgress.Builder()
                                 .conversionId(conversionId)
                                 .progress(1.0f)
                                 .stage("Complete")
@@ -252,7 +255,7 @@ public class GGUFConverter {
                         progressCallback.accept(finalProgress);
                     }
 
-                    return ConversionResult.builder()
+                    return new ConversionResult.Builder()
                             .conversionId(conversionId)
                             .success(true)
                             .inputInfo(inputInfo)

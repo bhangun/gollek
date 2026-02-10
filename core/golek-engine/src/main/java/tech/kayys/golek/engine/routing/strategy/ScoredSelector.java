@@ -89,7 +89,8 @@ public class ScoredSelector implements ProviderSelector {
         String id = providerId.toLowerCase();
         return id.contains("local") || id.contains("ollama") ||
                 id.contains("vllm") || id.contains("gguf") ||
-                id.contains("onnx") || id.contains("pytorch");
+                id.contains("onnx") || id.contains("pytorch") ||
+                id.contains("litert");
     }
 
     private record ScoredProvider(LLMProvider provider, int score) {

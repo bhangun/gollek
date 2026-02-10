@@ -27,12 +27,15 @@ class LlamaCppRunnerTest {
     @Mock
     LlamaCppBinding binding;
 
+    @Mock
+    GGUFChatTemplateService templateService;
+
     private LlamaCppRunner runner;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        runner = new LlamaCppRunner(binding, config);
+        runner = new LlamaCppRunner(binding, config, templateService);
     }
 
     @Test

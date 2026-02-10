@@ -2,15 +2,15 @@ package tech.kayys.golek.cli.commands;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.InjectMock;
-import io.smallrye.mutiny.Uni;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import jakarta.inject.Inject;
-import tech.kayys.golek.model.core.LocalModelRepository;
-import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.sdk.core.GolekSdk;
+import tech.kayys.golek.sdk.core.model.ModelInfo;
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -22,43 +22,40 @@ public class ShowCommandTest {
     ShowCommand showCommand;
 
     @InjectMock
-    LocalModelRepository modelRepository;
+    GolekSdk sdk;
 
     @Test
-    public void testShowCommandModelFound() {
-        ModelManifest model = new ModelManifest(
-                "test-model",
-                "Test Model",
-                "1.0",
-                "default",
-                Collections.emptyMap(),
-                Collections.emptyList(),
-                null,
-                Collections.emptyMap(),
-                Instant.now(),
-                Instant.now());
+    public void testShowCommandModelFound() throws Exception {
+        ModelInfo model = ModelInfo.builder()
+                .modelId("test-model")
+                .name("Test Model")
+                .version("1.0")
+                .tenantId("default")
+                .format("GGUF")
+                .metadata(Collections.emptyMap())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
 
-        Mockito.when(modelRepository.findById(any(String.class), any(String.class)))
-                .thenReturn(Uni.createFrom().item(model));
+        Mockito.when(sdk.getModelInfo(eq("test-model")))
+                .thenReturn(Optional.of(model));
 
         showCommand.modelId = "test-model";
-        showCommand.tenantId = "default";
 
         showCommand.run();
 
-        Mockito.verify(modelRepository).findById(eq("test-model"), eq("default"));
+        Mockito.verify(sdk).getModelInfo(eq("test-model"));
     }
 
     @Test
-    public void testShowCommandModelNotFound() {
-        Mockito.when(modelRepository.findById(any(String.class), any(String.class)))
-                .thenReturn(Uni.createFrom().nullItem());
+    public void testShowCommandModelNotFound() throws Exception {
+        Mockito.when(sdk.getModelInfo(any(String.class)))
+                .thenReturn(Optional.empty());
 
         showCommand.modelId = "nonexistent";
-        showCommand.tenantId = "default";
 
         showCommand.run();
 
-        Mockito.verify(modelRepository).findById(eq("nonexistent"), eq("default"));
+        Mockito.verify(sdk).getModelInfo(eq("nonexistent"));
     }
 }

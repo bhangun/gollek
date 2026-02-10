@@ -1,7 +1,7 @@
 package tech.kayys.golek.spi.exception;
 
-import tech.kayys.golek.spi.ErrorPayload;
 import tech.kayys.golek.spi.error.ErrorCode;
+import tech.kayys.golek.spi.error.ErrorPayload;
 
 /**
  * Base exception for all provider errors.

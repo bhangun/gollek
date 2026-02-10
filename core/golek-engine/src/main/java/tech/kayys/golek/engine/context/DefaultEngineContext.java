@@ -8,10 +8,13 @@ import java.util.concurrent.ExecutorService;
 import tech.kayys.golek.spi.context.EngineContext;
 import tech.kayys.golek.spi.plugin.PluginRegistry;
 import tech.kayys.golek.spi.provider.ProviderRegistry;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 /**
  * Default implementation of engine context.
  */
+@ApplicationScoped
 public class DefaultEngineContext implements EngineContext {
 
     private final PluginRegistry pluginRegistry;
@@ -21,6 +24,23 @@ public class DefaultEngineContext implements EngineContext {
     private final Instant startTime;
     private final String version;
     private volatile boolean running;
+
+    /**
+     * CDI constructor.
+     */
+    @Inject
+    public DefaultEngineContext(
+            PluginRegistry pluginRegistry,
+            ProviderRegistry providerRegistry,
+            ExecutorService executorService) {
+        this.pluginRegistry = Objects.requireNonNull(pluginRegistry);
+        this.providerRegistry = Objects.requireNonNull(providerRegistry);
+        this.executorService = Objects.requireNonNull(executorService);
+        this.config = Map.of();
+        this.startTime = Instant.now();
+        this.version = "1.0.0";
+        this.running = false;
+    }
 
     private DefaultEngineContext(Builder builder) {
         this.pluginRegistry = Objects.requireNonNull(builder.pluginRegistry);

@@ -24,7 +24,6 @@ import tech.kayys.golek.client.GolekClient;
 GolekClient client = GolekClient.builder()
     .baseUrl("https://api.golek.example.com")
     .apiKey("your-api-key")
-    .defaultTenantId("default")
     .build();
 ```
 
@@ -32,9 +31,9 @@ GolekClient client = GolekClient.builder()
 
 ```java
 import tech.kayys.golek.spi.Message;
-import tech.kayys.golek.client.builder.InferenceRequestBuilder;
+import tech.kayys.golek.client.builder.InferenceRequest;
 
-var request = InferenceRequestBuilder.builder()
+var request = InferenceRequest.builder()
     .model("llama3:latest")
     .userMessage("Hello, how are you?")
     .temperature(0.7)
@@ -97,13 +96,12 @@ The client supports various configuration options:
 
 - `baseUrl`: The base URL of the Golek API
 - `apiKey`: Your API key for authentication
-- `defaultTenantId`: The default tenant ID to use (only required when multi-tenancy is enabled)
 - `connectTimeout`: Connection timeout duration
 - `sslContext`: Custom SSL context for HTTPS connections
 
-## Multi-Tenancy Note
+## API Key Note
 
-Golek is single-tenant by default. Multi-tenancy is enabled only when `tenant-golek-ext` is added or `wayang.multitenancy.enabled=true` is set. In single-tenant mode, `defaultTenantId` can remain `"default"` and the API does not require `X-Tenant-ID`.
+Multi-tenancy is resolved on the backend using your API key. For community/standalone deployments, use the API key `"community"`.
 
 ## Error Handling
 
@@ -143,7 +141,7 @@ var tool = ToolDefinition.builder()
     .parameter("city", Map.of("type", "string", "description", "City name"))
     .build();
 
-var request = InferenceRequestBuilder.builder()
+var request = InferenceRequest.builder()
     .model("llama3:latest")
     .userMessage("What's the weather in Tokyo?")
     .tool(tool)
@@ -155,7 +153,7 @@ var response = client.createCompletion(request);
 ### Custom Parameters
 
 ```java
-var request = InferenceRequestBuilder.builder()
+var request = InferenceRequest.builder()
     .model("llama3:latest")
     .userMessage("Summarize this document")
     .parameter("temperature", 0.5)

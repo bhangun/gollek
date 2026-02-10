@@ -1,42 +1,40 @@
 package tech.kayys.golek.spi.routing;
 
+import tech.kayys.golek.spi.exception.ProviderException;
+import tech.kayys.golek.spi.error.ErrorCode;
+
 /**
  * Exception thrown when a provider's quota is exhausted.
  * Triggers failover to alternative providers.
  */
-public class QuotaExhaustedException extends RuntimeException {
+public class QuotaExhaustedException extends ProviderException {
 
-    private final String providerId;
     private final String tenantId;
     private final long quotaLimit;
     private final long currentUsage;
 
     public QuotaExhaustedException(String providerId, String tenantId) {
-        super(String.format("Quota exhausted for provider '%s' (tenant: %s)", 
-            providerId, tenantId));
-        this.providerId = providerId;
+        super(providerId, String.format("Quota exhausted for provider '%s' (tenant: %s)",
+                providerId, tenantId), null, ErrorCode.PROVIDER_QUOTA_EXCEEDED, false);
         this.tenantId = tenantId;
         this.quotaLimit = -1;
         this.currentUsage = -1;
     }
 
     public QuotaExhaustedException(
-            String providerId, 
-            String tenantId, 
-            long quotaLimit, 
+            String providerId,
+            String tenantId,
+            long quotaLimit,
             long currentUsage) {
-        super(String.format(
-            "Quota exhausted for provider '%s' (tenant: %s): %d/%d used", 
-            providerId, tenantId, currentUsage, quotaLimit));
-        this.providerId = providerId;
+        super(providerId, String.format(
+                "Quota exhausted for provider '%s' (tenant: %s): %d/%d used",
+                providerId, tenantId, currentUsage, quotaLimit), null, ErrorCode.PROVIDER_QUOTA_EXCEEDED, false);
         this.tenantId = tenantId;
         this.quotaLimit = quotaLimit;
         this.currentUsage = currentUsage;
     }
 
-    public String getProviderId() {
-        return providerId;
-    }
+    // getProviderId() is inherited from ProviderException
 
     public String getTenantId() {
         return tenantId;

@@ -1,5 +1,6 @@
 package tech.kayys.golek.cli.commands;
 
+import io.quarkus.arc.Unremovable;
 import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
@@ -8,16 +9,16 @@ import picocli.CommandLine.Parameters;
 import tech.kayys.golek.sdk.core.GolekSdk;
 
 /**
- * Pull a model from registry using GolekSdk.
+ * Pull model using GolekSdk.
  * Usage: golek pull <model-spec>
- * 
- * Model spec formats:
+ * Model spec examples:
  * - ollama:llama2 -> Pull from Ollama
  * - hf:TheBloke/Llama-2 -> Pull from HuggingFace (future)
  * - llama2 -> Default to Ollama
  */
-@Command(name = "pull", description = "Pull a model from registry")
 @Dependent
+@Unremovable
+@Command(name = "pull", description = "Pull a model from a provider")
 public class PullCommand implements Runnable {
 
     @Inject

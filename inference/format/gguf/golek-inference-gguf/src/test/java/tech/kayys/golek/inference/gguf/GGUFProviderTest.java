@@ -79,7 +79,7 @@ class GGUFProviderTest {
         String version = provider.version();
 
         // Then: Metadata should be correct
-        assertThat(id).isEqualTo("gguf-llama-cpp");
+        assertThat(id).isEqualTo("gguf");
         assertThat(name).isEqualTo("GGUF Provider (llama.cpp)");
         assertThat(version).isEqualTo("1.1.0");
     }
@@ -144,10 +144,12 @@ class GGUFProviderTest {
         doThrow(new RuntimeException("Native library not found"))
                 .when(binding).backendInit();
 
-        // When/Then: Initialization should throw
-        assertThatThrownBy(() -> provider.onStart(new StartupEvent()))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("initialization failed");
+        // When: Initialization is called
+        provider.onStart(new StartupEvent());
+
+        // Then: Provider should not be initialized but should not throw
+        var health = provider.health().await().indefinitely();
+        assertThat(health.status()).isNotEqualTo(ProviderHealth.Status.HEALTHY);
     }
 
     @Test

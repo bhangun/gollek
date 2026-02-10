@@ -29,6 +29,7 @@ public final class InferenceRequest {
     private final String requestId;
 
     @Nullable
+    @Deprecated
     private final String tenantId;
 
     @NotBlank
@@ -54,6 +55,8 @@ public final class InferenceRequest {
 
     private final int priority;
 
+    private final boolean cacheBypass;
+
     @JsonCreator
     public InferenceRequest(
             @JsonProperty("requestId") String requestId,
@@ -66,7 +69,8 @@ public final class InferenceRequest {
             @JsonProperty("streaming") boolean streaming,
             @JsonProperty("preferredProvider") String preferredProvider,
             @JsonProperty("timeout") Duration timeout,
-            @JsonProperty("priority") int priority) {
+            @JsonProperty("priority") int priority,
+            @JsonProperty("cacheBypass") boolean cacheBypass) {
         this.requestId = Objects.requireNonNull(requestId, "requestId");
         this.tenantId = tenantId;
         this.model = Objects.requireNonNull(model, "model");
@@ -81,6 +85,7 @@ public final class InferenceRequest {
         this.preferredProvider = preferredProvider;
         this.timeout = timeout;
         this.priority = priority;
+        this.cacheBypass = cacheBypass;
     }
 
     // Getters
@@ -88,6 +93,11 @@ public final class InferenceRequest {
         return requestId;
     }
 
+    /**
+     * @deprecated Tenant ID is resolved server-side from the API key.
+     * Client code should not set or rely on this value.
+     */
+    @Deprecated
     public String getTenantId() {
         return tenantId;
     }
@@ -128,6 +138,10 @@ public final class InferenceRequest {
         return priority;
     }
 
+    public boolean isCacheBypass() {
+        return cacheBypass;
+    }
+
     // Builder
     public static Builder builder() {
         return new Builder();
@@ -145,12 +159,18 @@ public final class InferenceRequest {
         private String preferredProvider;
         private Duration timeout;
         private int priority = 5;
+        private boolean cacheBypass = false;
 
         public Builder requestId(String requestId) {
             this.requestId = requestId;
             return this;
         }
 
+        /**
+         * @deprecated Tenant ID is resolved server-side from the API key.
+         * Client code should not set or rely on this value.
+         */
+        @Deprecated
         public Builder tenantId(String tenantId) {
             this.tenantId = tenantId;
             return this;
@@ -211,6 +231,21 @@ public final class InferenceRequest {
             return this;
         }
 
+        public Builder topK(int topK) {
+            this.parameters.put("top_k", topK);
+            return this;
+        }
+
+        public Builder minP(double minP) {
+            this.parameters.put("min_p", minP);
+            return this;
+        }
+
+        public Builder seed(int seed) {
+            this.parameters.put("seed", seed);
+            return this;
+        }
+
         public Builder streaming(boolean streaming) {
             this.streaming = streaming;
             return this;
@@ -231,6 +266,11 @@ public final class InferenceRequest {
             return this;
         }
 
+        public Builder cacheBypass(boolean cacheBypass) {
+            this.cacheBypass = cacheBypass;
+            return this;
+        }
+
         public InferenceRequest build() {
             Objects.requireNonNull(model, "model is required");
             if (messages.isEmpty()) {
@@ -238,7 +278,7 @@ public final class InferenceRequest {
             }
             return new InferenceRequest(
                     requestId, tenantId, model, messages, parameters, tools, toolChoice, streaming,
-                    preferredProvider, timeout, priority);
+                    preferredProvider, timeout, priority, cacheBypass);
         }
     }
 

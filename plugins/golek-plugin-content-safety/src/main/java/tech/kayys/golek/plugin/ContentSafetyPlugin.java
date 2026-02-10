@@ -1,15 +1,16 @@
 package tech.kayys.golek.plugin;
 
-import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
-import tech.kayys.golek.provider.core.inference.InferencePhasePlugin;
-import tech.kayys.wayang.inference.api.InferenceRequest;
-import tech.kayys.wayang.inference.api.Message;
-import tech.kayys.wayang.inference.execution.ExecutionContext;
-import tech.kayys.wayang.inference.pipeline.InferencePhase;
-import tech.kayys.wayang.inference.plugin.*;
+import tech.kayys.golek.core.plugin.InferencePhasePlugin;
+import tech.kayys.golek.core.execution.ExecutionContext;
+import tech.kayys.golek.spi.inference.InferencePhase;
+import tech.kayys.golek.spi.inference.InferenceRequest;
+import tech.kayys.golek.spi.Message;
+import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.spi.plugin.PluginContext;
+import tech.kayys.golek.spi.plugin.PluginException;
 
 import java.util.*;
 import java.util.regex.Pattern;
@@ -19,10 +20,10 @@ import java.util.regex.Pattern;
  * Phase-bound to VALIDATE.
  */
 @ApplicationScoped
-public class ContentSafetyPlugin implements InferencePhasePlugin, ConfigurablePlugin {
+public class ContentSafetyPlugin implements InferencePhasePlugin {
 
     private static final Logger LOG = Logger.getLogger(ContentSafetyPlugin.class);
-    private static final String PLUGIN_ID = "content-safety";
+    private static final String PLUGIN_ID = "tech.kayys/content-safety";
 
     private Map<String, Object> config = new HashMap<>();
     private boolean enabled = true;
@@ -32,16 +33,6 @@ public class ContentSafetyPlugin implements InferencePhasePlugin, ConfigurablePl
     @Override
     public String id() {
         return PLUGIN_ID;
-    }
-
-    @Override
-    public String name() {
-        return "Content Safety Filter";
-    }
-
-    @Override
-    public String version() {
-        return "1.0.0";
     }
 
     @Override
@@ -55,25 +46,10 @@ public class ContentSafetyPlugin implements InferencePhasePlugin, ConfigurablePl
     }
 
     @Override
-    public Uni<Void> initialize(PluginContext context) {
-        this.config = new HashMap<>(context.config());
-        this.enabled = context.getConfigOrDefault("enabled", true);
+    public void initialize(PluginContext context) {
+        this.enabled = Boolean.parseBoolean(context.getConfig("enabled", "true"));
 
-        // Load blocked keywords
-        @SuppressWarnings("unchecked")
-        List<String> keywords = (List<String>) config.getOrDefault("blockedKeywords", List.of());
-        this.blockedKeywords = new HashSet<>(keywords);
-
-        // Load blocked patterns
-        @SuppressWarnings("unchecked")
-        List<String> patterns = (List<String>) config.getOrDefault("blockedPatterns", List.of());
-        this.blockedPatterns = patterns.stream()
-                .map(Pattern::compile)
-                .toList();
-
-        LOG.infof("Initialized %s (enabled: %s, keywords: %d, patterns: %d)",
-                name(), enabled, blockedKeywords.size(), blockedPatterns.size());
-        return Uni.createFrom().voidItem();
+        LOG.infof("Initialized %s (enabled: %s)", PLUGIN_ID, enabled);
     }
 
     @Override
@@ -82,45 +58,41 @@ public class ContentSafetyPlugin implements InferencePhasePlugin, ConfigurablePl
     }
 
     @Override
-    public Uni<Void> execute(ExecutionContext context) {
-        InferenceRequest request = context.getVariable("request", InferenceRequest.class)
-                .orElseThrow(() -> new IllegalStateException("Request not found"));
+    public void execute(ExecutionContext context, EngineContext engine) throws PluginException {
+        InferenceRequest request = (InferenceRequest) context.variables().get("request");
+        if (request == null) {
+            throw new IllegalStateException("Request not found");
+        }
 
         for (Message message : request.getMessages()) {
-            String content = message.getContent().toLowerCase();
+            String content = message.getContent();
+            if (content == null)
+                continue;
+
+            String lowerContent = content.toLowerCase();
 
             // Check blocked keywords
             for (String keyword : blockedKeywords) {
-                if (content.contains(keyword.toLowerCase())) {
-                    throw new UnsafeContentException(
+                if (lowerContent.contains(keyword.toLowerCase())) {
+                    throw new InferencePhasePlugin.PhasePluginException(
                             "Content contains blocked keyword: " + keyword);
                 }
             }
 
             // Check blocked patterns
             for (Pattern pattern : blockedPatterns) {
-                if (pattern.matcher(content).find()) {
-                    throw new UnsafeContentException(
+                if (pattern.matcher(lowerContent).find()) {
+                    throw new InferencePhasePlugin.PhasePluginException(
                             "Content matches blocked pattern: " + pattern.pattern());
                 }
             }
         }
 
         LOG.debugf("Safety check passed for %s", request.getRequestId());
-        return Uni.createFrom().voidItem();
     }
 
     @Override
-    public boolean onFailure(ExecutionContext context, Throwable error) {
-        if (error instanceof UnsafeContentException) {
-            context.setError(error);
-            return false; // Halt pipeline
-        }
-        return true; // Continue for other errors
-    }
-
-    @Override
-    public Uni<Void> onConfigUpdate(Map<String, Object> newConfig) {
+    public void onConfigUpdate(Map<String, Object> newConfig) {
         this.config = new HashMap<>(newConfig);
         this.enabled = (Boolean) newConfig.getOrDefault("enabled", true);
 
@@ -133,26 +105,11 @@ public class ContentSafetyPlugin implements InferencePhasePlugin, ConfigurablePl
         this.blockedPatterns = patterns.stream()
                 .map(Pattern::compile)
                 .toList();
-
-        return Uni.createFrom().voidItem();
     }
 
     @Override
     public Map<String, Object> currentConfig() {
         return new HashMap<>(config);
-    }
-
-    @Override
-    public PluginMetadata metadata() {
-        return PluginMetadata.builder()
-                .id(id())
-                .name(name())
-                .version(version())
-                .description("Filters unsafe content from inference requests")
-                .author("Kayys Tech")
-                .tag("safety")
-                .tag("content-moderation")
-                .build();
     }
 
     public static class UnsafeContentException extends RuntimeException {

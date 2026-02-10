@@ -77,21 +77,21 @@ public final class Message {
         return toolCallId;
     }
 
-    // Factory methods
+    // Factory methods for common roles
     public static Message system(String content) {
-        return new Message(Role.SYSTEM, content);
+        return new Message(Message.Role.SYSTEM, content);
     }
 
     public static Message user(String content) {
-        return new Message(Role.USER, content);
+        return new Message(Message.Role.USER, content);
     }
 
     public static Message assistant(String content) {
-        return new Message(Role.ASSISTANT, content);
+        return new Message(Message.Role.ASSISTANT, content);
     }
 
     public static Message tool(String toolCallId, String content) {
-        return new Message(Role.TOOL, content, null, null, toolCallId);
+        return new Message(Message.Role.TOOL, content, null, null, toolCallId);
     }
 
     @Override

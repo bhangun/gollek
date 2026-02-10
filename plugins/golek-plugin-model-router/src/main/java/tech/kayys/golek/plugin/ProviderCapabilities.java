@@ -4,16 +4,16 @@ package tech.kayys.golek.plugin;
  * Represents the capabilities and characteristics of a provider.
  */
 public class ProviderCapabilities {
-    
+
     private final String providerId;
     private final double reliability; // Percentage (0-100)
     private final double avgLatencyMs; // Average latency in milliseconds
     private final double costPerThousand; // Cost per thousand tokens/units
     private final String performanceTier; // "low", "medium", "high"
 
-    public ProviderCapabilities(String providerId, double reliability, 
-                              double avgLatencyMs, double costPerThousand, 
-                              String performanceTier) {
+    public ProviderCapabilities(String providerId, double reliability,
+            double avgLatencyMs, double costPerThousand,
+            String performanceTier) {
         this.providerId = providerId;
         this.reliability = reliability;
         this.avgLatencyMs = avgLatencyMs;
@@ -39,6 +39,16 @@ public class ProviderCapabilities {
 
     public String performanceTier() {
         return performanceTier;
+    }
+
+    public double performance() {
+        if ("high".equalsIgnoreCase(performanceTier)) {
+            return 90.0;
+        } else if ("medium".equalsIgnoreCase(performanceTier)) {
+            return 60.0;
+        } else {
+            return 30.0;
+        }
     }
 
     public boolean isHighPerformance() {
@@ -90,8 +100,8 @@ public class ProviderCapabilities {
         }
 
         public ProviderCapabilities build() {
-            return new ProviderCapabilities(providerId, reliability, avgLatencyMs, 
-                                         costPerThousand, performanceTier);
+            return new ProviderCapabilities(providerId, reliability, avgLatencyMs,
+                    costPerThousand, performanceTier);
         }
     }
 }

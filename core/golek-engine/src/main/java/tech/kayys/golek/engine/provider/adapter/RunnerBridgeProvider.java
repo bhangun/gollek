@@ -1,6 +1,7 @@
 package tech.kayys.golek.engine.provider.adapter;
 
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.Multi;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.model.ModelManifest;
@@ -9,28 +10,30 @@ import tech.kayys.golek.spi.provider.ProviderConfig;
 import tech.kayys.golek.spi.provider.ProviderHealth;
 import tech.kayys.golek.spi.provider.ProviderMetadata;
 import tech.kayys.golek.spi.provider.ProviderRequest;
-import tech.kayys.golek.engine.execution.ModelRunnerFactory;
+import tech.kayys.golek.spi.provider.StreamingProvider;
 import tech.kayys.golek.engine.model.ModelRunner;
+import tech.kayys.golek.engine.model.ModelRunnerFactory;
 import tech.kayys.golek.model.exception.ModelNotFoundException;
-import tech.kayys.golek.engine.model.ModelRepository;
-import tech.kayys.golek.provider.core.spi.LLMProvider;
-import tech.kayys.golek.provider.core.spi.StreamingProvider;
+import tech.kayys.golek.engine.model.CachedModelRepository;
+
 import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.spi.stream.StreamChunk;
-import io.smallrye.mutiny.Multi;
+
+import java.time.Duration;
 
 /**
  * Adapter that exposes a local ModelRunner as an LLMProvider.
  * This enables the unified routing and execution of both local and remote
  * models.
  */
-public class RunnerBridgeProvider implements LLMProvider, StreamingProvider {
+public class RunnerBridgeProvider implements StreamingProvider {
 
     private final String runnerType;
     private final ModelRunnerFactory runnerFactory;
-    private final ModelRepository modelRepository;
+    private final CachedModelRepository modelRepository;
 
-    public RunnerBridgeProvider(String runnerType, ModelRunnerFactory runnerFactory, ModelRepository modelRepository) {
+    public RunnerBridgeProvider(String runnerType, ModelRunnerFactory runnerFactory,
+            CachedModelRepository modelRepository) {
         this.runnerType = runnerType;
         this.runnerFactory = runnerFactory;
         this.modelRepository = modelRepository;
@@ -43,7 +46,6 @@ public class RunnerBridgeProvider implements LLMProvider, StreamingProvider {
 
     @Override
     public String name() {
-        // e.g. "litert-cpu" -> "Local (LiteRT CPU)"
         return "Local (" + runnerType + ")";
     }
 
@@ -61,54 +63,30 @@ public class RunnerBridgeProvider implements LLMProvider, StreamingProvider {
 
     @Override
     public ProviderCapabilities capabilities() {
-        // Capabilities depend on the underlying runner, which we can't fully know
-        // without instantiating it.
-        // For now, we return a broad set of capabilities and rely on supports() and
-        // runtime checks.
-        // Ideally, ModelRunnerFactory would expose capabilities per runner type.
         return ProviderCapabilities.builder()
-                .streaming(true) // Most local runners support streaming
+                .streaming(true)
                 .embeddings(true)
-                .supportedFormats(java.util.Collections.emptySet()) // Dynamic
-                .maxContextTokens(32000) // Placeholder
+                .supportedFormats(java.util.Collections.emptySet())
+                .maxContextTokens(32000)
                 .build();
     }
 
     @Override
     public void initialize(ProviderConfig config) {
-        // No heavy initialization here, as runners are lazy-loaded by the factory
     }
 
     @Override
     public boolean supports(String modelId, TenantContext tenantContext) {
         TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
-        // We need to check if the underlying runner supports the model's format.
-        // This requires looking up the model manifest.
         try {
-            ModelManifest manifest = modelRepository.findById(modelId, effectiveTenantContext.getTenantId())
-                    .orElse(null);
+            ModelManifest manifest = modelRepository.findById(modelId, effectiveTenantContext.getTenantId().value())
+                    .await().atMost(Duration.ofSeconds(5));
 
             if (manifest == null) {
                 return false;
             }
 
-            // Ideally ModelRunnerFactory or ModelRunner should have a static/lightweight
-            // supports() check.
-            // For now, we rely on the logic that ModelRouter used: check format
-            // compatibility.
-            // But checking that here requires duplicating logic or exposing it from
-            // Factory.
-            // Let's assume if the factory has this runner, it *might* support it.
-            // A more robust check would involve checking manifest formats against runner's
-            // supported formats.
-
-            // Re-using logic similar to ModelRouter's extractFramework approach:
             String framework = extractFramework(runnerType);
-            // Check if any of the artifacts match the framework
-            // Assuming framework string maps to ModelFormat logic.
-            // A more precise check would convert string framework to ModelFormat if
-            // possible.
-            // For now, we check if any artifact's format name matches the framework string.
             return manifest.artifacts().keySet().stream()
                     .anyMatch(format -> framework.equalsIgnoreCase(format.name()));
 
@@ -119,65 +97,45 @@ public class RunnerBridgeProvider implements LLMProvider, StreamingProvider {
 
     @Override
     public Uni<InferenceResponse> infer(ProviderRequest request, TenantContext context) {
-        return Uni.createFrom().item(() -> {
-            try {
-                TenantContext effectiveTenantContext = ensureTenantContext(context);
-                // translate ProviderRequest to InferenceRequest (Engine's internal format)
-                // Note: ProviderRequest and InferenceRequest are very similar.
-                // We might need a converter. For now, assuming manual mapping.
+        TenantContext effectiveTenantContext = ensureTenantContext(context);
+        // translate ProviderRequest to InferenceRequest (Engine's internal format)
+        InferenceRequest inferenceRequest = InferenceRequest.builder()
+                .requestId(request.getRequestId())
+                .model(request.getModel())
+                .messages(request.getMessages())
+                .parameters(request.getMessages().isEmpty() ? request.getParameters() : request.getParameters()) // dummy
+                .parameters(request.getParameters())
+                .streaming(request.isStreaming())
+                .timeout(request.getTimeout())
+                .preferredProvider(runnerType)
+                .build();
 
-                InferenceRequest inferenceRequest = InferenceRequest.builder()
-                        .requestId(request.getRequestId())
-                        .model(request.getModel())
-                        .messages(request.getMessages())
-                        .tools(request.getTools())
-                        .toolChoice(request.getToolChoice())
-                        .parameters(request.getParameters())
-                        .streaming(request.isStreaming())
-                        .timeout(request.getTimeout())
-                        .priority(5) // Default priority
-                        .preferredProvider(runnerType) // Lock to this runner
-                        .build();
-
-                // Get Manifest
-                ModelManifest manifest = modelRepository.findById(request.getModel(), effectiveTenantContext.getTenantId())
-                        .orElseThrow(() -> new ModelNotFoundException(request.getModel()));
-
-                // Get Runner
-                ModelRunner runner = runnerFactory.getOrCreateRunner(runnerType, manifest);
-
-                // Execute logic matching InferenceOrchestrator's executeWithRunner
-                // Note: ModelRunner.infer() is synchronous or async.
-
-                return runner.infer(inferenceRequest);
-
-            } catch (Exception e) {
-                // Wrap in RuntimeException for Uni
-                throw new RuntimeException(e);
-            }
-        });
+        return modelRepository
+                .findById(request.getModel(), effectiveTenantContext.getTenantId().value())
+                .onItem().ifNull().failWith(() -> new ModelNotFoundException(request.getModel()))
+                .chain(manifest -> {
+                    ModelRunner runner = runnerFactory.getOrCreateRunner(runnerType, manifest);
+                    try {
+                        return Uni.createFrom().item(runner.infer(inferenceRequest, null));
+                    } catch (tech.kayys.golek.spi.exception.InferenceException e) {
+                        return Uni.createFrom().failure(e);
+                    }
+                });
     }
 
     @Override
-    public Multi<StreamChunk> stream(ProviderRequest request, TenantContext context) {
-        // Currently ModelRunner does not have a native stream() method.
-        // We throw an exception until ModelRunner SPI is updated to support streaming.
+    public Multi<StreamChunk> inferStream(ProviderRequest request, TenantContext context) {
         return Multi.createFrom().failure(new UnsupportedOperationException(
-                "Streaming is not yet supported for local runners via RunnerBridgeProvider. " +
-                        "Underlying ModelRunner SPI needs to be updated."));
+                "Streaming is not yet supported for local runners via RunnerBridgeProvider."));
     }
 
     @Override
     public Uni<ProviderHealth> health() {
-        return Uni.createFrom().item(() -> {
-            // Check factory pool status or just report healthy if factory is up
-            return ProviderHealth.healthy(runnerType);
-        });
+        return Uni.createFrom().item(() -> ProviderHealth.healthy(runnerType));
     }
 
     @Override
     public void shutdown() {
-        // Nothing to do, factory manages lifecycle
     }
 
     private String extractFramework(String runnerName) {
@@ -189,6 +147,6 @@ public class RunnerBridgeProvider implements LLMProvider, StreamingProvider {
     }
 
     private TenantContext ensureTenantContext(TenantContext tenantContext) {
-        return tenantContext != null ? tenantContext : TenantContext.of("default");
+        return tenantContext != null ? tenantContext : TenantContext.of("community");
     }
 }

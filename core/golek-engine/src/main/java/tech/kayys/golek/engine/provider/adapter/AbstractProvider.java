@@ -6,13 +6,14 @@ import org.jboss.logging.Logger;
 
 import tech.kayys.golek.engine.reliability.CircuitBreaker;
 import tech.kayys.golek.engine.reliability.DefaultCircuitBreaker;
-import tech.kayys.golek.provider.core.exception.ProviderException;
 import tech.kayys.golek.provider.core.ratelimit.RateLimiter;
 import tech.kayys.golek.engine.ratelimit.TokenBucketRateLimiter;
-import tech.kayys.golek.provider.core.spi.LLMProvider;
 import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.wayang.tenant.TenantId;
+import tech.kayys.golek.spi.exception.ProviderException;
+import tech.kayys.golek.spi.exception.ProviderException.ProviderInitializationException;
 import tech.kayys.golek.spi.inference.InferenceResponse;
+import tech.kayys.golek.spi.provider.LLMProvider;
 import tech.kayys.golek.spi.provider.ProviderConfig;
 import tech.kayys.golek.spi.provider.ProviderHealth;
 import tech.kayys.golek.spi.provider.ProviderRequest;
@@ -86,7 +87,7 @@ public abstract class AbstractProvider implements LLMProvider {
                     new ProviderException(id(), "Provider not initialized"));
         }
 
-        String tenantId = context != null ? context.getTenantId().value() : "default";
+        String tenantId = context != null ? context.getTenantId().value() : "community";
 
         return checkQuota(context)
                 .chain(() -> checkRateLimit(tenantId))
@@ -101,7 +102,7 @@ public abstract class AbstractProvider implements LLMProvider {
     protected Uni<Void> checkQuota(TenantContext context) {
         return Uni.createFrom().item(() -> {
             if (!quotaService.hasQuota(id())) {
-                String tenantId = context != null ? context.getTenantId().value() : "default";
+                String tenantId = context != null ? context.getTenantId().value() : "community";
                 throw new tech.kayys.golek.spi.routing.QuotaExhaustedException(id(),
                         "Provider quota exhausted for: " + id() + ", tenant: " + tenantId);
             }
@@ -195,7 +196,7 @@ public abstract class AbstractProvider implements LLMProvider {
     protected Uni<InferenceResponse> executeWithCircuitBreaker(
             ProviderRequest request,
             TenantContext context) {
-        String tenantId = context != null ? context.getTenantId().value() : "default";
+        String tenantId = context != null ? context.getTenantId().value() : "community";
 
         CircuitBreaker circuitBreaker = circuitBreakers.computeIfAbsent(
                 tenantId,

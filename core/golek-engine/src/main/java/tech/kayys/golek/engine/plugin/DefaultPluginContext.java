@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-import tech.kayys.golek.engine.context.EngineContext;
+import tech.kayys.golek.spi.context.EngineContext;
 import tech.kayys.golek.spi.plugin.PluginContext;
 import tech.kayys.golek.spi.plugin.PluginRegistry;
 
@@ -35,17 +35,25 @@ public class DefaultPluginContext implements PluginContext {
         this.sharedData = new ConcurrentHashMap<>();
     }
 
-    @Override
     public EngineContext engineContext() {
         return engineContext;
     }
 
-    @Override
     public Map<String, Object> config() {
         return new HashMap<>(config);
     }
 
     @Override
+    public Optional<String> getConfig(String key) {
+        Object value = config.get(key);
+        if (value != null) {
+            return Optional.of(value.toString());
+        }
+        return Optional.empty();
+    }
+
+    // Retaining these as useful helper methods, though not in the interface
+    // strictly as is
     @SuppressWarnings("unchecked")
     public <T> Optional<T> getConfig(String key, Class<T> type) {
         Object value = config.get(key);
@@ -55,32 +63,24 @@ public class DefaultPluginContext implements PluginContext {
         return Optional.empty();
     }
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public <T> T getConfigOrDefault(String key, T defaultValue) {
-        Object value = config.get(key);
-        if (value != null && defaultValue.getClass().isInstance(value)) {
-            return (T) value;
-        }
-        return defaultValue;
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return getConfigOrDefault("enabled", true);
-    }
-
-    @Override
     public PluginRegistry registry() {
         return registry;
     }
 
     @Override
+    public String getPluginId() {
+        // Assuming we might need to pass this in constructor or get it from
+        // registry/metadata
+        // For now returning property or throw
+        return (String) config.getOrDefault("plugin.id", "unknown");
+    }
+
+    // Shared data methods if they are not in interface, keep them if used
+    // internally or remove @Override
     public void putSharedData(String key, Object value) {
         sharedData.put(key, value);
     }
 
-    @Override
     @SuppressWarnings("unchecked")
     public <T> Optional<T> getSharedData(String key, Class<T> type) {
         Object value = sharedData.get(key);

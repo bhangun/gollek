@@ -122,25 +122,21 @@ class GolekClientTest {
     }
     
     @Test
-    void testBuilder_WithoutApiKey_ThrowsException() {
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class, 
-            () -> new GolekClient.Builder().build()
-        );
-        
-        assertEquals("API key is required", exception.getMessage());
+    void testBuilder_WithoutApiKey_UsesCommunityKey() {
+        // Act
+        GolekClient client = new GolekClient.Builder().build();
+
+        // Assert
+        assertNotNull(client);
     }
     
     @Test
-    void testBuilder_WithEmptyApiKey_ThrowsException() {
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class, 
-            () -> new GolekClient.Builder().apiKey("").build()
-        );
-        
-        assertEquals("API key is required", exception.getMessage());
+    void testBuilder_WithEmptyApiKey_UsesCommunityKey() {
+        // Act
+        GolekClient client = new GolekClient.Builder().apiKey("").build();
+
+        // Assert
+        assertNotNull(client);
     }
     
     @Test
@@ -149,11 +145,21 @@ class GolekClientTest {
         GolekClient client = new GolekClient.Builder()
                 .baseUrl("https://api.example.com")
                 .apiKey("valid-api-key")
-                .defaultTenantId("test-tenant")
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
         
         // Assert
         assertNotNull(client);
+    }
+
+    @Test
+    void testBuilder_DefaultsToCommunityKey() throws Exception {
+        GolekClient client = new GolekClient.Builder().build();
+
+        java.lang.reflect.Field apiKeyField = GolekClient.class.getDeclaredField("apiKey");
+        apiKeyField.setAccessible(true);
+        String apiKey = (String) apiKeyField.get(client);
+
+        assertEquals("community", apiKey);
     }
 }

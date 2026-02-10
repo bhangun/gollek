@@ -2,7 +2,8 @@ package tech.kayys.golek.engine.model;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tech.kayys.golek.engine.model.ModelRegistryService.ConversionJob;
 
 import java.util.Map;
@@ -11,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service for converting models between different formats.
- * 
+ *
  * <p>
  * Supported conversions:
  * <ul>
@@ -20,16 +21,17 @@ import java.util.concurrent.ConcurrentHashMap;
  * <li>ONNX → LiteRT</li>
  * <li>TensorFlow → ONNX</li>
  * </ul>
- * 
+ *
  * <p>
  * Conversion happens asynchronously in background workers.
- * 
- * @author bhangun
+ *
+ * @author Bhangun
  * @since 1.0.0
  */
 @ApplicationScoped
-@Slf4j
 public class ModelConversionService {
+
+    private static final Logger log = LoggerFactory.getLogger(ModelConversionService.class);
 
     private final Map<String, ConversionJob> jobs = new ConcurrentHashMap<>();
 

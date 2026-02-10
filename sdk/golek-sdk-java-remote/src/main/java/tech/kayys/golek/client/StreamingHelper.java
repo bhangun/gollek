@@ -5,6 +5,7 @@ import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 import tech.kayys.golek.spi.stream.StreamChunk;
 import tech.kayys.golek.client.exception.GolekClientException;
+import tech.kayys.golek.spi.auth.ApiKeyConstants;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -29,14 +30,12 @@ public class StreamingHelper {
     private final ObjectMapper objectMapper;
     private final String baseUrl;
     private final String apiKey;
-    private final String defaultTenantId;
 
-    public StreamingHelper(HttpClient httpClient, ObjectMapper objectMapper, String baseUrl, String apiKey, String defaultTenantId) {
+    public StreamingHelper(HttpClient httpClient, ObjectMapper objectMapper, String baseUrl, String apiKey) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
         this.baseUrl = baseUrl;
-        this.apiKey = apiKey;
-        this.defaultTenantId = defaultTenantId;
+        this.apiKey = normalizeApiKey(apiKey);
     }
 
     /**
@@ -75,8 +74,8 @@ public class StreamingHelper {
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(baseUrl + "/v1/models/pull/stream"))
                         .header("Content-Type", "application/json")
-                        .header("Authorization", "Bearer " + apiKey)
-                        .header("X-Tenant-ID", defaultTenantId)
+                        .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                        .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
                         .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                         .timeout(Duration.ofMinutes(30)) // Longer timeout for model pulling
                         .build();
@@ -139,8 +138,8 @@ public class StreamingHelper {
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(endpoint))
                         .header("Content-Type", "application/json")
-                        .header("Authorization", "Bearer " + apiKey)
-                        .header("X-Tenant-ID", defaultTenantId)
+                        .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                        .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
                         .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                         .timeout(Duration.ofMinutes(10)) // Longer timeout for streaming
                         .build();
@@ -181,5 +180,12 @@ public class StreamingHelper {
                 }
             }
         });
+    }
+
+    private static String normalizeApiKey(String apiKey) {
+        if (apiKey == null || apiKey.isBlank()) {
+            return ApiKeyConstants.COMMUNITY_API_KEY;
+        }
+        return apiKey;
     }
 }

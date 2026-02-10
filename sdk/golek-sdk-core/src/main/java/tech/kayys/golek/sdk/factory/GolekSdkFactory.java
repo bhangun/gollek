@@ -6,7 +6,6 @@ import tech.kayys.golek.sdk.core.GolekSdk;
 import tech.kayys.golek.sdk.core.config.SdkConfig;
 import tech.kayys.golek.sdk.core.exception.SdkException;
 
-
 import java.time.Duration;
 import java.util.Objects;
 
@@ -14,24 +13,25 @@ import java.util.Objects;
  * Factory for creating Golek SDK instances.
  * Provides convenient methods to create local or remote SDK implementations.
  *
- * <p>Usage examples:
+ * <p>
+ * Usage examples:
+ * 
  * <pre>{@code
  * // Local SDK (embedded in same JVM as engine)
  * GolekSdk localSdk = GolekSdkFactory.createLocalSdk();
  *
  * // Local SDK with configuration
  * SdkConfig config = SdkConfig.builder()
- *     .tenantId("my-tenant")
- *     .preferredProvider("tech.kayys/ollama-provider")
- *     .build();
+ *         .apiKey("community")
+ *         .preferredProvider("tech.kayys/ollama-provider")
+ *         .build();
  * GolekSdk configuredSdk = GolekSdkFactory.createLocalSdk(config);
  *
  * // Remote SDK (communicates via HTTP)
  * GolekSdk remoteSdk = GolekSdkFactory.builder()
- *     .baseUrl("https://golek-spi.example.com")
- *     .apiKey("your-api-key")
- *     .tenantId("my-tenant")
- *     .buildRemote();
+ *         .baseUrl("https://golek-spi.example.com")
+ *         .apiKey("your-api-key")
+ *         .buildRemote();
  * }</pre>
  */
 public class GolekSdkFactory {
@@ -39,7 +39,8 @@ public class GolekSdkFactory {
     private static volatile SeContainer cdiContainer;
 
     /**
-     * Creates a local SDK instance that runs within the same JVM as the inference engine.
+     * Creates a local SDK instance that runs within the same JVM as the inference
+     * engine.
      * Uses CDI to inject dependencies from the running Quarkus application.
      *
      * @return A local SDK instance
@@ -48,7 +49,8 @@ public class GolekSdkFactory {
     public static GolekSdk createLocalSdk() throws SdkException {
         // TODO: Implement proper CDI or service loading for LocalGolekSdk
         // For now, returning null to resolve compilation errors.
-        // The correct approach would involve a service loader or CDI to find the implementation
+        // The correct approach would involve a service loader or CDI to find the
+        // implementation
         return null;
     }
 
@@ -72,8 +74,8 @@ public class GolekSdkFactory {
             try {
                 sdk.setPreferredProvider(providerId);
             } catch (Exception e) {
-                throw new SdkException("SDK_ERR_CONFIG",
-                        "Failed to set preferred provider: " + providerId, e);
+                throw new RuntimeException(new SdkException("SDK_ERR_CONFIG",
+                        "Failed to set preferred provider: " + providerId, e));
             }
         });
 
@@ -81,56 +83,58 @@ public class GolekSdkFactory {
     }
 
     /**
-     * Creates a remote SDK instance that communicates with the inference engine via HTTP API.
+     * Creates a remote SDK instance that communicates with the inference engine via
+     * HTTP API.
      *
      * @param baseUrl The base URL of the inference engine API
-     * @param apiKey The API key for authentication
+     * @param apiKey  The API key for authentication
      * @return A remote SDK instance
-    public static GolekSdk createRemoteSdk(String baseUrl, String apiKey) {
-        return builder()
-                .baseUrl(baseUrl)
-                .apiKey(apiKey)
-                .buildRemote();
-    }
-
-    /**
-     * Creates a remote SDK instance with additional configuration options.
+     *         public static GolekSdk createRemoteSdk(String baseUrl, String apiKey)
+     *         {
+     *         return builder()
+     *         .baseUrl(baseUrl)
+     *         .apiKey(apiKey)
+     *         .buildRemote();
+     *         }
+     * 
+     *         /**
+     *         Creates a remote SDK instance with additional configuration options.
      *
-     * @param baseUrl The base URL of the inference engine API
-     * @param apiKey The API key for authentication
-     * @param tenantId The default tenant ID to use
+     * @param baseUrl  The base URL of the inference engine API
+     * @param apiKey   The API key for authentication
+     * @param apiKey The API key to use (defaults to community if not provided)
      * @return A remote SDK instance
-    public static GolekSdk createRemoteSdk(String baseUrl, String apiKey, String tenantId) {
-        return builder()
-                .baseUrl(baseUrl)
-                .apiKey(apiKey)
-                .tenantId(tenantId)
-                .buildRemote();
-    }
-
-    /**
-     * Creates a remote SDK instance with custom configuration.
+     *         public static GolekSdk createRemoteSdk(String baseUrl, String apiKey,
+     *         String apiKey) {
+     *         return builder()
+     *         .baseUrl(baseUrl)
+     *         .apiKey(apiKey)
+     *         .buildRemote();
+     *         }
+     * 
+     *         /**
+     *         Creates a remote SDK instance with custom configuration.
      *
      * @param config SDK configuration
      * @return A remote SDK instance
-    public static GolekSdk createRemoteSdk(SdkConfig config) {
-        Objects.requireNonNull(config, "config cannot be null");
-
-        Builder builder = builder()
-                .tenantId(config.getTenantId())
-                .requestTimeout(config.getRequestTimeout())
-                .requestTimeout(config.getConnectTimeout())
-                .maxRetries(config.getRetryConfig().getMaxAttempts());
-
-        config.getPreferredProvider().ifPresent(builder::preferredProvider);
-
-        // Note: baseUrl and apiKey should be in provider configs for remote
-        // This is a simplified implementation
-        return builder.buildRemote();
-    }
-
-    /**
-     * Creates a new builder for configuring SDK instances.
+     *         public static GolekSdk createRemoteSdk(SdkConfig config) {
+     *         Objects.requireNonNull(config, "config cannot be null");
+     * 
+     *         Builder builder = builder()
+     *         .apiKey(config.getApiKey())
+     *         .requestTimeout(config.getRequestTimeout())
+     *         .requestTimeout(config.getConnectTimeout())
+     *         .maxRetries(config.getRetryConfig().getMaxAttempts());
+     * 
+     *         config.getPreferredProvider().ifPresent(builder::preferredProvider);
+     * 
+     *         // Note: baseUrl and apiKey should be in provider configs for remote
+     *         // This is a simplified implementation
+     *         return builder.buildRemote();
+     *         }
+     * 
+     *         /**
+     *         Creates a new builder for configuring SDK instances.
      *
      * @return A new builder instance
      */
@@ -178,8 +182,7 @@ public class GolekSdkFactory {
      */
     public static class Builder {
         private String baseUrl;
-        private String apiKey;
-        private String tenantId = "default";
+        private String apiKey = "community";
         private String preferredProvider;
         private Duration requestTimeout = Duration.ofSeconds(60);
         private Duration connectTimeout = Duration.ofSeconds(30);
@@ -196,11 +199,6 @@ public class GolekSdkFactory {
 
         public Builder apiKey(String apiKey) {
             this.apiKey = Objects.requireNonNull(apiKey, "apiKey cannot be null");
-            return this;
-        }
-
-        public Builder tenantId(String tenantId) {
-            this.tenantId = Objects.requireNonNull(tenantId, "tenantId cannot be null");
             return this;
         }
 
@@ -240,7 +238,8 @@ public class GolekSdkFactory {
         public GolekSdk buildLocal() {
             // TODO: Implement proper CDI or service loading for LocalGolekSdk
             // For now, returning null to resolve compilation errors.
-            // The correct approach would involve a service loader or CDI to find the implementation
+            // The correct approach would involve a service loader or CDI to find the
+            // implementation
             return null;
         }
 
@@ -248,15 +247,17 @@ public class GolekSdkFactory {
          * Builds a remote SDK instance with the configured settings.
          *
          * @return A configured remote SDK instance
+         * @throws SdkException if configuration is invalid
          */
-        public GolekSdk buildRemote() {
+        public GolekSdk buildRemote() throws SdkException {
             if (baseUrl == null || baseUrl.isBlank()) {
                 throw new SdkException("SDK_ERR_CONFIG", "baseUrl is required for remote SDK");
             }
             if (apiKey == null || apiKey.isBlank()) {
-                throw new SdkException("SDK_ERR_CONFIG", "apiKey is required for remote SDK");
+                apiKey = "community";
             }
-            // TODO: Implement proper remote SDK instantiation when golek-sdk-java-remote is available
+            // TODO: Implement proper remote SDK instantiation when golek-sdk-java-remote is
+            // available
             throw new UnsupportedOperationException("Remote SDK not yet implemented.");
         }
     }

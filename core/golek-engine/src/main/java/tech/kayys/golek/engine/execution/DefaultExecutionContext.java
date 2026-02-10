@@ -25,7 +25,7 @@ public class DefaultExecutionContext implements ExecutionContext {
             TenantContext tenantContext,
             ExecutionToken initialToken) {
         this.engineContext = engineContext;
-        this.tenantContext = tenantContext != null ? tenantContext : TenantContext.of("default");
+        this.tenantContext = tenantContext != null ? tenantContext : TenantContext.of("community");
         this.tokenRef = new AtomicReference<>(initialToken);
         this.errorRef = new AtomicReference<>();
     }

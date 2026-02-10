@@ -1,0 +1,137 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/
+
+# Gradle
+.gradle/
+build/
+
+# Project-specific targets (for each module)
+**/target/
+
+# IDE
+## IntelliJ IDEA
+.idea
+*.iws
+*.iml
+*.ipr
+*.iws
+out/
+
+## Eclipse
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.settings/
+.loadpath
+.recommenders
+
+## NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+## VS Code
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+*.lnk
+
+# Logs
+*.log
+logs/
+*.out
+
+# Testing
+*.JUnitTestSuite
+jacoco/
+
+# Environment specific
+.env
+config/
+secrets/
+credentials.json
+
+# Runtime data
+pid
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Temporary folders
+tmp/
+temp/
+
+# Package manager caches
+node_modules/
+jspm_packages/
+
+# Local configuration
+local/
+config.local
+*.local
+
+# Compiled class file
+*.class
+
+# JAR, WAR, EAR
+*.war
+*.ear
+*.jar
+*.zip
+*.tar.gz
+*.rar
+
+# Java binary files
+*.exe
+*.dll
+*.so
+
+# Generated files
+generated-sources/
+gen/
+
+# Documentation
+doc/
+apidocs/
+
+# Database
+*.db
+*.db-journal
+
+# Sensitive or local files
+**/local.properties
+**/application-local.properties
+**/application-dev.properties
+**/application-test.properties
+**/application-prod.properties
+
+   

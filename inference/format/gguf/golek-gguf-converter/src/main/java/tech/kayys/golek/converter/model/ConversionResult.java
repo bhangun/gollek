@@ -132,4 +132,65 @@ public class ConversionResult {
         return String.format("%dm %ds", minutes, seconds);
     }
 
+    /**
+     * Builder class for ConversionResult.
+     */
+    public static class Builder {
+        private long conversionId;
+        private boolean success;
+        private ModelInfo inputInfo;
+        private Path outputPath;
+        private long outputSize;
+        private long durationMs;
+        private double compressionRatio;
+        private String errorMessage;
+
+        public Builder conversionId(long conversionId) {
+            this.conversionId = conversionId;
+            return this;
+        }
+
+        public Builder success(boolean success) {
+            this.success = success;
+            return this;
+        }
+
+        public Builder inputInfo(ModelInfo inputInfo) {
+            this.inputInfo = inputInfo;
+            return this;
+        }
+
+        public Builder outputPath(Path outputPath) {
+            this.outputPath = outputPath;
+            return this;
+        }
+
+        public Builder outputSize(long outputSize) {
+            this.outputSize = outputSize;
+            return this;
+        }
+
+        public Builder durationMs(long durationMs) {
+            this.durationMs = durationMs;
+            return this;
+        }
+
+        public Builder compressionRatio(double compressionRatio) {
+            this.compressionRatio = compressionRatio;
+            return this;
+        }
+
+        public Builder errorMessage(String errorMessage) {
+            this.errorMessage = errorMessage;
+            return this;
+        }
+
+        public ConversionResult build() {
+            return new ConversionResult(conversionId, success, inputInfo, outputPath, outputSize, durationMs, compressionRatio, errorMessage);
+        }
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
 }

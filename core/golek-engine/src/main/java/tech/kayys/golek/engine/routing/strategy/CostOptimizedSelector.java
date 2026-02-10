@@ -14,7 +14,7 @@ import java.util.Set;
 public class CostOptimizedSelector implements ProviderSelector {
 
     private static final Set<String> LOCAL_PREFIXES = Set.of(
-            "local", "ollama", "onnx", "pytorch", "vllm", "gguf");
+            "local", "ollama", "onnx", "pytorch", "vllm", "gguf", "litert");
 
     private static final Set<String> EXPENSIVE_PREFIXES = Set.of(
             "openai", "anthropic", "gemini", "claude");

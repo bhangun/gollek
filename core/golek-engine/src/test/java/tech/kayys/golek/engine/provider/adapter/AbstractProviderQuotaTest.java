@@ -15,7 +15,6 @@ import tech.kayys.golek.spi.Message;
 import tech.kayys.golek.provider.core.quota.ProviderQuotaService;
 import tech.kayys.wayang.tenant.TenantContext;
 
-import java.util.Collections;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -39,7 +38,20 @@ public class AbstractProviderQuotaTest {
                 .providerId("test-provider")
                 .property("name", "Test Provider")
                 .property("version", "1.0.0")
+                .property("provider.circuit-breaker.failure-threshold", 5)
+                .property("provider.circuit-breaker.timeout", "PT60S")
                 .build());
+
+        // Manually inject config properties since we are no running in a container
+        java.lang.reflect.Field thresholdField = tech.kayys.golek.engine.provider.adapter.AbstractProvider.class
+                .getDeclaredField("circuitBreakerFailureThreshold");
+        thresholdField.setAccessible(true);
+        thresholdField.setInt(provider, 5);
+
+        java.lang.reflect.Field timeoutField = tech.kayys.golek.engine.provider.adapter.AbstractProvider.class
+                .getDeclaredField("circuitBreakerTimeout");
+        timeoutField.setAccessible(true);
+        timeoutField.set(provider, java.time.Duration.ofSeconds(60));
     }
 
     @Test
@@ -48,6 +60,7 @@ public class AbstractProviderQuotaTest {
         when(quotaService.hasQuota(any())).thenReturn(true);
         ProviderRequest request = ProviderRequest.builder()
                 .model("test-model")
+                .requestId("test-req-id")
                 .message(Message.user("hello"))
                 .build();
         TenantContext context = TenantContext.of("tenant-1");
@@ -71,6 +84,7 @@ public class AbstractProviderQuotaTest {
         when(quotaService.hasQuota(any())).thenReturn(false);
         ProviderRequest request = ProviderRequest.builder()
                 .model("test-model")
+                .requestId("test-req-id")
                 .message(Message.user("hello"))
                 .build();
         TenantContext context = TenantContext.of("tenant-1");
@@ -124,6 +138,7 @@ public class AbstractProviderQuotaTest {
         @Override
         protected Uni<InferenceResponse> doInfer(ProviderRequest request) {
             return Uni.createFrom().item(InferenceResponse.builder()
+                    .requestId(request.getRequestId())
                     .content("test-response")
                     .tokensUsed(10)
                     .build());

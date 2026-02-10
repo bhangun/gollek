@@ -1,8 +1,9 @@
 package tech.kayys.golek.converter;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -20,8 +21,9 @@ import java.nio.file.Paths;
  * @version 1.0.0
  */
 @ApplicationScoped
-@Slf4j
 public class ConversionStorageService {
+
+    private static final Logger log = LoggerFactory.getLogger(ConversionStorageService.class);
 
     @ConfigProperty(name = "converter.storage.base-path", defaultValue = "/var/lib/inference/models")
     String baseStoragePath;

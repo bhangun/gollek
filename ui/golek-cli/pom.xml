@@ -27,12 +27,27 @@
         <!-- Golek Dependencies -->
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-engine</artifactId>
+            <artifactId>golek-spi</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-adapter-gguf</artifactId>
+            <artifactId>golek-engine</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.14.0</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.18.0</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-inference-gguf</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -48,6 +63,11 @@
         <dependency>
             <groupId>tech.kayys.golek</groupId>
             <artifactId>golek-provider-ollama</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-model-repo-local</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -132,4 +152,19 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Native Image Profile -->
+        <profile>
+            <id>native</id>
+            <activation>
+                <property>
+                    <name>native</name>
+                </property>
+            </activation>
+            <properties>
+                <quarkus.package.type>native</quarkus.package.type>
+            </properties>
+        </profile>
+    </profiles>
 </project>

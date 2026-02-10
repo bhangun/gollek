@@ -65,7 +65,7 @@ To enable multi-tenancy (enterprise mode), add the `tenant-golek-ext` module or 
 **Enable via dependency**
 ```xml
 <dependency>
-  <groupId>tech.kayys.tenant</groupId>
+  <groupId>tech.kayys.wayang</groupId>
   <artifactId>tenant-golek-ext</artifactId>
   <version>${project.version}</version>
 </dependency>

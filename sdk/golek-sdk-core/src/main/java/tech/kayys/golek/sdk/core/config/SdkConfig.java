@@ -9,7 +9,7 @@ import java.util.Optional;
  * Global configuration for the Golek SDK.
  */
 public class SdkConfig {
-    private final String tenantId;
+    private final String apiKey;
     private final String preferredProvider;
     private final Map<String, ProviderConfig> providerConfigs;
     private final Duration requestTimeout;
@@ -19,7 +19,7 @@ public class SdkConfig {
     private final boolean enableCircuitBreaker;
 
     private SdkConfig(Builder builder) {
-        this.tenantId = builder.tenantId;
+        this.apiKey = builder.apiKey;
         this.preferredProvider = builder.preferredProvider;
         this.providerConfigs = new HashMap<>(builder.providerConfigs);
         this.requestTimeout = builder.requestTimeout;
@@ -29,8 +29,8 @@ public class SdkConfig {
         this.enableCircuitBreaker = builder.enableCircuitBreaker;
     }
 
-    public String getTenantId() {
-        return tenantId;
+    public String getApiKey() {
+        return apiKey;
     }
 
     public Optional<String> getPreferredProvider() {
@@ -70,7 +70,7 @@ public class SdkConfig {
     }
 
     public static class Builder {
-        private String tenantId = "default";
+        private String apiKey = "community";
         private String preferredProvider;
         private Map<String, ProviderConfig> providerConfigs = new HashMap<>();
         private Duration requestTimeout = Duration.ofSeconds(60);
@@ -79,8 +79,8 @@ public class SdkConfig {
         private boolean enableMetrics = false;
         private boolean enableCircuitBreaker = true;
 
-        public Builder tenantId(String tenantId) {
-            this.tenantId = tenantId;
+        public Builder apiKey(String apiKey) {
+            this.apiKey = apiKey;
             return this;
         }
 

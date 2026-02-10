@@ -10,6 +10,7 @@ import java.time.Instant;
 public class AsyncJobStatus {
     private final String jobId;
     private final String requestId;
+    @Deprecated
     private final String tenantId;
     private final String status; // PENDING, RUNNING, COMPLETED, FAILED
     private final InferenceResponse result;
@@ -37,6 +38,11 @@ public class AsyncJobStatus {
         return requestId;
     }
 
+    /**
+     * @deprecated Tenant ID is resolved server-side from the API key.
+     * Client code should not rely on this field.
+     */
+    @Deprecated
     public String getTenantId() {
         return tenantId;
     }
@@ -72,6 +78,7 @@ public class AsyncJobStatus {
     public static class Builder {
         private String jobId;
         private String requestId;
+        @Deprecated
         private String tenantId;
         private String status;
         private InferenceResponse result;
@@ -89,6 +96,11 @@ public class AsyncJobStatus {
             return this;
         }
 
+        /**
+         * @deprecated Tenant ID is resolved server-side from the API key.
+         * Client code should not set or rely on this value.
+         */
+        @Deprecated
         public Builder tenantId(String tenantId) {
             this.tenantId = tenantId;
             return this;

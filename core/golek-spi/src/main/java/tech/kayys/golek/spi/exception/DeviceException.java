@@ -5,7 +5,7 @@ import tech.kayys.golek.spi.error.ErrorCode;
 /**
  * Exception for device-related errors (GPU/TPU/NPU unavailable, OOM, etc.).
  * 
- * @author bhangun
+ * @author Bhangun
  * @since 1.0.0
  */
 public class DeviceException extends InferenceException {

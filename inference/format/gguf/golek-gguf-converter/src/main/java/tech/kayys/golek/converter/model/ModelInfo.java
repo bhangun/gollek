@@ -226,4 +226,78 @@ public class ModelInfo {
         sb.append("}");
         return sb.toString();
     }
+
+    /**
+     * Builder class for ModelInfo.
+     */
+    public static class Builder {
+        private String modelType;
+        private String architecture;
+        private long parameterCount;
+        private int numLayers;
+        private int hiddenSize;
+        private int vocabSize;
+        private int contextLength;
+        private String quantization;
+        private long fileSize;
+        private ModelFormat format;
+
+        public Builder modelType(String modelType) {
+            this.modelType = modelType;
+            return this;
+        }
+
+        public Builder architecture(String architecture) {
+            this.architecture = architecture;
+            return this;
+        }
+
+        public Builder parameterCount(long parameterCount) {
+            this.parameterCount = parameterCount;
+            return this;
+        }
+
+        public Builder numLayers(int numLayers) {
+            this.numLayers = numLayers;
+            return this;
+        }
+
+        public Builder hiddenSize(int hiddenSize) {
+            this.hiddenSize = hiddenSize;
+            return this;
+        }
+
+        public Builder vocabSize(int vocabSize) {
+            this.vocabSize = vocabSize;
+            return this;
+        }
+
+        public Builder contextLength(int contextLength) {
+            this.contextLength = contextLength;
+            return this;
+        }
+
+        public Builder quantization(String quantization) {
+            this.quantization = quantization;
+            return this;
+        }
+
+        public Builder fileSize(long fileSize) {
+            this.fileSize = fileSize;
+            return this;
+        }
+
+        public Builder format(ModelFormat format) {
+            this.format = format;
+            return this;
+        }
+
+        public ModelInfo build() {
+            return new ModelInfo(modelType, architecture, parameterCount, numLayers, hiddenSize, vocabSize, contextLength, quantization, fileSize, format);
+        }
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
 }

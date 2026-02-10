@@ -1,10 +1,10 @@
 package tech.kayys.golek.model.core;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.model.Pageable;
 
 import java.nio.file.Path;
 import java.time.Instant;

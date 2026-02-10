@@ -2,14 +2,8 @@ package tech.kayys.golek.engine.module;
 
 import tech.kayys.golek.core.config.ConfigurationManager;
 import tech.kayys.golek.core.plugin.PluginManager;
-import tech.kayys.golek.core.observability.ObservabilityManager;
-import tech.kayys.golek.spi.context.EngineContext;
-import tech.kayys.golek.spi.plugin.PluginRegistry;
 import tech.kayys.golek.spi.provider.ProviderRegistry;
-import tech.kayys.golek.engine.context.DefaultEngineContext;
 import tech.kayys.golek.engine.plugin.GolekPluginRegistry;
-import tech.kayys.golek.engine.registry.GolekProviderRegistry;
-
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.metrics.SdkMeterProvider;
@@ -31,7 +25,6 @@ public class KernelModule {
 
     private final PluginManager pluginManager;
     private final ConfigurationManager configurationManager;
-    private final ObservabilityManager observabilityManager;
     private final ProviderRegistry providerRegistry;
     private final GolekPluginRegistry kernelPluginRegistry;
 
@@ -50,7 +43,6 @@ public class KernelModule {
 
         // Initialize core components
         this.configurationManager = new ConfigurationManager();
-        this.observabilityManager = new ObservabilityManager(openTelemetry);
         this.pluginManager = new PluginManager();
         this.providerRegistry = providerRegistry;
         this.kernelPluginRegistry = new GolekPluginRegistry();
@@ -167,14 +159,6 @@ public class KernelModule {
         return configurationManager;
     }
 
-    /**
-     * Get the observability manager
-     */
-    @Produces
-    @Singleton
-    public ObservabilityManager getObservabilityManager() {
-        return observabilityManager;
-    }
 
     /**
      * Get the enhanced provider registry
@@ -186,8 +170,6 @@ public class KernelModule {
     /**
      * Get the kernel plugin registry
      */
-    @Produces
-    @Singleton
     public GolekPluginRegistry getKernelPluginRegistry() {
         return kernelPluginRegistry;
     }

@@ -5,7 +5,7 @@ import tech.kayys.golek.spi.error.ErrorCode;
 /**
  * Exception thrown during runner initialization.
  *
- * @author bhangun
+ * @author Bhangun
  * @since 1.0.0
  */
 public class RunnerInitializationException extends InferenceException {

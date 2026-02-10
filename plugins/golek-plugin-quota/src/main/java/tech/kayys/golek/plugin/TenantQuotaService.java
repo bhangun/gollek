@@ -1,6 +1,6 @@
 package tech.kayys.golek.plugin;
 
-import tech.kayys.golek.inference.TenantId;
+import tech.kayys.wayang.tenant.TenantId;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Default;

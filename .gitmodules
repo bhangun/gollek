@@ -1,3 +1,6 @@
 [submodule "adapter/source/llama-cpp/llama.cpp"]
 	path = adapter/source/llama-cpp/llama.cpp
 	url = https://github.com/ggerganov/llama.cpp.git
+[submodule "inference/format/gguf/vendor/llama-cpp/llama.cpp"]
+	path = inference/format/gguf/vendor/llama-cpp/llama.cpp
+	url = https://github.com/ggerganov/llama.cpp.git

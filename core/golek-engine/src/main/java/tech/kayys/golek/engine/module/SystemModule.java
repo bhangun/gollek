@@ -1,15 +1,12 @@
 package tech.kayys.golek.engine.module;
 
 import tech.kayys.golek.core.config.EnhancedConfigurationManager;
-import tech.kayys.golek.core.observability.ObservabilityManager;
 import tech.kayys.golek.core.plugin.PluginManager;
 import tech.kayys.golek.engine.plugin.GolekPluginRegistry;
-import tech.kayys.golek.engine.execution.ModelRunnerFactory;
 import tech.kayys.golek.engine.model.ReliabilityManager;
-import tech.kayys.golek.spi.plugin.PluginRegistry;
 import tech.kayys.golek.spi.provider.ProviderRegistry;
-import tech.kayys.golek.engine.registry.GolekProviderRegistry;
-import tech.kayys.golek.engine.model.ModelRepository;
+import tech.kayys.golek.engine.model.CachedModelRepository;
+import tech.kayys.golek.engine.model.ModelRunnerFactory;
 
 import org.jboss.logging.Logger;
 
@@ -17,6 +14,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import java.util.Map;
+import tech.kayys.wayang.tenant.TenantConfig;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -33,13 +32,12 @@ public class SystemModule {
     private final KernelModule kernelModule;
     private final PluginManager pluginManager;
     private final EnhancedConfigurationManager configurationManager;
-    private final ObservabilityManager observabilityManager;
     private final ProviderRegistry providerRegistry;
     private final GolekPluginRegistry kernelPluginRegistry;
     private final ReliabilityManager reliabilityManager;
     private final ExecutorService executorService;
     private final ModelRunnerFactory runnerFactory;
-    private final ModelRepository modelRepository;
+    private final CachedModelRepository modelRepository;
 
     private volatile boolean initialized = false;
     private volatile boolean started = false;
@@ -47,14 +45,13 @@ public class SystemModule {
     @Inject
     public SystemModule(ProviderRegistry providerRegistry,
             ModelRunnerFactory runnerFactory,
-            ModelRepository modelRepository) {
+            CachedModelRepository modelRepository) {
         this.providerRegistry = providerRegistry;
         this.runnerFactory = runnerFactory;
         this.modelRepository = modelRepository;
         // Initialize core components
         this.kernelModule = new KernelModule(providerRegistry);
         this.pluginManager = kernelModule.getPluginManager();
-        this.observabilityManager = kernelModule.getObservabilityManager();
         this.kernelPluginRegistry = kernelModule.getKernelPluginRegistry();
 
         // Initialize enhanced configuration manager
@@ -242,19 +239,8 @@ public class SystemModule {
     }
 
     /**
-     * Get the observability manager
-     */
-    @Produces
-    @Singleton
-    public ObservabilityManager getObservabilityManager() {
-        return observabilityManager;
-    }
-
-    /**
      * Get the kernel plugin registry
      */
-    @Produces
-    @Singleton
     public GolekPluginRegistry getKernelPluginRegistry() {
         return kernelPluginRegistry;
     }
@@ -262,19 +248,67 @@ public class SystemModule {
     /**
      * Get the reliability manager
      */
-    @Produces
-    @Singleton
     public ReliabilityManager getReliabilityManager() {
         return reliabilityManager;
     }
 
     /**
-     * Get the executor service
+     * Produce HardwareDetector bean
      */
     @Produces
     @Singleton
-    public ExecutorService getExecutorService() {
-        return executorService;
+    public tech.kayys.golek.model.core.HardwareDetector produceHardwareDetector() {
+        return new tech.kayys.golek.model.core.HardwareDetector();
+    }
+
+    @Produces
+    @Singleton
+    public tech.kayys.wayang.tenant.TenantConfigRepository produceTenantConfigRepository() {
+        return new tech.kayys.wayang.tenant.TenantConfigRepository() {
+            @Override
+            public Map<String, Object> getRunnerConfig(String tenantId, String runnerId) {
+                return Map.of();
+            }
+
+            @Override
+            public boolean isQuotaExhausted(String tenantId, String providerId) {
+                return false;
+            }
+
+            @Override
+            public boolean isCostSensitive(String tenantId) {
+                return false;
+            }
+
+            @Override
+            public void updateConfig(String tenantId, TenantConfig config) {
+                // No-op
+            }
+        };
+    }
+
+    /**
+     * Produce RunnerMetrics bean
+     */
+    @Produces
+    @Singleton
+    public tech.kayys.golek.model.core.RunnerMetrics produceRunnerMetrics() {
+        return new tech.kayys.golek.model.core.RunnerMetrics() {
+            @Override
+            public java.util.Optional<java.time.Duration> getP95Latency(String runnerName, String modelId) {
+                return java.util.Optional.empty();
+            }
+
+            @Override
+            public boolean isHealthy(String runnerName) {
+                return true;
+            }
+
+            @Override
+            public double getCurrentLoad(String runnerName) {
+                return 0.0;
+            }
+        };
     }
 
     /**

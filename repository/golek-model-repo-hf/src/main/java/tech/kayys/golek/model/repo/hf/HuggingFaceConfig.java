@@ -1,4 +1,5 @@
-package tech.kayys.golek.model.repository.hf;
+package tech.kayys.golek.model.repo.hf;
+
 
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;

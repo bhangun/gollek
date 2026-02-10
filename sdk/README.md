@@ -45,8 +45,7 @@ import tech.kayys.golek.sdk.core.GolekSdk;
 
 GolekSdk sdk = GolekSdkFactory.createRemoteSdk(
     "https://api.golek.example.com",
-    "your-api-key",
-    "default"
+    "your-api-key"
 );
 ```
 
@@ -69,9 +68,9 @@ InferenceResponse response = sdk.createCompletion(request);
 System.out.println("Response: " + response.getContent());
 ```
 
-### Multi-Tenancy Note
+### API Key Note
 
-Golek is single-tenant by default. `defaultTenantId` is only required when multi-tenancy is enabled (via `tenant-golek-ext` or `wayang.multitenancy.enabled=true`). In single-tenant mode, you can leave it as `"default"`.
+Multi-tenancy is resolved on the backend using your API key. For community/standalone deployments, use the API key `"community"`.
 
 ## Benefits of This Architecture
 

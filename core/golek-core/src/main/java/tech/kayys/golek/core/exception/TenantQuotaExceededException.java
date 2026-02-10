@@ -11,11 +11,12 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  *
- * @author bhangun
+ * @author Bhangun
  */
 
 package tech.kayys.golek.core.exception;
 
+import tech.kayys.golek.spi.auth.ApiKeyConstants;
 import tech.kayys.golek.spi.error.ErrorCode;
 
 public class TenantQuotaExceededException extends InferenceException {
@@ -25,13 +26,13 @@ public class TenantQuotaExceededException extends InferenceException {
 
     public TenantQuotaExceededException(String tenantId, String resourceType, String message) {
         super(ErrorCode.QUOTA_EXCEEDED, message);
-        this.tenantId = tenantId;
+        this.tenantId = normalizeTenantId(tenantId);
         this.resourceType = resourceType;
     }
 
     public TenantQuotaExceededException(String tenantId, String resourceType, String message, Throwable cause) {
         super(ErrorCode.QUOTA_EXCEEDED, message, cause);
-        this.tenantId = tenantId;
+        this.tenantId = normalizeTenantId(tenantId);
         this.resourceType = resourceType;
     }
 
@@ -41,5 +42,12 @@ public class TenantQuotaExceededException extends InferenceException {
 
     public String getResourceType() {
         return resourceType;
+    }
+
+    private static String normalizeTenantId(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            return ApiKeyConstants.COMMUNITY_API_KEY;
+        }
+        return tenantId;
     }
 }

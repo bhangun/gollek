@@ -2,15 +2,27 @@ package tech.kayys.golek.inference.gguf;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
-import io.quarkus.runtime.Startup;
+import jakarta.enterprise.inject.Disposes;
+import jakarta.inject.Inject;
 
 @ApplicationScoped
 public class GGUFBeanProducer {
 
+    @Inject
+    GGUFProviderConfig config;
+
     @Produces
     @ApplicationScoped
-    @Startup
     public LlamaCppBinding llamaCppBinding() {
-        return LlamaCppBinding.load();
+        if (!config.enabled()) {
+            return null;
+        }
+        return LlamaCppBinding.load(config.verboseLogging());
+    }
+
+    public void dispose(@Disposes LlamaCppBinding binding) {
+        if (binding != null) {
+            binding.backendFree();
+        }
     }
 }

@@ -11,6 +11,7 @@ import tech.kayys.golek.sdk.core.GolekSdk;
 import tech.kayys.golek.sdk.core.exception.SdkException;
 import tech.kayys.golek.sdk.core.model.AsyncJobStatus;
 import tech.kayys.golek.sdk.core.model.BatchInferenceRequest;
+import tech.kayys.golek.spi.auth.ApiKeyConstants;
 
 import javax.net.ssl.SSLContext;
 import java.net.URI;
@@ -33,13 +34,11 @@ public class GolekClient implements GolekSdk {
     private final ObjectMapper objectMapper;
     private final String baseUrl;
     private final String apiKey;
-    private final String defaultTenantId;
     private String preferredProvider;
 
     private GolekClient(Builder builder) {
         this.baseUrl = builder.baseUrl;
-        this.apiKey = builder.apiKey;
-        this.defaultTenantId = builder.defaultTenantId;
+        this.apiKey = normalizeApiKey(builder.apiKey);
         this.preferredProvider = builder.preferredProvider;
 
         HttpClient.Builder clientBuilder = HttpClient.newBuilder()
@@ -69,8 +68,8 @@ public class GolekClient implements GolekSdk {
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/v1/inference/completions"))
                     .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("X-Tenant-ID", defaultTenantId)
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .timeout(Duration.ofSeconds(60)) // Add timeout for sync requests
                     .build();
@@ -118,8 +117,8 @@ public class GolekClient implements GolekSdk {
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/v1/inference/jobs"))
                     .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("X-Tenant-ID", defaultTenantId)
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .timeout(Duration.ofSeconds(10)) // Short timeout for job submission
                     .build();
@@ -150,8 +149,8 @@ public class GolekClient implements GolekSdk {
         try {
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/v1/inference/jobs/" + URLEncoder.encode(jobId, StandardCharsets.UTF_8)))
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("X-Tenant-ID", defaultTenantId)
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
                     .timeout(Duration.ofSeconds(10)) // Short timeout for status check
                     .GET()
                     .build();
@@ -214,8 +213,8 @@ public class GolekClient implements GolekSdk {
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/v1/inference/batch"))
                     .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("X-Tenant-ID", defaultTenantId)
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .timeout(Duration.ofMinutes(5)) // Longer timeout for batch processing
                     .build();
@@ -244,7 +243,7 @@ public class GolekClient implements GolekSdk {
         try {
             String requestBody = objectMapper.writeValueAsString(request);
 
-            StreamingHelper helper = new StreamingHelper(httpClient, objectMapper, baseUrl, apiKey, defaultTenantId);
+            StreamingHelper helper = new StreamingHelper(httpClient, objectMapper, baseUrl, apiKey);
 
             // Convert the Flow.Publisher to Mutiny Multi
             return Multi.createFrom().publisher(helper.createStreamPublisher(requestBody));
@@ -310,8 +309,8 @@ public class GolekClient implements GolekSdk {
         try {
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/v1/providers"))
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("X-Tenant-ID", defaultTenantId)
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
                     .timeout(Duration.ofSeconds(10))
                     .GET()
                     .build();
@@ -340,8 +339,8 @@ public class GolekClient implements GolekSdk {
         try {
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/v1/providers/" + URLEncoder.encode(providerId, StandardCharsets.UTF_8)))
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("X-Tenant-ID", defaultTenantId)
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
                     .timeout(Duration.ofSeconds(10))
                     .GET()
                     .build();
@@ -385,7 +384,6 @@ public class GolekClient implements GolekSdk {
     public static class Builder {
         private String baseUrl = "http://localhost:8080";
         private String apiKey;
-        private String defaultTenantId = "default";
         private String preferredProvider;
         private Duration connectTimeout = Duration.ofSeconds(30);
         private SSLContext sslContext;
@@ -397,11 +395,6 @@ public class GolekClient implements GolekSdk {
 
         public Builder apiKey(String apiKey) {
             this.apiKey = apiKey;
-            return this;
-        }
-
-        public Builder defaultTenantId(String tenantId) {
-            this.defaultTenantId = tenantId;
             return this;
         }
 
@@ -421,9 +414,6 @@ public class GolekClient implements GolekSdk {
         }
 
         public GolekClient build() {
-            if (apiKey == null || apiKey.trim().isEmpty()) {
-                throw new IllegalArgumentException("API key is required");
-            }
             return new GolekClient(this);
         }
     }
@@ -437,8 +427,8 @@ public class GolekClient implements GolekSdk {
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("X-Tenant-ID", defaultTenantId)
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
                     .header("Content-Type", "application/json")
                     .timeout(Duration.ofSeconds(30))
                     .GET()
@@ -463,8 +453,8 @@ public class GolekClient implements GolekSdk {
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("X-Tenant-ID", defaultTenantId)
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
                     .header("Content-Type", "application/json")
                     .timeout(Duration.ofSeconds(30))
                     .GET()
@@ -490,8 +480,8 @@ public class GolekClient implements GolekSdk {
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("X-Tenant-ID", defaultTenantId)
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
                     .header("Content-Type", "application/json")
                     .timeout(Duration.ofSeconds(30))
                     .GET()
@@ -527,8 +517,8 @@ public class GolekClient implements GolekSdk {
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/v1/models/pull"))
                     .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("X-Tenant-ID", defaultTenantId)
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .timeout(Duration.ofMinutes(5)) // Shorter timeout for initial request
                     .build();
@@ -546,7 +536,7 @@ public class GolekClient implements GolekSdk {
                 return;
             } else if (response.statusCode() == 202) {
                 // Server accepted the request, now we need to stream progress updates
-                StreamingHelper helper = new StreamingHelper(httpClient, objectMapper, baseUrl, apiKey, defaultTenantId);
+                StreamingHelper helper = new StreamingHelper(httpClient, objectMapper, baseUrl, apiKey);
 
                 // Create a publisher for the streaming progress
                 Publisher<tech.kayys.golek.sdk.core.model.PullProgress> publisher =
@@ -586,8 +576,8 @@ public class GolekClient implements GolekSdk {
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("X-Tenant-ID", defaultTenantId)
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
                     .header("Content-Type", "application/json")
                     .timeout(Duration.ofSeconds(30))
                     .DELETE()
@@ -609,5 +599,12 @@ public class GolekClient implements GolekSdk {
         } catch (Exception e) {
             throw new SdkException("SDK_ERR_MODEL_DELETE", "Failed to delete model", e);
         }
+    }
+
+    private static String normalizeApiKey(String apiKey) {
+        if (apiKey == null || apiKey.isBlank()) {
+            return ApiKeyConstants.COMMUNITY_API_KEY;
+        }
+        return apiKey;
     }
 }

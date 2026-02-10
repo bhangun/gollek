@@ -12,6 +12,7 @@ public final class ModelInfo {
     private final String modelId;
     private final String name;
     private final String version;
+    @Deprecated
     private final String tenantId;
     private final String format;
     private final Long sizeBytes;
@@ -55,6 +56,11 @@ public final class ModelInfo {
         return version;
     }
 
+    /**
+     * @deprecated Tenant ID is resolved server-side from the API key.
+     * Client code should not rely on this field.
+     */
+    @Deprecated
     public String getTenantId() {
         return tenantId;
     }
@@ -109,6 +115,7 @@ public final class ModelInfo {
         private String modelId;
         private String name;
         private String version;
+        @Deprecated
         private String tenantId;
         private String format;
         private Long sizeBytes;
@@ -132,6 +139,11 @@ public final class ModelInfo {
             return this;
         }
 
+        /**
+         * @deprecated Tenant ID is resolved server-side from the API key.
+         * Client code should not set or rely on this value.
+         */
+        @Deprecated
         public Builder tenantId(String tenantId) {
             this.tenantId = tenantId;
             return this;

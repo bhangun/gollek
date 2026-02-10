@@ -2,8 +2,8 @@ package tech.kayys.golek.core;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
 import tech.kayys.golek.spi.AuditPayload;
-import tech.kayys.golek.spi.ErrorPayload;
 import tech.kayys.golek.spi.Message;
+import tech.kayys.golek.spi.error.ErrorPayload;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 
@@ -16,21 +16,21 @@ import tech.kayys.golek.spi.inference.InferenceResponse;
  * dependencies
  */
 @RegisterForReflection(targets = {
-        InferenceRequest.class,
-        InferenceResponse.class,
-        Message.class,
-        ErrorPayload.class,
-        AuditPayload.class
+                InferenceRequest.class,
+                InferenceResponse.class,
+                Message.class,
+                ErrorPayload.class,
+                AuditPayload.class
 })
 public class NativeImageFeature /* implements Feature */ {
 
-    // Commented out - requires GraalVM native-image dependencies
-    /*
-     * @Override
-     * public void beforeAnalysis(BeforeAnalysisAccess access) {
-     * // Register classes for reflection
-     * access.registerAsInHeap(InferenceRequest.class);
-     * access.registerAsInHeap(InferenceResponse.class);
-     * }
-     */
+        // Commented out - requires GraalVM native-image dependencies
+        /*
+         * @Override
+         * public void beforeAnalysis(BeforeAnalysisAccess access) {
+         * // Register classes for reflection
+         * access.registerAsInHeap(InferenceRequest.class);
+         * access.registerAsInHeap(InferenceResponse.class);
+         * }
+         */
 }

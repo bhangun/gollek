@@ -11,7 +11,7 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  *
- * @author bhangun
+ * @author Bhangun
  */
 
 package tech.kayys.golek.model.core;
@@ -24,8 +24,13 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.model.ModelFormat;
+import tech.kayys.golek.spi.model.ModelRef;
+import tech.kayys.golek.spi.model.ModelDescriptor;
+import tech.kayys.golek.spi.model.ModelArtifact;
+import tech.kayys.golek.spi.model.Pageable;
 import tech.kayys.golek.spi.error.ErrorCode;
-import tech.kayys.golek.model.exception.InferenceException;
+import tech.kayys.golek.spi.exception.InferenceException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -204,6 +209,69 @@ public class LocalModelRepository implements ModelRepository {
             }
             return null;
         });
+    }
+
+    @Override
+    public ModelDescriptor resolve(ModelRef ref) {
+        return new ModelDescriptor(
+                ref.name(),
+                ref.parameters().getOrDefault("format", "gguf"),
+                java.net.URI.create("file://" + rootPath.resolve(ref.name()).toString()),
+                ref.parameters());
+    }
+
+    @Override
+    public ModelArtifact fetch(ModelDescriptor descriptor) {
+        Path modelPath = rootPath.resolve(descriptor.id());
+        return new ModelArtifact(modelPath, null, descriptor.metadata());
+    }
+
+    @Override
+    public boolean supports(ModelRef ref) {
+        return "local".equalsIgnoreCase(ref.scheme()) || ref.scheme() == null;
+    }
+
+    @Override
+    public Path downloadArtifact(ModelManifest manifest, ModelFormat format) {
+        Path modelDir = rootPath.resolve(manifest.tenantId()).resolve(manifest.modelId());
+        Path artifactPath = modelDir.resolve(format.toString().toLowerCase());
+        if (Files.exists(artifactPath)) {
+            return artifactPath;
+        }
+        throw new InferenceException(ErrorCode.MODEL_NOT_FOUND, "Artifact not found for format: " + format)
+                .addContext("modelId", manifest.modelId())
+                .addContext("format", format.toString());
+    }
+
+    @Override
+    public boolean isCached(String modelId, ModelFormat format) {
+        // For local repo, "cached" means the file exists.
+        // We check across all tenants if it's a shared repository or specific ones.
+        // Implementation simplified: check in any tenant dir.
+        try (Stream<Path> tenants = Files.list(rootPath)) {
+            return tenants.filter(Files::isDirectory)
+                    .anyMatch(tenantDir -> Files
+                            .exists(tenantDir.resolve(modelId).resolve(format.toString().toLowerCase())));
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    @Override
+    public void evictCache(String modelId, ModelFormat format) {
+        // Find and delete the artifact from any tenant directories
+        try (Stream<Path> tenants = Files.list(rootPath)) {
+            tenants.filter(Files::isDirectory)
+                    .forEach(tenantDir -> {
+                        try {
+                            Files.deleteIfExists(tenantDir.resolve(modelId).resolve(format.toString().toLowerCase()));
+                        } catch (IOException e) {
+                            LOG.warnf("Failed to evict cache for model %s: %s", modelId, e.getMessage());
+                        }
+                    });
+        } catch (IOException e) {
+            LOG.errorf(e, "Failed to list tenants for cache eviction");
+        }
     }
 
     private Path getManifestPath(String modelId, String tenantId) {

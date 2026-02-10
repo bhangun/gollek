@@ -11,17 +11,19 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  *
- * @author bhangun
+ * @author Bhangun
  */
 
 package tech.kayys.golek.core.inference;
 
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.core.engine.EngineMetadata;
 import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.spi.model.HealthStatus;
+import tech.kayys.golek.spi.inference.StreamingInferenceChunk;
 
 /**
  * Main entry point for inference requests.
@@ -37,13 +39,6 @@ public interface InferenceEngine {
                         TenantContext tenantContext);
 
         /**
-         * Execute streaming inference
-         */
-        Uni<StreamingResponse> inferStream(
-                        InferenceRequest request,
-                        TenantContext tenantContext);
-
-        /**
          * Get engine metadata
          */
         EngineMetadata metadata();
@@ -52,4 +47,45 @@ public interface InferenceEngine {
          * Health check
          */
         HealthStatus health();
+
+        /**
+         * Initialize the inference engine
+         */
+        void initialize();
+
+        /**
+         * Execute streaming inference
+         */
+        Multi<StreamingInferenceChunk> stream(InferenceRequest request);
+
+        /**
+         * Submit asynchronous inference job
+         */
+        Uni<String> submitAsyncJob(InferenceRequest request);
+
+        /**
+         * Shutdown the inference engine gracefully
+         */
+        void shutdown();
+
+        /**
+         * Get engine health status
+         */
+        boolean isHealthy();
+
+        /**
+         * Get engine statistics
+         */
+        EngineStats getStats();
+
+        /**
+         * Engine statistics data
+         */
+        record EngineStats(
+                        long activeInferences,
+                        long totalInferences,
+                        long failedInferences,
+                        double avgLatencyMs,
+                        String status) {
+        }
 }

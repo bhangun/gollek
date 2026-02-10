@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * ✅ Resource utilization monitoring
  * ✅ Historical data collection
  * 
- * @author bhangun
+ * @author Bhangun
  * @since 1.1.0
  */
 @Slf4j

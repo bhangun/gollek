@@ -1,0 +1,15 @@
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/CMakeFiles/gguf_bridge.dir
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/CMakeFiles/test.dir
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/CMakeFiles/edit_cache.dir
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/CMakeFiles/rebuild_cache.dir
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/CMakeFiles/list_install_components.dir
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/CMakeFiles/install.dir
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/CMakeFiles/install/local.dir
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/CMakeFiles/install/strip.dir
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/tests/CMakeFiles/test.dir
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/tests/CMakeFiles/edit_cache.dir
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/tests/CMakeFiles/rebuild_cache.dir
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/tests/CMakeFiles/list_install_components.dir
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/tests/CMakeFiles/install.dir
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/tests/CMakeFiles/install/local.dir
+/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/tests/CMakeFiles/install/strip.dir
