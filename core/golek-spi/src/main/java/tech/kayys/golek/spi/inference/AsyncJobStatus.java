@@ -2,13 +2,15 @@ package tech.kayys.golek.spi.inference;
 
 import java.time.Instant;
 
+import tech.kayys.golek.spi.auth.ApiKeyConstants;
+
 /**
  * Detailed status of an asynchronous inference job.
  */
 public record AsyncJobStatus(
         String jobId,
         String requestId,
-        String tenantId,
+        @Deprecated String tenantId,
         String status,
         InferenceResponse result,
         String error,
@@ -20,5 +22,12 @@ public record AsyncJobStatus(
      */
     public boolean isComplete() {
         return "COMPLETED".equals(status) || "FAILED".equals(status) || "CANCELLED".equals(status);
+    }
+
+    public String apiKey() {
+        if (tenantId == null || tenantId.isBlank()) {
+            return ApiKeyConstants.COMMUNITY_API_KEY;
+        }
+        return tenantId;
     }
 }

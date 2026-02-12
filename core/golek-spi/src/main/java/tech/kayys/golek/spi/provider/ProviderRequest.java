@@ -104,6 +104,14 @@ public final class ProviderRequest {
         return timeout;
     }
 
+    public Object getApiKeyContext() {
+        return tenantContext;
+    }
+
+    /**
+     * @deprecated Use {@link #getApiKeyContext()}.
+     */
+    @Deprecated
     public Object getTenantContext() {
         return tenantContext;
     }
@@ -210,6 +218,15 @@ public final class ProviderRequest {
             return this;
         }
 
+        public Builder apiKeyContext(Object apiKeyContext) {
+            this.tenantContext = apiKeyContext;
+            return this;
+        }
+
+        /**
+         * @deprecated Use {@link #apiKeyContext(Object)}.
+         */
+        @Deprecated
         public Builder tenantContext(Object tenantContext) {
             this.tenantContext = tenantContext;
             return this;

@@ -1,7 +1,7 @@
 package tech.kayys.wayang.tool.spi;
 
 import io.smallrye.mutiny.Uni;
-import tech.kayys.golek.tool.dto.ToolExecutionResult;
+import tech.kayys.wayang.tool.dto.ToolExecutionResult;
 
 import java.util.Map;
 

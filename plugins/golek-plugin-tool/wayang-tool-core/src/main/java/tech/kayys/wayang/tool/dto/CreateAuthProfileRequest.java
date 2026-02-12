@@ -1,4 +1,4 @@
-package tech.kayys.wayang.mcp.dto;
+package tech.kayys.wayang.tool.dto;
 
 public record CreateAuthProfileRequest(
         String profileName,

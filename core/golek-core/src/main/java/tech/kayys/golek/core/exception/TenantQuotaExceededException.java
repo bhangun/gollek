@@ -40,6 +40,10 @@ public class TenantQuotaExceededException extends InferenceException {
         return tenantId;
     }
 
+    public String getApiKey() {
+        return tenantId;
+    }
+
     public String getResourceType() {
         return resourceType;
     }

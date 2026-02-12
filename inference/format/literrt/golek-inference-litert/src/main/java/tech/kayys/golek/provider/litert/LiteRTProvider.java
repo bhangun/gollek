@@ -142,7 +142,7 @@ public class LiteRTProvider implements LLMProvider {
     }
 
     private TenantContext ensureTenantContext(TenantContext context) {
-        return context != null ? context : TenantContext.of("default");
+        return context != null ? context : TenantContext.of("community");
     }
 
     private LiteRTCpuRunner getOrCreateRunner(String tenantId, String modelId) {

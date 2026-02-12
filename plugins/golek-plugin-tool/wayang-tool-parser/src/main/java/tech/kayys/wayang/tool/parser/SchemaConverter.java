@@ -1,4 +1,4 @@
-package tech.kayys.wayang.mcp.parser;
+package tech.kayys.wayang.tool.parser;
 
 import io.swagger.v3.oas.models.media.Schema;
 import jakarta.enterprise.context.ApplicationScoped;

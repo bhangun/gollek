@@ -5,6 +5,7 @@ import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
+import com.azure.core.util.BinaryData;
 import tech.kayys.golek.spi.storage.ModelStorageService;
 
 import jakarta.enterprise.context.ApplicationScoped;

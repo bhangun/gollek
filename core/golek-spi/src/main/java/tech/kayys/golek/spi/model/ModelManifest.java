@@ -1,5 +1,7 @@
 package tech.kayys.golek.spi.model;
 
+import tech.kayys.golek.spi.auth.ApiKeyConstants;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +49,13 @@ public record ModelManifest(
                 .anyMatch(d -> d.type() == deviceType);
     }
 
+    public String apiKey() {
+        if (tenantId == null || tenantId.isBlank()) {
+            return ApiKeyConstants.COMMUNITY_API_KEY;
+        }
+        return tenantId;
+    }
+
     public static class Builder {
         private String modelId;
         private String name;
@@ -79,6 +88,11 @@ public record ModelManifest(
 
         public Builder tenantId(String tenantId) {
             this.tenantId = tenantId;
+            return this;
+        }
+
+        public Builder apiKey(String apiKey) {
+            this.tenantId = apiKey;
             return this;
         }
 

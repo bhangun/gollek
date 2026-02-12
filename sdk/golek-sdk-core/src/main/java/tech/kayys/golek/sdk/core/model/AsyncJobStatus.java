@@ -38,6 +38,13 @@ public class AsyncJobStatus {
         return requestId;
     }
 
+    public String getApiKey() {
+        if (tenantId == null || tenantId.isBlank()) {
+            return "community";
+        }
+        return tenantId;
+    }
+
     /**
      * @deprecated Tenant ID is resolved server-side from the API key.
      * Client code should not rely on this field.
@@ -103,6 +110,11 @@ public class AsyncJobStatus {
         @Deprecated
         public Builder tenantId(String tenantId) {
             this.tenantId = tenantId;
+            return this;
+        }
+
+        public Builder apiKey(String apiKey) {
+            this.tenantId = apiKey;
             return this;
         }
 

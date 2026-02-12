@@ -14,7 +14,7 @@
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
-        <lombok.version>1.18.32</lombok.version>
+        <lombok.version>1.18.42</lombok.version>
     </properties>
 
     <dependencies>
@@ -42,6 +42,11 @@
         <dependency>
             <groupId>tech.kayys.golek</groupId>
             <artifactId>golek-tool-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys.wayang</groupId>
+            <artifactId>wayang-vault-manager</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

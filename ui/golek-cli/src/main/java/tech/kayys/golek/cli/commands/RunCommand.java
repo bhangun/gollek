@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * Run inference command using GolekSdk.
@@ -53,7 +54,7 @@ public class RunCommand implements Runnable {
     @Option(names = { "--repeat-penalty" }, description = "Repeat penalty", defaultValue = "1.1")
     double repeatPenalty;
 
-    @Option(names = { "--json" }, description = "Enable JSON mode", defaultValue = "true")
+    @Option(names = { "--json" }, description = "Enable JSON mode", defaultValue = "false")
     boolean jsonMode;
 
     @Option(names = { "--max-tokens" }, description = "Maximum tokens to generate", defaultValue = "2048")
@@ -90,6 +91,14 @@ public class RunCommand implements Runnable {
         long startTime = System.currentTimeMillis();
 
         try {
+            System.out.println(BOLD + YELLOW + "  _____       _      _    " + RESET);
+            System.out.println(BOLD + YELLOW + " / ____|     | |    | |   " + RESET);
+            System.out.println(BOLD + YELLOW + "| |  __  ___ | | ___| | __" + RESET);
+            System.out.println(BOLD + YELLOW + "| | |_ |/ _ \\| |/ _ \\ |/ /" + RESET);
+            System.out.println(BOLD + YELLOW + "| |__| | (_) | |  __/   < " + RESET);
+            System.out.println(BOLD + YELLOW + " \\_____|\\___/|_|\\___|_|\\_\\" + RESET);
+            System.out.println();
+
             // If --model-path is provided, use it directly
             if (modelPath != null && !modelPath.isEmpty()) {
                 Path customModelPath = Paths.get(modelPath);
@@ -202,12 +211,13 @@ public class RunCommand implements Runnable {
 
                 InferenceRequest request = requestBuilder.build();
 
-                System.out.printf("Running inference [Model: %s]%n", modelId);
-                if (providerId != null) {
-                    System.out.printf("Provider: %s%n", providerId);
-                }
+                System.out.printf(BOLD + "Model: " + RESET + CYAN + "%s" + RESET + "%n", modelId);
+                System.out.printf(BOLD + "Provider: " + RESET + YELLOW + "%s" + RESET + "%n",
+                        providerId != null ? providerId : "auto-select");
+                System.out.println(DIM + "-".repeat(50) + RESET);
 
                 if (stream) {
+                    CountDownLatch latch = new CountDownLatch(1);
                     // Streaming mode
                     java.util.concurrent.atomic.AtomicInteger tokenCount = new java.util.concurrent.atomic.AtomicInteger(
                             0);
@@ -218,17 +228,27 @@ public class RunCommand implements Runnable {
                                         if (delta != null) {
                                             System.out.print(delta);
                                             tokenCount.incrementAndGet();
+                                            System.out.flush();
                                         }
                                     },
-                                    error -> System.err.println("\n" + YELLOW + "Error: " + RESET + error.getMessage()),
+                                    error -> {
+                                        System.err.println("\n" + YELLOW + "Error: " + RESET + error.getMessage());
+                                        latch.countDown();
+                                    },
                                     () -> {
                                         long duration = System.currentTimeMillis() - startTime;
                                         double tps = (tokenCount.get() / (duration / 1000.0));
                                         System.out.printf(
-                                                "%n" + DIM + "[Duration: %d ms, Tokens: %d, Speed: %.2f t/s]" + RESET
+                                                "%n" + DIM + "[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]" + RESET
                                                         + "%n",
-                                                duration, tokenCount.get(), tps);
+                                                tokenCount.get(), duration / 1000.0, tps);
+                                        latch.countDown();
                                     });
+                    try {
+                        latch.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
                 } else {
                     // Sync mode
                     InferenceResponse response = sdk.createCompletion(request);
@@ -248,9 +268,9 @@ public class RunCommand implements Runnable {
     private void printResponse(InferenceResponse response, long startTime) {
         System.out.println();
         System.out.println(GREEN + response.getContent() + RESET);
-        System.out.printf("%n" + DIM + "[Duration: %d ms, Tokens: %d, Speed: %.2f t/s]" + RESET + "%n",
-                response.getDurationMs(),
+        System.out.printf("%n" + DIM + "[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]" + RESET + "%n",
                 response.getTokensUsed(),
+                response.getDurationMs() / 1000.0,
                 (response.getTokensUsed() / (response.getDurationMs() / 1000.0)));
     }
 }

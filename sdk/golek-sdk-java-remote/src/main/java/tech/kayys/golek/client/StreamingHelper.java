@@ -1,8 +1,7 @@
 package tech.kayys.golek.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.reactivex.Flowable;
-import org.reactivestreams.Publisher;
+import io.smallrye.mutiny.Multi;
 import tech.kayys.golek.spi.stream.StreamChunk;
 import tech.kayys.golek.client.exception.GolekClientException;
 import tech.kayys.golek.spi.auth.ApiKeyConstants;
@@ -11,18 +10,15 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.concurrent.Flow;
 import java.util.function.Consumer;
 
 /**
- * Helper class for handling Server-Sent Events (SSE) for streaming inference and model operations.
+ * Helper class for handling Server-Sent Events (SSE) for streaming inference
+ * and model operations.
  */
 public class StreamingHelper {
 
@@ -42,28 +38,27 @@ public class StreamingHelper {
      * Creates a publisher for streaming inference chunks.
      *
      * @param requestBody The JSON request body for the inference request
-     * @return A Publisher that emits StreamChunk objects
+     * @return A Multi that emits StreamChunk objects
      */
-    public Publisher<StreamChunk> createStreamPublisher(String requestBody) {
-        return createSsePublisher(
-            baseUrl + "/v1/inference/completions/stream",
-            requestBody,
-            StreamChunk.class
-        );
+    public Multi<StreamChunk> createStreamPublisher(String requestBody) {
+        return createSseMulti(
+                baseUrl + "/v1/inference/completions/stream",
+                requestBody,
+                StreamChunk.class);
     }
 
     /**
      * Creates a publisher for streaming model pull progress updates.
      *
-     * @param modelSpec The model specification to pull
+     * @param modelSpec        The model specification to pull
      * @param progressCallback Callback to receive progress updates
-     * @return A Publisher that emits PullProgress objects
+     * @return A Multi that emits PullProgress objects
      */
-    public Publisher<tech.kayys.golek.sdk.core.model.PullProgress> createModelPullStreamPublisher(
+    public Multi<tech.kayys.golek.sdk.core.model.PullProgress> createModelPullStreamPublisher(
             String modelSpec,
             Consumer<tech.kayys.golek.sdk.core.model.PullProgress> progressCallback) {
 
-        return Flowable.fromPublisher(subscriber -> {
+        return Multi.createFrom().emitter(emitter -> {
             try {
                 // Create request body
                 java.util.Map<String, Object> requestBodyMap = new java.util.HashMap<>();
@@ -84,56 +79,61 @@ public class StreamingHelper {
                         HttpResponse.BodyHandlers.ofInputStream());
 
                 if (response.statusCode() != 200) {
-                    subscriber.onError(new GolekClientException("Model pull stream request failed with status: " + response.statusCode()));
+                    emitter.fail(new GolekClientException(
+                            "Model pull stream request failed with status: " + response.statusCode()));
                     return;
                 }
 
-                BufferedReader reader = new BufferedReader(new InputStreamReader(response.body()));
-                String line;
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.body()))) {
+                    String line;
+                    while (!emitter.isCancelled() && (line = reader.readLine()) != null) {
+                        if (line.startsWith("data: ")) {
+                            String data = line.substring(6); // Remove "data: " prefix
 
-                while ((line = reader.readLine()) != null && !subscriber.isCancelled()) {
-                    if (line.startsWith("data: ")) {
-                        String data = line.substring(6); // Remove "data: " prefix
-
-                        if ("[DONE]".equals(data)) {
-                            break; // End of stream
-                        }
-
-                        try {
-                            tech.kayys.golek.sdk.core.model.PullProgress progress =
-                                objectMapper.readValue(data, tech.kayys.golek.sdk.core.model.PullProgress.class);
-
-                            if (progressCallback != null) {
-                                progressCallback.accept(progress);
+                            if ("[DONE]".equals(data)) {
+                                break; // End of stream
                             }
 
-                            subscriber.onNext(progress);
-                        } catch (Exception e) {
-                            subscriber.onError(new GolekClientException("Error parsing model pull progress: " + e.getMessage(), e));
-                            return;
+                            try {
+                                tech.kayys.golek.sdk.core.model.PullProgress progress = objectMapper.readValue(data,
+                                        tech.kayys.golek.sdk.core.model.PullProgress.class);
+
+                                if (progressCallback != null) {
+                                    progressCallback.accept(progress);
+                                }
+
+                                emitter.emit(progress);
+                            } catch (Exception e) {
+                                emitter.fail(new GolekClientException(
+                                        "Error parsing model pull progress: " + e.getMessage(), e));
+                                return;
+                            }
                         }
                     }
                 }
 
-                subscriber.onComplete();
+                if (!emitter.isCancelled()) {
+                    emitter.complete();
+                }
             } catch (IOException | InterruptedException e) {
-                if (!subscriber.isCancelled()) {
-                    subscriber.onError(new GolekClientException("Error during model pull streaming: " + e.getMessage(), e));
+                if (!emitter.isCancelled()) {
+                    emitter.fail(
+                            new GolekClientException("Error during model pull streaming: " + e.getMessage(), e));
                 }
             }
         });
     }
 
     /**
-     * Generic method to create an SSE publisher for different response types.
+     * Generic method to create an SSE multi for different response types.
      *
-     * @param endpoint The API endpoint to call
-     * @param requestBody The JSON request body
+     * @param endpoint     The API endpoint to call
+     * @param requestBody  The JSON request body
      * @param responseType The class of the response type
-     * @return A Publisher that emits objects of the specified type
+     * @return A Multi that emits objects of the specified type
      */
-    private <T> Publisher<T> createSsePublisher(String endpoint, String requestBody, Class<T> responseType) {
-        return Flowable.fromPublisher(subscriber -> {
+    private <T> Multi<T> createSseMulti(String endpoint, String requestBody, Class<T> responseType) {
+        return Multi.createFrom().emitter(emitter -> {
             try {
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(endpoint))
@@ -148,35 +148,39 @@ public class StreamingHelper {
                         HttpResponse.BodyHandlers.ofInputStream());
 
                 if (response.statusCode() != 200) {
-                    subscriber.onError(new GolekClientException("Streaming request failed with status: " + response.statusCode()));
+                    emitter.fail(
+                            new GolekClientException("Streaming request failed with status: " + response.statusCode()));
                     return;
                 }
 
-                BufferedReader reader = new BufferedReader(new InputStreamReader(response.body()));
-                String line;
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.body()))) {
+                    String line;
+                    while (!emitter.isCancelled() && (line = reader.readLine()) != null) {
+                        if (line.startsWith("data: ")) {
+                            String data = line.substring(6); // Remove "data: " prefix
 
-                while ((line = reader.readLine()) != null && !subscriber.isCancelled()) {
-                    if (line.startsWith("data: ")) {
-                        String data = line.substring(6); // Remove "data: " prefix
+                            if ("[DONE]".equals(data)) {
+                                break; // End of stream
+                            }
 
-                        if ("[DONE]".equals(data)) {
-                            break; // End of stream
-                        }
-
-                        try {
-                            T chunk = objectMapper.readValue(data, responseType);
-                            subscriber.onNext(chunk);
-                        } catch (Exception e) {
-                            subscriber.onError(new GolekClientException("Error parsing stream chunk: " + e.getMessage(), e));
-                            return;
+                            try {
+                                T chunk = objectMapper.readValue(data, responseType);
+                                emitter.emit(chunk);
+                            } catch (Exception e) {
+                                emitter.fail(
+                                        new GolekClientException("Error parsing stream chunk: " + e.getMessage(), e));
+                                return;
+                            }
                         }
                     }
                 }
 
-                subscriber.onComplete();
+                if (!emitter.isCancelled()) {
+                    emitter.complete();
+                }
             } catch (IOException | InterruptedException e) {
-                if (!subscriber.isCancelled()) {
-                    subscriber.onError(new GolekClientException("Error during streaming: " + e.getMessage(), e));
+                if (!emitter.isCancelled()) {
+                    emitter.fail(new GolekClientException("Error during streaming: " + e.getMessage(), e));
                 }
             }
         });

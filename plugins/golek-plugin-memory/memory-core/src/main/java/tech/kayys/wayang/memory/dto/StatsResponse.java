@@ -1,4 +1,7 @@
+package tech.kayys.wayang.memory.dto;
+
 public record StatsResponse(
+
         boolean success,
         long totalMemories,
         long episodicCount,

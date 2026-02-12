@@ -1,4 +1,4 @@
-package tech.kayys.wayang.mcp.parser.multispec;
+package tech.kayys.wayang.tool.parser.multispec;
 
 import io.smallrye.mutiny.Uni;
 import io.swagger.v3.parser.OpenAPIV3Parser;
@@ -8,8 +8,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tech.kayys.wayang.mcp.dto.GenerateToolsRequest;
-import tech.kayys.wayang.mcp.dto.OpenApiParseResult;
+import tech.kayys.wayang.tool.dto.GenerateToolsRequest;
+import tech.kayys.wayang.tool.dto.OpenApiParseResult;
 import java.util.List;
 
 /**

@@ -146,13 +146,12 @@ public class OllamaProvider implements StreamingProvider {
                                                         .requestId(request.getRequestId())
                                                         .content(response.getMessage().getContent())
                                                         .model(response.getModel())
+                                                        .inputTokens(response.getPromptEvalCount())
+                                                        .outputTokens(response.getEvalCount())
+                                                        .tokensUsed(response.getPromptEvalCount()
+                                                                        + response.getEvalCount())
                                                         .durationMs(duration)
                                                         .metadata("provider", PROVIDER_ID)
-                                                        .metadata("prompt_tokens", response.getPromptEvalCount())
-                                                        .metadata("completion_tokens", response.getEvalCount())
-                                                        .metadata("total_tokens",
-                                                                        response.getPromptEvalCount()
-                                                                                        + response.getEvalCount())
                                                         .build();
                                 });
         }

@@ -129,9 +129,15 @@ public class CerebrasProvider implements StreamingProvider {
                     }
 
                     return InferenceResponse.builder()
-                            .requestId(String.valueOf(requestId))
+                            .requestId(
+                                    request.getRequestId() != null ? request.getRequestId() : String.valueOf(requestId))
                             .content(content)
                             .model(response.getModel())
+                            .inputTokens(response.getUsage() != null ? response.getUsage().getPromptTokens() : 0)
+                            .outputTokens(response.getUsage() != null ? response.getUsage().getCompletionTokens() : 0)
+                            .tokensUsed(response.getUsage() != null ? response.getUsage().getTotalTokens() : 0)
+                            .durationMs(duration)
+                            .metadata("provider", PROVIDER_ID)
                             .build();
                 })
                 .onFailure().transform(this::wrapException);

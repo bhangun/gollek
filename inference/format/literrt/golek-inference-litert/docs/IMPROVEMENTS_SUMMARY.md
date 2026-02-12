@@ -239,7 +239,7 @@ Model model = Model.findByTenantAndModelId(
    mvn quarkus:dev
    curl -X POST http://localhost:8080/v1/infer \
      -H "Content-Type: application/json" \
-     -H "X-Tenant-ID: default" \
+     -H "X-API-Key: community" \
      -d '{"modelId": "model-1", "inputs": {...}}'
    ```
 
@@ -280,7 +280,7 @@ Model model = Model.findByTenantAndModelId(
    @Provider
    public class TenantContextFilter implements ContainerRequestFilter {
        public void filter(ContainerRequestContext ctx) {
-           String tenantId = ctx.getHeaderString("X-Tenant-ID");
+           String tenantId = ctx.getHeaderString("X-API-Key");
            // Validate and set context
        }
    }
@@ -387,7 +387,7 @@ curl http://localhost:8080/openapi
 # Inference (once service implementation is added)
 curl -X POST http://localhost:8080/v1/infer \
   -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: default" \
+  -H "X-API-Key: community" \
   -d '{
     "modelId": "test-model:1.0",
     "inputs": {

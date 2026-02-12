@@ -72,8 +72,12 @@ public class InferenceService {
     @CircuitBreaker(requestVolumeThreshold = 20, failureRatio = 0.5, delay = 5000, successThreshold = 2)
     @Bulkhead(value = 100, waitingTaskQueue = 50)
     public Uni<InferenceResponse> inferAsync(InferenceRequest request) {
+        return inferAsync(request, null);
+    }
+
+    public Uni<InferenceResponse> inferAsync(InferenceRequest request, TenantContext tenantContext) {
         String requestId = request.getRequestId();
-        String tenantId = resolveTenantId(request.getTenantId());
+        String tenantId = resolveTenantId(tenantContext);
 
         log.info("Processing inference request: requestId={}, tenantId={}, model={}",
                 requestId, tenantId, request.getModel());
@@ -121,21 +125,25 @@ public class InferenceService {
      * Submit async inference job and return immediately.
      */
     public Uni<String> submitAsyncJob(InferenceRequest request) {
+        return submitAsyncJob(request, null);
+    }
+
+    public Uni<String> submitAsyncJob(InferenceRequest request, TenantContext tenantContext) {
         String jobId = UUID.randomUUID().toString();
-        String tId = resolveTenantId(request.getTenantId());
+        String tId = resolveTenantId(tenantContext);
 
         log.info("Submitting async job: jobId={}, requestId={}, model={}",
                 jobId, request.getRequestId(), request.getModel());
 
         if (!multitenancyEnabled) {
-            asyncJobManager.enqueue(jobId, request);
+            asyncJobManager.enqueue(jobId, request, tId);
             return Uni.createFrom().item(jobId);
         }
 
         return validateTenant(tId)
                 .chain(tenant -> enforceQuota(tId, request).replaceWith(tenant))
                 .map(tenant -> {
-                    asyncJobManager.enqueue(jobId, request);
+                    asyncJobManager.enqueue(jobId, request, tId);
                     return jobId;
                 });
     }
@@ -166,8 +174,12 @@ public class InferenceService {
      * Stream inference results for generative models.
      */
     public Multi<StreamingInferenceChunk> inferStream(InferenceRequest request) {
+        return inferStream(request, null);
+    }
+
+    public Multi<StreamingInferenceChunk> inferStream(InferenceRequest request, TenantContext tenantContext) {
         String requestId = request.getRequestId();
-        String tId = resolveTenantId(request.getTenantId());
+        String tId = resolveTenantId(tenantContext);
 
         return Multi.createFrom().emitter(emitter -> {
             if (!multitenancyEnabled) {
@@ -305,11 +317,16 @@ public class InferenceService {
                 .failWith(() -> new InferenceException(ErrorCode.MODEL_NOT_FOUND, "Model not found: " + modelId));
     }
 
-    private String resolveTenantId(String tenantId) {
-        if (tenantId == null || tenantId.trim().isEmpty()) {
+    private String resolveTenantId(TenantContext tenantContext) {
+        if (tenantContext == null || tenantContext.getTenantId() == null) {
             return "community";
         }
-        return tenantId;
+        String tenantId = tenantContext.getTenantId().value();
+        return (tenantId == null || tenantId.trim().isEmpty()) ? "community" : tenantId;
+    }
+
+    private String resolveTenantId(String tenantId) {
+        return (tenantId == null || tenantId.trim().isEmpty()) ? "community" : tenantId;
     }
 
     @Transactional

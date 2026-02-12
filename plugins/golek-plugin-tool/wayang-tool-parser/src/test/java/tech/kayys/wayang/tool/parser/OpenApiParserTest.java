@@ -9,10 +9,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import tech.kayys.wayang.mcp.parser.OpenApiParser;
-import tech.kayys.wayang.mcp.dto.GenerateToolsRequest;
-import tech.kayys.wayang.mcp.dto.OpenApiParseResult;
-import tech.kayys.wayang.mcp.dto.SourceType;
+import tech.kayys.wayang.tool.parser.OpenApiParser;
+import tech.kayys.wayang.tool.dto.GenerateToolsRequest;
+import tech.kayys.wayang.tool.dto.OpenApiParseResult;
+import tech.kayys.wayang.tool.dto.SourceType;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -27,8 +27,6 @@ class OpenApiParserTest {
     @Mock
     private WebClient webClient;
 
-    @Mock
-    private io.vertx.mutiny.core.net.Socket socket;
 
     private OpenApiParser openApiParser;
 

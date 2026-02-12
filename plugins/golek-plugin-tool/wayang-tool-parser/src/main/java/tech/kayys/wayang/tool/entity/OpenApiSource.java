@@ -1,4 +1,4 @@
-package tech.kayys.wayang.mcp.domain;
+package tech.kayys.wayang.tool.entity;
 
 import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
 import java.time.Instant;
@@ -17,8 +17,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
-import tech.kayys.wayang.mcp.dto.SourceStatus;
-import tech.kayys.wayang.mcp.dto.SourceType;
+import tech.kayys.wayang.tool.dto.SourceStatus;
+import tech.kayys.wayang.tool.dto.SourceType;
 
 /**
  * OpenAPI source document

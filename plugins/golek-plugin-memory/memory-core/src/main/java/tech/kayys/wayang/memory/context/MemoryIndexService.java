@@ -10,23 +10,21 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.Random;
-import java.util.ArrayList;
 
 /**
  * Advanced indexing strategies for fast memory retrieval
  */
 @ApplicationScoped
 public class MemoryIndexService {
-
+    
     private static final Logger LOG = LoggerFactory.getLogger(MemoryIndexService.class);
-
+    
     @Inject
     RedisAPI redisAPI;
-
+    
     // In-memory inverted index for fast keyword search
     private final Map<String, Set<String>> invertedIndex = new ConcurrentHashMap<>();
-
+    
     // Semantic hash index for approximate nearest neighbor search
     private final Map<String, Set<String>> semanticHashIndex = new ConcurrentHashMap<>();
 
@@ -34,28 +32,28 @@ public class MemoryIndexService {
      * Build inverted index for keyword search
      */
     public Uni<Void> buildInvertedIndex(String sessionId, List<ConversationMemory> memories) {
-        LOG.debug("Building inverted index for session: {} with {} memories",
+        LOG.debug("Building inverted index for session: {} with {} memories", 
                  sessionId, memories.size());
-
+        
         return Uni.createFrom().item(() -> {
             Map<String, Set<String>> localIndex = new HashMap<>();
-
+            
             for (ConversationMemory memory : memories) {
                 String[] tokens = tokenize(memory.getContent());
-
+                
                 for (String token : tokens) {
                     String indexKey = sessionId + ":" + token;
                     localIndex.computeIfAbsent(indexKey, k -> new HashSet<>())
                              .add(memory.getId());
                 }
             }
-
+            
             // Update the global index
             invertedIndex.putAll(localIndex);
-
+            
             // Persist to Redis for durability
             return persistIndexToRedis(sessionId, localIndex);
-        }).replaceWithVoid();
+        }).flatMap(uni -> uni).replaceWithVoid();
     }
 
     /**
@@ -63,14 +61,14 @@ public class MemoryIndexService {
      */
     public Uni<Void> buildSemanticHashIndex(String sessionId, List<ConversationMemory> memories) {
         LOG.debug("Building semantic hash index for session: {}", sessionId);
-
+        
         return Uni.createFrom().item(() -> {
             Map<String, Set<String>> localIndex = new HashMap<>();
-
+            
             for (ConversationMemory memory : memories) {
                 if (memory.getEmbedding() != null && !memory.getEmbedding().isEmpty()) {
                     String[] hashes = computeLocalitySensitiveHash(memory.getEmbedding());
-
+                    
                     for (String hash : hashes) {
                         String indexKey = sessionId + ":lsh:" + hash;
                         localIndex.computeIfAbsent(indexKey, k -> new HashSet<>())
@@ -78,7 +76,7 @@ public class MemoryIndexService {
                     }
                 }
             }
-
+            
             semanticHashIndex.putAll(localIndex);
             return null;
         }).replaceWithVoid();
@@ -91,11 +89,11 @@ public class MemoryIndexService {
         return Uni.createFrom().item(() -> {
             String[] queryTokens = tokenize(query);
             Set<String> results = new HashSet<>();
-
+            
             for (String token : queryTokens) {
                 String indexKey = sessionId + ":" + token;
                 Set<String> memoryIds = invertedIndex.get(indexKey);
-
+                
                 if (memoryIds != null) {
                     if (results.isEmpty()) {
                         results.addAll(memoryIds);
@@ -105,7 +103,7 @@ public class MemoryIndexService {
                     }
                 }
             }
-
+            
             return results;
         });
     }
@@ -117,16 +115,16 @@ public class MemoryIndexService {
         return Uni.createFrom().item(() -> {
             String[] queryHashes = computeLocalitySensitiveHash(queryEmbedding);
             Set<String> candidates = new HashSet<>();
-
+            
             for (String hash : queryHashes) {
                 String indexKey = sessionId + ":lsh:" + hash;
                 Set<String> memoryIds = semanticHashIndex.get(indexKey);
-
+                
                 if (memoryIds != null) {
                     candidates.addAll(memoryIds);
                 }
             }
-
+            
             return candidates;
         });
     }
@@ -147,32 +145,32 @@ public class MemoryIndexService {
         int numHashFunctions = 5;
         int numBits = 8;
         String[] hashes = new String[numHashFunctions];
-
+        
         Random random = new Random(42); // Fixed seed for reproducibility
-
+        
         for (int h = 0; h < numHashFunctions; h++) {
             StringBuilder hashBits = new StringBuilder();
-
+            
             for (int b = 0; b < numBits; b++) {
                 // Generate random hyperplane
                 List<Double> hyperplane = new ArrayList<>();
                 for (int i = 0; i < embedding.size(); i++) {
                     hyperplane.add(random.nextGaussian());
                 }
-
+                
                 // Compute dot product
                 double dotProduct = 0.0;
                 for (int i = 0; i < embedding.size(); i++) {
                     dotProduct += embedding.get(i) * hyperplane.get(i);
                 }
-
+                
                 // Hash bit is 1 if dot product is positive
                 hashBits.append(dotProduct >= 0 ? "1" : "0");
             }
-
+            
             hashes[h] = hashBits.toString();
         }
-
+        
         return hashes;
     }
 
@@ -180,17 +178,23 @@ public class MemoryIndexService {
      * Persist index to Redis for durability
      */
     private Uni<Void> persistIndexToRedis(String sessionId, Map<String, Set<String>> index) {
+        if (index.isEmpty()) return Uni.createFrom().voidItem();
+        
         List<Uni<Void>> operations = new ArrayList<>();
-
+        
         for (Map.Entry<String, Set<String>> entry : index.entrySet()) {
             String redisKey = "index:" + entry.getKey();
             String[] values = entry.getValue().toArray(new String[0]);
-
-            Uni<Void> op = redisAPI.sadd(List.of(redisKey, values))
+            
+            List<String> args = new ArrayList<>();
+            args.add(redisKey);
+            Collections.addAll(args, values);
+            
+            Uni<Void> op = redisAPI.sadd(args)
                 .replaceWithVoid();
             operations.add(op);
         }
-
+        
         return Uni.combine().all().unis(operations).discardItems();
     }
 
@@ -202,8 +206,7 @@ public class MemoryIndexService {
             // Remove from in-memory index
             invertedIndex.keySet().removeIf(key -> key.startsWith(sessionId + ":"));
             semanticHashIndex.keySet().removeIf(key -> key.startsWith(sessionId + ":"));
-
-            // Remove from Redis
+            
             return null;
         }).replaceWithVoid();
     }

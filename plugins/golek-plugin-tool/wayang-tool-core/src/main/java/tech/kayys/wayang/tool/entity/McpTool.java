@@ -23,6 +23,7 @@ import jakarta.persistence.Version;
 import jakarta.validation.constraints.NotNull;
 import tech.kayys.wayang.tool.dto.CapabilityLevel;
 import tech.kayys.wayang.tool.dto.ToolType;
+import tech.kayys.wayang.tool.entity.HttpExecutionConfig;
 
 /**
  * ============================================================================

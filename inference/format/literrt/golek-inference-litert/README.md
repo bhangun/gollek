@@ -9,7 +9,7 @@ Provider for local LiteRT (.tflite) inference with delegate support (CPU/GPU/NNA
 ```json
 {
   "requestId": "req-123",
-  "tenantId": "default",
+  "tenantId": "community",
   "model": "mobilenet-v2",
   "preferredProvider": "litert",
   "messages": [],

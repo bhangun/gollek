@@ -1,12 +1,10 @@
 package tech.kayys.wayang.tool.parser;
 
+import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import tech.kayys.wayang.mcp.parser.multispec.SpecTypeDetector;
-
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
+import tech.kayys.wayang.tool.dto.SourceType;
+import tech.kayys.wayang.tool.parser.multispec.SpecTypeDetector;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -31,12 +29,11 @@ class SpecTypeDetectorTest {
               "paths": {}
             }
             """;
-        
-        InputStream inputStream = new ByteArrayInputStream(openApi3Json.getBytes(StandardCharsets.UTF_8));
-        String detectedType = specTypeDetector.detectSpecType(inputStream);
-        
+
+        SourceType detectedType = specTypeDetector.detect(openApi3Json).subscribe().withSubscriber(UniAssertSubscriber.create()).awaitItem().getItem();
+
         assertNotNull(detectedType);
-        assertTrue(detectedType.toUpperCase().contains("OPENAPI") || detectedType.toUpperCase().contains("OAS"));
+        assertEquals(SourceType.OPENAPI_3_RAW, detectedType);
     }
 
     @Test
@@ -48,12 +45,11 @@ class SpecTypeDetectorTest {
               version: 1.0.0
             paths: {}
             """;
-        
-        InputStream inputStream = new ByteArrayInputStream(openApi3Yaml.getBytes(StandardCharsets.UTF_8));
-        String detectedType = specTypeDetector.detectSpecType(inputStream);
-        
+
+        SourceType detectedType = specTypeDetector.detect(openApi3Yaml).subscribe().withSubscriber(UniAssertSubscriber.create()).awaitItem().getItem();
+
         assertNotNull(detectedType);
-        assertTrue(detectedType.toUpperCase().contains("OPENAPI") || detectedType.toUpperCase().contains("OAS"));
+        assertEquals(SourceType.OPENAPI_3_RAW, detectedType);
     }
 
     @Test
@@ -68,12 +64,11 @@ class SpecTypeDetectorTest {
               "paths": {}
             }
             """;
-        
-        InputStream inputStream = new ByteArrayInputStream(swagger2Json.getBytes(StandardCharsets.UTF_8));
-        String detectedType = specTypeDetector.detectSpecType(inputStream);
-        
+
+        SourceType detectedType = specTypeDetector.detect(swagger2Json).subscribe().withSubscriber(UniAssertSubscriber.create()).awaitItem().getItem();
+
         assertNotNull(detectedType);
-        assertTrue(detectedType.toUpperCase().contains("SWAGGER"));
+        assertEquals(SourceType.SWAGGER_2_RAW, detectedType);
     }
 
     @Test
@@ -84,28 +79,31 @@ class SpecTypeDetectorTest {
               "json": "content"
             }
             """;
-        
-        InputStream inputStream = new ByteArrayInputStream(invalidSpec.getBytes(StandardCharsets.UTF_8));
-        String detectedType = specTypeDetector.detectSpecType(inputStream);
-        
-        // Should return UNKNOWN or null for unrecognized specs
-        assertNull(detectedType);
+
+        Exception exception = assertThrows(RuntimeException.class, () -> {
+            specTypeDetector.detect(invalidSpec).subscribe().withSubscriber(UniAssertSubscriber.create()).awaitItem().getItem();
+        });
+
+        assertTrue(exception.getMessage().contains("Unknown"));
     }
 
     @Test
     void testDetectEmptySpec() {
         String emptySpec = "";
-        
-        InputStream inputStream = new ByteArrayInputStream(emptySpec.getBytes(StandardCharsets.UTF_8));
-        String detectedType = specTypeDetector.detectSpecType(inputStream);
-        
-        assertNull(detectedType);
+
+        Exception exception = assertThrows(RuntimeException.class, () -> {
+            specTypeDetector.detect(emptySpec).subscribe().withSubscriber(UniAssertSubscriber.create()).awaitItem().getItem();
+        });
+
+        assertTrue(exception.getMessage().contains("Unknown"));
     }
 
     @Test
-    void testDetectWithNullStream() {
-        assertThrows(Exception.class, () -> {
-            specTypeDetector.detectSpecType(null);
+    void testDetectWithNullSpec() {
+        Exception exception = assertThrows(RuntimeException.class, () -> {
+            specTypeDetector.detect(null).subscribe().withSubscriber(UniAssertSubscriber.create()).awaitItem().getItem();
         });
+
+        assertTrue(exception.getMessage().contains("Unknown"));
     }
 }

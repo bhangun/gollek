@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 
+import tech.kayys.golek.spi.auth.ApiKeyConstants;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.routing.SelectionStrategy;
 import tech.kayys.wayang.tenant.TenantContext;
@@ -97,6 +98,13 @@ public record RoutingContext(
      */
     public SelectionStrategy getEffectiveStrategy(SelectionStrategy defaultStrategy) {
         return strategyOverride.orElse(defaultStrategy);
+    }
+
+    public String apiKey() {
+        if (tenantContext == null || tenantContext.getTenantId() == null) {
+            return ApiKeyConstants.COMMUNITY_API_KEY;
+        }
+        return tenantContext.getTenantId().value();
     }
 
     /**

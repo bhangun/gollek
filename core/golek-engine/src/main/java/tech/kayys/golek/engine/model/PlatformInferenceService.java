@@ -132,7 +132,7 @@ public class PlatformInferenceService {
 
                     auditService.logStreamStart(request, tenantContext);
 
-                    return engine.stream(request)
+                    return engine.stream(request, tenantContext)
                             .map(chunk -> (StreamingInferenceChunk) chunk)
                             .onItem().invoke(chunk -> {
                                 metrics.recordRequestStarted(

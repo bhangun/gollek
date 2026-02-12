@@ -104,7 +104,7 @@ response.getUsageMetrics()     // Resource usage
 # Request inference for sentiment analysis
 curl -X POST http://localhost:8080/api/infer \
   -H "Content-Type: application/json" \
-  -H "X-Tenant-Id: tenant-1" \
+  -H "X-API-Key: tenant-1" \
   -d '{
     "modelId": "distilbert-sentiment",
     "prompt": "This movie was amazing!",

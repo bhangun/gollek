@@ -132,14 +132,11 @@ public class MistralProvider implements StreamingProvider {
                             .requestId(request.getRequestId())
                             .content(content)
                             .model(response.getModel())
+                            .inputTokens(response.getUsage() != null ? response.getUsage().getPromptTokens() : 0)
+                            .outputTokens(response.getUsage() != null ? response.getUsage().getCompletionTokens() : 0)
+                            .tokensUsed(response.getUsage() != null ? response.getUsage().getTotalTokens() : 0)
                             .durationMs(duration)
                             .metadata("provider", PROVIDER_ID)
-                            .metadata("prompt_tokens",
-                                    response.getUsage() != null ? response.getUsage().getPromptTokens() : 0)
-                            .metadata("completion_tokens",
-                                    response.getUsage() != null ? response.getUsage().getCompletionTokens() : 0)
-                            .metadata("total_tokens",
-                                    response.getUsage() != null ? response.getUsage().getTotalTokens() : 0)
                             .build();
                 });
     }

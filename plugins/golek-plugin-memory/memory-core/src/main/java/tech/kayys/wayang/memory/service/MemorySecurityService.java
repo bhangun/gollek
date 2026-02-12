@@ -1,5 +1,6 @@
 package tech.kayys.wayang.memory.service;
 
+import tech.kayys.wayang.memory.model.ConversationMemory;
 import tech.kayys.wayang.memory.model.MemoryContext;
 import tech.kayys.wayang.memory.model.SecurityScanResult;
 import io.smallrye.mutiny.Uni;

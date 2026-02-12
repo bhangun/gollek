@@ -2,7 +2,7 @@ package tech.kayys.wayang.tool.parser;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import tech.kayys.wayang.mcp.SpecFormatRegistry;
+import tech.kayys.wayang.tool.parser.SpecFormatRegistry;
 
 import java.util.List;
 import java.util.Map;

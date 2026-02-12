@@ -33,6 +33,13 @@
             <version>12.24.0</version>
         </dependency>
 
+        <!-- Azure Core for BinaryData -->
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-core</artifactId>
+            <version>1.47.0</version>
+        </dependency>
+
         <!-- Quarkus Core -->
         <dependency>
             <groupId>io.quarkus</groupId>

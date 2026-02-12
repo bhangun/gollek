@@ -7,8 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tech.kayys.golek.sdk.core.model.ModelInfo;
 import tech.kayys.golek.sdk.core.model.PullProgress;
-import tech.kayys.golek.client.exception.GolekClientException;
-
+import tech.kayys.golek.sdk.core.exception.SdkException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -49,15 +48,18 @@ class ModelOperationsTest {
     void testListModels_Success() throws Exception {
         // Arrange
         String jsonResponse = "[" +
-                "{\"id\":\"model1\", \"name\":\"Test Model 1\", \"size\":\"1GB\", \"description\":\"First test model\"}," +
-                "{\"id\":\"model2\", \"name\":\"Test Model 2\", \"size\":\"2GB\", \"description\":\"Second test model\"}" +
+                "{\"modelId\":\"model1\", \"name\":\"Test Model 1\", \"sizeBytes\":1073741824, \"metadata\":{\"description\":\"First test model\"}},"
+                +
+                "{\"modelId\":\"model2\", \"name\":\"Test Model 2\", \"sizeBytes\":2147483648, \"metadata\":{\"description\":\"Second test model\"}}"
+                +
                 "]";
 
         HttpResponse<String> httpResponse = mock(HttpResponse.class);
         when(httpResponse.statusCode()).thenReturn(200);
         when(httpResponse.body()).thenReturn(jsonResponse);
 
-        when(httpClient.send(any(HttpRequest.class), any())).thenReturn(httpResponse);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn((HttpResponse) httpResponse);
 
         // Act
         List<ModelInfo> models = client.listModels();
@@ -65,26 +67,28 @@ class ModelOperationsTest {
         // Assert
         assertNotNull(models);
         assertEquals(2, models.size());
-        assertEquals("model1", models.get(0).getId());
+        assertEquals("model1", models.get(0).getModelId());
         assertEquals("Test Model 1", models.get(0).getName());
-        assertEquals("1GB", models.get(0).getSize());
-        assertEquals("model2", models.get(1).getId());
+        assertEquals(1073741824L, models.get(0).getSizeBytes());
+        assertEquals("model2", models.get(1).getModelId());
         assertEquals("Test Model 2", models.get(1).getName());
-        assertEquals("2GB", models.get(1).getSize());
+        assertEquals(2147483648L, models.get(1).getSizeBytes());
     }
 
     @Test
     void testListModelsWithPagination_Success() throws Exception {
         // Arrange
         String jsonResponse = "[" +
-                "{\"id\":\"model3\", \"name\":\"Test Model 3\", \"size\":\"3GB\", \"description\":\"Third test model\"}" +
+                "{\"modelId\":\"model3\", \"name\":\"Test Model 3\", \"sizeBytes\":3221225472, \"metadata\":{\"description\":\"Third test model\"}}"
+                +
                 "]";
 
         HttpResponse<String> httpResponse = mock(HttpResponse.class);
         when(httpResponse.statusCode()).thenReturn(200);
         when(httpResponse.body()).thenReturn(jsonResponse);
 
-        when(httpClient.send(any(HttpRequest.class), any())).thenReturn(httpResponse);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn((HttpResponse) httpResponse);
 
         // Act
         List<ModelInfo> models = client.listModels(10, 5);
@@ -92,24 +96,25 @@ class ModelOperationsTest {
         // Assert
         assertNotNull(models);
         assertEquals(1, models.size());
-        assertEquals("model3", models.get(0).getId());
+        assertEquals("model3", models.get(0).getModelId());
         assertEquals("Test Model 3", models.get(0).getName());
-        assertEquals("3GB", models.get(0).getSize());
+        assertEquals(3221225472L, models.get(0).getSizeBytes());
     }
 
     @Test
     void testGetModelInfo_Success() throws Exception {
         // Arrange
         String jsonResponse = "{" +
-                "\"id\":\"llama3:latest\", \"name\":\"Llama 3 Latest\", \"size\":\"4.7GB\", " +
-                "\"description\":\"Latest Llama 3 model\"" +
+                "\"modelId\":\"llama3:latest\", \"name\":\"Llama 3 Latest\", \"sizeBytes\":5046586572, " +
+                "\"metadata\":{\"description\":\"Latest Llama 3 model\"}" +
                 "}";
 
         HttpResponse<String> httpResponse = mock(HttpResponse.class);
         when(httpResponse.statusCode()).thenReturn(200);
         when(httpResponse.body()).thenReturn(jsonResponse);
 
-        when(httpClient.send(any(HttpRequest.class), any())).thenReturn(httpResponse);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn((HttpResponse) httpResponse);
 
         // Act
         Optional<ModelInfo> modelInfoOpt = client.getModelInfo("llama3:latest");
@@ -117,10 +122,10 @@ class ModelOperationsTest {
         // Assert
         assertTrue(modelInfoOpt.isPresent());
         ModelInfo modelInfo = modelInfoOpt.get();
-        assertEquals("llama3:latest", modelInfo.getId());
+        assertEquals("llama3:latest", modelInfo.getModelId());
         assertEquals("Llama 3 Latest", modelInfo.getName());
-        assertEquals("4.7GB", modelInfo.getSize());
-        assertEquals("Latest Llama 3 model", modelInfo.getDescription());
+        assertEquals(5046586572L, modelInfo.getSizeBytes());
+        assertEquals("Latest Llama 3 model", modelInfo.getMetadata().get("description"));
     }
 
     @Test
@@ -128,9 +133,8 @@ class ModelOperationsTest {
         // Arrange
         HttpResponse<String> httpResponse = mock(HttpResponse.class);
         when(httpResponse.statusCode()).thenReturn(404);
-        when(httpResponse.body()).thenReturn("{\"error\":\"Model not found\"}");
-
-        when(httpClient.send(any(HttpRequest.class), any())).thenReturn(httpResponse);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn((HttpResponse) httpResponse);
 
         // Act
         Optional<ModelInfo> modelInfoOpt = client.getModelInfo("nonexistent-model");
@@ -144,9 +148,8 @@ class ModelOperationsTest {
         // Arrange
         HttpResponse<String> httpResponse = mock(HttpResponse.class);
         when(httpResponse.statusCode()).thenReturn(200);
-        when(httpResponse.body()).thenReturn("{}"); // Empty response body for successful deletion
-
-        when(httpClient.send(any(HttpRequest.class), any())).thenReturn(httpResponse);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn((HttpResponse) httpResponse);
 
         // Act & Assert (should not throw any exception)
         assertDoesNotThrow(() -> client.deleteModel("test-model-to-delete"));
@@ -157,25 +160,27 @@ class ModelOperationsTest {
         // Arrange
         HttpResponse<String> httpResponse = mock(HttpResponse.class);
         when(httpResponse.statusCode()).thenReturn(204); // No content response
-        when(httpResponse.body()).thenReturn(""); // Empty response body
-
-        when(httpClient.send(any(HttpRequest.class), any())).thenReturn(httpResponse);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn((HttpResponse) httpResponse);
 
         // Act & Assert (should not throw any exception)
         assertDoesNotThrow(() -> client.deleteModel("test-model-to-delete"));
     }
 
     @Test
-    void testDeleteModel_NotFound() {
+    void testDeleteModel_NotFound() throws Exception {
         // Arrange
         HttpResponse<String> httpResponse = mock(HttpResponse.class);
         when(httpResponse.statusCode()).thenReturn(404);
         when(httpResponse.body()).thenReturn("{\"error\":\"Model not found\"}");
 
-        when(httpClient.send(any(HttpRequest.class), any())).thenThrow(new RuntimeException("Simulated network error"));
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn((HttpResponse) httpResponse);
 
         // Act & Assert
-        assertThrows(Exception.class, () -> client.deleteModel("nonexistent-model"));
+        SdkException exception = assertThrows(
+                SdkException.class,
+                () -> client.deleteModel("nonexistent-model"));
     }
 
     @Test
@@ -185,9 +190,8 @@ class ModelOperationsTest {
 
         HttpResponse<String> httpResponse = mock(HttpResponse.class);
         when(httpResponse.statusCode()).thenReturn(200); // Immediate success
-        when(httpResponse.body()).thenReturn("{\"status\":\"success\", \"message\":\"Model pulled\"}");
-
-        when(httpClient.send(any(HttpRequest.class), any())).thenReturn(httpResponse);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn((HttpResponse) httpResponse);
 
         // Act
         assertDoesNotThrow(() -> client.pullModel("test-model", progress -> {
@@ -195,7 +199,9 @@ class ModelOperationsTest {
         }));
 
         // Assert
-        // Since the response is immediate success, the progress callback should be called with completion
-        // This is a simplified test - in a real scenario, we'd test the streaming behavior too
+        // Since the response is immediate success, the progress callback should be
+        // called with completion
+        // This is a simplified test - in a real scenario, we'd test the streaming
+        // behavior too
     }
 }

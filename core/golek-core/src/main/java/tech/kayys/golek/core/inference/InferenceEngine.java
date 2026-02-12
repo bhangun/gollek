@@ -56,7 +56,7 @@ public interface InferenceEngine {
         /**
          * Execute streaming inference
          */
-        Multi<StreamingInferenceChunk> stream(InferenceRequest request);
+        Multi<StreamingInferenceChunk> stream(InferenceRequest request, TenantContext tenantContext);
 
         /**
          * Submit asynchronous inference job

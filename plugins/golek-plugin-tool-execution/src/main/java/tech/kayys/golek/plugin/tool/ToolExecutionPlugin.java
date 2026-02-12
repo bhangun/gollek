@@ -11,6 +11,7 @@ package tech.kayys.golek.plugin.tool;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import tech.kayys.golek.core.execution.ExecutionContext;
 import tech.kayys.golek.core.plugin.InferencePhasePlugin;
@@ -43,14 +44,18 @@ public class ToolExecutionPlugin implements InferencePhasePlugin {
     private boolean enabled = true;
     private Map<String, Object> config = new HashMap<>();
 
-    // Note: We'll need to update this once we have the DefaultToolExecutor in the new module
+    // Note: We'll need to update this once we have the DefaultToolExecutor in the
+    // new module
     // For now, keeping the old import for the executor
     @Inject
     tech.kayys.wayang.tool.impl.DefaultToolExecutor toolExecutor;
-    
+
+    @Inject
+    ObjectMapper objectMapper;
+
     @Inject
     ToolRegistry toolRegistry;
-    
+
     private final ToolArgumentValidator validator = new ToolArgumentValidator();
     private final ToolResultFormatter resultFormatter = new ToolResultFormatter();
 
@@ -95,38 +100,60 @@ public class ToolExecutionPlugin implements InferencePhasePlugin {
 
         // Execute all tools in parallel to support multiple tool calls per turn
         List<ToolExecutionResult> results = new ArrayList<>();
-        
+
         // For now, execute sequentially but with enhanced error handling
         // In the future, this could be optimized for parallel execution
         for (ToolCall call : toolCalls) {
             try {
                 // Get the tool from registry to validate arguments
                 Tool tool = toolRegistry.getTool(call.getFunction().getName()).await().indefinitely();
-                
+
+                Map<String, Object> arguments = Collections.emptyMap();
+                try {
+                    String argsJson = call.getFunction().getArguments();
+                    if (argsJson != null && !argsJson.trim().isEmpty()) {
+                        arguments = objectMapper.readValue(argsJson, Map.class);
+                    }
+                } catch (Exception e) {
+                    LOG.errorf("Error parsing arguments for tool %s: %s", call.getFunction().getName(), e.getMessage());
+                    throw new PluginException("Invalid arguments for tool " + call.getFunction().getName(), e);
+                }
+
                 // Validate arguments against the tool's schema
-                validator.validate(tool, call.getFunction().getArguments());
-                
+                validator.validate(tool, arguments);
+
                 // Execute the tool using the DefaultToolExecutor
                 // We need to convert the SPI ToolCall to the format expected by the executor
-                tech.kayys.golek.tool.dto.ToolExecutionResult result = toolExecutor.execute(
-                    call.getFunction().getName(), 
-                    call.getFunction().getArguments(), 
-                    Collections.emptyMap() // context
+                tech.kayys.wayang.tool.dto.ToolExecutionResult wayangResult = toolExecutor.execute(
+                        call.getFunction().getName(),
+                        arguments,
+                        Collections.emptyMap() // context
                 ).await().indefinitely();
-                
+
+                // Map Wayang result to Golek result
+                tech.kayys.golek.tool.dto.ToolExecutionResult result = new tech.kayys.golek.tool.dto.ToolExecutionResult(
+                        call.getId(),
+                        call.getFunction().getName(),
+                        tech.kayys.golek.tool.dto.InvocationStatus.valueOf(wayangResult.status().name()),
+                        wayangResult.output(),
+                        wayangResult.errorMessage(),
+                        wayangResult.executionTimeMs(),
+                        wayangResult.metadata(),
+                        wayangResult.status().name().equals("SUCCESS"));
+
                 results.add(result);
 
                 LOG.debugf("Tool %s executed successfully", call.getFunction().getName());
 
             } catch (Exception e) {
                 LOG.errorf("Error executing tool %s: %s", call.getFunction().getName(), e.getMessage());
-                
+
                 // Create an error result to include in the response
                 ToolExecutionResult errorResult = ToolExecutionResult.failure(
-                    call.getId(),
-                    call.getFunction().getName(),
-                    "Error: " + e.getMessage(),
-                    0 // execution time
+                        call.getId(),
+                        call.getFunction().getName(),
+                        "Error: " + e.getMessage(),
+                        0 // execution time
                 );
                 results.add(errorResult);
             }
@@ -140,12 +167,13 @@ public class ToolExecutionPlugin implements InferencePhasePlugin {
         if (!results.isEmpty()) {
             Map<String, Object> toolResultMessage = resultFormatter.createToolResultMessage(results);
             context.putVariable("toolResultMessage", toolResultMessage);
-            
-            // Add to conversation history so the next iteration of the reasoning loop can use it
+
+            // Add to conversation history so the next iteration of the reasoning loop can
+            // use it
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> conversationHistory = context.getVariable("conversationHistory", List.class)
                     .orElse(new ArrayList<>());
-            
+
             conversationHistory.add(toolResultMessage);
             context.putVariable("conversationHistory", conversationHistory);
         }

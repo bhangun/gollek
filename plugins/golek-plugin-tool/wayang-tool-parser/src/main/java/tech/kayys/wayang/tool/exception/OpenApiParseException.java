@@ -1,4 +1,4 @@
-package tech.kayys.wayang.mcp.exception;
+package tech.kayys.wayang.tool.exception;
 
 public class OpenApiParseException extends RuntimeException {
     public OpenApiParseException(String message) {

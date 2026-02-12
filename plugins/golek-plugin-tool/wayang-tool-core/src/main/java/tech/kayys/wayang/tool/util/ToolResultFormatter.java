@@ -31,9 +31,9 @@ public class ToolResultFormatter {
      */
     private Map<String, Object> formatSingleResult(ToolExecutionResult result) {
         return Map.of(
-                "tool_call_id", result.getToolCallId(),
-                "name", result.getToolName(),
-                "content", result.getOutput()
+                "tool_call_id", result.toolId(),
+                "name", result.toolId(), // Assuming toolId is used for name if name is missing in record
+                "content", result.output()
         );
     }
 

@@ -122,13 +122,19 @@ public class GeminiProvider implements StreamingProvider {
                                                                         : String.valueOf(requestId))
                                                         .content(content)
                                                         .model(request.getModel())
+                                                        .inputTokens(response.getUsageMetadata() != null
+                                                                        ? response.getUsageMetadata()
+                                                                                        .getPromptTokenCount()
+                                                                        : 0)
+                                                        .outputTokens(response.getUsageMetadata() != null
+                                                                        ? response.getUsageMetadata()
+                                                                                        .getCandidatesTokenCount()
+                                                                        : 0)
+                                                        .tokensUsed(response.getUsageMetadata() != null
+                                                                        ? response.getUsageMetadata()
+                                                                                        .getTotalTokenCount()
+                                                                        : 0)
                                                         .durationMs(duration)
-                                                        .tokensUsed(response.getUsageMetadata() != null ? response
-                                                                        .getUsageMetadata().getTotalTokenCount() : 0)
-                                                        .metadata("total_tokens",
-                                                                        response.getUsageMetadata() != null ? response
-                                                                                        .getUsageMetadata()
-                                                                                        .getTotalTokenCount() : 0)
                                                         .build();
                                 })
                                 .onFailure().transform(this::wrapException);

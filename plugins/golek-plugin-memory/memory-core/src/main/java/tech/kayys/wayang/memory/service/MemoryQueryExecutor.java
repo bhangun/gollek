@@ -1,15 +1,21 @@
-package tech.kayys.gamelan.executor.memory;
+package tech.kayys.wayang.memory.service;
+
+import tech.kayys.wayang.memory.model.*;
+import tech.kayys.wayang.memory.context.ScoredMemory;
+
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tech.kayys.gamelan.core.domain.*;
-import tech.kayys.gamelan.core.engine.NodeExecutionResult;
-import tech.kayys.gamelan.core.engine.NodeExecutionTask;
-import tech.kayys.gamelan.executor.AbstractWorkflowExecutor;
-import tech.kayys.gamelan.executor.Executor;
+import tech.kayys.gamelan.engine.node.NodeExecutionResult;
+import tech.kayys.gamelan.engine.node.DefaultNodeExecutionResult;
+import tech.kayys.gamelan.engine.node.NodeExecutionTask;
+import tech.kayys.gamelan.engine.node.NodeExecutionStatus;
+import tech.kayys.gamelan.engine.protocol.CommunicationType;
+import tech.kayys.gamelan.sdk.executor.core.AbstractWorkflowExecutor;
+import tech.kayys.gamelan.sdk.executor.core.Executor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +29,7 @@ import java.util.Map;
  * - Metadata filtering
  * - Cross-namespace search
  */
-@Executor(executorType = "memory-query", communicationType = tech.kayys.gamelan.core.scheduler.CommunicationType.GRPC, maxConcurrentTasks = 20)
+@Executor(executorType = "memory-query", communicationType = tech.kayys.gamelan.engine.protocol.CommunicationType.GRPC, maxConcurrentTasks = 20)
 @ApplicationScoped
 public class MemoryQueryExecutor extends AbstractWorkflowExecutor {
 
@@ -72,11 +78,13 @@ public class MemoryQueryExecutor extends AbstractWorkflowExecutor {
                             "results", results,
                             "contextTokens", engineeredContext.getTotalTokens());
 
-                    return NodeExecutionResult.success(
+                    return new DefaultNodeExecutionResult(
                             task.runId(),
                             task.nodeId(),
                             task.attempt(),
+                            NodeExecutionStatus.COMPLETED,
                             output,
+                            null,
                             task.token());
                 });
     }

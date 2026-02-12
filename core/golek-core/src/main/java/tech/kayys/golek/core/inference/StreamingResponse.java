@@ -56,6 +56,16 @@ public final class StreamingResponse implements InferenceResponseInterface {
     }
 
     @Override
+    public int getInputTokens() {
+        return 0;
+    }
+
+    @Override
+    public int getOutputTokens() {
+        return 0;
+    }
+
+    @Override
     public long getDurationMs() {
         // Return a default value, actual duration would be computed
         return 0;

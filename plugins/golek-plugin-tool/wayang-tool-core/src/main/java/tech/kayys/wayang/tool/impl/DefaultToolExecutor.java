@@ -5,9 +5,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import tech.kayys.wayang.tool.spi.ToolExecutor;
 import tech.kayys.wayang.tool.spi.ToolRegistry;
-import tech.kayys.golek.tool.dto.InvocationStatus;
-import tech.kayys.golek.tool.dto.ToolExecutionResult;
-import tech.kayys.golek.tool.validation.ToolArgumentValidator;
+import tech.kayys.wayang.tool.dto.InvocationStatus;
+import tech.kayys.wayang.tool.dto.ToolExecutionResult;
+import tech.kayys.wayang.tool.validation.ToolArgumentValidator;
 
 import java.util.Map;
 
@@ -30,14 +30,13 @@ public class DefaultToolExecutor implements ToolExecutor {
                     // Execute the tool and wrap the result in a ToolExecutionResult
                     return tool.execute(arguments, context)
                             .map(output -> ToolExecutionResult.success(
-                                generateCallId(toolId),
                                 toolId,
                                 output,
-                                0 // execution time - in a real implementation, measure actual time
+                                0 // execution time
                             ))
                             .onFailure().recoverWithItem(throwable -> ToolExecutionResult.failure(
-                                generateCallId(toolId),
                                 toolId,
+                                InvocationStatus.FAILURE,
                                 throwable.getMessage(),
                                 0 // execution time
                             ));

@@ -1,4 +1,5 @@
-package tech.kayys.gamelan.executor.memory;
+package tech.kayys.wayang.memory.service;
+
 
 import io.quarkus.runtime.Quarkus;
 import io.quarkus.runtime.QuarkusApplication;

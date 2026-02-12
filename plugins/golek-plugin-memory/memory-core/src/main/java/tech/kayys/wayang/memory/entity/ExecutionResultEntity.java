@@ -45,4 +45,23 @@ public class ExecutionResultEntity extends PanacheEntityBase {
     
     @Column(name = "timestamp", nullable = false)
     public Instant timestamp;
+
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+    public String getSessionId() { return sessionId; }
+    public void setSessionId(String sessionId) { this.sessionId = sessionId; }
+    public String getRequestId() { return requestId; }
+    public void setRequestId(String requestId) { this.requestId = requestId; }
+    public String getContent() { return content; }
+    public void setContent(String content) { this.content = content; }
+    public ResponseType getType() { return type; }
+    public void setType(ResponseType type) { this.type = type; }
+    public ResponseStatus getStatus() { return status; }
+    public void setStatus(ResponseStatus status) { this.status = status; }
+    public Map<String, String> getMetadata() { return metadata; }
+    public void setMetadata(Map<String, String> metadata) { this.metadata = metadata; }
+    public List<String> getToolCalls() { return toolCalls; }
+    public void setToolCalls(List<String> toolCalls) { this.toolCalls = toolCalls; }
+    public Instant getTimestamp() { return timestamp; }
+    public void setTimestamp(Instant timestamp) { this.timestamp = timestamp; }
 }

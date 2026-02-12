@@ -1,10 +1,12 @@
-package tech.kayys.gamelan.executor.memory.api;
+package tech.kayys.wayang.memory.api;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
-import tech.kayys.gamelan.executor.memory.*;
+import tech.kayys.wayang.memory.dto.*;
+import tech.kayys.wayang.memory.model.*;
+import tech.kayys.wayang.memory.service.*;
 import tech.kayys.wayang.error.ErrorCode;
 import tech.kayys.wayang.error.WayangException;
 
@@ -36,15 +38,15 @@ public class MemoryResource {
     public Uni<StoreResponse> storeMemory(StoreRequest request) {
         EmbeddingService embeddingService = embeddingFactory.getEmbeddingService();
 
-        return embeddingService.embed(request.content)
+        return embeddingService.embed(request.content())
                 .flatMap(embedding -> {
                     Memory memory = Memory.builder()
-                            .namespace(request.namespace != null ? request.namespace : "default")
-                            .content(request.content)
+                            .namespace(request.namespace() != null ? request.namespace() : "default")
+                            .content(request.content())
                             .embedding(embedding)
-                            .type(request.type != null ? request.type : MemoryType.EPISODIC)
-                            .importance(request.importance != null ? request.importance : 0.5)
-                            .metadata(request.metadata != null ? request.metadata : Map.of())
+                            .type(request.type() != null ? request.type() : MemoryType.EPISODIC)
+                            .importance(request.importance() != null ? request.importance() : 0.5)
+                            .metadata(request.metadata() != null ? request.metadata() : Map.of())
                             .build();
 
                     return memoryStore.store(memory);
@@ -62,12 +64,12 @@ public class MemoryResource {
     public Uni<SearchResponse> search(SearchRequest request) {
         EmbeddingService embeddingService = embeddingFactory.getEmbeddingService();
 
-        return embeddingService.embed(request.query)
+        return embeddingService.embed(request.query())
                 .flatMap(queryEmbedding -> memoryStore.search(
                         queryEmbedding,
-                        request.limit != null ? request.limit : 10,
-                        request.minSimilarity != null ? request.minSimilarity : 0.5,
-                        Map.of("namespace", request.namespace != null ? request.namespace : "default")))
+                        request.limit() != null ? request.limit() : 10,
+                        request.minSimilarity() != null ? request.minSimilarity() : 0.5,
+                        Map.of("namespace", request.namespace() != null ? request.namespace() : "default")))
                 .map(results -> {
                     List<MemoryResult> memoryResults = results.stream()
                             .map(scored -> new MemoryResult(
@@ -91,15 +93,15 @@ public class MemoryResource {
     @Path("/context")
     public Uni<ContextResponse> buildContext(ContextRequest request) {
         ContextConfig config = ContextConfig.builder()
-                .maxMemories(request.maxMemories != null ? request.maxMemories : 10)
-                .systemPrompt(request.systemPrompt)
-                .taskInstructions(request.taskInstructions)
-                .includeMetadata(request.includeMetadata != null ? request.includeMetadata : true)
+                .maxMemories(request.maxMemories() != null ? request.maxMemories() : 10)
+                .systemPrompt(request.systemPrompt())
+                .taskInstructions(request.taskInstructions())
+                .includeMetadata(request.includeMetadata() != null ? request.includeMetadata() : true)
                 .build();
 
         return contextService.buildContext(
-                request.query,
-                request.namespace != null ? request.namespace : "default",
+                request.query(),
+                request.namespace() != null ? request.namespace() : "default",
                 config)
                 .map(context -> new ContextResponse(
                         true,

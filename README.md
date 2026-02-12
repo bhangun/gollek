@@ -58,7 +58,7 @@ flowchart
 
 ### Multi-Tenancy Defaults
 
-Golek runs in **single-tenant mode by default**. In this mode, `X-Tenant-ID` is not required and the runtime uses `tenantId=default`.
+Golek runs in **single-tenant mode by default**. In this mode, tenant is resolved from API key and the runtime uses API key `community` when no key is provided.
 
 To enable multi-tenancy (enterprise mode), add the `tenant-golek-ext` module or explicitly set the config flag.
 
@@ -76,7 +76,7 @@ To enable multi-tenancy (enterprise mode), add the `tenant-golek-ext` module or 
 wayang.multitenancy.enabled=true
 ```
 
-When enabled, the API enforces `X-Tenant-ID` and tenant-aware features (quotas, routing preferences, and audit tags) are activated.
+When enabled, the API enforces API key authentication (`X-API-Key` or `Authorization: ApiKey <key>`) and tenant-aware features (quotas, routing preferences, and audit tags) are activated.
 
 ### Error Code Docs
 

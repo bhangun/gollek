@@ -2,6 +2,7 @@ package tech.kayys.golek.spi.routing;
 
 import tech.kayys.golek.spi.exception.ProviderException;
 import tech.kayys.golek.spi.error.ErrorCode;
+import tech.kayys.golek.spi.auth.ApiKeyConstants;
 
 /**
  * Exception thrown when a provider's quota is exhausted.
@@ -37,6 +38,13 @@ public class QuotaExhaustedException extends ProviderException {
     // getProviderId() is inherited from ProviderException
 
     public String getTenantId() {
+        return tenantId;
+    }
+
+    public String getApiKey() {
+        if (tenantId == null || tenantId.isBlank()) {
+            return ApiKeyConstants.COMMUNITY_API_KEY;
+        }
         return tenantId;
     }
 

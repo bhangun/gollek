@@ -50,6 +50,13 @@ public interface ObservabilityPlugin extends GolekPlugin {
     void recordTokenUsage(int inputTokens, int outputTokens, String modelId, String tenantId);
 
     /**
+     * API-key-first alias for {@link #recordTokenUsage(int, int, String, String)}.
+     */
+    default void recordTokenUsageByApiKey(int inputTokens, int outputTokens, String modelId, String apiKey) {
+        recordTokenUsage(inputTokens, outputTokens, modelId, apiKey);
+    }
+
+    /**
      * Record latency for a specific inference phase.
      *
      * @param phase    the inference phase

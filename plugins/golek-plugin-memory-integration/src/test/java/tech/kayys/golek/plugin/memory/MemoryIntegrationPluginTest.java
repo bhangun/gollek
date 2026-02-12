@@ -20,16 +20,21 @@ import tech.kayys.golek.spi.Message;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.plugin.PluginContext;
 import tech.kayys.wayang.memory.impl.VectorAgentMemory;
-import tech.kayys.wayang.memory.dto.SearchRequest;
-import tech.kayys.wayang.memory.dto.SearchResponse;
-import tech.kayys.wayang.memory.context.ScoredMemory;
+import tech.kayys.wayang.memory.spi.MemoryEntry;
+import io.smallrye.mutiny.Uni;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -61,14 +66,18 @@ class MemoryIntegrationPluginTest {
     void initialize_loadsConfig() {
         when(pluginContext.getConfig("maxResults")).thenReturn(Optional.of("10"));
         plugin.initialize(pluginContext);
-        
+
         Map<String, Object> config = plugin.currentConfig();
         assertEquals(10, config.get("maxResults"));
     }
 
     @Test
     void execute_noUserMessage_skipsRetrieval() {
-        InferenceRequest request = new InferenceRequest("req-1", "model", List.of(Message.system("Sys")));
+        InferenceRequest request = InferenceRequest.builder()
+                .requestId("req-1")
+                .model("model")
+                .messages(List.of(Message.system("Sys")))
+                .build();
         when(executionContext.getVariable("request", InferenceRequest.class))
                 .thenReturn(Optional.of(request));
 
@@ -80,20 +89,19 @@ class MemoryIntegrationPluginTest {
     @Test
     void execute_performsRetrievalAndInjectsContext() {
         // Setup request
-        InferenceRequest request = new InferenceRequest("req-1", "model", 
-                List.of(Message.user("Hello Golek")));
+        InferenceRequest request = InferenceRequest.builder()
+                .requestId("req-1")
+                .model("model")
+                .messages(List.of(Message.user("Hello Golek")))
+                .build();
         when(executionContext.getVariable("request", InferenceRequest.class))
                 .thenReturn(Optional.of(request));
 
-        // Mock memory response
-        ScoredMemory memory = new ScoredMemory();
-        memory.setContent("Golek is a puppet");
-        memory.setScore(0.9);
-        
-        SearchResponse response = new SearchResponse();
-        response.setResults(List.of(memory));
-
-        when(memoryService.search(any(SearchRequest.class))).thenReturn(response);
+        // Mock memory response - VectorAgentMemory.retrieve() returns
+        // Uni<List<MemoryEntry>>
+        MemoryEntry entry = new MemoryEntry("id-1", "Golek is a puppet", Instant.now(), Map.of());
+        when(memoryService.retrieve(anyString(), anyString(), anyInt()))
+                .thenReturn(Uni.createFrom().item(List.of(entry)));
 
         plugin.execute(executionContext, null);
 

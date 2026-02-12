@@ -1,4 +1,4 @@
-package tech.kayys.wayang.mcp.domain;
+package tech.kayys.wayang.tool.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;

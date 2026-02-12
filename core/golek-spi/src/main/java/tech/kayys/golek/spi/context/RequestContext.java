@@ -3,6 +3,7 @@ package tech.kayys.golek.spi.context;
 import java.time.Duration;
 import java.util.Optional;
 
+import tech.kayys.golek.spi.auth.ApiKeyConstants;
 import tech.kayys.golek.spi.model.DeviceType;
 
 public record RequestContext(
@@ -22,6 +23,17 @@ public record RequestContext(
         boolean costSensitive
 
 ) {
+
+    public String apiKey() {
+        if (tenantId == null || tenantId.isBlank()) {
+            return ApiKeyConstants.COMMUNITY_API_KEY;
+        }
+        return tenantId;
+    }
+
+    public static RequestContext createApiKey(String apiKey, String userId, String sessionId) {
+        return create(apiKey, userId, sessionId);
+    }
 
     public static RequestContext create(String tenantId, String userId, String sessionId) {
         return new RequestContext(

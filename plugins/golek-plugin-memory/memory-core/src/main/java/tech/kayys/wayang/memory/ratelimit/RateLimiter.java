@@ -4,6 +4,7 @@ import io.quarkus.redis.datasource.RedisDataSource;
 import io.quarkus.redis.datasource.string.StringCommands;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.time.Duration;
@@ -12,39 +13,57 @@ import java.time.Duration;
 public class RateLimiter {
     
     @Inject
-    RedisDataSource redisDataSource;
+    Instance<RedisDataSource> redisDataSource;
 
     public Uni<Boolean> checkRateLimit(String userId, int maxRequests, Duration window) {
-        StringCommands<String, String> commands = redisDataSource.string(String.class);
-        String key = "ratelimit:" + userId;
-        
+        if (!redisDataSource.isResolvable()) {
+            return Uni.createFrom().item(true); // Fail open if Redis unavailable
+        }
+
         return Uni.createFrom().item(() -> {
-            String countStr = commands.get(key);
-            int count = countStr != null ? Integer.parseInt(countStr) : 0;
-            
-            if (count >= maxRequests) {
-                return false;
+            try {
+                RedisDataSource ds = redisDataSource.get();
+                StringCommands<String, String> commands = ds.string(String.class);
+                String key = "ratelimit:" + userId;
+                
+                String countStr = commands.get(key);
+                int count = countStr != null ? Integer.parseInt(countStr) : 0;
+                
+                if (count >= maxRequests) {
+                    return false;
+                }
+                
+                if (count == 0) {
+                    commands.setex(key, window.toSeconds(), "1");
+                } else {
+                    commands.incr(key);
+                }
+                
+                return true;
+            } catch (Exception e) {
+                return true; // Fail open
             }
-            
-            if (count == 0) {
-                commands.setex(key, window.toSeconds(), "1");
-            } else {
-                commands.incr(key);
-            }
-            
-            return true;
         });
     }
 
     public Uni<RateLimitInfo> getRateLimitInfo(String userId) {
-        StringCommands<String, String> commands = redisDataSource.string(String.class);
-        String key = "ratelimit:" + userId;
-        
+        if (!redisDataSource.isResolvable()) {
+            return Uni.createFrom().item(new RateLimitInfo(userId, 0));
+        }
+
         return Uni.createFrom().item(() -> {
-            String countStr = commands.get(key);
-            int count = countStr != null ? Integer.parseInt(countStr) : 0;
-            
-            return new RateLimitInfo(userId, count);
+            try {
+                RedisDataSource ds = redisDataSource.get();
+                StringCommands<String, String> commands = ds.string(String.class);
+                String key = "ratelimit:" + userId;
+                
+                String countStr = commands.get(key);
+                int count = countStr != null ? Integer.parseInt(countStr) : 0;
+                
+                return new RateLimitInfo(userId, count);
+            } catch (Exception e) {
+                return new RateLimitInfo(userId, 0);
+            }
         });
     }
 

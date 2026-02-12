@@ -1,0 +1,119 @@
+{
+    "foreign": {
+        "downcalls": [
+            {
+                "returnType": "void",
+                "parameterTypes": []
+            },
+            {
+                "returnType": "void",
+                "parameterTypes": [
+                    "long"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long"
+                ]
+            },
+            {
+                "returnType": "int",
+                "parameterTypes": [
+                    "long"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "void",
+                "parameterTypes": [
+                    "long",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "void",
+                "parameterTypes": [
+                    "long",
+                    "int",
+                    "int",
+                    "int"
+                ]
+            },
+            {
+                "returnType": "int",
+                "parameterTypes": [
+                    "long",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long",
+                    "int"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long",
+                    "float"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long",
+                    "float",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "int",
+                "parameterTypes": [
+                    "long",
+                    "long",
+                    "int",
+                    "long",
+                    "int",
+                    "int",
+                    "int",
+                    "int"
+                ]
+            },
+            {
+                "returnType": "int",
+                "parameterTypes": [
+                    "long",
+                    "int",
+                    "long",
+                    "int",
+                    "int",
+                    "int"
+                ]
+            },
+            {
+                "returnType": "int",
+                "parameterTypes": [
+                    "long",
+                    "int"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long",
+                    "long",
+                    "long"
+                ]
+            }
+        ]
+    }
+}
