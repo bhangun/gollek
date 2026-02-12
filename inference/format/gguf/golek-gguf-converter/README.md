@@ -128,7 +128,7 @@ docker run -p 8082:8082 \
 ```bash
 curl -X POST http://localhost:8082/v1/converter/gguf/convert \
   -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: tenant-123" \
+  -H "X-API-Key: tenant-123" \
   -d '{
     "inputPath": "models/llama-2-7b",
     "outputPath": "conversions/llama-2-7b-q4.gguf",
@@ -160,7 +160,7 @@ Response:
 ### Convert with Progress Stream
 
 ```bash
-curl -N -H "X-Tenant-ID: tenant-123" \
+curl -N -H "X-API-Key: tenant-123" \
      -H "Accept: text/event-stream" \
      -X POST http://localhost:8082/v1/converter/gguf/convert/stream \
      -d '{"inputPath": "models/llama-2-7b", "outputPath": "out.gguf", "quantization": "Q4_K_M"}'
@@ -181,7 +181,7 @@ data: {"conversionId":1,"success":true,...}
 
 ```bash
 curl "http://localhost:8082/v1/converter/gguf/detect-format?path=models/llama-2-7b" \
-     -H "X-Tenant-ID: tenant-123"
+     -H "X-API-Key: tenant-123"
 ```
 
 Response:
@@ -198,7 +198,7 @@ Response:
 
 ```bash
 curl "http://localhost:8082/v1/converter/gguf/model-info?path=models/llama-2-7b" \
-     -H "X-Tenant-ID: tenant-123"
+     -H "X-API-Key: tenant-123"
 ```
 
 Response:
@@ -247,7 +247,7 @@ Response:
 
 ```bash
 curl -X POST http://localhost:8082/v1/converter/gguf/convert/123/cancel \
-     -H "X-Tenant-ID: tenant-123"
+     -H "X-API-Key: tenant-123"
 ```
 
 ## Configuration
@@ -300,7 +300,7 @@ The service provides complete tenant isolation:
 3. **Concurrent Limits**: Max conversions per tenant
 4. **Path Validation**: Prevents path traversal attacks
 
-Tenant ID is passed via `X-Tenant-ID` header and validated by `TenantContextFilter`.
+Tenant context is resolved via API key (`X-API-Key` or `Authorization: ApiKey <key>`) and validated by `TenantContextFilter`. For community/standalone mode, use API key `community`.
 
 ## Performance
 

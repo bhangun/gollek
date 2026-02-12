@@ -10,7 +10,6 @@ import org.mockito.MockitoAnnotations;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.model.ModelManifest;
 import tech.kayys.golek.spi.model.ModelFormat;
-import tech.kayys.wayang.tenant.TenantContext;
 
 import java.util.Collections;
 import java.util.List;
@@ -67,10 +66,9 @@ class LlamaCppRunnerTest {
                 java.time.Instant.now(),
                 java.time.Instant.now());
 
-        TenantContext context = TenantContext.of("tenant1");
         Map<String, Object> runnerConfig = Collections.emptyMap();
 
-        assertThatThrownBy(() -> runner.initialize(manifest, runnerConfig, context))
+        assertThatThrownBy(() -> runner.initialize(manifest, runnerConfig))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Failed to initialize GGUF runner")
                 .hasCauseInstanceOf(RuntimeException.class);

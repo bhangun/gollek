@@ -2,8 +2,6 @@ import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.nio.file.Path;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -18,18 +16,18 @@ public class LlamaCppRunnerTest {
 
 private static LlamaCppRunner runner;
 private static ModelManifest testManifest;
-private static TenantContext testTenant;
+private static String testTenantId;
 
 @BeforeAll
 public static void setup() throws Exception {
 // Setup test model (use a small model like TinyLlama)
-testTenant = TenantContext.of(new TenantId("test-tenant"));
+testTenantId = "test-tenant";
 
 testManifest = ModelManifest.builder()
 .modelId("test-gguf-model")
 .name("Test GGUF Model")
 .version("1.0")
-.tenantId(testTenant.tenantId())
+.tenantId(testTenantId)
 .artifacts(Map.of(
 ModelFormat.GGUF,
 ArtifactLocation.of("file:///tmp/test-model.gguf")
@@ -54,7 +52,7 @@ Map
 );
 
 assertDoesNotThrow(() ->
-runner.initialize(testManifest, config, testTenant)
+runner.initialize(testManifest, config)
 );
 
 assertTrue(runner.health().isHealthy());
@@ -70,10 +68,7 @@ InferenceRequest request = InferenceRequest.builder()
 .parameter("temperature", 0.7f)
 .build();
 
-RequestContext context = RequestContext.builder()
-.tenantContext(testTenant)
-.timeout(Duration.ofSeconds(30))
-.build();
+RequestContext context = RequestContext.create(testTenantId, "test-user", "test-session");
 
 InferenceResponse response = runner.infer(request, context);
 
@@ -101,10 +96,7 @@ for (int i = 0; i
     .input("prompt" , "Test prompt " + i)
     .parameter("max_tokens" , 10)
     .build();
-    RequestContext context= RequestContext.builder()
-    .tenantContext(testTenant)
-    .timeout(Duration.ofSeconds(30))
-    .build();
+    RequestContext context = RequestContext.create(testTenantId, "test-user", "test-session");
     CompletableFuture
 <InferenceResponse> future =
 runner.inferAsync(request, context).toCompletableFuture();

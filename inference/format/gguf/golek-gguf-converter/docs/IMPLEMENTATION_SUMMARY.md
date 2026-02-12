@@ -117,7 +117,7 @@ Complete tenant isolation with:
 ```bash
 POST /v1/converter/gguf/convert
 Content-Type: application/json
-X-Tenant-ID: acme-corp
+X-API-Key: acme-corp
 
 {
   "inputPath": "models/llama-2-7b",
@@ -131,7 +131,7 @@ X-Tenant-ID: acme-corp
 ```bash
 POST /v1/converter/gguf/convert/stream
 Accept: text/event-stream
-X-Tenant-ID: acme-corp
+X-API-Key: acme-corp
 
 # Returns real-time progress updates:
 data: {"progress":0.1,"stage":"Loading model"}
@@ -142,7 +142,7 @@ data: {"progress":1.0,"stage":"Complete"}
 ### Detect Format
 ```bash
 GET /v1/converter/gguf/detect-format?path=models/llama-2-7b
-X-Tenant-ID: acme-corp
+X-API-Key: acme-corp
 
 # Returns:
 {"format":"pytorch","convertible":true}

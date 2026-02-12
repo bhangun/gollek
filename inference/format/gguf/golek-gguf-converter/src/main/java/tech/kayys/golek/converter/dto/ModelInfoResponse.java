@@ -149,7 +149,7 @@ public class ModelInfoResponse {
         this.estimatedMemoryGb = estimatedMemoryGb;
     }
 
-    static ModelInfoResponse fromModelInfo(ModelInfo info) {
+    public static ModelInfoResponse fromModelInfo(ModelInfo info) {
         if (info == null) {
             return null;
         }

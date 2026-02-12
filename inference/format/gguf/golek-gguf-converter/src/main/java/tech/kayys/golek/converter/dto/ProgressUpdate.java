@@ -57,7 +57,7 @@ public class ProgressUpdate {
         return complete;
     }
 
-    static ProgressUpdate fromProgress(ConversionProgress progress) {
+    public static ProgressUpdate fromProgress(ConversionProgress progress) {
         return ProgressUpdate.builder()
                 .conversionId(progress.getConversionId())
                 .progress(progress.getProgress())

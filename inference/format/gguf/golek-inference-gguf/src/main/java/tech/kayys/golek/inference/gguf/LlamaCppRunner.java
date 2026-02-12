@@ -5,7 +5,6 @@ import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.model.ModelManifest;
 import tech.kayys.golek.spi.model.ModelFormat;
-import tech.kayys.wayang.tenant.TenantContext;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.subscription.MultiEmitter;
 import tech.kayys.golek.spi.stream.StreamChunk;
@@ -33,7 +32,6 @@ public class LlamaCppRunner {
 
     private volatile boolean initialized = false;
     private ModelManifest manifest;
-    private TenantContext tenantContext;
 
     // Native handles
     private final LlamaCppBinding binding;
@@ -74,21 +72,17 @@ public class LlamaCppRunner {
 
     public void initialize(
             ModelManifest manifest,
-            Map<String, Object> runnerConfig,
-            TenantContext tenantContext) {
-        TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
-
+            Map<String, Object> runnerConfig) {
         if (initialized) {
             log.warnf("Runner already initialized for model %s", manifest.modelId());
             return;
         }
 
         log.infof("Initializing GGUF runner for model %s (tenant: %s)",
-                manifest.modelId(), effectiveTenantContext.getTenantId().value());
+                manifest.modelId(), manifest.tenantId());
 
         try {
             this.manifest = manifest;
-            this.tenantContext = effectiveTenantContext;
 
             // Assume model is already at location or resolve it
             // Extract from artifacts map
@@ -120,7 +114,9 @@ public class LlamaCppRunner {
             this.model = binding.loadModel(modelPath.toString(), modelParams);
 
             MemorySegment contextParams = binding.getDefaultContextParams();
-            // Configure context...
+            // Increase context size for multi-turn chat and longer prompts
+            binding.setContextParam(contextParams, "n_ctx", 4096);
+            binding.setContextParam(contextParams, "n_batch", 512);
 
             this.context = binding.createContext(model, contextParams);
 
@@ -134,10 +130,6 @@ public class LlamaCppRunner {
             cleanup();
             throw new RuntimeException("Failed to initialize GGUF runner", e);
         }
-    }
-
-    private TenantContext ensureTenantContext(TenantContext tenantContext) {
-        return tenantContext != null ? tenantContext : TenantContext.of("community");
     }
 
     public InferenceResponse infer(
@@ -259,7 +251,9 @@ public class LlamaCppRunner {
                 .requestId(request.getRequestId())
                 .model(manifest.modelId())
                 .content(result.toString())
-                .tokensUsed(tokensGenerated)
+                .inputTokens(nTokens)
+                .outputTokens(tokensGenerated)
+                .tokensUsed(nTokens + tokensGenerated)
                 .build();
     }
 
@@ -320,7 +314,10 @@ public class LlamaCppRunner {
             }
 
             if (binding.decode(this.context, batch) != 0) {
-                emitter.fail(new RuntimeException("Prompt evaluation failed"));
+                log.errorf("Prompt evaluation failed for model %s (request %s)", manifest.modelId(),
+                        request.getRequestId());
+                emitter.fail(
+                        new RuntimeException("Prompt evaluation failed (check context size or model compatibility)"));
                 return;
             }
 
@@ -421,7 +418,7 @@ public class LlamaCppRunner {
 
             // 3. Grammar / JSON Mode
             String grammar = (String) request.getParameters().get("grammar");
-            boolean jsonMode = (boolean) request.getParameters().getOrDefault("json_mode", true);
+            boolean jsonMode = (boolean) request.getParameters().getOrDefault("json_mode", false);
             if (jsonMode && (grammar == null || grammar.isBlank())) {
                 // Simple JSON grammar if none provided and JSON mode requested
                 grammar = "root ::= object\n" +

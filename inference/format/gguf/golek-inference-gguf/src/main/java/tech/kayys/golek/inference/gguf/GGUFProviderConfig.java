@@ -215,7 +215,7 @@ public interface GGUFProviderConfig {
      * Default for JSON-only mode
      */
     @WithName("generation.json-mode")
-    @WithDefault("true")
+    @WithDefault("false")
     boolean defaultJsonMode();
 
     /**
