@@ -119,7 +119,7 @@ public class ConversionResponse {
         this.errorMessage = errorMessage;
     }
 
-    static ConversionResponse fromResult(ConversionResult result, String tenantId) {
+    public static ConversionResponse fromResult(ConversionResult result, String tenantId) {
         return ConversionResponse.builder()
                 .conversionId(result.getConversionId())
                 .success(result.isSuccess())

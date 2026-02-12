@@ -60,6 +60,7 @@ public class GGUFProvider implements StreamingProvider {
     Tracer tracer;
 
     private final AtomicBoolean initialized = new AtomicBoolean(false);
+    private final AtomicBoolean shutdown = new AtomicBoolean(false);
     private final ProviderMetrics metrics = new ProviderMetrics();
     private final Map<String, Instant> modelLastUsed = new ConcurrentHashMap<>();
 
@@ -67,9 +68,9 @@ public class GGUFProvider implements StreamingProvider {
     private ProviderCapabilities capabilities;
 
     void onStart(@Observes StartupEvent event) {
-        System.out.println("DEBUG: GGUFProvider.onStart entered");
+
         if (!config.enabled()) {
-            System.out.println("DEBUG: GGUF Provider disabled");
+
             log.info("GGUF Provider is disabled by configuration");
             return;
         }
@@ -103,15 +104,16 @@ public class GGUFProvider implements StreamingProvider {
                 .build();
 
         try {
-            System.out.println("DEBUG: calling binding.backendInit()");
+            // binding.backendInit() is already called during LlamaCppBinding.load()
+            // but we call it here to ensure it's ready if we use a different lifecycle
+            log.debug("Initializing GGUF native backend");
             binding.backendInit();
-            System.out.println("DEBUG: backendInit success");
             log.info("llama.cpp native library initialized");
 
             sessionManager.initialize();
 
             if (config.prewarmEnabled() && config.prewarmModels().isPresent()) {
-                System.out.println("DEBUG: prewarming models");
+
                 prewarmModels(config.prewarmModels().get());
             }
 
@@ -119,7 +121,7 @@ public class GGUFProvider implements StreamingProvider {
             log.info("GGUF Provider initialization completed");
 
         } catch (Throwable t) {
-            System.out.println("DEBUG: GGUFProvider init failed: " + t.getMessage());
+
             t.printStackTrace();
             log.error("Failed to initialize GGUF Provider. The provider will be unavailable.", t);
             // We don't throw here to allow the application to start even if native
@@ -160,6 +162,12 @@ public class GGUFProvider implements StreamingProvider {
     @Override
     public void initialize(ProviderConfig config) throws ProviderException.ProviderInitializationException {
         if (!initialized.get()) {
+            if (shutdown.get()) {
+                throw new ProviderException.ProviderInitializationException(
+                        PROVIDER_ID,
+                        "GGUF provider is shutting down",
+                        null);
+            }
             throw new ProviderException.ProviderInitializationException(
                     PROVIDER_ID,
                     "GGUF provider failed to initialize during startup",
@@ -360,10 +368,14 @@ public class GGUFProvider implements StreamingProvider {
 
     @Override
     public void shutdown() {
-        if (initialized.compareAndSet(true, false)) {
-            sessionManager.shutdown();
-            binding.backendFree();
-            modelLastUsed.clear();
+        if (shutdown.compareAndSet(false, true)) {
+            log.info("Shutting down GGUF Provider");
+            if (initialized.get()) {
+                sessionManager.shutdown();
+                binding.backendFree();
+                modelLastUsed.clear();
+                initialized.set(false);
+            }
         }
     }
 
@@ -450,8 +462,8 @@ public class GGUFProvider implements StreamingProvider {
     }
 
     private TenantContext ensureTenantContext(TenantContext tenantContext) {
-        // Single-tenant default when multitenancy is disabled or context is absent.
-        return tenantContext != null ? tenantContext : TenantContext.of("default");
+        // Community/standalone default when context is absent.
+        return tenantContext != null ? tenantContext : TenantContext.of("community");
     }
 
     private void recordMicrometerMetrics(String modelId, boolean success, Duration duration) {
@@ -474,7 +486,11 @@ public class GGUFProvider implements StreamingProvider {
     }
 
     private void ensureInitialized() {
-        if (!initialized.get())
+        if (shutdown.get()) {
+            throw new IllegalStateException("GGUF Provider has been shutdown");
+        }
+        if (!initialized.get()) {
             throw new IllegalStateException("GGUF Provider not initialized");
+        }
     }
 }

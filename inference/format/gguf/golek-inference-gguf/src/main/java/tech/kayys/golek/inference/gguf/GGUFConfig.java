@@ -1,6 +1,6 @@
+package tech.kayys.golek.inference.gguf;
 
 import java.time.Duration;
-import java.util.Objects;
 
 /**
  * Configuration for GGUF model loading and inference

@@ -1,0 +1,40 @@
+{
+  "foreign": {
+    "downcalls": [
+      {
+        "comment": "Allow all Panama FFM downcalls (wildcard)",
+        "descriptor": "*"
+      },
+      {
+        "comment": "Specific registration for (long)void",
+        "descriptor": "(long)void"
+      },
+      {
+        "comment": "Specific registration for (long)long",
+        "descriptor": "(long)long"
+      },
+      {
+        "comment": "Specific registration for (long,long)void",
+        "descriptor": "(long,long)void"
+      },
+      {
+        "comment": "Specific registration for (long,long)long",
+        "descriptor": "(long,long)long"
+      },
+      {
+        "comment": "Specific registration for (long,long,long)void",
+        "descriptor": "(long,long,long)void"
+      },
+      {
+        "comment": "Specific registration for (long,long,long)long",
+        "descriptor": "(long,long,long)long"
+      }
+    ],
+    "upcalls": [
+      {
+        "comment": "Allow all Panama FFM upcalls (callbacks from native code)",
+        "descriptor": "*"
+      }
+    ]
+  }
+}

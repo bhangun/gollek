@@ -1,5 +1,6 @@
 package tech.kayys.golek.inference.gguf;
 
+import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
@@ -116,9 +117,8 @@ public class GGUFSessionManager {
         private SessionContext createSession() {
             String sessionId = java.util.UUID.randomUUID().toString();
 
-            // Create tenant context (extract from poolKey)
+            // Extract tenant id from poolKey
             String tenantId = poolKey.split(":")[0];
-            tech.kayys.wayang.tenant.TenantContext tenantContext = tech.kayys.wayang.tenant.TenantContext.of(tenantId);
 
             // Create artifact location
             tech.kayys.golek.spi.model.ArtifactLocation location = new tech.kayys.golek.spi.model.ArtifactLocation(
@@ -153,7 +153,7 @@ public class GGUFSessionManager {
             LlamaCppRunner runner = new LlamaCppRunner(binding, config, templateService);
 
             try {
-                runner.initialize(manifest, runnerConfig, tenantContext);
+                runner.initialize(manifest, runnerConfig);
 
                 // Warmup runner if configured
                 if (config.prewarmEnabled()) {
@@ -297,6 +297,7 @@ public class GGUFSessionManager {
     /**
      * Graceful shutdown
      */
+    @PreDestroy
     public void shutdown() {
         if (shutdown) {
             return;

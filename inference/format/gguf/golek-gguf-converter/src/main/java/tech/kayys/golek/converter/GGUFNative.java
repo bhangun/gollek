@@ -68,9 +68,10 @@ public final class GGUFNative {
             ValueLayout.JAVA_INT.withName("vocab_only"),
             ValueLayout.JAVA_INT.withName("use_mmap"),
             ValueLayout.JAVA_INT.withName("num_threads"),
+            MemoryLayout.paddingLayout(4), // Alignment padding for 8-byte Address
             ValueLayout.ADDRESS.withName("vocab_type"),
             ValueLayout.JAVA_INT.withName("pad_vocab"),
-            MemoryLayout.paddingLayout(4), // Alignment padding
+            MemoryLayout.paddingLayout(4), // Alignment padding for 8-byte Address
             ValueLayout.ADDRESS.withName("metadata_overrides"),
             ValueLayout.ADDRESS.withName("progress_cb"),
             ValueLayout.ADDRESS.withName("log_cb"),

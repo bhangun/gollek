@@ -11,6 +11,9 @@ import tech.kayys.golek.converter.model.QuantizationType;
 import tech.kayys.golek.spi.model.ModelFormat;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.lang.foreign.*;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -46,6 +49,15 @@ public class GGUFConverter {
     private final ConcurrentHashMap<Long, ConversionContext> activeConversions = new ConcurrentHashMap<>();
 
     /**
+     * Get the native GGUF bridge version.
+     *
+     * @return version string
+     */
+    public String getVersion() {
+        return GGUFNative.getVersion();
+    }
+
+    /**
      * Detect model format from path.
      *
      * @param modelPath path to model file or directory
@@ -56,7 +68,7 @@ public class GGUFConverter {
             log.warn("Cannot detect format: modelPath is null");
             return ModelFormat.UNKNOWN;
         }
-        
+
         try (Arena arena = Arena.ofConfined()) {
             String format = GGUFNative.detectFormat(arena, modelPath.toString());
             if (format != null) {
@@ -85,12 +97,12 @@ public class GGUFConverter {
             log.warn("Cannot get model info: modelPath is null");
             throw new GGUFException("Model path cannot be null");
         }
-        
+
         if (!Files.exists(modelPath)) {
             log.warn("Cannot get model info: model path does not exist: {}", modelPath);
             throw new GGUFException("Model path does not exist: " + modelPath);
         }
-        
+
         GGUFConversionParams params = GGUFConversionParams.builder()
                 .inputPath(modelPath)
                 .outputPath(Path.of("/tmp/dummy")) // Not used for validation
@@ -176,7 +188,7 @@ public class GGUFConverter {
 
                     // Execute conversion with periodic progress checks
                     long startTime = System.currentTimeMillis();
-                    
+
                     // Start a background thread to periodically check progress
                     Thread progressChecker = null;
                     if (progressCallback != null) {
@@ -185,7 +197,7 @@ public class GGUFConverter {
                                 float lastProgress = 0.0f;
                                 while (true) {
                                     float currentProgress = GGUFNative.getProgress(nativeCtx);
-                                    
+
                                     if (currentProgress >= 0.0f && Math.abs(currentProgress - lastProgress) > 0.01f) {
                                         // Only report if progress has changed significantly
                                         ConversionProgress progress = new ConversionProgress.Builder()
@@ -194,25 +206,26 @@ public class GGUFConverter {
                                                 .stage("Processing") // This will be updated by native callbacks
                                                 .timestamp(System.currentTimeMillis())
                                                 .build();
-                                        
+
                                         progressCallback.accept(progress);
                                         lastProgress = currentProgress;
                                     }
-                                    
+
                                     // Check if conversion is complete
                                     if (currentProgress >= 1.0f) {
                                         break;
                                     }
-                                    
+
                                     Thread.sleep(500); // Check every 500ms
                                 }
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
                             } catch (Exception e) {
-                                log.warn("Error in progress checker thread for conversion {}: {}", conversionId, e.getMessage());
+                                log.warn("Error in progress checker thread for conversion {}: {}", conversionId,
+                                        e.getMessage());
                             }
                         });
-                        
+
                         progressChecker.start();
                     }
 
@@ -357,7 +370,7 @@ public class GGUFConverter {
             return QuantizationType.values();
         }
     }
-    
+
     /**
      * Check if a conversion is currently active.
      *
@@ -380,17 +393,17 @@ public class GGUFConverter {
             log.warn("Cannot verify GGUF: ggufPath is null");
             throw new GGUFException("GGUF path cannot be null");
         }
-        
+
         if (!Files.exists(ggufPath)) {
             log.warn("Cannot verify GGUF: file does not exist: {}", ggufPath);
             throw new GGUFException("GGUF file does not exist: " + ggufPath);
         }
-        
+
         if (!Files.isRegularFile(ggufPath)) {
             log.warn("Cannot verify GGUF: path is not a regular file: {}", ggufPath);
             throw new GGUFException("GGUF path is not a regular file: " + ggufPath);
         }
-        
+
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment infoSegment = arena.allocate(GGUFNative.MODEL_INFO_LAYOUT);
             int result = GGUFNative.verifyFile(arena, ggufPath.toString(), infoSegment);
@@ -471,47 +484,79 @@ public class GGUFConverter {
             return MemorySegment.NULL;
         }
 
-        return Linker.nativeLinker().upcallStub(
-                (float progress, MemorySegment stagePtr, MemorySegment userDataPtr) -> {
-                    String stage = stagePtr.address() != 0 ? stagePtr.reinterpret(Long.MAX_VALUE).getString(0) : "";
+        ProgressCallback target = (float progress, MemorySegment stagePtr, MemorySegment userDataPtr) -> {
+            String stage = stagePtr.address() != 0 ? stagePtr.reinterpret(Long.MAX_VALUE).getString(0) : "";
 
-                    ConversionProgress prog = ConversionProgress.builder()
-                            .conversionId(conversionId)
-                            .progress(progress)
-                            .stage(stage)
-                            .timestamp(System.currentTimeMillis())
-                            .build();
+            ConversionProgress prog = ConversionProgress.builder()
+                    .conversionId(conversionId)
+                    .progress(progress)
+                    .stage(stage)
+                    .timestamp(System.currentTimeMillis())
+                    .build();
 
-                    callback.accept(prog);
-                },
-                GGUFNative.PROGRESS_CALLBACK_DESC,
-                arena);
+            callback.accept(prog);
+        };
+
+        try {
+            MethodHandle handle = MethodHandles.lookup()
+                    .findVirtual(ProgressCallback.class, "run",
+                            MethodType.methodType(void.class, float.class, MemorySegment.class, MemorySegment.class))
+                    .bindTo(target);
+
+            return Linker.nativeLinker().upcallStub(
+                    handle,
+                    GGUFNative.PROGRESS_CALLBACK_DESC,
+                    arena);
+        } catch (Throwable t) {
+            throw new RuntimeException("Failed to create progress upcall stub", t);
+        }
     }
 
     private MemorySegment createLogCallback(Arena arena, long conversionId) {
-        return Linker.nativeLinker().upcallStub(
-                (int level, MemorySegment messagePtr, MemorySegment userDataPtr) -> {
-                    if (messagePtr.address() == 0)
-                        return;
+        LogCallback target = (int level, MemorySegment messagePtr, MemorySegment userDataPtr) -> {
+            if (messagePtr.address() == 0)
+                return;
 
-                    String message = messagePtr.reinterpret(Long.MAX_VALUE).getString(0);
+            String message = messagePtr.reinterpret(Long.MAX_VALUE).getString(0);
 
-                    switch (level) {
-                        case 0 -> log.debug("[Conversion {}] {}", conversionId, message);
-                        case 1 -> log.info("[Conversion {}] {}", conversionId, message);
-                        case 2 -> log.warn("[Conversion {}] {}", conversionId, message);
-                        case 3 -> log.error("[Conversion {}] {}", conversionId, message);
-                    }
-                },
-                GGUFNative.LOG_CALLBACK_DESC,
-                arena);
+            switch (level) {
+                case 0 -> log.debug("[Conversion {}] {}", conversionId, message);
+                case 1 -> log.info("[Conversion {}] {}", conversionId, message);
+                case 2 -> log.warn("[Conversion {}] {}", conversionId, message);
+                case 3 -> log.error("[Conversion {}] {}", conversionId, message);
+            }
+        };
+
+        try {
+            MethodHandle handle = MethodHandles.lookup()
+                    .findVirtual(LogCallback.class, "run",
+                            MethodType.methodType(void.class, int.class, MemorySegment.class, MemorySegment.class))
+                    .bindTo(target);
+
+            return Linker.nativeLinker().upcallStub(
+                    handle,
+                    GGUFNative.LOG_CALLBACK_DESC,
+                    arena);
+        } catch (Throwable t) {
+            throw new RuntimeException("Failed to create log upcall stub", t);
+        }
+    }
+
+    @FunctionalInterface
+    private interface ProgressCallback {
+        void run(float progress, MemorySegment stagePtr, MemorySegment userDataPtr);
+    }
+
+    @FunctionalInterface
+    private interface LogCallback {
+        void run(int level, MemorySegment messagePtr, MemorySegment userDataPtr);
     }
 
     private ModelInfo extractModelInfo(MemorySegment infoSegment, Path sourcePath) {
         // Extract string fields
         String modelType = extractString(infoSegment, 0, 64);
         String architecture = extractString(infoSegment, 64, 64);
-        String quantization = extractString(infoSegment, 200, 32);
+        String quantization = extractString(infoSegment, 152, 32);
 
         // Extract numeric fields
         long paramCount = infoSegment.get(ValueLayout.JAVA_LONG, 128);
@@ -519,7 +564,7 @@ public class GGUFConverter {
         int hiddenSize = infoSegment.get(ValueLayout.JAVA_INT, 140);
         int vocabSize = infoSegment.get(ValueLayout.JAVA_INT, 144);
         int contextLength = infoSegment.get(ValueLayout.JAVA_INT, 148);
-        long fileSize = infoSegment.get(ValueLayout.JAVA_LONG, 232);
+        long fileSize = infoSegment.get(ValueLayout.JAVA_LONG, 184);
 
         ModelFormat format = detectFormat(sourcePath);
 

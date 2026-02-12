@@ -21,6 +21,8 @@ public class LlamaCppBinding {
 
     private final SymbolLookup symbolLookup;
     private final Arena arena;
+    private final java.util.concurrent.atomic.AtomicBoolean backendInitialized = new java.util.concurrent.atomic.AtomicBoolean(
+            false);
 
     // Function handles
     private final MethodHandle llama_backend_init;
@@ -30,7 +32,8 @@ public class LlamaCppBinding {
     private final MethodHandle llama_load_model_from_file;
     private final MethodHandle llama_new_context_with_model;
     private final MethodHandle llama_free_model;
-    private final MethodHandle llama_kv_cache_clear;
+    private final MethodHandle llama_get_memory;
+    private final MethodHandle llama_memory_clear;
     private final MethodHandle llama_free;
     private final MethodHandle llama_model_get_vocab;
     private final MethodHandle llama_model_meta_val_str;
@@ -135,13 +138,12 @@ public class LlamaCppBinding {
             ValueLayout.JAVA_BOOLEAN.withName("no_perf"));
 
     private LlamaCppBinding(SymbolLookup symbolLookup) {
-        System.out.println("DEBUG: LlamaCppBinding constructor called via NativeLibraryLoader mechanism?");
+
         this.symbolLookup = symbolLookup;
         this.arena = Arena.ofShared();
 
         // Link function handles
         Linker linker = Linker.nativeLinker();
-        System.out.println("DEBUG: Linker obtained");
 
         this.llama_backend_init = linkFunction(linker, "llama_backend_init",
                 FunctionDescriptor.ofVoid());
@@ -162,16 +164,11 @@ public class LlamaCppBinding {
         this.llama_free_model = linkFunction(linker, "llama_free_model",
                 FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
 
-        // Make kv_cache_clear optional as it might not be available in older llama.cpp
-        // builds
-        MethodHandle kvCacheClearHandle = null;
-        try {
-            kvCacheClearHandle = linkFunction(linker, "llama_kv_cache_clear",
-                    FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
-        } catch (Exception e) {
-            log.warn("llama_kv_cache_clear symbol not found - cache clearing will be disabled");
-        }
-        this.llama_kv_cache_clear = kvCacheClearHandle;
+        // llama_kv_cache_clear is deprecated/removed in favor of llama_memory_clear
+        this.llama_get_memory = linkFunction(linker, "llama_get_memory",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+        this.llama_memory_clear = linkFunction(linker, "llama_memory_clear",
+                FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.JAVA_BOOLEAN));
 
         this.llama_free = linkFunction(linker, "llama_free",
                 FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
@@ -299,20 +296,23 @@ public class LlamaCppBinding {
     }
 
     private MethodHandle linkFunction(Linker linker, String name, FunctionDescriptor descriptor) {
-        System.out.println("DEBUG: Linking symbol: " + name);
+
         try {
             return symbolLookup.find(name)
                     .map(addr -> {
-                        System.out.println("DEBUG: Found symbol: " + name);
+
                         return linker.downcallHandle(addr, descriptor);
                     })
                     .orElseGet(() -> {
-                        System.out.println("DEBUG: Symbol not found: " + name);
-                        log.warnf("Native function not found: %s. Some features may be unavailable.", name);
+                        String msg = String.format(
+                                "Native function '%s' not found. This may cause issues with specific features.", name);
+                        log.warnf("Native function '%s' not found. This may cause issues with specific features.",
+                                name);
+                        log.warn(msg);
                         return null;
                     });
         } catch (Throwable t) {
-            System.out.println("DEBUG: Exception linking " + name + ": " + t.getMessage());
+
             t.printStackTrace();
             throw t;
         }
@@ -511,21 +511,28 @@ public class LlamaCppBinding {
     // ===================================================================
 
     public void backendInit() {
-        try {
-            checkHandle(llama_backend_init, "llama_backend_init");
-            llama_backend_init.invoke();
-        } catch (Throwable e) {
-            throw new RuntimeException("Failed to initialize llama backend", e);
+        if (backendInitialized.compareAndSet(false, true)) {
+            try {
+                checkHandle(llama_backend_init, "llama_backend_init");
+                log.info("Initializing llama.cpp backend...");
+                llama_backend_init.invoke();
+            } catch (Throwable e) {
+                backendInitialized.set(false);
+                throw new RuntimeException("Failed to initialize llama backend", e);
+            }
         }
     }
 
     public void backendFree() {
-        try {
-            if (llama_backend_free != null) {
-                llama_backend_free.invoke();
+        if (backendInitialized.compareAndSet(true, false)) {
+            try {
+                if (llama_backend_free != null) {
+                    log.info("Freeing llama.cpp backend");
+                    llama_backend_free.invoke();
+                }
+            } catch (Throwable e) {
+                log.error("Failed to free llama backend", e);
             }
-        } catch (Throwable e) {
-            log.error("Failed to free llama backend", e);
         }
     }
 
@@ -690,12 +697,12 @@ public class LlamaCppBinding {
      * Clear the KV cache
      */
     public void kvCacheClear(MemorySegment context) {
-        if (llama_kv_cache_clear == null) {
-            log.debug("Skipping KV cache clear (symbol not found)");
-            return;
-        }
         try {
-            llama_kv_cache_clear.invoke(context);
+            checkHandle(llama_get_memory, "llama_get_memory");
+            checkHandle(llama_memory_clear, "llama_memory_clear");
+
+            MemorySegment memory = (MemorySegment) llama_get_memory.invoke(context);
+            llama_memory_clear.invoke(memory, true);
         } catch (Throwable e) {
             throw new RuntimeException("Failed to clear KV cache", e);
         }
