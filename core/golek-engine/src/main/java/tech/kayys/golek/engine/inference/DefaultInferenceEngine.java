@@ -61,12 +61,13 @@ public class DefaultInferenceEngine implements InferenceEngine {
         }
 
         @Override
-        public Multi<StreamingInferenceChunk> stream(InferenceRequest request) {
+        public Multi<StreamingInferenceChunk> stream(InferenceRequest request, TenantContext tenantContext) {
                 if (!initialized || !healthy) {
                         return Multi.createFrom().failure(new IllegalStateException("Engine not ready"));
                 }
 
-                return orchestrator.streamExecute(request.getModel(), request, TenantContext.of(request.getTenantId()))
+                TenantContext effectiveTenant = tenantContext != null ? tenantContext : TenantContext.of("community");
+                return orchestrator.streamExecute(request.getModel(), request, effectiveTenant)
                                 .map(chunk -> new StreamingInferenceChunk(
                                                 request.getRequestId(),
                                                 0, // sequence not easily available from StreamChunk

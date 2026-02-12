@@ -1,15 +1,19 @@
-package tech.kayys.gamelan.executor.memory;
+package tech.kayys.wayang.memory.service;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tech.kayys.gamelan.core.domain.*;
-import tech.kayys.gamelan.core.engine.NodeExecutionResult;
-import tech.kayys.gamelan.core.engine.NodeExecutionTask;
-import tech.kayys.gamelan.executor.AbstractWorkflowExecutor;
-import tech.kayys.gamelan.executor.Executor;
+import tech.kayys.gamelan.engine.node.NodeExecutionResult;
+import tech.kayys.gamelan.engine.node.DefaultNodeExecutionResult;
+import tech.kayys.gamelan.engine.node.NodeExecutionTask;
+import tech.kayys.gamelan.engine.node.NodeExecutionStatus;
+import tech.kayys.gamelan.engine.protocol.CommunicationType;
+import tech.kayys.gamelan.sdk.executor.core.AbstractWorkflowExecutor;
+import tech.kayys.gamelan.sdk.executor.core.Executor;
+import tech.kayys.wayang.memory.model.*;
+import tech.kayys.wayang.memory.util.TextChunker;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -20,7 +24,7 @@ import java.util.*;
  * engineering
  * to enhance task execution with relevant historical context.
  */
-@Executor(executorType = "memory-aware-executor", communicationType = tech.kayys.gamelan.core.scheduler.CommunicationType.GRPC, maxConcurrentTasks = 10)
+@Executor(executorType = "memory-aware-executor", communicationType = CommunicationType.GRPC, maxConcurrentTasks = 10)
 @ApplicationScoped
 public class MemoryAwareExecutor extends AbstractWorkflowExecutor {
 
@@ -90,11 +94,13 @@ public class MemoryAwareExecutor extends AbstractWorkflowExecutor {
                     .toList();
             output.put("relevantInsights", relevantInsights);
 
-            return NodeExecutionResult.success(
+            return new DefaultNodeExecutionResult(
                     task.runId(),
                     task.nodeId(),
                     task.attempt(),
+                    NodeExecutionStatus.COMPLETED,
                     output,
+                    null,
                     task.token());
         });
     }

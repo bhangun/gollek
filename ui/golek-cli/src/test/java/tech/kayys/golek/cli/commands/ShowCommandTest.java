@@ -30,7 +30,7 @@ public class ShowCommandTest {
                 .modelId("test-model")
                 .name("Test Model")
                 .version("1.0")
-                .tenantId("default")
+                .apiKey("community")
                 .format("GGUF")
                 .metadata(Collections.emptyMap())
                 .createdAt(Instant.now())

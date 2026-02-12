@@ -183,14 +183,14 @@ metrics.recordQuotaUsage(tenantId, resourceType, used, limit);
 **Features**:
 - ✅ **Request-scoped bean** for tenant storage
 - ✅ **JAX-RS filter** for automatic tenant validation
-- ✅ **Header-based tenant identification** (X-Tenant-ID)
+- ✅ **Header-based tenant identification** (X-API-Key)
 - ✅ **Tenant status validation** (ACTIVE/SUSPENDED check)
 - ✅ **MDC logging integration** (tenantId, requestId)
 - ✅ **Public endpoint bypass** (health, metrics)
 
 **Filter Flow**:
 ```java
-1. Extract X-Tenant-ID header
+1. Extract X-API-Key header
 2. Validate tenant exists
 3. Check tenant status (ACTIVE)
 4. Set TenantContext
@@ -302,7 +302,7 @@ mvn quarkus:dev
 # 3. Make inference request
 curl -X POST http://localhost:8080/v1/infer \
   -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: default" \
+  -H "X-API-Key: community" \
   -H "X-Request-ID: req-123" \
   -d '{
     "modelId": "mobilenet:1.0",
@@ -333,7 +333,7 @@ curl -X POST http://localhost:8080/v1/infer \
   "httpStatus": 429,
   "requestId": "req-123",
   "context": {
-    "tenantId": "default",
+    "tenantId": "community",
     "quotaType": "requests",
     "currentUsage": 1001,
     "limit": 1000
@@ -532,7 +532,7 @@ mvn quarkus:dev
 # 3. Test inference
 curl -X POST http://localhost:8080/v1/infer \
   -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: default" \
+  -H "X-API-Key: community" \
   -d @request.json
 
 # 4. Check metrics

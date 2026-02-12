@@ -1,4 +1,4 @@
-package tech.kayys.wayang.mcp.parser;
+package tech.kayys.wayang.tool.parser;
 
 import io.quarkus.hibernate.reactive.panache.Panache;
 import io.smallrye.mutiny.Uni;
@@ -15,22 +15,22 @@ import jakarta.inject.Inject;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tech.kayys.wayang.mcp.domain.*;
-import tech.kayys.wayang.mcp.dto.CapabilityLevel;
-import tech.kayys.wayang.mcp.dto.GenerateToolsRequest;
-import tech.kayys.wayang.mcp.dto.HttpMethod;
-import tech.kayys.wayang.mcp.dto.OpenApiParseException;
-import tech.kayys.wayang.mcp.dto.OpenApiParseResult;
-import tech.kayys.wayang.mcp.dto.ParameterLocation;
-import tech.kayys.wayang.mcp.dto.ParameterMapping;
-import tech.kayys.wayang.mcp.dto.RetryConfig;
-import tech.kayys.wayang.mcp.dto.SourceStatus;
-import tech.kayys.wayang.mcp.dto.SourceType;
-import tech.kayys.wayang.mcp.dto.ToolGenerationResult;
-import tech.kayys.wayang.mcp.repository.McpToolRepository;
-import tech.kayys.wayang.mcp.repository.OpenApiSourceRepository;
-import tech.kayys.wayang.mcp.service.ToolCapabilityAnalyzer;
-import tech.kayys.wayang.mcp.service.ToolGuardrailGenerator;
+import tech.kayys.wayang.tool.entity.*;
+import tech.kayys.wayang.tool.dto.CapabilityLevel;
+import tech.kayys.wayang.tool.dto.GenerateToolsRequest;
+import tech.kayys.wayang.tool.dto.HttpMethod;
+import tech.kayys.wayang.tool.dto.OpenApiParseException;
+import tech.kayys.wayang.tool.dto.OpenApiParseResult;
+import tech.kayys.wayang.tool.dto.ParameterLocation;
+import tech.kayys.wayang.tool.dto.ParameterMapping;
+import tech.kayys.wayang.tool.dto.RetryConfig;
+import tech.kayys.wayang.tool.dto.SourceStatus;
+import tech.kayys.wayang.tool.dto.SourceType;
+import tech.kayys.wayang.tool.dto.ToolGenerationResult;
+import tech.kayys.wayang.tool.repository.ToolRepository;
+import tech.kayys.wayang.tool.repository.OpenApiSourceRepository;
+import tech.kayys.wayang.tool.ToolCapabilityAnalyzer;
+import tech.kayys.wayang.tool.ToolGuardrailGenerator;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -70,7 +70,7 @@ public class OpenApiToolGenerator {
     ToolGuardrailGenerator guardrailGenerator;
 
     @Inject
-    McpToolRepository mcpToolRepository;
+    ToolRepository toolRepository;
 
     @Inject
     OpenApiSourceRepository openApiSourceRepository;
@@ -520,7 +520,7 @@ public class OpenApiToolGenerator {
     private Uni<List<McpTool>> persistTools(List<McpTool> tools) {
         return Uni.join().all(
                 tools.stream()
-                        .map(tool -> mcpToolRepository.save(tool))
+                        .map(tool -> toolRepository.save(tool))
                         .collect(Collectors.toList()))
                 .andFailFast();
     }

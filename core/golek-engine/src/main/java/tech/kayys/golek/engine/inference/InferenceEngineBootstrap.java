@@ -73,9 +73,9 @@ public class InferenceEngineBootstrap {
      * Bootstrap on application startup
      */
     void onStart(@Observes StartupEvent event) {
-        System.out.println("DEBUG: InferenceEngineBootstrap.onStart entered");
+
         if (!engineEnabled) {
-            System.out.println("DEBUG: Inference engine disabled");
+
             LOG.warn("Inference engine is disabled");
             return;
         }
@@ -89,31 +89,26 @@ public class InferenceEngineBootstrap {
 
         try {
             // Validate configuration first
-            System.out.println("DEBUG: Validating configuration");
+
             validateConfiguration();
 
-            System.out.println("DEBUG: Awaiting bootstrap...");
             bootstrap().await().atMost(startupTimeout);
-            System.out.println("DEBUG: Bootstrap completed");
 
             Duration elapsed = Duration.between(start, Instant.now());
-            System.out.println("DEBUG: Calculated elapsed time: " + elapsed.toMillis() + "ms");
 
             // LOG.infof("✓ Inference engine started successfully in %d ms",
             // elapsed.toMillis());
-            System.out.println("DEBUG: Logging success message (skipped LOG.infof to avoid hang)");
 
             // Log metrics
-            System.out.println("DEBUG: Calling collectMetrics()");
+
             collectMetrics();
-            System.out.println("DEBUG: collectMetrics() returned");
 
             LOG.info("========================================");
 
             initialized = true;
-            System.out.println("DEBUG: InferenceEngineBootstrap initialized");
+
         } catch (Throwable e) {
-            System.out.println("DEBUG: InferenceEngineBootstrap failed: " + e.getMessage());
+
             e.printStackTrace();
             // LOG.error("========================================");
             // LOG.error("✗ Failed to start inference engine", e);

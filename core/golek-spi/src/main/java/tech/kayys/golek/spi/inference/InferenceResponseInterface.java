@@ -8,11 +8,22 @@ import java.util.Map;
  */
 public interface InferenceResponseInterface {
     String getRequestId();
+
     String getContent();
+
     String getModel();
+
     int getTokensUsed();
+
+    int getInputTokens();
+
+    int getOutputTokens();
+
     long getDurationMs();
+
     Instant getTimestamp();
+
     Map<String, Object> getMetadata();
+
     boolean isStreaming();
 }

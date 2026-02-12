@@ -39,6 +39,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Engine Implementation -->
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-engine</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Infrastructure -->
         <dependency>
             <groupId>tech.kayys.golek</groupId>

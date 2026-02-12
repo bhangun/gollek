@@ -15,8 +15,8 @@ class InferenceRequestTest {
         // Act
         InferenceRequest request = InferenceRequest.builder()
                 .model("test-model")
-                .userMessage("Hello, world!")
-                .systemMessage("System message")
+                .message(Message.system("System message"))
+                .message(Message.user("Hello, world!"))
                 .temperature(0.7)
                 .maxTokens(100)
                 .topP(0.9)
@@ -74,11 +74,7 @@ class MessageBuilderTest {
     @Test
     void testBuildMessage() {
         // Act
-        Message message = MessageBuilder.builder()
-                .role(Message.Role.USER)
-                .content("Test content")
-                .name("test-user")
-                .build();
+        Message message = new Message(Message.Role.USER, "Test content", "test-user", null, null);
 
         // Assert
         assertNotNull(message);
@@ -90,10 +86,10 @@ class MessageBuilderTest {
     @Test
     void testConvenienceMethods() {
         // Act
-        Message systemMsg = MessageBuilder.system("System message");
-        Message userMsg = MessageBuilder.user("User message");
-        Message assistantMsg = MessageBuilder.assistant("Assistant message");
-        Message toolMsg = MessageBuilder.tool("tool-call-id", "Tool response");
+        Message systemMsg = Message.system("System message");
+        Message userMsg = Message.user("User message");
+        Message assistantMsg = Message.assistant("Assistant message");
+        Message toolMsg = Message.tool("tool-call-id", "Tool response");
 
         // Assert
         assertEquals(Message.Role.SYSTEM, systemMsg.getRole());

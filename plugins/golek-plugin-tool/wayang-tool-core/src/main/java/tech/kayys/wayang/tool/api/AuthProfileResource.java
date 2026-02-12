@@ -11,8 +11,8 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.resteasy.reactive.RestResponse;
 import tech.kayys.wayang.error.ErrorCode;
 import tech.kayys.wayang.error.WayangException;
-import tech.kayys.wayang.tool.utils.AuthProfile;
-import tech.kayys.wayang.tool.utils.AuthConfig;
+import tech.kayys.wayang.tool.entity.AuthProfile;
+import tech.kayys.wayang.tool.entity.AuthConfig;
 import tech.kayys.wayang.tool.dto.AuthLocation;
 import tech.kayys.wayang.tool.dto.AuthProfileResponse;
 import tech.kayys.wayang.tool.dto.AuthType;
@@ -21,6 +21,10 @@ import tech.kayys.wayang.tool.dto.TenantContext;
 import tech.kayys.wayang.tool.repository.AuthProfileRepository;
 
 import java.util.*;
+
+import tech.kayys.wayang.security.secrets.dto.SecretType;
+import tech.kayys.wayang.security.secrets.dto.StoreSecretRequest;
+import tech.kayys.wayang.security.secrets.vault.VaultSecretManager;
 
 /**
  * Auth Profile Resource API
@@ -36,7 +40,7 @@ public class AuthProfileResource {
     TenantContext tenantContext;
 
     @Inject
-    tech.kayys.wayang.mcp.security.VaultSecretManager vaultManager;
+    VaultSecretManager vaultManager;
 
     @Inject
     AuthProfileRepository authProfileRepository;
@@ -68,26 +72,33 @@ public class AuthProfileResource {
 
             // Store secret in Vault
             String vaultPath = "wayang/mcp/" + tenantId + "/" + profile.getProfileId();
+            
+            StoreSecretRequest storeRequest = StoreSecretRequest.builder()
+                    .tenantId(tenantId)
+                    .path(vaultPath)
+                    .data(Map.of("auth_secret", request.secretValue()))
+                    .type(SecretType.API_KEY)
+                    .build();
 
-            return vaultManager.storeSecret(vaultPath, request.secretValue())
-                    .flatMap(v -> {
+            return vaultManager.store(storeRequest)
+                    .flatMap(metadata -> {
                         profile.setVaultPath(vaultPath);
                         profile.setSecretKey("auth_secret");
                         profile.setEnabled(true);
                         profile.setCreatedAt(java.time.Instant.now());
                         profile.setUpdatedAt(java.time.Instant.now());
 
-                        return authProfileRepository.save(profile);
-                    })
-                    .map(p -> RestResponse.status(
-                            RestResponse.Status.CREATED,
-                            new AuthProfileResponse(
-                                    profile.getProfileId(),
-                                    profile.getProfileName(),
-                                    profile.getAuthType().name(),
-                                    profile.isEnabled())));
-        }).onFailure().transform(error ->
-                new WayangException(ErrorCode.SECURITY_SECRET_BACKEND_UNAVAILABLE, error.getMessage(), error));
+                        return authProfileRepository.save(profile)
+                                .map(p -> {
+                                    AuthProfileResponse response = new AuthProfileResponse(
+                                            p.getProfileId(),
+                                            p.getProfileName(),
+                                            p.getAuthType().name(),
+                                            p.isEnabled());
+                                    return RestResponse.status(RestResponse.Status.CREATED, response);
+                                });
+                    });
+        });
     }
 
     /**

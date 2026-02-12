@@ -1,10 +1,12 @@
 package tech.kayys.golek.spi.inference;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import tech.kayys.golek.spi.Message;
+import tech.kayys.golek.spi.auth.ApiKeyConstants;
 import tech.kayys.golek.spi.tool.ToolDefinition;
 
 import org.jetbrains.annotations.Nullable;
@@ -60,7 +62,7 @@ public final class InferenceRequest {
     @JsonCreator
     public InferenceRequest(
             @JsonProperty("requestId") String requestId,
-            @JsonProperty("tenantId") String tenantId,
+            @JsonProperty("apiKey") @JsonAlias("tenantId") String apiKey,
             @JsonProperty("model") String model,
             @JsonProperty("messages") List<Message> messages,
             @JsonProperty("parameters") Map<String, Object> parameters,
@@ -72,7 +74,7 @@ public final class InferenceRequest {
             @JsonProperty("priority") int priority,
             @JsonProperty("cacheBypass") boolean cacheBypass) {
         this.requestId = Objects.requireNonNull(requestId, "requestId");
-        this.tenantId = tenantId;
+        this.tenantId = apiKey;
         this.model = Objects.requireNonNull(model, "model");
         this.messages = Collections.unmodifiableList(new ArrayList<>(
                 Objects.requireNonNull(messages, "messages")));
@@ -104,6 +106,13 @@ public final class InferenceRequest {
 
     public String getModel() {
         return model;
+    }
+
+    public String getApiKey() {
+        if (tenantId == null || tenantId.isBlank()) {
+            return ApiKeyConstants.COMMUNITY_API_KEY;
+        }
+        return tenantId;
     }
 
     public List<Message> getMessages() {
@@ -173,6 +182,11 @@ public final class InferenceRequest {
         @Deprecated
         public Builder tenantId(String tenantId) {
             this.tenantId = tenantId;
+            return this;
+        }
+
+        public Builder apiKey(String apiKey) {
+            this.tenantId = apiKey;
             return this;
         }
 

@@ -1,4 +1,4 @@
-package tech.kayys.wayang.mcp;
+package tech.kayys.wayang.tool.parser;
 
 import java.util.Collections;
 import java.util.List;

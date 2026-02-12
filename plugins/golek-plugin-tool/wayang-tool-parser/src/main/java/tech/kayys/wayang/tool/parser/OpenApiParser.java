@@ -1,4 +1,4 @@
-package tech.kayys.wayang.mcp.parser;
+package tech.kayys.wayang.tool.parser;
 
 import io.smallrye.mutiny.Uni;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -11,10 +11,10 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tech.kayys.wayang.mcp.dto.GenerateToolsRequest;
-import tech.kayys.wayang.mcp.dto.OpenApiParseException;
-import tech.kayys.wayang.mcp.dto.OpenApiParseResult;
-import tech.kayys.wayang.mcp.dto.SourceType;
+import tech.kayys.wayang.tool.dto.GenerateToolsRequest;
+import tech.kayys.wayang.tool.dto.OpenApiParseException;
+import tech.kayys.wayang.tool.dto.OpenApiParseResult;
+import tech.kayys.wayang.tool.dto.SourceType;
 
 /**
  * OpenAPI specification parser

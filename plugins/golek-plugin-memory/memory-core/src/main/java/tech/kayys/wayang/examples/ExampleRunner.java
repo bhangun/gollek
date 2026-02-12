@@ -1,4 +1,4 @@
-package tech.kayys.gamelan.executor.memory.examples;
+package tech.kayys.wayang.examples;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;

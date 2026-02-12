@@ -7,6 +7,8 @@ import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tech.kayys.golek.spi.model.ModelManifest;
+import tech.kayys.golek.spi.auth.ApiKeyConstants;
+import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.wayang.tenant.TenantId;
 import tech.kayys.golek.spi.exception.ModelException;
 import tech.kayys.golek.spi.error.ErrorCode;
@@ -47,14 +49,28 @@ public class ModelRegistryService implements tech.kayys.golek.spi.model.ModelReg
     @Override
     @Transactional
     public Uni<ModelManifest> registerModel(ModelRegistry.ModelUploadRequest uploadRequest) {
-        log.info("Registering model: tenantId={}, modelId={}, version={}",
-                uploadRequest.tenantId(), uploadRequest.modelId(), uploadRequest.version());
+        // Compatibility entry-point: tenant must come from API-key context in higher layers.
+        return registerModel(uploadRequest, ApiKeyConstants.COMMUNITY_API_KEY);
+    }
 
-        return Tenant.findByTenantId(uploadRequest.tenantId())
+    @Transactional
+    public Uni<ModelManifest> registerModel(
+            ModelRegistry.ModelUploadRequest uploadRequest,
+            TenantContext tenantContext) {
+        return registerModel(uploadRequest, resolveTenantId(tenantContext));
+    }
+
+    private Uni<ModelManifest> registerModel(
+            ModelRegistry.ModelUploadRequest uploadRequest,
+            String tenantId) {
+        log.info("Registering model: tenantId={}, modelId={}, version={}",
+                tenantId, uploadRequest.modelId(), uploadRequest.version());
+
+        return Tenant.findByTenantId(tenantId)
                 .onItem().ifNull().failWith(() -> new AuthenticationException(
-                        "Tenant not found: " + uploadRequest.tenantId()))
+                        "Tenant not found: " + tenantId))
                 .chain(tenant -> Model
-                        .findByTenantAndModelId(uploadRequest.tenantId(),
+                        .findByTenantAndModelId(tenantId,
                                 uploadRequest.modelId())
                         .chain(model -> {
                             if (model == null) {
@@ -85,8 +101,8 @@ public class ModelRegistryService implements tech.kayys.golek.spi.model.ModelReg
                                                 + uploadRequest.version(),
                                         uploadRequest.modelId());
                             }
-                            return storageService.uploadModel(
-                                    uploadRequest.tenantId(),
+                            return storageService.uploadModelByApiKey(
+                                    tenantId,
                                     uploadRequest.modelId(),
                                     uploadRequest.version(),
                                     uploadRequest.modelData()).map(storageUri -> {
@@ -106,6 +122,7 @@ public class ModelRegistryService implements tech.kayys.golek.spi.model.ModelReg
                                                 .manifest(objectMapper
                                                         .convertValue(buildManifest(
                                                                 uploadRequest,
+                                                                tenantId,
                                                                 storageUri,
                                                                 checksum,
                                                                 (long) uploadRequest
@@ -221,6 +238,7 @@ public class ModelRegistryService implements tech.kayys.golek.spi.model.ModelReg
 
     private ModelManifest buildManifest(
             ModelRegistry.ModelUploadRequest request,
+            String tenantId,
             String storageUri,
             String checksum,
             Long sizeBytes) {
@@ -234,7 +252,7 @@ public class ModelRegistryService implements tech.kayys.golek.spi.model.ModelReg
                 .modelId(request.modelId())
                 .name(request.name() != null ? request.name() : request.modelId())
                 .version(request.version())
-                .tenantId(request.tenantId())
+                .tenantId(tenantId)
                 .metadata(request.metadata())
                 .artifacts(artifacts)
                 .supportedDevices(Collections.emptyList())
@@ -317,6 +335,17 @@ public class ModelRegistryService implements tech.kayys.golek.spi.model.ModelReg
         }
 
         return null;
+    }
+
+    private String resolveTenantId(TenantContext tenantContext) {
+        if (tenantContext == null || tenantContext.getTenantId() == null) {
+            return "community";
+        }
+        return resolveTenantId(tenantContext.getTenantId().value());
+    }
+
+    private String resolveTenantId(String tenantId) {
+        return (tenantId == null || tenantId.isBlank()) ? "community" : tenantId.trim();
     }
 
     public record ConversionJob(

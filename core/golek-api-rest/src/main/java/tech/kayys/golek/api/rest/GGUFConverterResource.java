@@ -21,6 +21,7 @@ import tech.kayys.golek.converter.model.ConversionResult;
 import tech.kayys.golek.converter.model.GGUFConversionParams;
 import tech.kayys.golek.converter.model.ModelInfo;
 import tech.kayys.golek.converter.model.QuantizationType;
+import tech.kayys.golek.spi.auth.ApiKeyConstants;
 import tech.kayys.golek.spi.model.ModelFormat;
 import tech.kayys.wayang.tenant.TenantContext;
 
@@ -71,7 +72,7 @@ public class GGUFConverterResource {
     @Path("/convert")
     @Operation(summary = "Convert model to GGUF", description = "Converts a model from PyTorch, SafeTensors, TensorFlow, or Flax to GGUF format")
     public Uni<ConversionResponse> convertModel(@Valid @NotNull ConversionRequest request) {
-        String tenantId = tenantContext.getCurrentTenant();
+        String tenantId = resolveTenantId();
         log.info("Tenant {} requested conversion: {} -> {}",
                 tenantId, request.getInputPath(), request.getQuantization());
 
@@ -103,7 +104,7 @@ public class GGUFConverterResource {
     @RestStreamElementType(MediaType.APPLICATION_JSON)
     @Operation(summary = "Convert model with progress updates", description = "Converts a model and streams progress updates via Server-Sent Events")
     public Multi<Object> convertModelWithProgress(@Valid @NotNull ConversionRequest request) {
-        String tenantId = tenantContext.getCurrentTenant();
+        String tenantId = resolveTenantId();
         log.info("Tenant {} requested streaming conversion: {}", tenantId, request.getInputPath());
 
         GGUFConversionParams params = GGUFConversionParams.builder()
@@ -136,7 +137,7 @@ public class GGUFConverterResource {
     public Response cancelConversion(
             @Parameter(description = "Conversion ID") @PathParam("conversionId") long conversionId) {
 
-        String tenantId = tenantContext.getCurrentTenant();
+        String tenantId = resolveTenantId();
         log.info("Tenant {} requested cancellation of conversion {}", tenantId, conversionId);
 
         boolean cancelled = converter.cancelConversion(conversionId);
@@ -157,8 +158,8 @@ public class GGUFConverterResource {
     @Path("/detect-format")
     @Operation(summary = "Detect model format", description = "Detects the format of a model file or directory")
     public Response detectFormat(@QueryParam("path") @NotNull String path) {
-        String tenantId = tenantContext.getCurrentTenant();
-        Path fullPath = getTenantPath(tenantId, path);
+        String tenantId = resolveTenantId();
+        java.nio.file.Path fullPath = getTenantPath(tenantId, path);
 
         ModelFormat format = converter.detectFormat(fullPath);
 
@@ -176,8 +177,8 @@ public class GGUFConverterResource {
     @Path("/model-info")
     @Operation(summary = "Get model information", description = "Extracts metadata from a model without converting")
     public Response getModelInfo(@QueryParam("path") @NotNull String path) {
-        String tenantId = tenantContext.getCurrentTenant();
-        Path fullPath = getTenantPath(tenantId, path);
+        String tenantId = resolveTenantId();
+        java.nio.file.Path fullPath = getTenantPath(tenantId, path);
 
         try {
             ModelInfo info = converter.getModelInfo(fullPath);
@@ -197,8 +198,8 @@ public class GGUFConverterResource {
     @Path("/verify")
     @Operation(summary = "Verify GGUF file", description = "Verifies the integrity of a GGUF file")
     public Response verifyGGUF(@QueryParam("path") @NotNull String path) {
-        String tenantId = tenantContext.getCurrentTenant();
-        Path fullPath = getTenantPath(tenantId, path);
+        String tenantId = resolveTenantId();
+        java.nio.file.Path fullPath = getTenantPath(tenantId, path);
 
         try {
             ModelInfo info = converter.verifyGGUF(fullPath);
@@ -257,6 +258,13 @@ public class GGUFConverterResource {
                 .build();
     }
 
+    private String resolveTenantId() {
+        if (tenantContext == null || tenantContext.getTenantId() == null) {
+            return ApiKeyConstants.COMMUNITY_API_KEY;
+        }
+        return tenantContext.getTenantId().value();
+    }
+
     // ========================================================================
     // Helper Methods
     // ========================================================================
@@ -264,10 +272,10 @@ public class GGUFConverterResource {
     /**
      * Get tenant-specific path with proper isolation.
      */
-    private Path getTenantPath(String tenantId, String relativePath) {
+    private java.nio.file.Path getTenantPath(String tenantId, String relativePath) {
         // In production, this would use proper storage service
         // For now, simple path construction with tenant isolation
-        Path basePath = storageService.getTenantBasePath(tenantId);
+        java.nio.file.Path basePath = storageService.getTenantBasePath(tenantId);
         return basePath.resolve(relativePath).normalize();
     }
 }

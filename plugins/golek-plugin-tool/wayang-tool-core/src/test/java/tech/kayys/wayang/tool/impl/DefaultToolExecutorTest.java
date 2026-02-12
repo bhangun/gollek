@@ -39,12 +39,12 @@ public class DefaultToolExecutorTest {
 
     @Test
     public void testExecuteSuccess() {
-        Map<String, Object> result = toolExecutor.execute("mock-tool", Map.of(), Map.of())
+        tech.kayys.wayang.tool.dto.ToolExecutionResult result = toolExecutor.execute("mock-tool", Map.of(), Map.of())
                 .subscribe().withSubscriber(UniAssertSubscriber.create())
                 .awaitItem()
                 .getItem();
 
-        org.junit.jupiter.api.Assertions.assertEquals("success", result.get("result"));
+        org.junit.jupiter.api.Assertions.assertEquals("success", result.output().get("result"));
     }
 
     @Test

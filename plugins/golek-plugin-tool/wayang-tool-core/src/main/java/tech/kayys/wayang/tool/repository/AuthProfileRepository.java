@@ -1,7 +1,7 @@
 package tech.kayys.wayang.tool.repository;
 
 import io.smallrye.mutiny.Uni;
-import tech.kayys.wayang.tool.utils.AuthProfile;
+import tech.kayys.wayang.tool.entity.AuthProfile;
 
 import java.util.List;
 

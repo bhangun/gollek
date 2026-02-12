@@ -78,8 +78,7 @@ public class ModelRouter {
                 request.getModel(), request.getRequestId());
 
         // 1. Get model manifest
-        // Using tenantId from request, default to "community" if null
-        String tenantId = request.getTenantId() != null ? request.getTenantId() : "community";
+        String tenantId = "community";
         ModelManifest manifest = getModelManifest(tenantId, request.getModel());
 
         // 2. Select runner candidates
@@ -164,7 +163,7 @@ public class ModelRouter {
      * Select runner for streaming inference.
      */
     public ModelRunner selectRunner(InferenceRequest request, boolean requiresStreaming) {
-        String tenantId = request.getTenantId() != null ? request.getTenantId() : "community";
+        String tenantId = "community";
         ModelManifest manifest = getModelManifest(tenantId, request.getModel());
         List<String> candidates = selectRunnerCandidates(request, manifest);
 

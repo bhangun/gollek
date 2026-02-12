@@ -1,4 +1,4 @@
-package tech.kayys.wayang.mcp.dto;
+package tech.kayys.wayang.tool.dto;
 
 import java.util.List;
 import java.util.UUID;

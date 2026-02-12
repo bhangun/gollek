@@ -1,7 +1,7 @@
-package tech.kayys.wayang.mcp.repository;
+package tech.kayys.wayang.tool.repository;
 
 import io.smallrye.mutiny.Uni;
-import tech.kayys.wayang.mcp.domain.OpenApiSource;
+import tech.kayys.wayang.tool.entity.OpenApiSource;
 
 import java.util.List;
 import java.util.UUID;

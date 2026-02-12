@@ -29,9 +29,9 @@ public class MemoryMessageConsumer {
                 LOG.error("Failed to store execution result: {}", result.getId(), throwable))
             .onItemOrFailure().transformToUni((unused, throwable) -> {
                 if (throwable != null) {
-                    return message.nack(throwable);
+                    return Uni.createFrom().completionStage(message.nack(throwable));
                 } else {
-                    return message.ack();
+                    return Uni.createFrom().completionStage(message.ack());
                 }
             });
     }
@@ -48,9 +48,9 @@ public class MemoryMessageConsumer {
             .onItemOrFailure().transformToUni((unused, throwable) -> {
                 if (throwable != null) {
                     LOG.error("Failed to process planning request: {}", request.requestId, throwable);
-                    return message.nack(throwable);
+                    return Uni.createFrom().completionStage(message.nack(throwable));
                 } else {
-                    return message.ack();
+                    return Uni.createFrom().completionStage(message.ack());
                 }
             });
     }

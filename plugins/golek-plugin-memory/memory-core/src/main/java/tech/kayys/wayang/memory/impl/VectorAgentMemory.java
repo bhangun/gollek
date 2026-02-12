@@ -2,12 +2,13 @@ package tech.kayys.wayang.memory.impl;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import tech.kayys.gamelan.executor.memory.Memory;
-import tech.kayys.gamelan.executor.memory.VectorMemoryStore;
+import tech.kayys.wayang.memory.model.Memory;
+import tech.kayys.wayang.memory.service.VectorMemoryStore;
 import tech.kayys.wayang.memory.spi.AgentMemory;
 import tech.kayys.wayang.memory.spi.EmbeddingService;
 import tech.kayys.wayang.memory.spi.MemoryEntry;
 import io.smallrye.mutiny.Uni;
+import tech.kayys.wayang.memory.model.ScoredMemory;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -75,7 +76,8 @@ public class VectorAgentMemory implements AgentMemory {
     @Override
     public Uni<Void> clear(String agentId) {
         // Delete all memories for this agent using namespace (which contains agentId)
-        return vectorMemoryStore.deleteNamespace(agentId);
+        return vectorMemoryStore.deleteNamespace(agentId)
+                .replaceWithVoid();
     }
 
     private MemoryEntry toMemoryEntry(Memory memory) {
@@ -95,6 +97,10 @@ public class VectorAgentMemory implements AgentMemory {
      */
     private float[] toFloatArray(List<Float> list) {
         if (list == null) return new float[0];
-        return list.stream().mapToDouble(Float::doubleValue).map(f -> (float) f).toArray();
+        float[] result = new float[list.size()];
+        for (int i = 0; i < list.size(); i++) {
+            result[i] = list.get(i);
+        }
+        return result;
     }
 }

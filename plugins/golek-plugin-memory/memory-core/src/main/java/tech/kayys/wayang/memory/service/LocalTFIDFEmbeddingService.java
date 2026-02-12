@@ -1,4 +1,5 @@
-package tech.kayys.gamelan.executor.memory;
+package tech.kayys.wayang.memory.service;
+
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;

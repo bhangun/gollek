@@ -3,7 +3,7 @@ package tech.kayys.wayang.tool.repository;
 import io.quarkus.hibernate.reactive.panache.PanacheRepository;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
-import tech.kayys.wayang.tool.utils.AuthProfile;
+import tech.kayys.wayang.tool.entity.AuthProfile;
 
 import java.util.List;
 

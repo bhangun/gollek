@@ -1,8 +1,8 @@
-package tech.kayys.wayang.mcp.parser.multispec;
+package tech.kayys.wayang.tool.parser.multispec;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
-import tech.kayys.wayang.mcp.dto.SourceType;
+import tech.kayys.wayang.tool.dto.SourceType;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

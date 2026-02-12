@@ -10,6 +10,9 @@ import tech.kayys.golek.cli.commands.PullCommand;
 import tech.kayys.golek.cli.commands.RunCommand;
 import tech.kayys.golek.cli.commands.ShowCommand;
 
+import picocli.CommandLine;
+import picocli.CommandLine.Option;
+
 @TopCommand
 @Command(name = "golek", mixinStandardHelpOptions = true, version = "1.0.0", description = "Golek Inference CLI - Run local and cloud AI models", subcommands = {
         RunCommand.class,
@@ -20,8 +23,24 @@ import tech.kayys.golek.cli.commands.ShowCommand;
         ProvidersCommand.class,
         InfoCommand.class
 })
-public class GolekCommand {
+public class GolekCommand implements Runnable {
+
+    @Option(names = { "--log" }, description = "Enable verbose logging", scope = CommandLine.ScopeType.INHERIT)
+    boolean verbose;
+
     public GolekCommand() {
-        System.out.println("DEBUG: GolekCommand constructor");
+    }
+
+    @Override
+    public void run() {
+        if (verbose) {
+            System.setProperty("quarkus.log.level", "DEBUG");
+            System.setProperty("quarkus.log.category.\"tech.kayys.golek\".level", "DEBUG");
+            System.setProperty("gguf.provider.verbose-logging", "true");
+            // Workaround for programmatic change during runtime if possible,
+            // but Picocli runs before Quarkus finishes all init in some modes.
+            // For now, these system properties might help, or we check this flag in
+            // commands.
+        }
     }
 }

@@ -17,7 +17,6 @@ import tech.kayys.golek.spi.plugin.BackpressureMode;
 import tech.kayys.golek.spi.stream.StreamChunk;
 
 import java.time.Duration;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 

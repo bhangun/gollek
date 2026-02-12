@@ -12,9 +12,10 @@ import org.jboss.resteasy.reactive.RestResponse;
 import tech.kayys.wayang.error.ErrorCode;
 import tech.kayys.wayang.error.WayangException;
 
-import tech.kayys.wayang.tool.api.SpecFormatRegistry;
+import tech.kayys.wayang.tool.registry.SpecFormatRegistry;
 import tech.kayys.wayang.tool.entity.*;
 import tech.kayys.wayang.tool.dto.GenerateToolsRequest;
+import tech.kayys.wayang.tool.dto.SourceType;
 import tech.kayys.wayang.tool.dto.OpenApiToolRequest;
 import tech.kayys.wayang.tool.dto.HttpRequestContext;
 import tech.kayys.wayang.tool.dto.TenantContext;
@@ -25,7 +26,7 @@ import tech.kayys.wayang.tool.dto.ToolGenerationResponse; // Wait, check if this
 import tech.kayys.wayang.tool.dto.ToolMetadataResponse; // Wait, check if this exists
 import tech.kayys.wayang.tool.dto.ToolUpdateRequest; // Wait, check if this exists
 import tech.kayys.wayang.tool.dto.InvocationStatus;
-import tech.kayys.wayang.tool.parser.OpenApiToolGenerator;
+
 import tech.kayys.wayang.tool.repository.ToolRepository;
 import tech.kayys.wayang.tool.dto.ToolExecutionRequest;
 import tech.kayys.wayang.tool.service.ToolExecutor;
@@ -57,7 +58,7 @@ import java.util.*;
 public class ToolResource {
 
     @Inject
-    OpenApiToolGenerator toolGenerator;
+    tech.kayys.wayang.tool.service.ToolGenerationService toolGenerator;
 
     @Inject
     ToolExecutor toolExecutor;
@@ -95,7 +96,7 @@ public class ToolResource {
         GenerateToolsRequest genRequest = new GenerateToolsRequest(
                 tenantId,
                 request.namespace(),
-                request.sourceType(),
+                SourceType.valueOf(request.sourceType()),
                 request.source(),
                 request.authProfileId(),
                 "current-user", // From security context

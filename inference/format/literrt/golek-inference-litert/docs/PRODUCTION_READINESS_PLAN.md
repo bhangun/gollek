@@ -69,7 +69,7 @@ public class InferenceResource {
     @Counted(value = "inference.request.total")
     @RolesAllowed({"USER", "ADMIN"})
     public Uni<InferenceResponse> infer(
-        @HeaderParam("X-Tenant-ID") String tenantId,
+        @HeaderParam("X-API-Key") String tenantId,
         @HeaderParam("X-Request-ID") String requestId,
         @Valid InferenceRequest request) {
         
@@ -287,7 +287,7 @@ quarkus:
 public class TenantContextFilter implements ContainerRequestFilter {
     @Override
     public void filter(ContainerRequestContext ctx) {
-        String tenantId = ctx.getHeaderString("X-Tenant-ID");
+        String tenantId = ctx.getHeaderString("X-API-Key");
         // Validate tenant
         // Set ThreadLocal context
         TenantContext.set(tenantId);
@@ -1098,7 +1098,7 @@ public class InferenceLoadSimulation extends Simulation {
         .exec(
             http("Infer Request")
                 .post("/v1/infer")
-                .header("X-Tenant-ID", "load-test")
+                .header("X-API-Key", "load-test")
                 .body(StringBody(session -> generateInferenceRequest()))
                 .check(status().is(200))
                 .check(jsonPath("$.latencyMs").lessThan(100))
@@ -1364,7 +1364,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: X-Tenant-ID
+        - name: X-API-Key
           in: header
           required: true
           schema:

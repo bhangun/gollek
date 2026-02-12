@@ -2,38 +2,117 @@
   "foreign": {
     "downcalls": [
       {
-        "comment": "Allow all Panama FFM downcalls (wildcard)",
-        "descriptor": "*"
+        "returnType": "void",
+        "parameterTypes": []
       },
       {
-        "comment": "Specific registration for (long)void",
-        "descriptor": "(long)void"
+        "returnType": "void",
+        "parameterTypes": [
+          "long"
+        ]
       },
       {
-        "comment": "Specific registration for (long)long",
-        "descriptor": "(long)long"
+        "returnType": "long",
+        "parameterTypes": [
+          "long"
+        ]
       },
       {
-        "comment": "Specific registration for (long,long)void",
-        "descriptor": "(long,long)void"
+        "returnType": "int",
+        "parameterTypes": [
+          "long"
+        ]
       },
       {
-        "comment": "Specific registration for (long,long)long",
-        "descriptor": "(long,long)long"
+        "returnType": "long",
+        "parameterTypes": [
+          "long",
+          "long"
+        ]
       },
       {
-        "comment": "Specific registration for (long,long,long)void",
-        "descriptor": "(long,long,long)void"
+        "returnType": "void",
+        "parameterTypes": [
+          "long",
+          "long"
+        ]
       },
       {
-        "comment": "Specific registration for (long,long,long)long",
-        "descriptor": "(long,long,long)long"
-      }
-    ],
-    "upcalls": [
+        "returnType": "void",
+        "parameterTypes": [
+          "long",
+          "int",
+          "int",
+          "int"
+        ]
+      },
       {
-        "comment": "Allow all Panama FFM upcalls (callbacks from native code)",
-        "descriptor": "*"
+        "returnType": "int",
+        "parameterTypes": [
+          "long",
+          "long"
+        ]
+      },
+      {
+        "returnType": "long",
+        "parameterTypes": [
+          "long",
+          "int"
+        ]
+      },
+      {
+        "returnType": "long",
+        "parameterTypes": [
+          "long",
+          "float"
+        ]
+      },
+      {
+        "returnType": "long",
+        "parameterTypes": [
+          "long",
+          "float",
+          "long"
+        ]
+      },
+      {
+        "returnType": "int",
+        "parameterTypes": [
+          "long",
+          "long",
+          "int",
+          "long",
+          "int",
+          "int",
+          "int",
+          "int"
+        ]
+      },
+      {
+        "returnType": "int",
+        "parameterTypes": [
+          "long",
+          "int",
+          "long",
+          "int",
+          "int",
+          "int"
+        ]
+      },
+      {
+        "returnType": "int",
+        "parameterTypes": [
+          "long",
+          "int"
+        ]
+      },
+      {
+        "returnType": "long",
+        "parameterTypes": [
+          "long",
+          "long",
+          "long"
+        ]
       }
     ]
   }

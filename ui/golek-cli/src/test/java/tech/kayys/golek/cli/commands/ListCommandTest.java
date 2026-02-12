@@ -41,7 +41,7 @@ public class ListCommandTest {
                                 .modelId("test-model")
                                 .name("Test Model")
                                 .version("1.0")
-                                .tenantId("default")
+                                .apiKey("community")
                                 .build();
 
                 Mockito.when(sdk.listModels(any(Integer.class), any(Integer.class)))
@@ -61,7 +61,7 @@ public class ListCommandTest {
                                 .modelId("test-model")
                                 .name("Test Model")
                                 .version("1.0")
-                                .tenantId("default")
+                                .apiKey("community")
                                 .build();
 
                 Mockito.when(sdk.listModels(any(Integer.class), any(Integer.class)))

@@ -26,6 +26,8 @@ public final class InferenceResponse implements InferenceResponseInterface {
 
     private final String model;
     private final int tokensUsed;
+    private final int inputTokens;
+    private final int outputTokens;
     private final long durationMs;
 
     @NotNull
@@ -62,6 +64,8 @@ public final class InferenceResponse implements InferenceResponseInterface {
             @JsonProperty("content") String content,
             @JsonProperty("model") String model,
             @JsonProperty("tokensUsed") int tokensUsed,
+            @JsonProperty("inputTokens") int inputTokens,
+            @JsonProperty("outputTokens") int outputTokens,
             @JsonProperty("durationMs") long durationMs,
             @JsonProperty("timestamp") Instant timestamp,
             @JsonProperty("metadata") Map<String, Object> metadata,
@@ -71,7 +75,9 @@ public final class InferenceResponse implements InferenceResponseInterface {
         this.requestId = Objects.requireNonNull(requestId, "requestId");
         this.content = Objects.requireNonNull(content, "content");
         this.model = model;
-        this.tokensUsed = tokensUsed;
+        this.tokensUsed = tokensUsed > 0 ? tokensUsed : (inputTokens + outputTokens);
+        this.inputTokens = inputTokens;
+        this.outputTokens = outputTokens;
         this.durationMs = durationMs;
         this.timestamp = timestamp != null ? timestamp : Instant.now();
         this.metadata = metadata != null
@@ -103,6 +109,16 @@ public final class InferenceResponse implements InferenceResponseInterface {
     @Override
     public int getTokensUsed() {
         return tokensUsed;
+    }
+
+    @Override
+    public int getInputTokens() {
+        return inputTokens;
+    }
+
+    @Override
+    public int getOutputTokens() {
+        return outputTokens;
     }
 
     @Override
@@ -151,6 +167,8 @@ public final class InferenceResponse implements InferenceResponseInterface {
         private String content;
         private String model;
         private int tokensUsed;
+        private int inputTokens;
+        private int outputTokens;
         private long durationMs;
         private Instant timestamp = Instant.now();
         private final Map<String, Object> metadata = new HashMap<>();
@@ -175,6 +193,16 @@ public final class InferenceResponse implements InferenceResponseInterface {
 
         public Builder tokensUsed(int tokensUsed) {
             this.tokensUsed = tokensUsed;
+            return this;
+        }
+
+        public Builder inputTokens(int inputTokens) {
+            this.inputTokens = inputTokens;
+            return this;
+        }
+
+        public Builder outputTokens(int outputTokens) {
+            this.outputTokens = outputTokens;
             return this;
         }
 
@@ -222,7 +250,7 @@ public final class InferenceResponse implements InferenceResponseInterface {
             Objects.requireNonNull(requestId, "requestId is required");
             Objects.requireNonNull(content, "content is required");
             return new InferenceResponse(
-                    requestId, content, model, tokensUsed,
+                    requestId, content, model, tokensUsed, inputTokens, outputTokens,
                     durationMs, timestamp, metadata, toolCalls, finishReason, sessionId);
         }
     }

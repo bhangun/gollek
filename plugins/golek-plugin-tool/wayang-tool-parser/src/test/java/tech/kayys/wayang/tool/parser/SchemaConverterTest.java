@@ -6,8 +6,9 @@ import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.StringSchema;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import tech.kayys.wayang.mcp.parser.SchemaConverter;
+import tech.kayys.wayang.tool.parser.SchemaConverter;
 
+import java.math.BigDecimal;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -44,8 +45,8 @@ class SchemaConverterTest {
         assertNotNull(result);
         assertEquals("string", result.get("type"));
         assertEquals("A sample string field", result.get("description"));
-        assertEquals(1, result.get("minLength"));
-        assertEquals(100, result.get("maxLength"));
+        assertEquals(java.math.BigDecimal.valueOf(1), result.get("minLength"));
+        assertEquals(java.math.BigDecimal.valueOf(100), result.get("maxLength"));
         assertEquals("^[a-zA-Z]+$", result.get("pattern"));
     }
 
@@ -53,16 +54,16 @@ class SchemaConverterTest {
     void testConvertIntegerSchema() {
         IntegerSchema integerSchema = new IntegerSchema();
         integerSchema.setDescription("A sample integer field");
-        integerSchema.setMinimum(0);
-        integerSchema.setMaximum(100);
+        integerSchema.setMinimum(BigDecimal.valueOf(0));
+        integerSchema.setMaximum(BigDecimal.valueOf(100));
 
         Map<String, Object> result = schemaConverter.convert(integerSchema);
 
         assertNotNull(result);
         assertEquals("integer", result.get("type"));
         assertEquals("A sample integer field", result.get("description"));
-        assertEquals(0, result.get("minimum"));
-        assertEquals(100, result.get("maximum"));
+        assertEquals(java.math.BigDecimal.valueOf(0), result.get("minimum"));
+        assertEquals(java.math.BigDecimal.valueOf(100), result.get("maximum"));
     }
 
     @Test

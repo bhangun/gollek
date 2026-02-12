@@ -28,7 +28,7 @@ public class StartupInitializer {
     ModelRunnerFactory runnerFactory;
 
     void onStart(@Observes StartupEvent event) {
-        System.out.println("DEBUG: StartupInitializer.onStart entered");
+
         LOG.info("=".repeat(80));
         LOG.info("Wayang Inference Platform Runtime Starting...");
         LOG.info("=".repeat(80));
@@ -36,9 +36,8 @@ public class StartupInitializer {
         try {
             // Initialize engine
             LOG.info("Initializing inference engine...");
-            System.out.println("DEBUG: Calling engine.initialize()");
+
             engine.initialize();
-            System.out.println("DEBUG: Engine initialized");
 
             // Load plugins
             int pluginCount = pluginRegistry.all().size();
@@ -50,9 +49,9 @@ public class StartupInitializer {
             LOG.info("=".repeat(80));
             LOG.info("Wayang Inference Platform Runtime Ready!");
             LOG.info("=".repeat(80));
-            System.out.println("DEBUG: StartupInitializer.onStart completed");
+
         } catch (Throwable t) {
-            System.out.println("DEBUG: StartupInitializer failed: " + t.getMessage());
+
             t.printStackTrace();
             throw t;
         }

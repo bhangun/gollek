@@ -13,9 +13,25 @@ public interface MetricsCollector {
                         String tenant,
                         Duration duration);
 
+        default void recordSuccessByApiKey(
+                        String provider,
+                        String model,
+                        String apiKey,
+                        Duration duration) {
+                recordSuccess(provider, model, apiKey, duration);
+        }
+
         void recordFailure(
                         String provider,
                         String model,
                         String tenant,
                         String errorType);
+
+        default void recordFailureByApiKey(
+                        String provider,
+                        String model,
+                        String apiKey,
+                        String errorType) {
+                recordFailure(provider, model, apiKey, errorType);
+        }
 }

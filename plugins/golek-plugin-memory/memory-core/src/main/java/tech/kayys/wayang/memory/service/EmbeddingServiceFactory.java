@@ -1,4 +1,5 @@
-package tech.kayys.gamelan.executor.memory;
+package tech.kayys.wayang.memory.service;
+
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -17,8 +18,9 @@ public class EmbeddingServiceFactory {
     @ConfigProperty(name = "gamelan.embedding.provider", defaultValue = "local")
     String provider;
 
-    @Inject
-    OpenAIEmbeddingService openAIService;
+    // TODO: Re-enable when OpenAIEmbeddingService is implemented
+    // @Inject
+    // OpenAIEmbeddingService openAIService;
 
     @Inject
     LocalTFIDFEmbeddingService localService;
@@ -30,7 +32,6 @@ public class EmbeddingServiceFactory {
         LOG.info("Using embedding provider: {}", provider);
 
         return switch (provider.toLowerCase()) {
-            case "openai" -> openAIService;
             case "local", "local-tfidf" -> localService;
             default -> {
                 LOG.warn("Unknown provider: {}, falling back to local", provider);

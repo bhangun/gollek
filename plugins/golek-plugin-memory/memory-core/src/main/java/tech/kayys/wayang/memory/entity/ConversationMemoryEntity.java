@@ -44,4 +44,25 @@ public class ConversationMemoryEntity extends PanacheEntityBase {
     
     @Column(name = "summary_of_session")
     public String summaryOfSession;
+
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+    public String getSessionId() { return sessionId; }
+    public void setSessionId(String sessionId) { this.sessionId = sessionId; }
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
+    public String getContent() { return content; }
+    public void setContent(String content) { this.content = content; }
+    public Map<String, String> getMetadata() { return metadata; }
+    public void setMetadata(Map<String, String> metadata) { this.metadata = metadata; }
+    public List<Double> getEmbedding() { return embedding; }
+    public void setEmbedding(List<Double> embedding) { this.embedding = embedding; }
+    public Instant getTimestamp() { return timestamp; }
+    public void setTimestamp(Instant timestamp) { this.timestamp = timestamp; }
+    public Double getRelevanceScore() { return relevanceScore; }
+    public void setRelevanceScore(Double relevanceScore) { this.relevanceScore = relevanceScore; }
+    public Boolean getIsSummary() { return isSummary; }
+    public void setIsSummary(Boolean isSummary) { this.isSummary = isSummary; }
+    public String getSummaryOfSession() { return summaryOfSession; }
+    public void setSummaryOfSession(String summaryOfSession) { this.summaryOfSession = summaryOfSession; }
 }

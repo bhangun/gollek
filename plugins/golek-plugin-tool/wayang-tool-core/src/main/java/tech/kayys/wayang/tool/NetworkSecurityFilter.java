@@ -1,12 +1,12 @@
-package tech.kayys.wayang.mcp.service;
+package tech.kayys.wayang.tool.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
-import tech.kayys.wayang.mcp.domain.ToolGuardrails;
-import tech.kayys.wayang.mcp.dto.HttpRequestContext;
+import tech.kayys.wayang.tool.entity.ToolGuardrails;
+import tech.kayys.wayang.tool.dto.HttpRequestContext;
 
 /**
  * Network security filter

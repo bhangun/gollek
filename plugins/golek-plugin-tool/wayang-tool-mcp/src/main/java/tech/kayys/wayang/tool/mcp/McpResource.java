@@ -17,7 +17,7 @@ import tech.kayys.wayang.tool.entity.*;
 import tech.kayys.wayang.tool.dto.GenerateToolsRequest;
 import tech.kayys.wayang.tool.dto.ToolGenerationResult;
 import tech.kayys.wayang.tool.dto.InvocationStatus;
-import tech.kayys.wayang.tool.parser.OpenApiToolGenerator;
+import tech.kayys.wayang.tool.service.ToolGenerationService;
 
 import tech.kayys.wayang.tool.dto.ToolExecutionRequest;
 import tech.kayys.wayang.tool.dto.ToolExecutionResult;
@@ -37,7 +37,7 @@ public class McpResource {
         private static final Logger LOG = LoggerFactory.getLogger(McpResource.class);
 
         @Inject
-        OpenApiToolGenerator toolGenerator;
+        ToolGenerationService toolGenerator;
 
         @Inject
         ToolExecutor toolExecutor;

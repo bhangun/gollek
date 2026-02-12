@@ -12,15 +12,25 @@ import java.util.stream.Collectors;
 @ApplicationScoped
 public class GGUFChatTemplateService {
 
-    private final Jinjava jinjava;
+    private Jinjava jinjava;
+    private boolean jinjavaAvailable = false;
 
     public GGUFChatTemplateService() {
-        this.jinjava = new Jinjava();
-        // Configure jinjava for security/performance if needed
+        try {
+            this.jinjava = new Jinjava();
+            this.jinjavaAvailable = true;
+        } catch (Throwable e) {
+            // Jinjava might fail in native mode if not fully configured
+            System.err.println(
+                    "Warning: Jinjava template engine failed to initialize (likely due to native image restrictions). Using fallback renderer. Error: "
+                            + e.getMessage());
+            this.jinjava = null;
+            this.jinjavaAvailable = false;
+        }
     }
 
     public String render(String template, List<Message> messages) {
-        if (template == null || template.isBlank()) {
+        if (!jinjavaAvailable || template == null || template.isBlank()) {
             return fallbackRender(messages);
         }
 
@@ -36,6 +46,7 @@ public class GGUFChatTemplateService {
             return jinjava.render(template, context);
         } catch (Exception e) {
             // Fallback if rendering fails
+            System.err.println("Warning: Template rendering failed: " + e.getMessage());
             return fallbackRender(messages);
         }
     }

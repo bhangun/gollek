@@ -15,6 +15,13 @@ public interface ModelStorageService {
     Uni<String> uploadModel(String tenantId, String modelId, String version, byte[] data);
 
     /**
+     * API-key-first alias for {@link #uploadModel(String, String, String, byte[])}.
+     */
+    default Uni<String> uploadModelByApiKey(String apiKey, String modelId, String version, byte[] data) {
+        return uploadModel(apiKey, modelId, version, data);
+    }
+
+    /**
      * Download model data from storage.
      */
     Uni<byte[]> downloadModel(String storageUri);

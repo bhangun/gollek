@@ -5,16 +5,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import tech.kayys.wayang.mcp.parser.OpenApiToolGenerator;
-import tech.kayys.wayang.mcp.parser.OpenApiParser;
-import tech.kayys.wayang.mcp.parser.SchemaConverter;
-import tech.kayys.wayang.mcp.service.ToolGuardrailGenerator;
-import tech.kayys.wayang.mcp.service.ToolCapabilityAnalyzer;
-import tech.kayys.wayang.mcp.repository.McpToolRepository;
-import tech.kayys.wayang.mcp.repository.OpenApiSourceRepository;
-import tech.kayys.wayang.mcp.domain.McpTool;
-import tech.kayys.wayang.mcp.domain.OpenApiSource;
-import tech.kayys.wayang.mcp.dto.*;
+import tech.kayys.wayang.tool.parser.OpenApiToolGenerator;
+import tech.kayys.wayang.tool.parser.OpenApiParser;
+import tech.kayys.wayang.tool.parser.SchemaConverter;
+import tech.kayys.wayang.tool.ToolGuardrailGenerator;
+import tech.kayys.wayang.tool.ToolCapabilityAnalyzer;
+import tech.kayys.wayang.tool.repository.ToolRepository;
+import tech.kayys.wayang.tool.repository.OpenApiSourceRepository;
+import tech.kayys.wayang.tool.entity.McpTool;
+import tech.kayys.wayang.tool.entity.OpenApiSource;
+import tech.kayys.wayang.tool.dto.*;
 
 import java.util.List;
 import java.util.UUID;
@@ -35,7 +35,7 @@ class OpenApiToolGeneratorTest {
     private ToolGuardrailGenerator guardrailGenerator;
 
     @Mock
-    private ToolRepository mcpToolRepository;
+    private ToolRepository toolRepository;
 
     @Mock
     private OpenApiSourceRepository openApiSourceRepository;
@@ -68,9 +68,9 @@ class OpenApiToolGeneratorTest {
             guardrailGeneratorField.setAccessible(true);
             guardrailGeneratorField.set(generator, guardrailGenerator);
 
-            var mcpToolRepositoryField = OpenApiToolGenerator.class.getDeclaredField("mcpToolRepository");
-            mcpToolRepositoryField.setAccessible(true);
-            mcpToolRepositoryField.set(generator, mcpToolRepository);
+            var toolRepositoryField = OpenApiToolGenerator.class.getDeclaredField("toolRepository");
+            toolRepositoryField.setAccessible(true);
+            toolRepositoryField.set(generator, toolRepository);
 
             var openApiSourceRepositoryField = OpenApiToolGenerator.class.getDeclaredField("openApiSourceRepository");
             openApiSourceRepositoryField.setAccessible(true);
@@ -115,7 +115,7 @@ class OpenApiToolGeneratorTest {
         when(openApiSourceRepository.save(any(OpenApiSource.class))).thenReturn(Uni.createFrom().item(source));
 
         // Mock tool persistence
-        when(mcpToolRepository.save(any(McpTool.class))).thenReturn(Uni.createFrom().item(mockTool));
+        when(toolRepository.save(any(McpTool.class))).thenReturn(Uni.createFrom().item(mockTool));
 
         // Act
         Uni<ToolGenerationResult> resultUni = generator.generateTools(request);

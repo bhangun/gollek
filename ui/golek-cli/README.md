@@ -3,6 +3,56 @@
 
 Production-ready CLI similar to Ollama CLI, integrating with existing providers and model repository.
 
+
+```bash
+  _____       _      _    
+ / ____|     | |    | |   
+| |  __  ___ | | ___| | __
+| | |_ |/ _ \| |/ _ \ |/ /
+| |__| | (_) | |  __/   < 
+ \_____|\___/|_|\___|_|\_\
+
+Model: qwen2.5-7b-instruct-GGUF
+Provider: gguf
+Commands: 'exit' to quit, '/reset' to clear history.
+Note: Use '\' at the end of a line for multiline input.
+--------------------------------------------------
+
+>>> Hello, what can you do?
+
+Assistant: I can help you with coding, writing, and analysis...
+
+[Tokens: 42, Duration: 0.85s, Speed: 49.41 t/s]
+
+```
+
+## Build
+
+```bash
+cd inference-golek && mvn clean package -pl ui/golek-cli -am
+```
+
+## Build Native
+```bash
+cd inference-golek && mvn clean package -pl ui/golek-cli -am -Pnative -DskipTests
+```
+
+Other options to build native:
+
+Option 1: Disable UPX compression (quickest solution) Add this property to skip the compression step:
+
+```bash
+mvn clean package -pl ui/golek-cli -am -Pnative -DskipTests -Dquarkus.native.compression.disable=true
+```
+Option 2: Install UPX (for smaller executable) If you want the compressed executable, install UPX manually:
+
+```bash
+brew install upx
+mvn clean package -pl ui/golek-cli -am -Pnative -DskipTests
+```
+
+> **Note**: The GGUF provider uses Panama FFM (Foreign Function & Memory API) to interface with llama.cpp. GraalVM native image requires explicit registration of foreign function calls via `reachability-metadata.json` in the `golek-inference-gguf` module.
+
 ## Goal
 
 Create a fully functional CLI that supports:
@@ -82,6 +132,9 @@ Production-ready CLI inspired by Ollama CLI with full provider support.
 | `show` | Model details |
 | `providers` | List providers |
 
+
+
+
 ## Usage Examples
 
 ```bash
@@ -93,6 +146,16 @@ java -jar ui/golek-cli/target/quarkus-app/quarkus-run.jar providers
 
 java -jar target/golek-cli-1.0.0-SNAPSHOT-runner.jar run --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct --prompt "Hello"
 
+java -jar ui/golek-cli/target/golek-cli-1.0.0-SNAPSHOT-runner.jar run --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct --prompt "Explain quantum entanglement in 2 sentences."
+
+
+
+java -jar ui/golek-cli/target/golek-cli-1.0.0-SNAPSHOT-runner.jar chat --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct 
+
+
+
+
+
 # Run with different providers
 java -jar ui/golek-cli/target/quarkus-app/quarkus-run.jar run \
   --provider openai --model gpt-4 --prompt "Hello"
@@ -103,6 +166,13 @@ java -jar ui/golek-cli/target/quarkus-app/quarkus-run.jar run \
 java -jar ui/golek-cli/target/quarkus-app/quarkus-run.jar run \
   --provider cerebras --model llama-3.1-8b --prompt "Hello"
 ```
+
+
+### Run native
+```bash
+./target/golek-cli-1.0.0-SNAPSHOT-runner chat --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct  
+```
+
 
 
 ```bash

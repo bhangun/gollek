@@ -64,11 +64,12 @@ public class Model extends PanacheEntityBase {
     public LocalDateTime createdAt;
     public LocalDateTime updatedAt;
 
-    public Model() {}
+    public Model() {
+    }
 
-    public Model(UUID id, Tenant tenant, String modelId, String name, String description, String framework, 
-                 ModelStage stage, String[] tags, Map<String, Object> metadata, String createdBy, 
-                 LocalDateTime createdAt, LocalDateTime updatedAt) {
+    public Model(UUID id, Tenant tenant, String modelId, String name, String description, String framework,
+            ModelStage stage, String[] tags, Map<String, Object> metadata, String createdBy,
+            LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.tenant = tenant;
         this.modelId = modelId;
@@ -183,26 +184,29 @@ public class Model extends PanacheEntityBase {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         Model model = (Model) o;
         return Objects.equals(id, model.id) &&
-               Objects.equals(tenant, model.tenant) &&
-               Objects.equals(modelId, model.modelId) &&
-               Objects.equals(name, model.name) &&
-               Objects.equals(description, model.description) &&
-               Objects.equals(framework, model.framework) &&
-               stage == model.stage &&
-               java.util.Arrays.equals(tags, model.tags) &&
-               Objects.equals(metadata, model.metadata) &&
-               Objects.equals(createdBy, model.createdBy) &&
-               Objects.equals(createdAt, model.createdAt) &&
-               Objects.equals(updatedAt, model.updatedAt);
+                Objects.equals(tenant, model.tenant) &&
+                Objects.equals(modelId, model.modelId) &&
+                Objects.equals(name, model.name) &&
+                Objects.equals(description, model.description) &&
+                Objects.equals(framework, model.framework) &&
+                stage == model.stage &&
+                java.util.Arrays.equals(tags, model.tags) &&
+                Objects.equals(metadata, model.metadata) &&
+                Objects.equals(createdBy, model.createdBy) &&
+                Objects.equals(createdAt, model.createdAt) &&
+                Objects.equals(updatedAt, model.updatedAt);
     }
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(id, tenant, modelId, name, description, framework, stage, metadata, createdBy, createdAt, updatedAt);
+        int result = Objects.hash(id, tenant, modelId, name, description, framework, stage, metadata, createdBy,
+                createdAt, updatedAt);
         result = 31 * result + java.util.Arrays.hashCode(tags);
         return result;
     }
@@ -226,6 +230,7 @@ public class Model extends PanacheEntityBase {
         return ModelManifest.builder()
                 .modelId(this.modelId)
                 .name(this.name)
+                .version("latest")
                 .tenantId(this.tenant != null ? this.tenant.tenantId : null)
                 .metadata(this.metadata)
                 .createdAt(this.createdAt != null ? this.createdAt.atZone(java.time.ZoneId.systemDefault()).toInstant()
@@ -247,7 +252,7 @@ public class Model extends PanacheEntityBase {
     public static Uni<List<Model>> findByStage(ModelStage stage) {
         return list("stage", stage);
     }
-    
+
     public static Builder builder() {
         return new Builder();
     }
@@ -327,7 +332,8 @@ public class Model extends PanacheEntityBase {
         }
 
         public Model build() {
-            return new Model(id, tenant, modelId, name, description, framework, stage, tags, metadata, createdBy, createdAt, updatedAt);
+            return new Model(id, tenant, modelId, name, description, framework, stage, tags, metadata, createdBy,
+                    createdAt, updatedAt);
         }
     }
 }

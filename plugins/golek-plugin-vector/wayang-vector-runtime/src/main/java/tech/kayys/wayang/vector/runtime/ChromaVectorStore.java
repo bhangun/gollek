@@ -1,6 +1,7 @@
 package tech.kayys.wayang.vector.runtime;
 
 import io.smallrye.mutiny.Uni;
+import tech.kayys.wayang.vector.AbstractVectorStore;
 import tech.kayys.wayang.vector.VectorEntry;
 import tech.kayys.wayang.vector.VectorQuery;
 import tech.kayys.wayang.vector.VectorStore;
@@ -13,7 +14,7 @@ import java.util.Map;
  * This would be replaced with actual ChromaDB implementation.
  */
 public class ChromaVectorStore extends AbstractVectorStore {
-    
+
     @Override
     public Uni<Void> store(List<VectorEntry> entries) {
         // Actual implementation would connect to ChromaDB

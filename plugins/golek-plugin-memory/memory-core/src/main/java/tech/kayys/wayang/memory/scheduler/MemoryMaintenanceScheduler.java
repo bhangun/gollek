@@ -4,6 +4,8 @@ import tech.kayys.wayang.memory.service.MemoryOptimizationService;
 import tech.kayys.wayang.memory.service.MemorySecurityService;
 import tech.kayys.wayang.memory.service.MemoryService;
 import tech.kayys.wayang.memory.entity.MemorySessionEntity;
+import tech.kayys.wayang.memory.model.MemoryContext;
+import tech.kayys.wayang.memory.model.SecurityScanResult;
 import io.quarkus.scheduler.Scheduled;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.Multi;

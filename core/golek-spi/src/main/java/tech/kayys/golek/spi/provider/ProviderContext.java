@@ -11,8 +11,16 @@ import java.util.Optional;
 public interface ProviderContext {
 
     /**
-     * Get the tenant context for this request.
+     * Get the context for this request.
      */
+    default Object getApiKeyContext() {
+        return getTenantContext();
+    }
+
+    /**
+     * @deprecated Use {@link #getApiKeyContext()}.
+     */
+    @Deprecated
     Object getTenantContext(); // Using Object temporarily due to missing dependency
 
     /**

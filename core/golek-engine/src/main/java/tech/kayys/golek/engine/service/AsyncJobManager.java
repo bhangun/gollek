@@ -4,6 +4,7 @@ import io.quarkus.redis.datasource.RedisDataSource;
 import io.quarkus.redis.datasource.hash.HashCommands;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +44,7 @@ public class AsyncJobManager {
     InferenceOrchestrator orchestrator;
 
     @Inject
-    RedisDataSource redisDataSource;
+    Instance<RedisDataSource> redisDataSource;
 
     private HashCommands<String, String, String> hashCommands;
 
@@ -65,8 +66,13 @@ public class AsyncJobManager {
 
     @jakarta.annotation.PostConstruct
     void init() {
-        if (redisDataSource != null) {
-            this.hashCommands = redisDataSource.hash(String.class);
+        if (redisDataSource.isResolvable()) {
+            try {
+                RedisDataSource ds = redisDataSource.get();
+                this.hashCommands = ds.hash(String.class);
+            } catch (Exception e) {
+                log.debug("Redis datasource is not active, async job status will be in-memory only");
+            }
         }
 
         // Start worker threads
@@ -108,9 +114,15 @@ public class AsyncJobManager {
      * Enqueue async inference job.
      */
     public void enqueue(String jobId, InferenceRequest request) {
+        enqueue(jobId, request, null);
+    }
+
+    public void enqueue(String jobId, InferenceRequest request, String tenantId) {
+        String effectiveTenantId = resolveTenantId(tenantId);
         AsyncJob job = new AsyncJob(
                 jobId,
                 request,
+                effectiveTenantId,
                 request.getPriority(),
                 Instant.now());
 
@@ -120,7 +132,7 @@ public class AsyncJobManager {
         AsyncJobStatus status = new AsyncJobStatus(
                 jobId,
                 request.getRequestId(),
-                resolveTenantId(request.getTenantId()),
+                effectiveTenantId,
                 "PENDING",
                 null,
                 null,
@@ -138,9 +150,10 @@ public class AsyncJobManager {
      */
     public AsyncJobStatus getStatus(String jobId) {
         // Try Redis first
-        if (hashCommands != null) {
+        if (redisDataSource.isResolvable()) {
             try {
-                Map<String, String> jobData = hashCommands.hgetall(REDIS_JOB_PREFIX + jobId);
+                RedisDataSource ds = redisDataSource.get();
+                Map<String, String> jobData = ds.hash(String.class).hgetall(REDIS_JOB_PREFIX + jobId);
                 if (!jobData.isEmpty()) {
                     return parseJobStatus(jobData);
                 }
@@ -205,7 +218,7 @@ public class AsyncJobManager {
                     // Execute inference via orchestrator directly
                     InferenceResponse response = orchestrator
                             .execute(job.request.getModel(), job.request,
-                                    TenantContext.of(resolveTenantId(job.request.getTenantId())));
+                                    TenantContext.of(job.tenantId));
 
                     // Store result
                     updateStatus(job.jobId, "COMPLETED", response, null);
@@ -236,8 +249,9 @@ public class AsyncJobManager {
      */
     private void storeStatus(String jobId, AsyncJobStatus status) {
         // Store in Redis
-        if (hashCommands != null) {
+        if (redisDataSource.isResolvable()) {
             try {
+                RedisDataSource ds = redisDataSource.get();
                 Map<String, String> jobData = new HashMap<>();
                 jobData.put("jobId", status.jobId());
                 jobData.put("requestId", status.requestId());
@@ -257,10 +271,10 @@ public class AsyncJobManager {
                     jobData.put("latencyMs", String.valueOf(status.result().getDurationMs()));
                 }
 
-                hashCommands.hset(REDIS_JOB_PREFIX + jobId, jobData);
+                ds.hash(String.class).hset(REDIS_JOB_PREFIX + jobId, jobData);
 
                 // Set TTL
-                redisDataSource.key().expire(
+                ds.key().expire(
                         REDIS_JOB_PREFIX + jobId,
                         Duration.ofHours(JOB_TTL_HOURS));
 
@@ -361,6 +375,7 @@ public class AsyncJobManager {
     private record AsyncJob(
             String jobId,
             InferenceRequest request,
+            String tenantId,
             int priority,
             Instant submittedAt) {
     }

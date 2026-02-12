@@ -4,9 +4,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import tech.kayys.gamelan.executor.memory.VectorMemoryStore;
 import tech.kayys.wayang.vector.VectorStore;
-import tech.kayys.wayang.vector.runtime.adapter.VectorStoreAdapter;
 
 /**
  * Factory and producer for VectorStore implementations.
@@ -18,7 +16,6 @@ public class VectorStoreProvider {
     String vectorStoreType;
 
     private volatile VectorStore vectorStore;
-    private volatile VectorMemoryStore vectorMemoryStore;
 
     @Produces
     @ApplicationScoped
@@ -33,35 +30,21 @@ public class VectorStoreProvider {
         return vectorStore;
     }
 
-    @Produces
-    @ApplicationScoped
-    public VectorMemoryStore getVectorMemoryStore() {
-        if (vectorMemoryStore == null) {
-            synchronized (this) {
-                if (vectorMemoryStore == null) {
-                    VectorStore store = getVectorStore();
-                    vectorMemoryStore = new VectorStoreAdapter(store);
-                }
-            }
-        }
-        return vectorMemoryStore;
-    }
-
     private VectorStore createVectorStore(String type) {
         switch (type.toLowerCase()) {
             case "in-memory":
             case "inmemory":
                 return new InMemoryVectorStore();
             case "pgvector":
-                return new PgVectorStore(); // Placeholder - would be implemented separately
+                return new PgVectorStore();
             case "qdrant":
-                return new QdrantVectorStore(); // Placeholder - would be implemented separately
+                return new QdrantVectorStore();
             case "milvus":
-                return new MilvusVectorStore(); // Placeholder - would be implemented separately
+                return new MilvusVectorStore();
             case "chroma":
-                return new ChromaVectorStore(); // Placeholder - would be implemented separately
+                return new ChromaVectorStore();
             case "pinecone":
-                return new PineconeVectorStore(); // Placeholder - would be implemented separately
+                return new PineconeVectorStore();
             default:
                 throw new IllegalArgumentException("Unknown vector store type: " + type);
         }

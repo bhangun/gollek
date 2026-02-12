@@ -18,5 +18,10 @@
             <artifactId>golek-spi</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>tech.kayys.wayang</groupId>
+            <artifactId>wayang-memory-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 </project>

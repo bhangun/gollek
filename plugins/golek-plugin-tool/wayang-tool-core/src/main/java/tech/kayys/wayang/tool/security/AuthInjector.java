@@ -2,8 +2,9 @@ package tech.kayys.wayang.tool.security;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
-import tech.kayys.wayang.tool.utils.AuthProfile;
+import tech.kayys.wayang.tool.entity.AuthProfile;
 import tech.kayys.wayang.tool.dto.HttpRequestContext;
+import tech.kayys.wayang.security.secrets.vault.VaultSecretManager;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -39,8 +40,12 @@ public class AuthInjector {
                     }
 
                     // Retrieve secret from Vault
-                    return vaultManager.getSecret(profile.getVaultPath())
+                    return vaultManager.retrieve(
+                            tech.kayys.wayang.security.secrets.dto.RetrieveSecretRequest.latest(
+                                    profile.getTenantId(),
+                                    profile.getVaultPath()))
                             .map(secret -> {
+                                String secretValue = secret.data().get("auth_secret");
                                 Map<String, String> headers = new HashMap<>(request.headers());
 
                                 // Inject based on auth type and location
@@ -48,7 +53,7 @@ public class AuthInjector {
                                     case HEADER -> {
                                         String headerValue = buildAuthHeader(
                                                 profile.getConfig().getScheme(),
-                                                secret);
+                                                secretValue);
                                         headers.put(
                                                 profile.getConfig().getParamName(),
                                                 headerValue);
@@ -58,7 +63,7 @@ public class AuthInjector {
                                         Map<String, String> queryParams = new HashMap<>(request.queryParams());
                                         queryParams.put(
                                                 profile.getConfig().getParamName(),
-                                                secret);
+                                                secretValue);
                                         return new HttpRequestContext(
                                                 request.method(),
                                                 request.url(),

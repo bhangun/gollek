@@ -1,11 +1,17 @@
-package tech.kayys.gamelan.executor.memory.examples;
+package tech.kayys.wayang.examples;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tech.kayys.gamelan.executor.memory.*;
+import tech.kayys.wayang.memory.model.Memory;
+import tech.kayys.wayang.memory.service.VectorMemoryStore;
+import tech.kayys.wayang.memory.service.EmbeddingServiceFactory;
+import tech.kayys.wayang.memory.service.ContextEngineeringService;
+import tech.kayys.wayang.memory.service.ContextConfig;
+import tech.kayys.wayang.memory.service.EmbeddingService;
+import tech.kayys.wayang.memory.model.MemoryType;
 
 import java.time.Duration;
 import java.time.Instant;

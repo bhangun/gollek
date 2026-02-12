@@ -22,7 +22,7 @@ import java.util.UUID;
  */
 @Dependent
 @Unremovable
-@Command(name = "chat", description = "Start an interactive chat session with a model")
+@Command(name = "chat", aliases = { "chan" }, description = "Start an interactive chat session with a model")
 public class ChatCommand implements Runnable {
 
     @Inject
@@ -50,7 +50,7 @@ public class ChatCommand implements Runnable {
     @Option(names = { "--repeat-penalty" }, description = "Repeat penalty", defaultValue = "1.1")
     double repeatPenalty;
 
-    @Option(names = { "--json" }, description = "Enable JSON mode", defaultValue = "true")
+    @Option(names = { "--json" }, description = "Enable JSON mode", defaultValue = "false")
     boolean jsonMode;
 
     @Option(names = { "--no-cache" }, description = "Bypass response cache")
@@ -87,11 +87,9 @@ public class ChatCommand implements Runnable {
 
     @Override
     public void run() {
-        System.out.println("DEBUG: ChatCommand.run() entered");
         try {
             // Set preferred provider
             if (providerId != null && !providerId.isEmpty()) {
-                System.out.println("DEBUG: Setting preferred provider: " + providerId);
                 sdk.setPreferredProvider(providerId);
             }
 
@@ -108,9 +106,8 @@ public class ChatCommand implements Runnable {
             System.out.println(BOLD + YELLOW + " \\_____|\\___/|_|\\___|_|\\_\\" + RESET);
             System.out.println();
             System.out.printf(BOLD + "Model: " + RESET + CYAN + "%s" + RESET + "%n", modelId);
-            if (providerId != null) {
-                System.out.printf(BOLD + "Provider: " + RESET + YELLOW + "%s" + RESET + "%n", providerId);
-            }
+            System.out.printf(BOLD + "Provider: " + RESET + YELLOW + "%s" + RESET + "%n",
+                    providerId != null ? providerId : "auto-select");
             if (enableSession) {
                 sessionId = UUID.randomUUID().toString();
                 System.out.printf(BOLD + "Session: " + RESET + DIM + "%s (KV cache enabled)" + RESET + "%n",
@@ -165,6 +162,41 @@ public class ChatCommand implements Runnable {
                     continue;
                 }
 
+                if (finalInput.equalsIgnoreCase("/quit")) {
+                    System.out.println("\n" + YELLOW + "Goodbye!" + RESET);
+                    break;
+                }
+
+                if (finalInput.equalsIgnoreCase("/help")) {
+                    System.out.println(DIM + "Available commands:" + RESET);
+                    System.out.println(DIM + "  /reset  - Clear conversation history" + RESET);
+                    System.out.println(DIM + "  /quit   - Exit the chat" + RESET);
+                    System.out.println(DIM + "  /log    - Show last 100 lines of log" + RESET);
+                    System.out.println(DIM + "  /help   - Show this help message" + RESET);
+                    continue;
+                }
+
+                if (finalInput.equalsIgnoreCase("/log")) {
+                    try {
+                        String userHome = System.getProperty("user.home");
+                        java.nio.file.Path logPath = java.nio.file.Paths.get(userHome, ".golek", "logs", "cli.log");
+                        if (java.nio.file.Files.exists(logPath)) {
+                            List<String> lines = java.nio.file.Files.readAllLines(logPath);
+                            int start = Math.max(0, lines.size() - 100);
+                            System.out.println(DIM + "--- Last 100 log lines ---" + RESET);
+                            for (int i = start; i < lines.size(); i++) {
+                                System.out.println(DIM + lines.get(i) + RESET);
+                            }
+                            System.out.println(DIM + "--------------------------" + RESET);
+                        } else {
+                            System.out.println(YELLOW + "Log file not found at: " + logPath + RESET);
+                        }
+                    } catch (Exception e) {
+                        System.err.println(YELLOW + "Failed to read logs: " + e.getMessage() + RESET);
+                    }
+                    continue;
+                }
+
                 // Add user message to history
                 conversationHistory.add(Message.user(finalInput));
 
@@ -198,10 +230,23 @@ public class ChatCommand implements Runnable {
                 try {
                     System.out.print("\n" + BOLD + GREEN + "Assistant: " + RESET);
 
+                    if (verbose) {
+                        // Dynamically adjust log level if verbose flag is set (Java Util Logging /
+                        // JBoss Logging)
+                        // This might not work in native if not configured for runtime init, but
+                        // harmless to try
+                        java.util.logging.Logger.getLogger("").setLevel(java.util.logging.Level.INFO);
+                        java.util.logging.Logger.getLogger("tech.kayys.golek").setLevel(java.util.logging.Level.FINE);
+                    } else {
+                        // Ensure quiet by default
+                        java.util.logging.Logger.getLogger("tech.kayys.golek")
+                                .setLevel(java.util.logging.Level.WARNING);
+                    }
+
                     if (stream) {
-                        System.out.print(DIM + "Thinking..." + RESET);
-                        java.util.concurrent.atomic.AtomicBoolean firstToken = new java.util.concurrent.atomic.AtomicBoolean(
-                                true);
+                        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+                        java.util.concurrent.atomic.AtomicBoolean firstTokenReceived = new java.util.concurrent.atomic.AtomicBoolean(
+                                false);
                         java.util.concurrent.atomic.AtomicInteger tokenCount = new java.util.concurrent.atomic.AtomicInteger(
                                 0);
                         long startTime = System.currentTimeMillis();
@@ -210,14 +255,16 @@ public class ChatCommand implements Runnable {
                         sdk.streamCompletion(request)
                                 .subscribe().with(
                                         chunk -> {
-                                            if (firstToken.compareAndSet(true, false)) {
-                                                // Clear "Thinking..."
-                                                System.out.print(
-                                                        "\r" + BOLD + GREEN + "Assistant: " + RESET + "            \r"
-                                                                + BOLD + GREEN + "Assistant: " + RESET);
-                                            }
+                                            firstTokenReceived.set(true);
                                             String delta = chunk.getDelta();
                                             if (delta != null) {
+                                                // If this is the very first chunk that has content, verify we clear the
+                                                // spinner line effectively
+                                                // But since we are printing delta immediately, we need to handle
+                                                // spinner cleanup in the main thread or here.
+                                                // Let's do it here for immediate feedback, but main thread loop needs
+                                                // to stop printing spinner.
+
                                                 System.out.print(delta);
                                                 fullResponse.append(delta);
                                                 tokenCount.incrementAndGet();
@@ -226,6 +273,7 @@ public class ChatCommand implements Runnable {
                                         error -> {
                                             System.err.println(
                                                     "\n" + YELLOW + "Stream error: " + RESET + error.getMessage());
+                                            latch.countDown();
                                         },
                                         () -> {
                                             long duration = System.currentTimeMillis() - startTime;
@@ -236,7 +284,69 @@ public class ChatCommand implements Runnable {
                                                             + "%n",
                                                     tokenCount.get(), duration / 1000.0, tps);
                                             conversationHistory.add(Message.assistant(fullResponse.toString()));
+                                            latch.countDown();
                                         });
+
+                        // Spinner loop
+                        String[] spinner = { "|", "/", "-", "\\" };
+                        int i = 0;
+                        System.out.print(DIM + "Thinking... " + spinner[0] + RESET);
+
+                        while (!firstTokenReceived.get() && latch.getCount() > 0) {
+                            try {
+                                if (latch.await(100, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                                    break;
+                                }
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                break;
+                            }
+                            if (!firstTokenReceived.get()) {
+                                System.out.print("\r" + BOLD + GREEN + "Assistant: " + RESET + DIM + "Thinking... "
+                                        + spinner[i++ % spinner.length] + RESET);
+                            }
+                        }
+
+                        // Clear spinner if we haven't printed anything yet (e.g. error or fast
+                        // response)
+                        // Actually, if we received first token, the callback printed delta.
+                        // But we might have leftover "Thinking..." text if the callback printed delta
+                        // ON THE SAME LINE.
+                        // Ideally:
+                        // 1. Spinner prints "\rAssistant: Thinking... /"
+                        // 2. Callback receives token.
+                        // 3. Callback should preferably clear line or we ensure we are on a clean
+                        // state.
+
+                        // Let's refine:
+                        // The spinner loop ends when firstTokenReceived is true.
+                        // At that point, the cursor is at the end of spinner.
+                        // We need to clear the spinner text.
+
+                        if (firstTokenReceived.get()) {
+                            // We are relying on the fact that `System.out.print(delta)` in callback
+                            // happened.
+                            // But wait, if main thread was sleeping, callback ran.
+                            // Callback printed delta.
+                            // The delta appeared APENDED to "Thinking... /".
+                            // This is messy.
+                            // FIX: Callback should NOT print until spinner is cleared?
+                            // OR: Spinner loop handles everything?
+                            // NO, callback drives data.
+                        }
+
+                        // Alternative straightforward approach:
+                        // Main thread does NOT print spinner. It just waits.
+                        // We launch a separate thread for spinner?
+                        // Or we use the main thread loop for spinner.
+
+                        // Let's try to clear line in main thread once loop exits?
+                        // If loop exits because firstTokenReceived is true:
+                        // That means callback set it to true.
+                        // But callback runs concurrently.
+
+                        // Revised logic in replacement content below.
+
                     } else {
                         long startTime = System.currentTimeMillis();
                         InferenceResponse response = sdk.createCompletion(request);

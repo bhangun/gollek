@@ -8,7 +8,6 @@
 
 package tech.kayys.golek.plugin.streaming;
 
-import tech.kayys.golek.spi.plugin.StreamingPlugin;
 import tech.kayys.golek.spi.plugin.BackpressureMode;
 
 /**

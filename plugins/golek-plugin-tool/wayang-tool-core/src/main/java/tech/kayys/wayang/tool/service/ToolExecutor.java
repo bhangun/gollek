@@ -15,7 +15,7 @@ import org.apache.http.auth.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import tech.kayys.wayang.tool.utils.HttpExecutionConfig;
+import tech.kayys.wayang.tool.entity.HttpExecutionConfig;
 import tech.kayys.wayang.tool.entity.McpTool;
 import tech.kayys.wayang.tool.entity.ToolGuardrails;
 import tech.kayys.wayang.tool.dto.HttpRequestContext;

@@ -1,4 +1,8 @@
-package tech.kayys.gamelan.executor.memory;
+package tech.kayys.wayang.memory.service;
+
+import tech.kayys.wayang.memory.model.*;
+
+
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -156,7 +160,14 @@ public class InMemoryVectorStore implements VectorMemoryStore {
     public Uni<Long> deleteNamespace(String namespace) {
         LOG.debug("Deleting all memories in namespace: {}", namespace);
 
-        long count = memoryStore.values().removeIf(memory -> namespace.equals(memory.getNamespace()));
+        long count = 0;
+        Iterator<Map.Entry<String, Memory>> iterator = memoryStore.entrySet().iterator();
+        while (iterator.hasNext()) {
+            if (namespace.equals(iterator.next().getValue().getNamespace())) {
+                iterator.remove();
+                count++;
+            }
+        }
 
         return Uni.createFrom().item(count);
     }
@@ -171,16 +182,16 @@ public class InMemoryVectorStore implements VectorMemoryStore {
 
         long total = memories.size();
         long episodic = memories.stream()
-                .filter(m -> m.getType() == tech.kayys.gamelan.core.domain.MemoryType.EPISODIC)
+                .filter(m -> m.getType() == MemoryType.EPISODIC)
                 .count();
         long semantic = memories.stream()
-                .filter(m -> m.getType() == tech.kayys.gamelan.core.domain.MemoryType.SEMANTIC)
+                .filter(m -> m.getType() == MemoryType.SEMANTIC)
                 .count();
         long procedural = memories.stream()
-                .filter(m -> m.getType() == tech.kayys.gamelan.core.domain.MemoryType.PROCEDURAL)
+                .filter(m -> m.getType() == MemoryType.PROCEDURAL)
                 .count();
         long working = memories.stream()
-                .filter(m -> m.getType() == tech.kayys.gamelan.core.domain.MemoryType.WORKING)
+                .filter(m -> m.getType() == MemoryType.WORKING)
                 .count();
 
         double avgImportance = memories.stream()
