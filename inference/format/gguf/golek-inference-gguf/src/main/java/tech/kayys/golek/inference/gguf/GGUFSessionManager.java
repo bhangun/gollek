@@ -29,11 +29,14 @@ public class GGUFSessionManager {
 
     private static final Logger log = Logger.getLogger(GGUFSessionManager.class);
 
-    @Inject
-    LlamaCppBinding binding;
+    private final LlamaCppBinding binding;
+    private final GGUFChatTemplateService templateService;
 
     @Inject
-    GGUFChatTemplateService templateService;
+    public GGUFSessionManager(LlamaCppBinding binding, GGUFChatTemplateService templateService) {
+        this.binding = binding;
+        this.templateService = templateService;
+    }
 
     private final Map<String, SessionPool> pools = new ConcurrentHashMap<>();
     private final AtomicInteger totalActiveSessions = new AtomicInteger(0);

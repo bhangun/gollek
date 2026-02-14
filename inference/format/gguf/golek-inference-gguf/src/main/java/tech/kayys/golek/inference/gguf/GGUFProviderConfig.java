@@ -31,6 +31,19 @@ public interface GGUFProviderConfig {
     boolean verboseLogging();
 
     /**
+     * Optional absolute path to the llama native library file (e.g.
+     * /opt/llama/libllama.dylib).
+     */
+    @WithName("native.library-path")
+    Optional<String> nativeLibraryPath();
+
+    /**
+     * Optional directory containing llama/ggml native libraries.
+     */
+    @WithName("native.library-dir")
+    Optional<String> nativeLibraryDir();
+
+    /**
      * Base directory for GGUF model files
      */
     @WithName("model.base-path")

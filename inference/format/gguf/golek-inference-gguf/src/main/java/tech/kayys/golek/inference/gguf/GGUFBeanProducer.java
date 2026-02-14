@@ -17,7 +17,7 @@ public class GGUFBeanProducer {
         if (!config.enabled()) {
             return null;
         }
-        return LlamaCppBinding.load(config.verboseLogging());
+        return LlamaCppBinding.load(config);
     }
 
     public void dispose(@Disposes LlamaCppBinding binding) {

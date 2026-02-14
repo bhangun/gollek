@@ -59,12 +59,7 @@ class GGUFProviderTest {
         meterRegistry = new SimpleMeterRegistry();
 
         // Create provider instance with mocked dependencies
-        provider = new GGUFProvider();
-        setField(provider, "config", config);
-        setField(provider, "binding", binding);
-        setField(provider, "sessionManager", sessionManager);
-        setField(provider, "meterRegistry", meterRegistry);
-        setField(provider, "tracer", tracer);
+        provider = new GGUFProvider(config, binding, sessionManager, meterRegistry, tracer);
     }
 
     @Test
@@ -235,13 +230,4 @@ class GGUFProviderTest {
         provider.onStart(new StartupEvent());
     }
 
-    private void setField(Object target, String fieldName, Object value) {
-        try {
-            var field = target.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            field.set(target, value);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to set field: " + fieldName, e);
-        }
-    }
 }
