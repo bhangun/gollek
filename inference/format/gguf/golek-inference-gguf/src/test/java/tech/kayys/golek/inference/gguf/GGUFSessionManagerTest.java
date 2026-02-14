@@ -30,14 +30,16 @@ class GGUFSessionManagerTest {
     @Mock
     LlamaCppBinding binding;
 
+    @Mock
+    GGUFChatTemplateService templateService;
+
     private GGUFSessionManager sessionManager;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
 
-        sessionManager = new GGUFSessionManager();
-        setField(sessionManager, "binding", binding);
+        sessionManager = new GGUFSessionManager(binding, templateService);
 
         // Initialize the manager
         sessionManager.initialize();
@@ -238,15 +240,4 @@ class GGUFSessionManagerTest {
         assertThat(sessionManager.isHealthy()).isFalse();
     }
 
-    // Helper methods
-
-    private void setField(Object target, String fieldName, Object value) {
-        try {
-            var field = target.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            field.set(target, value);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to set field: " + fieldName, e);
-        }
-    }
 }

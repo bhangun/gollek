@@ -2,12 +2,10 @@ package tech.kayys.golek.inference.gguf;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
@@ -16,7 +14,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 /**
@@ -61,9 +58,9 @@ public class ModelConverterService {
 
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectErrorStream(true);
-        
+
         Process process = pb.start();
-        
+
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -99,7 +96,7 @@ public class ModelConverterService {
                     .filter(p -> p.getFileName().toString().equals(CONVERT_SCRIPT))
                     .filter(p -> p.toString().contains("llama.cpp"))
                     .findFirst();
-            
+
             if (found.isPresent()) {
                 scriptPath = found.get();
                 LOG.infof("Found conversion script: %s", scriptPath);
@@ -108,7 +105,7 @@ public class ModelConverterService {
         } catch (IOException e) {
             LOG.debug("Error searching for conversion script", e);
         }
-        
+
         LOG.warn("Could not find convert_hf_to_gguf.py script. Model conversion will not be available.");
     }
 }

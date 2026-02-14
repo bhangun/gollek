@@ -162,7 +162,9 @@
                                     <includes>
                                         <include>libllama*</include>
                                         <include>libggml*</include>
+                                        <include>libgolek_llama_shim*</include>
                                         <include>llama.dll</include>
+                                        <include>golek_llama_shim.dll</include>
                                     </includes>
                                 </resource>
                             </resources>

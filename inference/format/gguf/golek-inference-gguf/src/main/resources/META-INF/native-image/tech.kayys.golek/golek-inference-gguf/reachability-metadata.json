@@ -8,23 +8,17 @@
       {
         "returnType": "void",
         "parameterTypes": [
-          "long"
+          "int"
         ]
       },
       {
-        "returnType": "long",
+        "returnType": "void",
         "parameterTypes": [
           "long"
         ]
       },
       {
-        "returnType": "int",
-        "parameterTypes": [
-          "long"
-        ]
-      },
-      {
-        "returnType": "long",
+        "returnType": "void",
         "parameterTypes": [
           "long",
           "long"
@@ -34,7 +28,7 @@
         "returnType": "void",
         "parameterTypes": [
           "long",
-          "long"
+          "int"
         ]
       },
       {
@@ -47,7 +41,17 @@
         ]
       },
       {
-        "returnType": "int",
+        "returnType": "long",
+        "parameterTypes": []
+      },
+      {
+        "returnType": "long",
+        "parameterTypes": [
+          "long"
+        ]
+      },
+      {
+        "returnType": "long",
         "parameterTypes": [
           "long",
           "long"
@@ -76,34 +80,11 @@
         ]
       },
       {
-        "returnType": "int",
+        "returnType": "long",
         "parameterTypes": [
           "long",
           "long",
-          "int",
-          "long",
-          "int",
-          "int",
-          "int",
-          "int"
-        ]
-      },
-      {
-        "returnType": "int",
-        "parameterTypes": [
-          "long",
-          "int",
-          "long",
-          "int",
-          "int",
-          "int"
-        ]
-      },
-      {
-        "returnType": "int",
-        "parameterTypes": [
-          "long",
-          "int"
+          "long"
         ]
       },
       {
@@ -111,7 +92,107 @@
         "parameterTypes": [
           "long",
           "long",
+          "long",
           "long"
+        ]
+      },
+      {
+        "returnType": "long",
+        "parameterTypes": [
+          "int"
+        ]
+      },
+      {
+        "returnType": "long",
+        "parameterTypes": [
+          "int",
+          "int",
+          "int"
+        ]
+      },
+      {
+        "returnType": "int",
+        "parameterTypes": [
+          "long"
+        ]
+      },
+      {
+        "returnType": "int",
+        "parameterTypes": [
+          "long",
+          "long"
+        ]
+      },
+      {
+        "returnType": "int",
+        "parameterTypes": [
+          "long",
+          "int"
+        ]
+      },
+      {
+        "returnType": "int",
+        "parameterTypes": [
+          "long",
+          "long",
+          "long",
+          "long"
+        ]
+      },
+      {
+        "returnType": "int",
+        "parameterTypes": [
+          "long",
+          "long",
+          "int",
+          "long",
+          "int",
+          "int",
+          "int",
+          "int"
+        ]
+      },
+      {
+        "returnType": "int",
+        "parameterTypes": [
+          "long",
+          "int",
+          "long",
+          "int",
+          "int",
+          "int"
+        ]
+      },
+      {
+        "returnType": "int",
+        "parameterTypes": [
+          "long",
+          "int",
+          "long",
+          "int",
+          "int",
+          "int",
+          "int"
+        ]
+      },
+      {
+        "returnType": "int",
+        "parameterTypes": [
+          "int",
+          "int",
+          "int"
+        ]
+      },
+      {
+        "returnType": "int",
+        "parameterTypes": [
+          "long",
+          "int",
+          "int",
+          "int",
+          "int",
+          "int",
+          "int"
         ]
       }
     ]

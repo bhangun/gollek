@@ -6,6 +6,9 @@ import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -18,9 +21,12 @@ import org.jboss.logging.Logger;
 public class LlamaCppBinding {
 
     private static final Logger log = Logger.getLogger(LlamaCppBinding.class);
+    private static final String LIB_BASE_NAME = "llama";
 
     private final SymbolLookup symbolLookup;
     private final Arena arena;
+    private final java.util.concurrent.ConcurrentHashMap<Long, Arena> manualBatchArenas = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.concurrent.ConcurrentHashMap<Long, ManualBatchBuffers> manualBatchBuffers = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.concurrent.atomic.AtomicBoolean backendInitialized = new java.util.concurrent.atomic.AtomicBoolean(
             false);
 
@@ -29,6 +35,9 @@ public class LlamaCppBinding {
     private final MethodHandle llama_backend_free;
     private final MethodHandle llama_model_default_params;
     private final MethodHandle llama_context_default_params;
+    private final MethodHandle golek_llama_model_default_params_into;
+    private final MethodHandle golek_llama_context_default_params_into;
+    private final MethodHandle golek_llama_log_disable;
     private final MethodHandle llama_load_model_from_file;
     private final MethodHandle llama_new_context_with_model;
     private final MethodHandle llama_free_model;
@@ -39,6 +48,7 @@ public class LlamaCppBinding {
     private final MethodHandle llama_model_meta_val_str;
     private final MethodHandle llama_tokenize;
     private final MethodHandle llama_token_to_piece;
+    private final MethodHandle llama_detokenize;
     private final MethodHandle llama_decode;
     private final MethodHandle llama_get_logits;
     private final MethodHandle llama_get_logits_ith;
@@ -80,14 +90,12 @@ public class LlamaCppBinding {
             ValueLayout.ADDRESS.withName("progress_callback"),
             ValueLayout.ADDRESS.withName("progress_callback_user_data"),
             ValueLayout.ADDRESS.withName("kv_overrides"),
-            ValueLayout.JAVA_BOOLEAN.withName("vocab_only"),
-            ValueLayout.JAVA_BOOLEAN.withName("use_mmap"),
-            ValueLayout.JAVA_BOOLEAN.withName("use_direct_io"),
-            ValueLayout.JAVA_BOOLEAN.withName("use_mlock"),
-            ValueLayout.JAVA_BOOLEAN.withName("check_tensors"),
-            ValueLayout.JAVA_BOOLEAN.withName("use_extra_bufts"),
-            ValueLayout.JAVA_BOOLEAN.withName("no_host"),
-            ValueLayout.JAVA_BOOLEAN.withName("no_alloc")).withName("llama_model_params");
+            ValueLayout.JAVA_BYTE.withName("vocab_only"),
+            ValueLayout.JAVA_BYTE.withName("use_mmap"),
+            ValueLayout.JAVA_BYTE.withName("use_mlock"),
+            ValueLayout.JAVA_BYTE.withName("check_tensors"),
+            ValueLayout.JAVA_BYTE.withName("use_extra_bufts"),
+            MemoryLayout.paddingLayout(3)).withName("llama_model_params");
 
     private static final StructLayout LLAMA_CONTEXT_PARAMS_LAYOUT = MemoryLayout.structLayout(
             ValueLayout.JAVA_INT.withName("n_ctx"),
@@ -99,7 +107,6 @@ public class LlamaCppBinding {
             ValueLayout.JAVA_INT.withName("rope_scaling_type"),
             ValueLayout.JAVA_INT.withName("pooling_type"),
             ValueLayout.JAVA_INT.withName("attention_type"),
-            ValueLayout.JAVA_INT.withName("flash_attn_type"),
             ValueLayout.JAVA_FLOAT.withName("rope_freq_base"),
             ValueLayout.JAVA_FLOAT.withName("rope_freq_scale"),
             ValueLayout.JAVA_FLOAT.withName("yarn_ext_factor"),
@@ -108,21 +115,21 @@ public class LlamaCppBinding {
             ValueLayout.JAVA_FLOAT.withName("yarn_beta_slow"),
             ValueLayout.JAVA_INT.withName("yarn_orig_ctx"),
             ValueLayout.JAVA_FLOAT.withName("defrag_thold"),
+            MemoryLayout.paddingLayout(4),
             ValueLayout.ADDRESS.withName("cb_eval"),
             ValueLayout.ADDRESS.withName("cb_eval_user_data"),
             ValueLayout.JAVA_INT.withName("type_k"),
             ValueLayout.JAVA_INT.withName("type_v"),
             ValueLayout.ADDRESS.withName("abort_callback"),
             ValueLayout.ADDRESS.withName("abort_callback_data"),
-            ValueLayout.JAVA_BOOLEAN.withName("embeddings"),
-            ValueLayout.JAVA_BOOLEAN.withName("offload_kqv"),
-            ValueLayout.JAVA_BOOLEAN.withName("no_perf"),
-            ValueLayout.JAVA_BOOLEAN.withName("op_offload"),
-            ValueLayout.JAVA_BOOLEAN.withName("swa_full"),
-            ValueLayout.JAVA_BOOLEAN.withName("kv_unified"),
-            MemoryLayout.paddingLayout(2), // Align to 8 bytes for subsequent long/address
-            ValueLayout.ADDRESS.withName("samplers"),
-            ValueLayout.JAVA_LONG.withName("n_samplers")).withName("llama_context_params");
+            ValueLayout.JAVA_BYTE.withName("embeddings"),
+            ValueLayout.JAVA_BYTE.withName("offload_kqv"),
+            ValueLayout.JAVA_BYTE.withName("flash_attn"),
+            ValueLayout.JAVA_BYTE.withName("no_perf"),
+            ValueLayout.JAVA_BYTE.withName("op_offload"),
+            ValueLayout.JAVA_BYTE.withName("swa_full"),
+            ValueLayout.JAVA_BYTE.withName("kv_unified"),
+            MemoryLayout.paddingLayout(1)).withName("llama_context_params");
 
     private static final MemoryLayout LLAMA_BATCH_LAYOUT = MemoryLayout.structLayout(
             ValueLayout.JAVA_INT.withName("n_tokens"),
@@ -135,7 +142,28 @@ public class LlamaCppBinding {
             ValueLayout.ADDRESS.withName("logits")).withName("llama_batch");
 
     private static final MemoryLayout LLAMA_SAMPLER_CHAIN_PARAMS_LAYOUT = MemoryLayout.structLayout(
-            ValueLayout.JAVA_BOOLEAN.withName("no_perf"));
+            ValueLayout.JAVA_BYTE.withName("no_perf"));
+
+    private static final class ManualBatchBuffers {
+        private final MemorySegment token;
+        private final MemorySegment pos;
+        private final MemorySegment nSeqId;
+        private final MemorySegment seqIdPtr;
+        private final MemorySegment logits;
+
+        private ManualBatchBuffers(
+                MemorySegment token,
+                MemorySegment pos,
+                MemorySegment nSeqId,
+                MemorySegment seqIdPtr,
+                MemorySegment logits) {
+            this.token = token;
+            this.pos = pos;
+            this.nSeqId = nSeqId;
+            this.seqIdPtr = seqIdPtr;
+            this.logits = logits;
+        }
+    }
 
     private LlamaCppBinding(SymbolLookup symbolLookup) {
 
@@ -146,7 +174,7 @@ public class LlamaCppBinding {
         Linker linker = Linker.nativeLinker();
 
         this.llama_backend_init = linkFunction(linker, "llama_backend_init",
-                FunctionDescriptor.ofVoid());
+                FunctionDescriptor.ofVoid(ValueLayout.JAVA_BOOLEAN));
 
         this.llama_backend_free = linkFunction(linker, "llama_backend_free",
                 FunctionDescriptor.ofVoid());
@@ -156,6 +184,19 @@ public class LlamaCppBinding {
 
         this.llama_context_default_params = linkFunction(linker, "llama_context_default_params",
                 FunctionDescriptor.of(LLAMA_CONTEXT_PARAMS_LAYOUT));
+
+        this.golek_llama_model_default_params_into = linkFunction(
+                linker,
+                "golek_llama_model_default_params_into",
+                FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+        this.golek_llama_context_default_params_into = linkFunction(
+                linker,
+                "golek_llama_context_default_params_into",
+                FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+        this.golek_llama_log_disable = linkFunction(
+                linker,
+                "golek_llama_log_disable",
+                FunctionDescriptor.ofVoid());
 
         this.llama_load_model_from_file = linkFunction(linker, "llama_model_load_from_file",
                 FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, LLAMA_MODEL_PARAMS_LAYOUT));
@@ -196,6 +237,10 @@ public class LlamaCppBinding {
         this.llama_token_to_piece = linkFunction(linker, "llama_token_to_piece",
                 FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
                         ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_BOOLEAN));
+        this.llama_detokenize = linkFunction(linker, "llama_detokenize",
+                FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
+                        ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_BOOLEAN,
+                        ValueLayout.JAVA_BOOLEAN));
 
         this.llama_decode = linkFunction(linker, "llama_decode",
                 FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, LLAMA_BATCH_LAYOUT));
@@ -292,7 +337,7 @@ public class LlamaCppBinding {
 
         // llama_vocab_is_eog(const llama_vocab* vocab, llama_token token) -> bool
         this.llama_vocab_is_eog = linkFunction(linker, "llama_vocab_is_eog",
-                FunctionDescriptor.of(ValueLayout.JAVA_BOOLEAN, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+                FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     }
 
     private MethodHandle linkFunction(Linker linker, String name, FunctionDescriptor descriptor) {
@@ -300,7 +345,7 @@ public class LlamaCppBinding {
         try {
             return symbolLookup.find(name)
                     .map(addr -> {
-
+                        log.debugf("Linking native function: %s with descriptor: %s", name, descriptor);
                         return linker.downcallHandle(addr, descriptor);
                     })
                     .orElseGet(() -> {
@@ -312,9 +357,9 @@ public class LlamaCppBinding {
                         return null;
                     });
         } catch (Throwable t) {
-
-            t.printStackTrace();
-            throw t;
+            log.warnf("Failed to link native function '%s' (%s). Function will be treated as unavailable.",
+                    name, t.getMessage());
+            return null;
         }
     }
 
@@ -326,6 +371,13 @@ public class LlamaCppBinding {
         return load(false);
     }
 
+    public static LlamaCppBinding load(GGUFProviderConfig config) {
+        boolean verbose = config != null && config.verboseLogging();
+        Optional<String> explicitLibPath = config == null ? Optional.empty() : config.nativeLibraryPath();
+        Optional<String> explicitLibDir = config == null ? Optional.empty() : config.nativeLibraryDir();
+        return load(verbose, explicitLibPath, explicitLibDir);
+    }
+
     /**
      * Load the native library and create binding instance.
      * 
@@ -333,10 +385,13 @@ public class LlamaCppBinding {
      *                verbose logs
      */
     public static LlamaCppBinding load(boolean verbose) {
+        return load(verbose, Optional.empty(), Optional.empty());
+    }
+
+    private static LlamaCppBinding load(boolean verbose, Optional<String> explicitLibPath,
+            Optional<String> explicitLibDir) {
         try {
-            // Extract and load native library
-            Path nativeLib = extractNativeLibrary();
-            System.load(nativeLib.toAbsolutePath().toString());
+            Path loadedFrom = loadNativeLibrary(explicitLibPath, explicitLibDir, verbose);
 
             // Create symbol lookup
             SymbolLookup symbolLookup = SymbolLookup.loaderLookup();
@@ -354,13 +409,71 @@ public class LlamaCppBinding {
             if (!verbose) {
                 log.info("Loaded llama.cpp native library (quiet mode)");
             } else {
-                log.infof("Loaded llama.cpp native library: %s", nativeLib);
+                log.infof("Loaded llama.cpp native library: %s", loadedFrom);
             }
             return binding;
 
         } catch (Throwable e) {
+            e.printStackTrace();
+            System.err.println("FATAL: Failed to load llama.cpp library: " + e.getMessage());
             throw new RuntimeException("Failed to load llama.cpp library", e);
         }
+    }
+
+    private static Path loadNativeLibrary(Optional<String> explicitLibPath, Optional<String> explicitLibDir,
+            boolean verbose) throws Exception {
+        String mappedLibName = System.mapLibraryName(LIB_BASE_NAME);
+        List<String> attempts = new ArrayList<>();
+
+        // 1) Explicit absolute library file path.
+        if (explicitLibPath.isPresent() && !explicitLibPath.get().isBlank()) {
+            Path candidate = Path.of(explicitLibPath.get()).toAbsolutePath();
+            attempts.add("explicit library path: " + candidate);
+            if (Files.exists(candidate)) {
+                loadWithDependencies(candidate.getParent(), candidate.getFileName().toString(), verbose);
+                return candidate;
+            }
+        }
+
+        // 2) Explicit directory containing libllama + libggml* files.
+        if (explicitLibDir.isPresent() && !explicitLibDir.get().isBlank()) {
+            Path dir = Path.of(explicitLibDir.get()).toAbsolutePath();
+            Path candidate = dir.resolve(mappedLibName);
+            attempts.add("explicit library dir: " + candidate);
+            if (Files.exists(candidate)) {
+                loadWithDependencies(dir, mappedLibName, verbose);
+                return candidate;
+            }
+        }
+
+        // 3) Standard linker path (e.g. java.library.path / DYLD_LIBRARY_PATH).
+        try {
+            System.loadLibrary(LIB_BASE_NAME);
+            attempts.add("System.loadLibrary(" + LIB_BASE_NAME + ")");
+            return Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        } catch (Throwable t) {
+            attempts.add("System.loadLibrary(" + LIB_BASE_NAME + ") failed: " + t.getMessage());
+        }
+
+        // 4) Common runtime filesystem locations around executable/current dir.
+        for (Path dir : candidateRuntimeDirs()) {
+            Path candidate = dir.resolve(mappedLibName);
+            attempts.add("runtime dir: " + candidate);
+            if (Files.exists(candidate)) {
+                loadWithDependencies(dir, mappedLibName, verbose);
+                return candidate;
+            }
+        }
+
+        // 5) Extract all relevant libs from resources and load from temp.
+        Path extractedMain = extractAndLoadFromResources(verbose);
+        if (extractedMain != null) {
+            attempts.add("resource extraction: " + extractedMain);
+            return extractedMain;
+        }
+
+        throw new RuntimeException(
+                "Unable to locate/load llama.cpp native library. Attempts: " + String.join(" | ", attempts));
     }
 
     /**
@@ -368,6 +481,16 @@ public class LlamaCppBinding {
      */
     private static void suppressNativeLogsStatic(SymbolLookup symbolLookup) {
         try {
+            var shimLogDisableAddr = symbolLookup.find("golek_llama_log_disable");
+            if (shimLogDisableAddr.isPresent()) {
+                Linker nativeLinker = Linker.nativeLinker();
+                MethodHandle shimDisable = nativeLinker.downcallHandle(
+                        shimLogDisableAddr.get(),
+                        FunctionDescriptor.ofVoid());
+                shimDisable.invoke();
+                return;
+            }
+
             var logSetAddr = symbolLookup.find("llama_log_set");
             if (logSetAddr.isPresent()) {
                 Linker nativeLinker = Linker.nativeLinker();
@@ -417,70 +540,192 @@ public class LlamaCppBinding {
      * messages.
      */
     public void suppressNativeLogs() {
+        try {
+            if (golek_llama_log_disable != null) {
+                golek_llama_log_disable.invoke();
+                log.debug("Suppressed verbose llama.cpp native logging via shim");
+                return;
+            }
+        } catch (Throwable t) {
+            log.debugf("Shim-based native log suppression failed: %s", t.getMessage());
+        }
         suppressNativeLogsStatic(symbolLookup);
         log.debug("Suppressed verbose llama.cpp native logging");
     }
 
-    /**
-     * Extract native library from resources to temp directory
-     */
-    private static Path extractNativeLibrary() throws Exception {
-        String osName = System.getProperty("os.name").toLowerCase();
-
-        String libName;
-        if (osName.contains("win")) {
-            libName = "llama.dll";
-        } else if (osName.contains("mac")) {
-            libName = "libllama.dylib";
-        } else {
-            libName = "libllama.so";
-        }
-
-        // Check for CUDA support
-        String cudaPath = System.getenv("CUDA_PATH");
-        boolean hasCuda = cudaPath != null && !cudaPath.isEmpty();
-
-        String resourcePath = hasCuda ? "/native-libs/cuda/" + libName : "/native-libs/cpu/" + libName;
-
-        // Extract to temp directory
+    private static Path extractAndLoadFromResources(boolean verbose) throws Exception {
+        String mainLib = System.mapLibraryName(LIB_BASE_NAME);
         Path tempDir = Files.createTempDirectory("llama-cpp");
-        Path libPath = tempDir.resolve(libName);
+        List<Path> extracted = new ArrayList<>();
 
-        // Try multiple classloaders and paths
-        InputStream is = getResourceAsStream(resourcePath);
-        if (is == null) {
-            String fallbackPath = "/native-libs/" + libName;
-            is = getResourceAsStream(fallbackPath);
-            if (is == null) {
-                // Diagnostic logging of classpath if failed
-                log.errorf("Native library not found in %s or %s", resourcePath, fallbackPath);
-                throw new RuntimeException("Native library not found in " + resourcePath + " or " + fallbackPath);
+        for (String fileName : nativeDependencyFileNames()) {
+            Path extractedPath = extractLibraryFromResources(fileName, tempDir);
+            if (extractedPath != null) {
+                extracted.add(extractedPath);
             }
         }
 
-        try (InputStream stream = is) {
-            Files.copy(stream, libPath, StandardCopyOption.REPLACE_EXISTING);
+        if (extracted.isEmpty()) {
+            return null;
         }
 
-        // Also extract libggml if it exists (for newer llama.cpp versions)
-        String ggmlName = libName.replace("llama", "ggml");
-        String ggmlResource = "/native-libs/" + ggmlName;
-        try (InputStream ggmlStream = getResourceAsStream(ggmlResource)) {
-            if (ggmlStream != null) {
-                Path ggmlPath = tempDir.resolve(ggmlName);
-                Files.copy(ggmlStream, ggmlPath, StandardCopyOption.REPLACE_EXISTING);
-                if (!osName.contains("win")) {
-                    ggmlPath.toFile().setExecutable(true);
+        if (verbose) {
+            log.infof("Extracted native libraries to %s", tempDir);
+        }
+        loadWithDependencies(tempDir, mainLib, verbose);
+        return tempDir.resolve(mainLib);
+    }
+
+    private static Path extractLibraryFromResources(String fileName, Path targetDir) throws Exception {
+        for (String prefix : nativeResourcePrefixes()) {
+            String resourcePath = prefix + fileName;
+            try (InputStream is = getResourceAsStream(resourcePath)) {
+                if (is != null) {
+                    Path target = targetDir.resolve(fileName);
+                    Files.copy(is, target, StandardCopyOption.REPLACE_EXISTING);
+                    if (!isWindows()) {
+                        target.toFile().setExecutable(true);
+                    }
+                    return target;
                 }
             }
         }
+        return null;
+    }
 
-        // Make executable on Unix
-        if (!osName.contains("win")) {
-            libPath.toFile().setExecutable(true);
+    private static List<String> nativeResourcePrefixes() {
+        String cudaPath = System.getenv("CUDA_PATH");
+        boolean hasCuda = cudaPath != null && !cudaPath.isBlank();
+        List<String> prefixes = new ArrayList<>();
+        if (hasCuda) {
+            prefixes.add("/native-libs/cuda/");
+        } else {
+            prefixes.add("/native-libs/cpu/");
+        }
+        prefixes.add("/native-libs/");
+        return prefixes;
+    }
+
+    private static void loadWithDependencies(Path libraryDir, String mainLibName, boolean verbose) {
+        List<String> errors = new ArrayList<>();
+        String shimName = shimLibraryFileName();
+        for (String dep : nativeDependencyFileNames()) {
+            if (dep.equals(mainLibName)) {
+                continue;
+            }
+            if (dep.equals(shimName)) {
+                continue;
+            }
+            Path depPath = libraryDir.resolve(dep);
+            if (!Files.exists(depPath)) {
+                continue;
+            }
+            try {
+                System.load(depPath.toAbsolutePath().toString());
+                if (verbose) {
+                    log.infof("Loaded native dependency: %s", depPath);
+                }
+            } catch (UnsatisfiedLinkError e) {
+                errors.add(dep + ": " + e.getMessage());
+            }
         }
 
-        return libPath;
+        Path mainPath = libraryDir.resolve(mainLibName);
+        System.load(mainPath.toAbsolutePath().toString());
+
+        Path shimPath = libraryDir.resolve(shimName);
+        if (Files.exists(shimPath)) {
+            try {
+                System.load(shimPath.toAbsolutePath().toString());
+                if (verbose) {
+                    log.infof("Loaded native shim: %s", shimPath);
+                }
+            } catch (UnsatisfiedLinkError e) {
+                errors.add(shimName + ": " + e.getMessage());
+            }
+        }
+
+        if (!errors.isEmpty()) {
+            log.debugf("Some optional native dependency loads failed before main library load: %s",
+                    String.join(" | ", errors));
+        }
+    }
+
+    private static List<Path> candidateRuntimeDirs() {
+        List<Path> dirs = new ArrayList<>();
+        dirs.add(Path.of(".").toAbsolutePath().normalize());
+        dirs.add(Path.of("native-libs").toAbsolutePath().normalize());
+        dirs.add(Path.of("lib").toAbsolutePath().normalize());
+        dirs.add(Path.of(System.getProperty("user.home"), ".golek", "native-libs").toAbsolutePath().normalize());
+
+        ProcessHandle.current().info().command().ifPresent(command -> {
+            Path binary = Path.of(command).toAbsolutePath().normalize();
+            Path parent = binary.getParent();
+            if (parent != null) {
+                dirs.add(parent);
+                dirs.add(parent.resolve("native-libs"));
+                dirs.add(parent.resolve("lib"));
+            }
+        });
+        return dirs;
+    }
+
+    private static List<String> nativeDependencyFileNames() {
+        String ext = nativeLibExt();
+        List<String> names = new ArrayList<>();
+        if (isWindows()) {
+            names.add("ggml-base" + ext);
+            names.add("ggml-cpu" + ext);
+            names.add("ggml-blas" + ext);
+            names.add("ggml-cuda" + ext);
+            names.add("ggml-metal" + ext);
+            names.add("ggml" + ext);
+            names.add("llama" + ext);
+            names.add("libggml-base" + ext);
+            names.add("libggml-cpu" + ext);
+            names.add("libggml-blas" + ext);
+            names.add("libggml-cuda" + ext);
+            names.add("libggml-metal" + ext);
+            names.add("libggml" + ext);
+            names.add("libllama" + ext);
+        } else {
+            names.add("libggml-base" + ext);
+            names.add("libggml-cpu" + ext);
+            names.add("libggml-blas" + ext);
+            names.add("libggml-cuda" + ext);
+            names.add("libggml-vulkan" + ext);
+            names.add("libggml-metal" + ext);
+            names.add("libggml-opencl" + ext);
+            names.add("libggml" + ext);
+            names.add("libllama" + ext);
+            names.add(shimLibraryFileName());
+        }
+        return names;
+    }
+
+    private static String shimLibraryFileName() {
+        if (isWindows()) {
+            return "golek_llama_shim" + nativeLibExt();
+        }
+        return "libgolek_llama_shim" + nativeLibExt();
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name").toLowerCase().contains("win");
+    }
+
+    private static boolean isMac() {
+        return System.getProperty("os.name").toLowerCase().contains("mac");
+    }
+
+    private static String nativeLibExt() {
+        if (isWindows()) {
+            return ".dll";
+        }
+        if (isMac()) {
+            return ".dylib";
+        }
+        return ".so";
     }
 
     private static InputStream getResourceAsStream(String path) {
@@ -515,7 +760,7 @@ public class LlamaCppBinding {
             try {
                 checkHandle(llama_backend_init, "llama_backend_init");
                 log.info("Initializing llama.cpp backend...");
-                llama_backend_init.invoke();
+                llama_backend_init.invoke(false);
             } catch (Throwable e) {
                 backendInitialized.set(false);
                 throw new RuntimeException("Failed to initialize llama backend", e);
@@ -545,9 +790,24 @@ public class LlamaCppBinding {
 
     public MemorySegment getDefaultModelParams() {
         try {
-            checkHandle(llama_model_default_params, "llama_model_default_params");
             MemorySegment params = arena.allocate(LLAMA_MODEL_PARAMS_LAYOUT);
-            llama_model_default_params.invoke(params);
+            if (golek_llama_model_default_params_into != null) {
+                golek_llama_model_default_params_into.invoke(params);
+            } else if (llama_model_default_params != null) {
+                llama_model_default_params.invoke(params);
+            } else {
+                // Conservative defaults if native default-params helper is unavailable in
+                // native
+                // image linking.
+                setModelParam(params, "n_gpu_layers", 0);
+                setModelParam(params, "split_mode", 0);
+                // No GPU devices available in many native CPU-only environments.
+                setModelParam(params, "main_gpu", -1);
+                setModelParam(params, "use_mmap", true);
+                setModelParam(params, "use_mlock", false);
+                setModelParam(params, "check_tensors", false);
+                setModelParam(params, "use_extra_bufts", false);
+            }
             return params;
         } catch (Throwable e) {
             throw new RuntimeException("Failed to get default model params", e);
@@ -556,9 +816,33 @@ public class LlamaCppBinding {
 
     public MemorySegment getDefaultContextParams() {
         try {
-            checkHandle(llama_context_default_params, "llama_context_default_params");
             MemorySegment params = arena.allocate(LLAMA_CONTEXT_PARAMS_LAYOUT);
-            llama_context_default_params.invoke(params);
+            if (golek_llama_context_default_params_into != null) {
+                golek_llama_context_default_params_into.invoke(params);
+            } else if (llama_context_default_params != null) {
+                llama_context_default_params.invoke(params);
+            } else {
+                // Conservative defaults if native default-params helper is unavailable in
+                // native
+                // image linking.
+                setContextParam(params, "n_ctx", 4096);
+                setContextParam(params, "n_batch", 512);
+                setContextParam(params, "n_ubatch", 512);
+                setContextParam(params, "n_seq_max", 1);
+                setContextParam(params, "n_threads", Math.max(1, Runtime.getRuntime().availableProcessors() / 2));
+                setContextParam(params, "n_threads_batch", Math.max(1, Runtime.getRuntime().availableProcessors() / 2));
+                setContextParam(params, "rope_scaling_type", 0);
+                // llama.cpp default for causal LLM context is "none" (-1), not 0.
+                setContextParam(params, "pooling_type", -1);
+                setContextParam(params, "attention_type", 0);
+                setContextParam(params, "embeddings", false);
+                setContextParam(params, "offload_kqv", false);
+                setContextParam(params, "flash_attn", false);
+                setContextParam(params, "no_perf", false);
+                setContextParam(params, "op_offload", false);
+                setContextParam(params, "swa_full", false);
+                setContextParam(params, "kv_unified", false);
+            }
             return params;
         } catch (Throwable e) {
             throw new RuntimeException("Failed to get default context params", e);
@@ -616,11 +900,15 @@ public class LlamaCppBinding {
         try (Arena localArena = Arena.ofConfined()) {
             // Get vocab from model (new API)
             MemorySegment vocab = getVocab(model);
+
+            // Convert text to UTF-8 C-string
             MemorySegment textSegment = localArena.allocateFrom(text);
+            // Get actual byte length (excluding null terminator)
+            int textLenBytes = (int) textSegment.byteSize() - 1;
 
             // First call to get token count (negative value indicates needed buffer size)
             int tokenCount = (int) llama_tokenize.invoke(
-                    vocab, textSegment, text.length(),
+                    vocab, textSegment, textLenBytes,
                     MemorySegment.NULL, 0, addBos, special);
 
             // Handle negative return value (buffer too small)
@@ -630,11 +918,11 @@ public class LlamaCppBinding {
             MemorySegment tokensBuffer = localArena.allocate(ValueLayout.JAVA_INT, bufferSize);
 
             int actualCount = (int) llama_tokenize.invoke(
-                    vocab, textSegment, text.length(),
+                    vocab, textSegment, textLenBytes,
                     tokensBuffer, bufferSize, addBos, special);
 
             if (actualCount < 0) {
-                throw new RuntimeException("Tokenization failed: buffer too small");
+                throw new RuntimeException("Tokenization failed with error code: " + actualCount);
             }
 
             // Copy to Java array
@@ -642,6 +930,21 @@ public class LlamaCppBinding {
             for (int i = 0; i < actualCount; i++) {
                 tokens[i] = tokensBuffer.getAtIndex(ValueLayout.JAVA_INT, i);
             }
+
+            // DEBUG LOGGING
+            if (log.isDebugEnabled()) {
+                StringBuilder sb = new StringBuilder("Tokenized: '");
+                if (text.length() > 50)
+                    sb.append(text.substring(0, 50)).append("...");
+                else
+                    sb.append(text);
+                sb.append("' -> [");
+                for (int t : tokens)
+                    sb.append(t).append(", ");
+                sb.append("]");
+                log.debug(sb.toString());
+            }
+
             return tokens;
         } catch (Throwable e) {
             throw new RuntimeException("Failed to tokenize text", e);
@@ -650,22 +953,38 @@ public class LlamaCppBinding {
 
     public String tokenToPiece(MemorySegment model, int token) {
         try (Arena localArena = Arena.ofConfined()) {
-            // Get vocab from model (new API)
             MemorySegment vocab = getVocab(model);
+            MemorySegment tokenBuf = localArena.allocate(ValueLayout.JAVA_INT, 1);
+            tokenBuf.setAtIndex(ValueLayout.JAVA_INT, 0, token);
+
             MemorySegment buffer = localArena.allocate(ValueLayout.JAVA_BYTE, 256);
-            // Updated signature: (vocab, token, buf, length, lstrip, special)
-            int length = (int) llama_token_to_piece.invoke(vocab, token, buffer, 256, 0, false);
-            if (length < 0) {
-                return "";
+            int length;
+
+            if (llama_token_to_piece != null) {
+                length = (int) llama_token_to_piece.invoke(vocab, token, buffer, 256, 0, false);
+                if (length < 0 || length > 256) {
+                    int needed = length > 256 ? length : Math.abs(length);
+                    buffer = localArena.allocate(ValueLayout.JAVA_BYTE, needed);
+                    length = (int) llama_token_to_piece.invoke(vocab, token, buffer, needed, 0, false);
+                }
+            } else {
+                // Fallback for libraries that only expose llama_detokenize.
+                length = (int) llama_detokenize.invoke(vocab, tokenBuf, 1, buffer, 256, false, true);
+                if (length < 0 || length > 256) {
+                    int needed = length > 256 ? length : Math.abs(length);
+                    buffer = localArena.allocate(ValueLayout.JAVA_BYTE, needed);
+                    length = (int) llama_detokenize.invoke(vocab, tokenBuf, 1, buffer, needed, false, true);
+                }
             }
 
+            if (length <= 0)
+                return "";
+
             byte[] bytes = new byte[length];
-            for (int i = 0; i < length; i++) {
-                bytes[i] = buffer.getAtIndex(ValueLayout.JAVA_BYTE, i);
-            }
-            return new String(bytes);
+            MemorySegment.copy(buffer, 0, MemorySegment.ofArray(bytes), 0, length);
+            return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
         } catch (Throwable e) {
-            throw new RuntimeException("Failed to convert token to piece", e);
+            throw new RuntimeException("Failed to decode token", e);
         }
     }
 
@@ -740,8 +1059,36 @@ public class LlamaCppBinding {
 
     public MemorySegment batchInit(int nTokens, int embd, int nSeqMax) {
         try {
-            MemorySegment batch = arena.allocate(LLAMA_BATCH_LAYOUT);
-            llama_batch_init.invoke(batch, nTokens, embd, nSeqMax);
+            Arena batchArena = Arena.ofConfined();
+            MemorySegment batch = batchArena.allocate(LLAMA_BATCH_LAYOUT);
+            MemorySegment token = batchArena.allocate(ValueLayout.JAVA_INT, nTokens);
+            MemorySegment pos = batchArena.allocate(ValueLayout.JAVA_INT, nTokens);
+            MemorySegment nSeqId = batchArena.allocate(ValueLayout.JAVA_INT, nTokens);
+            MemorySegment logits = batchArena.allocate(ValueLayout.JAVA_BYTE, nTokens);
+            MemorySegment seqIdFlat = batchArena.allocate(ValueLayout.JAVA_INT, nTokens);
+            MemorySegment seqIdPtr = batchArena.allocate(ValueLayout.ADDRESS, nTokens);
+
+            for (int i = 0; i < nTokens; i++) {
+                seqIdPtr.setAtIndex(ValueLayout.ADDRESS, i,
+                        seqIdFlat.asSlice((long) i * ValueLayout.JAVA_INT.byteSize(), ValueLayout.JAVA_INT.byteSize()));
+            }
+
+            batch.set(ValueLayout.JAVA_INT,
+                    LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("n_tokens")), nTokens);
+            batch.set(ValueLayout.ADDRESS,
+                    LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("token")), token);
+            batch.set(ValueLayout.ADDRESS,
+                    LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("embd")), MemorySegment.NULL);
+            batch.set(ValueLayout.ADDRESS,
+                    LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("pos")), pos);
+            batch.set(ValueLayout.ADDRESS,
+                    LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("n_seq_id")), nSeqId);
+            batch.set(ValueLayout.ADDRESS,
+                    LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("seq_id")), seqIdPtr);
+            batch.set(ValueLayout.ADDRESS,
+                    LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("logits")), logits);
+            manualBatchArenas.put(batch.address(), batchArena);
+            manualBatchBuffers.put(batch.address(), new ManualBatchBuffers(token, pos, nSeqId, seqIdPtr, logits));
             return batch;
         } catch (Throwable e) {
             throw new RuntimeException("Failed to initialize batch", e);
@@ -750,7 +1097,15 @@ public class LlamaCppBinding {
 
     public void batchFree(MemorySegment batch) {
         try {
-            llama_batch_free.invoke(batch);
+            manualBatchBuffers.remove(batch.address());
+            Arena batchArena = manualBatchArenas.remove(batch.address());
+            if (batchArena != null) {
+                batchArena.close();
+                return;
+            }
+            if (llama_batch_free != null) {
+                llama_batch_free.invoke(batch);
+            }
         } catch (Throwable e) {
             log.error("Failed to free batch", e);
         }
@@ -794,7 +1149,7 @@ public class LlamaCppBinding {
             // However, we can construct cleaner bindings if we do it manually.
             // Simplified: manually init params
             MemorySegment paramsSeg = arena.allocate(LLAMA_SAMPLER_CHAIN_PARAMS_LAYOUT);
-            paramsSeg.set(ValueLayout.JAVA_BOOLEAN, 0, false); // no_perf = false
+            paramsSeg.set(ValueLayout.JAVA_BYTE, 0, (byte) 0); // no_perf = false
 
             return (MemorySegment) llama_sampler_chain_init.invoke(paramsSeg);
         } catch (Throwable e) {
@@ -982,7 +1337,7 @@ public class LlamaCppBinding {
         try {
             checkHandle(llama_vocab_is_eog, "llama_vocab_is_eog");
             MemorySegment vocab = getVocab(model);
-            return (boolean) llama_vocab_is_eog.invoke(vocab, tokenId);
+            return (int) llama_vocab_is_eog.invoke(vocab, tokenId) != 0;
         } catch (Throwable e) {
             // Fallback: just check EOS
             return tokenId == getEosToken(model);
@@ -996,33 +1351,45 @@ public class LlamaCppBinding {
     }
 
     public void setBatchToken(MemorySegment batch, int index, int token, int pos, int seqId, boolean outputLogits) {
+        ManualBatchBuffers manual = manualBatchBuffers.get(batch.address());
+        if (manual != null) {
+            manual.token.setAtIndex(ValueLayout.JAVA_INT, index, token);
+            manual.pos.setAtIndex(ValueLayout.JAVA_INT, index, pos);
+            manual.nSeqId.setAtIndex(ValueLayout.JAVA_INT, index, 1);
+            MemorySegment seqIdsForToken = manual.seqIdPtr.getAtIndex(ValueLayout.ADDRESS, index)
+                    .reinterpret(ValueLayout.JAVA_INT.byteSize());
+            seqIdsForToken.set(ValueLayout.JAVA_INT, 0, seqId);
+            manual.logits.setAtIndex(ValueLayout.JAVA_BYTE, index, (byte) (outputLogits ? 1 : 0));
+            return;
+        }
+
         // Access pointers from struct
         // Offset 8: token pointer (n_tokens 4 bytes + 4 bytes padding)
-        MemorySegment tokenPtr = batch.get(ValueLayout.ADDRESS, 8);
-        tokenPtr = tokenPtr.reinterpret(Long.MAX_VALUE);
+        MemorySegment tokenPtr = batch.get(ValueLayout.ADDRESS, 8)
+                .reinterpret((long) (index + 1) * ValueLayout.JAVA_INT.byteSize());
         tokenPtr.setAtIndex(ValueLayout.JAVA_INT, index, token);
 
         // Offset 24: pos pointer (8 + 8 + 8) -> 0:n_tokens(4+4), 8:token, 16:embd,
         // 24:pos
-        MemorySegment posPtr = batch.get(ValueLayout.ADDRESS, 24);
-        posPtr = posPtr.reinterpret(Long.MAX_VALUE);
+        MemorySegment posPtr = batch.get(ValueLayout.ADDRESS, 24)
+                .reinterpret((long) (index + 1) * ValueLayout.JAVA_INT.byteSize());
         posPtr.setAtIndex(ValueLayout.JAVA_INT, index, pos);
 
         // Offset 32: n_seq_id pointer
-        MemorySegment nSeqIdPtr = batch.get(ValueLayout.ADDRESS, 32);
-        nSeqIdPtr = nSeqIdPtr.reinterpret(Long.MAX_VALUE);
+        MemorySegment nSeqIdPtr = batch.get(ValueLayout.ADDRESS, 32)
+                .reinterpret((long) (index + 1) * ValueLayout.JAVA_INT.byteSize());
         nSeqIdPtr.setAtIndex(ValueLayout.JAVA_INT, index, 1); // We assume 1 sequence per token for now
 
         // Offset 40: seq_id pointer (pointer to pointer)
-        MemorySegment seqIdPtr = batch.get(ValueLayout.ADDRESS, 40);
-        seqIdPtr = seqIdPtr.reinterpret(Long.MAX_VALUE);
-        MemorySegment seqIdsForToken = seqIdPtr.getAtIndex(ValueLayout.ADDRESS, index);
-        seqIdsForToken = seqIdsForToken.reinterpret(Long.MAX_VALUE);
-        seqIdsForToken.setAtIndex(ValueLayout.JAVA_INT, 0, seqId);
+        MemorySegment seqIdPtr = batch.get(ValueLayout.ADDRESS, 40)
+                .reinterpret((long) (index + 1) * ValueLayout.ADDRESS.byteSize());
+        MemorySegment seqIdsForToken = seqIdPtr.getAtIndex(ValueLayout.ADDRESS, index)
+                .reinterpret(ValueLayout.JAVA_INT.byteSize());
+        seqIdsForToken.set(ValueLayout.JAVA_INT, 0, seqId);
 
         // Offset 48: logits pointer
-        MemorySegment logitsPtr = batch.get(ValueLayout.ADDRESS, 48);
-        logitsPtr = logitsPtr.reinterpret(Long.MAX_VALUE);
+        MemorySegment logitsPtr = batch.get(ValueLayout.ADDRESS, 48)
+                .reinterpret((long) (index + 1) * ValueLayout.JAVA_BYTE.byteSize());
         logitsPtr.setAtIndex(ValueLayout.JAVA_BYTE, index, (byte) (outputLogits ? 1 : 0));
     }
     // ===================================================================
@@ -1046,7 +1413,7 @@ public class LlamaCppBinding {
         } else if (value instanceof Float f) {
             segment.set(ValueLayout.JAVA_FLOAT, offset, f);
         } else if (value instanceof Boolean b) {
-            segment.set(ValueLayout.JAVA_BOOLEAN, offset, b);
+            segment.set(ValueLayout.JAVA_BYTE, offset, (byte) ((Boolean) value ? 1 : 0));
         } else if (value instanceof MemorySegment ms) {
             segment.set(ValueLayout.ADDRESS, offset, ms);
         } else {
@@ -1055,31 +1422,60 @@ public class LlamaCppBinding {
     }
 
     public void setBatchToken(MemorySegment batch, int index, int token) {
+        ManualBatchBuffers manual = manualBatchBuffers.get(batch.address());
+        if (manual != null) {
+            manual.token.setAtIndex(ValueLayout.JAVA_INT, index, token);
+            return;
+        }
         MemorySegment tokenPtr = batch.get(ValueLayout.ADDRESS,
-                LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("token")));
+                LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("token")))
+                .reinterpret((long) (index + 1) * ValueLayout.JAVA_INT.byteSize());
         tokenPtr.setAtIndex(ValueLayout.JAVA_INT, index, token);
     }
 
     public void setBatchPos(MemorySegment batch, int index, int pos) {
+        ManualBatchBuffers manual = manualBatchBuffers.get(batch.address());
+        if (manual != null) {
+            manual.pos.setAtIndex(ValueLayout.JAVA_INT, index, pos);
+            return;
+        }
         MemorySegment posPtr = batch.get(ValueLayout.ADDRESS,
-                LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("pos")));
+                LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("pos")))
+                .reinterpret((long) (index + 1) * ValueLayout.JAVA_INT.byteSize());
         posPtr.setAtIndex(ValueLayout.JAVA_INT, index, pos);
     }
 
     public void setBatchSeqId(MemorySegment batch, int index, int seqId) {
+        ManualBatchBuffers manual = manualBatchBuffers.get(batch.address());
+        if (manual != null) {
+            manual.nSeqId.setAtIndex(ValueLayout.JAVA_INT, index, 1);
+            MemorySegment seqIdPtr = manual.seqIdPtr.getAtIndex(ValueLayout.ADDRESS, index)
+                    .reinterpret(ValueLayout.JAVA_INT.byteSize());
+            seqIdPtr.set(ValueLayout.JAVA_INT, 0, seqId);
+            return;
+        }
         MemorySegment nSeqIdPtr = batch.get(ValueLayout.ADDRESS,
-                LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("n_seq_id")));
+                LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("n_seq_id")))
+                .reinterpret((long) (index + 1) * ValueLayout.JAVA_INT.byteSize());
         nSeqIdPtr.setAtIndex(ValueLayout.JAVA_INT, index, 1);
 
         MemorySegment seqIdPtrPtr = batch.get(ValueLayout.ADDRESS,
-                LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("seq_id")));
-        MemorySegment seqIdPtr = seqIdPtrPtr.getAtIndex(ValueLayout.ADDRESS, index);
-        seqIdPtr.setAtIndex(ValueLayout.JAVA_INT, 0, seqId);
+                LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("seq_id")))
+                .reinterpret((long) (index + 1) * ValueLayout.ADDRESS.byteSize());
+        MemorySegment seqIdPtr = seqIdPtrPtr.getAtIndex(ValueLayout.ADDRESS, index)
+                .reinterpret(ValueLayout.JAVA_INT.byteSize());
+        seqIdPtr.set(ValueLayout.JAVA_INT, 0, seqId);
     }
 
     public void setBatchLogits(MemorySegment batch, int index, boolean enable) {
+        ManualBatchBuffers manual = manualBatchBuffers.get(batch.address());
+        if (manual != null) {
+            manual.logits.setAtIndex(ValueLayout.JAVA_BYTE, index, (byte) (enable ? 1 : 0));
+            return;
+        }
         MemorySegment logitsPtr = batch.get(ValueLayout.ADDRESS,
-                LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("logits")));
+                LLAMA_BATCH_LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("logits")))
+                .reinterpret((long) (index + 1) * ValueLayout.JAVA_BYTE.byteSize());
         logitsPtr.setAtIndex(ValueLayout.JAVA_BYTE, index, (byte) (enable ? 1 : 0));
     }
 

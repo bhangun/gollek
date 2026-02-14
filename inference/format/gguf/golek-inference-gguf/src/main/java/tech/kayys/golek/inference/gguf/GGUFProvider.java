@@ -31,7 +31,6 @@ import java.util.Set;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 /**
  * Production-ready GGUF provider implementation using llama.cpp.
@@ -44,20 +43,21 @@ public class GGUFProvider implements StreamingProvider {
     private static final String PROVIDER_ID = "gguf";
     private static final String PROVIDER_VERSION = "1.1.0";
 
-    @Inject
-    GGUFProviderConfig config;
+    private final GGUFProviderConfig config;
+    private final LlamaCppBinding binding;
+    private final GGUFSessionManager sessionManager;
+    private final MeterRegistry meterRegistry;
+    private final Tracer tracer;
 
     @Inject
-    LlamaCppBinding binding;
-
-    @Inject
-    GGUFSessionManager sessionManager;
-
-    @Inject
-    MeterRegistry meterRegistry;
-
-    @Inject
-    Tracer tracer;
+    public GGUFProvider(GGUFProviderConfig config, LlamaCppBinding binding, GGUFSessionManager sessionManager,
+            MeterRegistry meterRegistry, Tracer tracer) {
+        this.config = config;
+        this.binding = binding;
+        this.sessionManager = sessionManager;
+        this.meterRegistry = meterRegistry;
+        this.tracer = tracer;
+    }
 
     private final AtomicBoolean initialized = new AtomicBoolean(false);
     private final AtomicBoolean shutdown = new AtomicBoolean(false);
@@ -68,65 +68,11 @@ public class GGUFProvider implements StreamingProvider {
     private ProviderCapabilities capabilities;
 
     void onStart(@Observes StartupEvent event) {
-
-        if (!config.enabled()) {
-
-            log.info("GGUF Provider is disabled by configuration");
-            return;
-        }
-
-        log.infof("Initializing GGUF Provider v%s", PROVIDER_VERSION);
-
-        // Basic initialization should always happen so the provider is recognized by
-        // the router
-        this.metadata = ProviderMetadata.builder()
-                .providerId(PROVIDER_ID)
-                .name("GGUF Provider (llama.cpp)")
-                .version(PROVIDER_VERSION)
-                .description("Local GGUF model inference using llama.cpp")
-                .vendor("Kayys Tech")
-                .homepage("https://github.com/ggerganov/llama.cpp")
-                .build();
-
-        this.capabilities = ProviderCapabilities.builder()
-                .streaming(true)
-                .functionCalling(false)
-                .multimodal(false)
-                .toolCalling(false)
-                .embeddings(false)
-                .maxContextTokens(config.maxContextTokens())
-                .maxOutputTokens(config.maxContextTokens() / 2)
-                .supportedFormats(Set.of(ModelFormat.GGUF))
-                .supportedDevices(buildSupportedDevices())
-                .supportedLanguages(java.util.List.of("en"))
-                .features(Set.of("local_inference", "cpu_inference",
-                        config.gpuEnabled() ? "gpu_acceleration" : "cpu_only"))
-                .build();
-
+        // Trigger initialization eagerly if possible, but don't fail if it doesn't run
         try {
-            // binding.backendInit() is already called during LlamaCppBinding.load()
-            // but we call it here to ensure it's ready if we use a different lifecycle
-            log.debug("Initializing GGUF native backend");
-            binding.backendInit();
-            log.info("llama.cpp native library initialized");
-
-            sessionManager.initialize();
-
-            if (config.prewarmEnabled() && config.prewarmModels().isPresent()) {
-
-                prewarmModels(config.prewarmModels().get());
-            }
-
-            initialized.set(true);
-            log.info("GGUF Provider initialization completed");
-
-        } catch (Throwable t) {
-
-            t.printStackTrace();
-            log.error("Failed to initialize GGUF Provider. The provider will be unavailable.", t);
-            // We don't throw here to allow the application to start even if native
-            // libraries are missing
-            // especially useful in test environments or CI/CD
+            ensureInitialized();
+        } catch (Exception e) {
+            log.warn("Eager initialization failed (will retry lazily): " + e.getMessage());
         }
     }
 
@@ -425,9 +371,9 @@ public class GGUFProvider implements StreamingProvider {
     }
 
     private InferenceRequest convertToInferenceRequest(ProviderRequest request) {
-        String prompt = request.getMessages().stream()
-                .map(Message::getContent)
-                .collect(Collectors.joining("\n"));
+        // Apply Chat Template (Defaulting to ChatML for now as Qwen uses it)
+        // TODO: detect template type from model metadata or config
+        String prompt = applyChatMLTemplate(request.getMessages());
 
         var builder = InferenceRequest.builder()
                 .model(request.getModel())
@@ -449,6 +395,17 @@ public class GGUFProvider implements StreamingProvider {
         });
 
         return builder.build();
+    }
+
+    private String applyChatMLTemplate(java.util.List<Message> messages) {
+        StringBuilder sb = new StringBuilder();
+        for (Message msg : messages) {
+            sb.append("<|im_start|>").append(msg.getRole().toString().toLowerCase()).append("\n");
+            sb.append(msg.getContent()).append("<|im_end|>\n");
+        }
+        // Append generation prompt
+        sb.append("<|im_start|>assistant\n");
+        return sb.toString();
     }
 
     private tech.kayys.golek.spi.context.RequestContext createRequestContext(
@@ -485,12 +442,68 @@ public class GGUFProvider implements StreamingProvider {
         return msg == null || (!msg.toLowerCase().contains("not found") && !msg.toLowerCase().contains("invalid"));
     }
 
-    private void ensureInitialized() {
+    private synchronized void ensureInitialized() {
         if (shutdown.get()) {
             throw new IllegalStateException("GGUF Provider has been shutdown");
         }
-        if (!initialized.get()) {
-            throw new IllegalStateException("GGUF Provider not initialized");
+        if (initialized.get()) {
+            return;
+        }
+
+        if (!config.enabled()) {
+            log.info("GGUF Provider is disabled by configuration");
+            // Mark as initialized but unusable? Or just return and let usages fail?
+            // If disabled, initialized remains false.
+            throw new IllegalStateException("GGUF Provider is disabled by configuration");
+        }
+
+        log.infof("Initializing GGUF Provider v%s", PROVIDER_VERSION);
+        System.out.println("Initializing GGUF Provider v" + PROVIDER_VERSION + " (Lazy Init)...");
+
+        try {
+            this.metadata = ProviderMetadata.builder()
+                    .providerId(PROVIDER_ID)
+                    .name("GGUF Provider (llama.cpp)")
+                    .version(PROVIDER_VERSION)
+                    .description("Local GGUF model inference using llama.cpp")
+                    .vendor("Kayys Tech")
+                    .homepage("https://github.com/ggerganov/llama.cpp")
+                    .build();
+
+            this.capabilities = ProviderCapabilities.builder()
+                    .streaming(true)
+                    .functionCalling(false)
+                    .multimodal(false)
+                    .toolCalling(false)
+                    .embeddings(false)
+                    .maxContextTokens(config.maxContextTokens())
+                    .maxOutputTokens(config.maxContextTokens() / 2)
+                    .supportedFormats(Set.of(ModelFormat.GGUF))
+                    .supportedDevices(buildSupportedDevices())
+                    .supportedLanguages(java.util.List.of("en"))
+                    .features(Set.of("local_inference", "cpu_inference",
+                            config.gpuEnabled() ? "gpu_acceleration" : "cpu_only"))
+                    .build();
+
+            log.debug("Initializing GGUF native backend");
+            binding.backendInit();
+            log.info("llama.cpp native library initialized");
+
+            sessionManager.initialize();
+
+            if (config.prewarmEnabled() && config.prewarmModels().isPresent()) {
+                prewarmModels(config.prewarmModels().get());
+            }
+
+            initialized.set(true);
+            log.info("GGUF Provider initialization completed");
+            System.out.println("GGUF Provider initialized successfully.");
+
+        } catch (Throwable t) {
+            t.printStackTrace();
+            System.err.println("FATAL: GGUF Provider initialization failed: " + t.getMessage());
+            log.error("Failed to initialize GGUF Provider", t);
+            throw new IllegalStateException("Failed to initialize GGUF Provider: " + t.getMessage(), t);
         }
     }
 }
