@@ -32,16 +32,16 @@ public class ChatCommand implements Runnable {
     String modelId;
 
     @Option(names = {
-            "--provider" }, description = "Provider: litert, gguf, ollama, gemini, openai, anthropic, cerebras")
+            "--provider" }, description = "Provider: litert, gguf, libtorch, ollama, gemini, openai, anthropic, cerebras")
     String providerId;
 
     @Option(names = { "--system" }, description = "System prompt")
     String systemPrompt;
 
-    @Option(names = { "--temperature" }, description = "Sampling temperature", defaultValue = "0.8")
+    @Option(names = { "--temperature" }, description = "Sampling temperature", defaultValue = "0.2")
     double temperature;
 
-    @Option(names = { "--top-p" }, description = "Top-p sampling", defaultValue = "0.95")
+    @Option(names = { "--top-p" }, description = "Top-p sampling", defaultValue = "0.9")
     double topP;
 
     @Option(names = { "--top-k" }, description = "Top-k sampling", defaultValue = "40")
@@ -62,7 +62,10 @@ public class ChatCommand implements Runnable {
     @Option(names = { "--session" }, description = "Enable stateful session (KV cache reuse)")
     boolean enableSession;
 
-    @Option(names = { "-v", "--verbose" }, description = "Enable verbose native debug output")
+    @Option(names = { "-o", "--output" }, description = "Output file for assistant responses")
+    java.io.File outputFile;
+
+    @Option(names = { "-v", "--verbose", "--logs" }, description = "Enable verbose native debug output")
     boolean verbose;
 
     @Option(names = { "--mirostat" }, description = "Mirostat mode (0, 1, 2)", defaultValue = "0")
@@ -70,6 +73,12 @@ public class ChatCommand implements Runnable {
 
     @Option(names = { "--grammar" }, description = "GBNF grammar string")
     String grammar;
+
+    @Option(names = { "--max-tokens" }, description = "Maximum tokens to generate per response", defaultValue = "64")
+    int maxTokens;
+
+    @Option(names = { "-q", "--quiet" }, description = "Minimal output (no banner/spinner/stats)")
+    boolean quiet;
 
     private static final String RESET = "\u001B[0m";
     private static final String GREEN = "\u001B[32m";
@@ -88,40 +97,85 @@ public class ChatCommand implements Runnable {
     @Override
     public void run() {
         try {
+            // Configure logging: show GGUF debug logs only if --verbose/--logs is on
+            if (verbose) {
+                java.util.logging.Logger ggufLogger = java.util.logging.Logger
+                        .getLogger("tech.kayys.golek.inference.gguf");
+                ggufLogger.setLevel(java.util.logging.Level.FINE);
+                // Ensure a console handler is present for FINE-level output
+                java.util.logging.ConsoleHandler ch = new java.util.logging.ConsoleHandler();
+                ch.setLevel(java.util.logging.Level.FINE);
+                ggufLogger.addHandler(ch);
+            }
+
             // Set preferred provider
             if (providerId != null && !providerId.isEmpty()) {
                 sdk.setPreferredProvider(providerId);
             }
+
+            if (!ensureModelAvailable()) {
+                return;
+            }
+            maybeAutoSelectProvider();
 
             // Add system prompt if provided
             if (systemPrompt != null && !systemPrompt.isEmpty()) {
                 conversationHistory.add(Message.system(systemPrompt));
             }
 
-            System.out.println(BOLD + YELLOW + "  _____       _      _    " + RESET);
-            System.out.println(BOLD + YELLOW + " / ____|     | |    | |   " + RESET);
-            System.out.println(BOLD + YELLOW + "| |  __  ___ | | ___| | __" + RESET);
-            System.out.println(BOLD + YELLOW + "| | |_ |/ _ \\| |/ _ \\ |/ /" + RESET);
-            System.out.println(BOLD + YELLOW + "| |__| | (_) | |  __/   < " + RESET);
-            System.out.println(BOLD + YELLOW + " \\_____|\\___/|_|\\___|_|\\_\\" + RESET);
-            System.out.println();
-            System.out.printf(BOLD + "Model: " + RESET + CYAN + "%s" + RESET + "%n", modelId);
-            System.out.printf(BOLD + "Provider: " + RESET + YELLOW + "%s" + RESET + "%n",
-                    providerId != null ? providerId : "auto-select");
+            if (!quiet) {
+                System.out.println(BOLD + YELLOW + "  _____       _      _    " + RESET);
+                System.out.println(BOLD + YELLOW + " / ____|     | |    | |   " + RESET);
+                System.out.println(BOLD + YELLOW + "| |  __  ___ | | ___| | __" + RESET);
+                System.out.println(BOLD + YELLOW + "| | |_ |/ _ \\| |/ _ \\ |/ /" + RESET);
+                System.out.println(BOLD + YELLOW + "| |__| | (_) | |  __/   < " + RESET);
+                System.out.println(BOLD + YELLOW + " \\_____|\\___/|_|\\___|_|\\_\\" + RESET);
+                System.out.println();
+                System.out.printf(BOLD + "Model: " + RESET + CYAN + "%s" + RESET + "%n", modelId);
+                System.out.printf(BOLD + "Provider: " + RESET + YELLOW + "%s" + RESET + "%n",
+                        providerId != null ? providerId : "auto-select");
+                if (outputFile != null) {
+                    System.out.printf(BOLD + "Output: " + RESET + YELLOW + "%s" + RESET + "%n",
+                            outputFile.getAbsolutePath());
+                }
+                System.out.println(DIM + "Commands: 'exit' to quit, '/reset' to clear history." + RESET);
+                System.out.println(DIM + "Note: Use '\\' at the end of a line for multiline input." + RESET);
+                System.out.println(DIM + "-".repeat(50) + RESET);
+            }
             if (enableSession) {
                 sessionId = UUID.randomUUID().toString();
-                System.out.printf(BOLD + "Session: " + RESET + DIM + "%s (KV cache enabled)" + RESET + "%n",
-                        sessionId.substring(0, 8));
+                if (!quiet) {
+                    System.out.printf(BOLD + "Session: " + RESET + DIM + "%s (KV cache enabled)" + RESET + "%n",
+                            sessionId.substring(0, 8));
+                }
             }
-            System.out.println(DIM + "Commands: 'exit' to quit, '/reset' to clear history." + RESET);
-            System.out.println(DIM + "Note: Use '\\' at the end of a line for multiline input." + RESET);
-            System.out.println(DIM + "-".repeat(50) + RESET);
+
+            boolean effectiveStream = stream;
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
             String line;
 
+            // Open output file if specified (append mode)
+            java.io.PrintWriter fileWriter = null;
+            if (outputFile != null) {
+                try {
+                    // Create parent dirs if needed
+                    if (outputFile.getParentFile() != null) {
+                        outputFile.getParentFile().mkdirs();
+                    }
+                    fileWriter = new java.io.PrintWriter(new java.io.FileWriter(outputFile, true), true);
+                    fileWriter.println("\n--- Chat Session Started " + java.time.Instant.now() + " ---");
+                } catch (Exception e) {
+                    System.err.println(YELLOW + "Failed to open output file: " + e.getMessage() + RESET);
+                }
+            }
+
             while (true) {
-                System.out.print("\n" + BOLD + CYAN + ">>> " + RESET);
+                if (quiet) {
+                    System.out.print("\n>>> ");
+                } else {
+                    System.out.print("\n" + BOLD + CYAN + ">>> " + RESET);
+                }
                 StringBuilder inputBuffer = new StringBuilder();
 
                 while (true) {
@@ -131,7 +185,11 @@ public class ChatCommand implements Runnable {
 
                     if (line.endsWith("\\")) {
                         inputBuffer.append(line, 0, line.length() - 1).append("\n");
-                        System.out.print(DIM + "... " + RESET);
+                        if (quiet) {
+                            System.out.print("... ");
+                        } else {
+                            System.out.print(DIM + "... " + RESET);
+                        }
                     } else {
                         inputBuffer.append(line);
                         break;
@@ -144,12 +202,19 @@ public class ChatCommand implements Runnable {
                 String finalInput = inputBuffer.toString().trim();
 
                 if (finalInput.equalsIgnoreCase("exit") || finalInput.equalsIgnoreCase("quit")) {
-                    System.out.println("\n" + YELLOW + "Goodbye!" + RESET);
+                    if (!quiet) {
+                        System.out.println("\n" + YELLOW + "Goodbye!" + RESET);
+                    }
                     break;
                 }
 
                 if (finalInput.isEmpty()) {
                     continue;
+                }
+
+                // Echo user input to file
+                if (fileWriter != null) {
+                    fileWriter.println("\n>>> User: " + finalInput);
                 }
 
                 // Handle special commands
@@ -159,11 +224,15 @@ public class ChatCommand implements Runnable {
                         conversationHistory.add(Message.system(systemPrompt));
                     }
                     System.out.println(YELLOW + "[Conversation reset]" + RESET);
+                    if (fileWriter != null)
+                        fileWriter.println("[Conversation reset]");
                     continue;
                 }
 
                 if (finalInput.equalsIgnoreCase("/quit")) {
-                    System.out.println("\n" + YELLOW + "Goodbye!" + RESET);
+                    if (!quiet) {
+                        System.out.println("\n" + YELLOW + "Goodbye!" + RESET);
+                    }
                     break;
                 }
 
@@ -210,7 +279,7 @@ public class ChatCommand implements Runnable {
                         .parameter("top_k", topK)
                         .parameter("repeat_penalty", repeatPenalty)
                         .parameter("json_mode", jsonMode)
-                        .maxTokens(2048)
+                        .maxTokens(maxTokens)
                         .preferredProvider(providerId)
                         .cacheBypass(noCache);
 
@@ -228,7 +297,18 @@ public class ChatCommand implements Runnable {
                 InferenceRequest request = reqBuilder.build();
 
                 try {
-                    System.out.print("\n" + BOLD + GREEN + "Assistant: " + RESET);
+                    if (fileWriter == null) {
+                        if (quiet) {
+                            System.out.print("\nAssistant: ");
+                        } else {
+                            System.out.print("\n" + BOLD + GREEN + "Assistant: " + RESET);
+                        }
+                    } else {
+                        if (!quiet) {
+                            System.out.print(DIM + "Thinking... (Outputting to file)" + RESET);
+                        }
+                        fileWriter.println("Assistant: ");
+                    }
 
                     if (verbose) {
                         // Dynamically adjust log level if verbose flag is set (Java Util Logging /
@@ -243,7 +323,7 @@ public class ChatCommand implements Runnable {
                                 .setLevel(java.util.logging.Level.WARNING);
                     }
 
-                    if (stream) {
+                    if (effectiveStream) {
                         java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
                         java.util.concurrent.atomic.AtomicBoolean firstTokenReceived = new java.util.concurrent.atomic.AtomicBoolean(
                                 false);
@@ -252,37 +332,105 @@ public class ChatCommand implements Runnable {
                         long startTime = System.currentTimeMillis();
                         StringBuilder fullResponse = new StringBuilder();
 
+                        // Synchronization object for printing
+                        Object printLock = new Object();
+
+                        // Capture standard out for potential restoration
+                        final java.io.PrintWriter finalFileWriter = fileWriter;
+
                         sdk.streamCompletion(request)
                                 .subscribe().with(
                                         chunk -> {
-                                            firstTokenReceived.set(true);
                                             String delta = chunk.getDelta();
                                             if (delta != null) {
-                                                // If this is the very first chunk that has content, verify we clear the
-                                                // spinner line effectively
-                                                // But since we are printing delta immediately, we need to handle
-                                                // spinner cleanup in the main thread or here.
-                                                // Let's do it here for immediate feedback, but main thread loop needs
-                                                // to stop printing spinner.
+                                                synchronized (printLock) {
+                                                    if (!firstTokenReceived.get()) {
+                                                        // Clear the spinner line completely
+                                                        if (quiet && finalFileWriter == null) {
+                                                            firstTokenReceived.set(true);
+                                                        } else if (finalFileWriter == null) {
+                                                            System.out.print("\r" + BOLD + GREEN + "Assistant: " + RESET
+                                                                    + "          \r" + BOLD + GREEN + "Assistant: "
+                                                                    + RESET);
+                                                        } else {
+                                                            if (!quiet) {
+                                                                System.out.print("\r" + BOLD + GREEN
+                                                                        + "Received response. Writing to file..." + RESET
+                                                                        + "   ");
+                                                            }
+                                                        }
+                                                        firstTokenReceived.set(true);
+                                                    }
 
-                                                System.out.print(delta);
+                                                    if (finalFileWriter != null) {
+                                                        // Write to file only
+                                                        finalFileWriter.print(delta);
+                                                        finalFileWriter.flush();
+                                                    } else {
+                                                        // Write to console
+                                                        System.out.print(delta);
+                                                    }
+                                                }
                                                 fullResponse.append(delta);
                                                 tokenCount.incrementAndGet();
                                             }
                                         },
                                         error -> {
-                                            System.err.println(
-                                                    "\n" + YELLOW + "Stream error: " + RESET + error.getMessage());
+                                            synchronized (printLock) {
+                                                    if (!firstTokenReceived.get() && !quiet) {
+                                                        System.out.print("\r" + "                                    \r"); // Clear
+                                                                                                                       // line
+                                                    }
+                                                    if (quiet) {
+                                                        System.err.println("\nStream error: " + error.getMessage());
+                                                    } else {
+                                                        System.err.println(
+                                                                "\n" + YELLOW + "Stream error: " + RESET
+                                                                        + error.getMessage());
+                                                    }
+                                                    if (finalFileWriter != null) {
+                                                        finalFileWriter.println("\n[Error: " + error.getMessage() + "]");
+                                                    }
+                                            }
                                             latch.countDown();
                                         },
                                         () -> {
-                                            long duration = System.currentTimeMillis() - startTime;
-                                            double tps = (tokenCount.get() / (duration / 1000.0));
-                                            System.out.println();
-                                            System.out.printf(
-                                                    DIM + "\n[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]" + RESET
-                                                            + "%n",
-                                                    tokenCount.get(), duration / 1000.0, tps);
+                                            synchronized (printLock) {
+                                                if (!firstTokenReceived.get()) {
+                                                    // Needed if response was empty but successful
+                                                    if (quiet && finalFileWriter == null) {
+                                                        // Keep output stable in quiet mode.
+                                                    } else if (finalFileWriter == null) {
+                                                        System.out.print("\r" + BOLD + GREEN + "Assistant: " + RESET
+                                                                + "          \r" + BOLD + GREEN + "Assistant: "
+                                                                + RESET);
+                                                    }
+                                                    firstTokenReceived.set(true);
+                                                }
+                                                long duration = System.currentTimeMillis() - startTime;
+                                                double tps = (tokenCount.get() / (duration / 1000.0));
+
+                                                if (finalFileWriter != null) {
+                                                    if (!quiet) {
+                                                        System.out.printf(DIM + "\n[Done. Tokens: %d, Speed: %.2f t/s]"
+                                                                + RESET + "%n", tokenCount.get(), tps);
+                                                    }
+                                                    finalFileWriter.println(); // newline in file
+                                                    finalFileWriter.printf(
+                                                            "\n[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]%n",
+                                                            tokenCount.get(), duration / 1000.0, tps);
+                                                    finalFileWriter.println("-".repeat(30));
+                                                } else {
+                                                    System.out.println();
+                                                    if (!quiet) {
+                                                        System.out.printf(
+                                                                DIM + "\n[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]"
+                                                                        + RESET
+                                                                        + "%n",
+                                                                tokenCount.get(), duration / 1000.0, tps);
+                                                    }
+                                                }
+                                            }
                                             conversationHistory.add(Message.assistant(fullResponse.toString()));
                                             latch.countDown();
                                         });
@@ -290,7 +438,15 @@ public class ChatCommand implements Runnable {
                         // Spinner loop
                         String[] spinner = { "|", "/", "-", "\\" };
                         int i = 0;
-                        System.out.print(DIM + "Thinking... " + spinner[0] + RESET);
+
+                        // Initial print
+                        if (!quiet) {
+                            synchronized (printLock) {
+                                if (!firstTokenReceived.get()) {
+                                    System.out.print(DIM + "Thinking... " + spinner[0] + RESET);
+                                }
+                            }
+                        }
 
                         while (!firstTokenReceived.get() && latch.getCount() > 0) {
                             try {
@@ -301,60 +457,47 @@ public class ChatCommand implements Runnable {
                                 Thread.currentThread().interrupt();
                                 break;
                             }
-                            if (!firstTokenReceived.get()) {
-                                System.out.print("\r" + BOLD + GREEN + "Assistant: " + RESET + DIM + "Thinking... "
-                                        + spinner[i++ % spinner.length] + RESET);
+
+                            if (quiet) {
+                                continue;
+                            }
+                            synchronized (printLock) {
+                                if (!firstTokenReceived.get()) {
+                                    // Move cursor back to update spinner without rewriting "Assistant:"
+                                    if (finalFileWriter == null) {
+                                        System.out.print(
+                                                "\r" + BOLD + GREEN + "Assistant: " + RESET + DIM + "Thinking... "
+                                                        + spinner[i++ % spinner.length] + RESET);
+                                    } else {
+                                        System.out.print(
+                                                "\r" + DIM + "Thinking... " + spinner[i++ % spinner.length] + RESET);
+                                    }
+                                }
+                            }
+                        }
+                        // Wait for stream to complete
+                        try {
+                            latch.await();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            if (!quiet) {
+                                System.out.println("\nInterrupted.");
                             }
                         }
 
-                        // Clear spinner if we haven't printed anything yet (e.g. error or fast
-                        // response)
-                        // Actually, if we received first token, the callback printed delta.
-                        // But we might have leftover "Thinking..." text if the callback printed delta
-                        // ON THE SAME LINE.
-                        // Ideally:
-                        // 1. Spinner prints "\rAssistant: Thinking... /"
-                        // 2. Callback receives token.
-                        // 3. Callback should preferably clear line or we ensure we are on a clean
-                        // state.
-
-                        // Let's refine:
-                        // The spinner loop ends when firstTokenReceived is true.
-                        // At that point, the cursor is at the end of spinner.
-                        // We need to clear the spinner text.
-
-                        if (firstTokenReceived.get()) {
-                            // We are relying on the fact that `System.out.print(delta)` in callback
-                            // happened.
-                            // But wait, if main thread was sleeping, callback ran.
-                            // Callback printed delta.
-                            // The delta appeared APENDED to "Thinking... /".
-                            // This is messy.
-                            // FIX: Callback should NOT print until spinner is cleared?
-                            // OR: Spinner loop handles everything?
-                            // NO, callback drives data.
+                    } else {
+                        // Non-streaming logic
+                        if (verbose && !quiet) {
+                            System.out.println(DIM + "Non-streaming mode..." + RESET);
                         }
 
-                        // Alternative straightforward approach:
-                        // Main thread does NOT print spinner. It just waits.
-                        // We launch a separate thread for spinner?
-                        // Or we use the main thread loop for spinner.
-
-                        // Let's try to clear line in main thread once loop exits?
-                        // If loop exits because firstTokenReceived is true:
-                        // That means callback set it to true.
-                        // But callback runs concurrently.
-
-                        // Revised logic in replacement content below.
-
-                    } else {
                         long startTime = System.currentTimeMillis();
                         InferenceResponse response = sdk.createCompletion(request);
                         long duration = System.currentTimeMillis() - startTime;
                         String content = response.getContent();
 
                         // Handle tool calls if present
-                        if (response.hasToolCalls()) {
+                        if (response.hasToolCalls() && !quiet) {
                             System.out.println();
                             for (var toolCall : response.getToolCalls()) {
                                 System.out.printf(YELLOW + "  [Tool Call] %s(%s)" + RESET + "%n",
@@ -362,21 +505,171 @@ public class ChatCommand implements Runnable {
                             }
                         }
 
-                        System.out.println(content);
-                        System.out.printf(DIM + "\n[Duration: %.2fs, Tokens: %d]" + RESET + "%n",
-                                duration / 1000.0, response.getTokensUsed());
+                        if (fileWriter != null) {
+                            fileWriter.println("\nAssistant: " + content);
+                            fileWriter.printf("\n[Duration: %.2fs, Tokens: %d]%n", duration / 1000.0,
+                                    response.getTokensUsed());
+                            fileWriter.println("-".repeat(30));
+                            if (!quiet) {
+                                System.out.print(DIM + "Response written to file." + RESET);
+                            }
+                        } else {
+                            System.out.println(content);
+                            if (!quiet) {
+                                System.out.printf(DIM + "\n[Duration: %.2fs, Tokens: %d]" + RESET + "%n",
+                                        duration / 1000.0, response.getTokensUsed());
+                            }
+                        }
 
                         // Add assistant response to history
                         conversationHistory.add(Message.assistant(content));
                     }
 
                 } catch (Exception e) {
-                    System.err.println("\n" + YELLOW + "Error: " + RESET + e.getMessage());
+                    if (quiet) {
+                        System.err.println("\nError: " + e.getMessage());
+                    } else {
+                        System.err.println("\n" + YELLOW + "Error: " + RESET + e.getMessage());
+                    }
                 }
             }
 
+            if (fileWriter != null)
+                fileWriter.close();
+
         } catch (Exception e) {
-            System.err.println("Chat failed: " + e.getMessage());
+            if (quiet) {
+                System.err.println("Chat failed: " + e.getMessage());
+            } else {
+                System.err.println("Chat failed: " + e.getMessage());
+            }
         }
+    }
+
+    private boolean ensureModelAvailable() {
+        try {
+            if (sdk.getModelInfo(modelId).isPresent()) {
+                return true;
+            }
+
+            String fallbackId = modelId + "-GGUF";
+            if (sdk.getModelInfo(fallbackId).isPresent()) {
+                modelId = fallbackId;
+                return true;
+            }
+
+            if (!isHuggingFaceSpec(modelId)) {
+                System.err.println("Error: Model not found locally: " + modelId);
+                return false;
+            }
+
+            boolean pulled = false;
+            Exception lastPullError = null;
+            for (String spec : buildPullSpecs(modelId)) {
+                try {
+                    if (!quiet) {
+                        System.out.println("Pulling model from Hugging Face: " + spec);
+                    }
+                    sdk.pullModel(spec, progress -> {
+                        if (quiet) {
+                            return;
+                        }
+                        if (progress.getTotal() > 0) {
+                            System.out.printf("\rDownloading: %s %d%% (%d/%d MB)",
+                                    progress.getProgressBar(20),
+                                    progress.getPercentComplete(),
+                                    progress.getCompleted() / 1024 / 1024,
+                                    progress.getTotal() / 1024 / 1024);
+                        } else {
+                            System.out.print("\rDownloading: " + progress.getStatus());
+                        }
+                    });
+                    if (!quiet) {
+                        System.out.println("\nDownload complete.");
+                    }
+                    pulled = true;
+                    break;
+                } catch (Exception e) {
+                    lastPullError = e;
+                }
+            }
+
+            if (!pulled) {
+                String reason = lastPullError != null ? lastPullError.getMessage() : "unknown error";
+                System.err.println("Failed to pull model from Hugging Face: " + reason);
+                return false;
+            }
+
+            String normalized = modelId.startsWith("hf:") ? modelId.substring(3) : modelId;
+            java.util.List<String> candidates = java.util.List.of(
+                    modelId,
+                    modelId + "-GGUF",
+                    normalized,
+                    normalized + "-GGUF");
+            for (String candidate : candidates) {
+                if (sdk.getModelInfo(candidate).isPresent()) {
+                    modelId = candidate;
+                    return true;
+                }
+            }
+
+            System.err.println("Model download finished but local registration was not found: " + modelId);
+            return false;
+        } catch (Exception e) {
+            System.err.println("Failed to resolve model: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean isHuggingFaceSpec(String id) {
+        return id != null && (id.startsWith("hf:") || id.contains("/"));
+    }
+
+    private java.util.List<String> buildPullSpecs(String id) {
+        if (id == null || id.isBlank()) {
+            return java.util.List.of();
+        }
+        if (id.startsWith("hf:")) {
+            String bare = id.substring(3);
+            return java.util.List.of(id, bare);
+        }
+        if (id.contains("/")) {
+            return java.util.List.of(id, "hf:" + id);
+        }
+        return java.util.List.of(id);
+    }
+
+    private void maybeAutoSelectProvider() {
+        if (providerId != null && !providerId.isBlank()) {
+            return;
+        }
+        try {
+            var modelInfoOpt = sdk.getModelInfo(modelId);
+            if (modelInfoOpt.isEmpty()) {
+                return;
+            }
+            String format = modelInfoOpt.get().getFormat();
+            String inferredProvider = providerForFormat(format);
+            if (inferredProvider == null || inferredProvider.isBlank()) {
+                return;
+            }
+            sdk.setPreferredProvider(inferredProvider);
+            providerId = inferredProvider;
+        } catch (Exception ignored) {
+            // Keep default router behavior when format/provider probing is not available.
+        }
+    }
+
+    private String providerForFormat(String format) {
+        if (format == null || format.isBlank()) {
+            return null;
+        }
+        String normalized = format.trim().toUpperCase();
+        return switch (normalized) {
+            case "GGUF" -> "gguf";
+            case "TORCHSCRIPT", "PYTORCH", "SAFETENSORS" -> "libtorch";
+            case "ONNX" -> "onnx";
+            default -> null;
+        };
     }
 }
