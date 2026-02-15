@@ -14,39 +14,100 @@ Complete Java bindings for PyTorch/LibTorch C++ frontend using JDK 25's Foreign 
 ✅ **Zero-Copy Interop** - Direct memory access via FFM for maximum performance  
 
 ## Architecture
+# LibTorch Module — Complete Implementation
 
+## Architecture
+
+```mermaid
+graph TD
+    A["LibTorchProvider<br/>(LLMProvider SPI)"] --> B["TorchScriptRunner"]
+    A --> C["LibTorchSessionManager"]
+    A --> D["LibTorchPluginRegistry"]
+    B --> E["LibTorchBinding<br/>(FFM Singleton)"]
+    D --> E
+    E --> F["NativeLibraryLoader"]
+
+    H["NN Module System<br/>18 modules"] --> E
+    H --> I["Tensor (509 lines)"]
+    I --> E
 ```
-┌─────────────────────────────────────┐
-│   Java Application Layer            │
-│   (Quarkus REST Services)            │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│   High-Level Java API                │
-│   - Tensor                           │
-│   - Module, Linear, Conv2d           │
-│   - Optimizer (SGD, Adam)            │
-│   - Loss Functions                   │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│   JDK 25 FFM Bindings                │
-│   - LibTorchFFM                      │
-│   - MethodHandle + MemorySegment     │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│   C Wrapper (libtorch_wrapper.so)   │
-│   - Extern "C" functions             │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│   LibTorch C++ Frontend              │
-│   - torch::Tensor                    │
-│   - torch::nn::Module                │
-│   - torch::optim                     │
-└──────────────────────────────────────┘
-```
+
+## File Inventory (38 source files + 2 SPI registrations)
+
+### Provider Integration (root package)
+| File | Purpose |
+|------|---------|
+| [LibTorchProvider](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/LibTorchProvider.java) | Full `LLMProvider` SPI implementation |
+| [LibTorchProviderConfig](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/LibTorchProviderConfig.java) | Quarkus `@ConfigMapping` |
+| [LibTorchSessionManager](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/LibTorchSessionManager.java) | Per-tenant/model session pooling |
+| [TorchScriptRunner](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/TorchScriptRunner.java) | JIT model loading + forward pass |
+| [LibTorchBeanProducer](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/LibTorchBeanProducer.java) | CDI bean producer |
+
+---
+
+### FFM Binding Layer (`binding/`)
+| File | Purpose |
+|------|---------|
+| [NativeLibraryLoader](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/binding/NativeLibraryLoader.java) | Platform-aware native lib loading (vendor path first) |
+| [LibTorchBinding](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/binding/LibTorchBinding.java) | FFM singleton with 40+ symbol descriptors |
+
+---
+
+### Core Types (`core/`)
+| File | Purpose |
+|------|---------|
+| [Tensor](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/core/Tensor.java) | 509-line tensor wrapper with fluent API |
+| [ScalarType](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/core/ScalarType.java) | PyTorch dtype enum |
+| [Device](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/core/Device.java) | CPU/CUDA/MPS device abstraction |
+
+---
+
+### NN Module System (`nn/` — 18 files)
+
+| Category | Modules |
+|----------|---------|
+| **Base** | [Module](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/Module.java), [Sequential](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/Sequential.java) |
+| **Layers** | [Linear](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/Linear.java), [Conv2d](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/Conv2d.java), [Embedding](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/Embedding.java), [Flatten](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/Flatten.java) |
+| **Activations** | [ReLU](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/ReLU.java), [GELU](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/GELU.java), [Sigmoid](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/Sigmoid.java), [Tanh](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/Tanh.java), [Softmax](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/Softmax.java) |
+| **Normalization** | [BatchNorm2d](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/BatchNorm2d.java), [LayerNorm](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/LayerNorm.java) |
+| **Regularization** | [Dropout](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/Dropout.java) |
+| **Pooling** | [MaxPool2d](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/MaxPool2d.java), [AdaptiveAvgPool2d](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/AdaptiveAvgPool2d.java) |
+| **Functional** | [Functional](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/Functional.java) — relu, gelu, sigmoid, tanh, softmax, logSoftmax, dropout, conv2d, batchNorm, layerNorm, maxPool2d, adaptiveAvgPool2d |
+| **Loss** | [Loss](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/nn/Loss.java) — mseLoss, crossEntropy, l1Loss, binaryCrossEntropy, smoothL1Loss |
+
+---
+
+### Optimizers (`optim/`)
+| File | Purpose |
+|------|---------|
+| [Optimizer](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/optim/Optimizer.java), [SGD](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/optim/SGD.java), [Adam](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/optim/Adam.java) | FFM-backed optimizers with momentum/AMSGrad |
+
+---
+
+### Plugin SPI (`plugin/`)
+| File | Purpose |
+|------|---------|
+| [LibTorchPlugin](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/plugin/LibTorchPlugin.java) | SPI interface |
+| [LibTorchPluginRegistry](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/plugin/LibTorchPluginRegistry.java) | ServiceLoader discovery + operation index |
+| [CoreOpsPlugin](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/plugin/builtin/CoreOpsPlugin.java), [NNOpsPlugin](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/plugin/builtin/NNOpsPlugin.java), [SerializationPlugin](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/plugin/builtin/SerializationPlugin.java), [CudaPlugin](extension/format/libtorch/golek-ext-format-libtorch/src/main/java/tech/kayys/golek/inference/libtorch/plugin/builtin/CudaPlugin.java) | Built-in plugins |
+
+---
+
+### SPI Service Registrations (`META-INF/services/`)
+- `tech.kayys.golek.inference.libtorch.plugin.LibTorchPlugin` — 4 built-in plugins
+- `tech.kayys.golek.spi.provider.LLMProvider` — `LibTorchProvider`
+
+### Config
+- [application.properties](extension/format/libtorch/golek-ext-format-libtorch/src/main/resources/application.properties) — disabled by default, all settings documented
+
+## UI / CLI Integration
+
+### Golek CLI
+- Added dependency `golek-ext-format-libtorch` to `golek-cli/pom.xml`.
+- Enabled provider by default in `golek-cli/src/main/resources/application.properties`.
+- Configured default model path to `~/.golek/models/torchscript`.
+
+---
 
 ## Requirements
 
