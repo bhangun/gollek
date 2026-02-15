@@ -3,6 +3,7 @@ package tech.kayys.golek.cli;
 import io.quarkus.picocli.runtime.annotations.TopCommand;
 import picocli.CommandLine.Command;
 import tech.kayys.golek.cli.commands.ChatCommand;
+import tech.kayys.golek.cli.commands.ExtensionsCommand;
 import tech.kayys.golek.cli.commands.InfoCommand;
 import tech.kayys.golek.cli.commands.ListCommand;
 import tech.kayys.golek.cli.commands.ProvidersCommand;
@@ -21,6 +22,7 @@ import picocli.CommandLine.Option;
         ListCommand.class,
         ShowCommand.class,
         ProvidersCommand.class,
+        ExtensionsCommand.class,
         InfoCommand.class
 })
 public class GolekCommand implements Runnable {

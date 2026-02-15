@@ -51,7 +51,7 @@ brew install upx
 mvn clean package -pl ui/golek-cli -am -Pnative -DskipTests
 ```
 
-> **Note**: The GGUF provider uses Panama FFM (Foreign Function & Memory API) to interface with llama.cpp. GraalVM native image requires explicit registration of foreign function calls via `reachability-metadata.json` in the `golek-inference-gguf` module.
+> **Note**: The GGUF provider uses Panama FFM (Foreign Function & Memory API) to interface with llama.cpp. GraalVM native image requires explicit registration of foreign function calls via `reachability-metadata.json` in the `golek-ext-format-gguf` module.
 
 ## Goal
 
@@ -152,7 +152,13 @@ java -jar ui/golek-cli/target/golek-cli-1.0.0-SNAPSHOT-runner.jar run --provider
 
 java -jar ui/golek-cli/target/golek-cli-1.0.0-SNAPSHOT-runner.jar chat --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct 
 
+# Minimal output mode (recommended for native GGUF)
+java -jar ui/golek-cli/target/golek-cli-1.0.0-SNAPSHOT-runner.jar chat --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct --quiet
 
+java -jar ui/golek-cli/target/golek-cli-1.0.0-SNAPSHOT-runner.jar chat --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct 
+
+
+java -jar ui/golek-cli/target/golek-cli-1.0.0-SNAPSHOT-runner.jar chat --model google-t5/t5-small
 
 
 
@@ -173,6 +179,25 @@ java -jar ui/golek-cli/target/quarkus-app/quarkus-run.jar run \
 ./target/golek-cli-1.0.0-SNAPSHOT-runner chat --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct  
 ```
 
+### Native smoke check
+```bash
+./scripts/native-gguf-smoke.sh Qwen/Qwen2.5-0.5B-Instruct
+```
+
+If the native executable cannot find `llama.cpp` libraries, point it explicitly:
+
+```bash
+export GOLEK_LLAMA_LIB_DIR=/absolute/path/to/native-libs
+# or:
+export GOLEK_LLAMA_LIB_PATH=/absolute/path/to/libllama.dylib
+```
+
+To enable file logging explicitly:
+```bash
+export GOLEK_CLI_FILE_LOG=true
+export GOLEK_CLI_LOG_FILE="$HOME/.golek/logs/cli.log"
+```
+
 
 
 ```bash
@@ -181,14 +206,14 @@ $ golek run --model Qwen/Qwen2.5-0.5B-Instruct --prompt "Hi"
 Checking model: Qwen/Qwen2.5-0.5B-Instruct... not found locally.
 Attempting to download from Hugging Face...
 Downloading: ████████████████████ 100% (468/468 MB)
-✓ Model saved to: /Users/bhangun/.golek/models/gguf/Qwen_Qwen2.5-0.5B-Instruct-GGUF
-Model path: /Users/bhangun/.golek/models/gguf/Qwen_Qwen2.5-0.5B-Instruct-GGUF
+✓ Model saved to: ~/.golek/models/gguf/Qwen_Qwen2.5-0.5B-Instruct-GGUF
+Model path: ~/.golek/models/gguf/Qwen_Qwen2.5-0.5B-Instruct-GGUF
 [inference output]
 
 # Second run - uses existing
 $ golek run --model Qwen/Qwen2.5-0.5B-Instruct --prompt "Hi"
 Checking model: Qwen/Qwen2.5-0.5B-Instruct... found local variant: Qwen/Qwen2.5-0.5B-Instruct-GGUF
-Model path: /Users/bhangun/.golek/models/gguf/Qwen_Qwen2.5-0.5B-Instruct-GGUF
+Model path: ~/.golek/models/gguf/Qwen_Qwen2.5-0.5B-Instruct-GGUF
 [inference output]
 
 # Using custom path
@@ -224,29 +249,29 @@ golek chat --model <tool-model> --session
 
 ### Build Configuration
 
-#### [MODIFY] [pom.xml](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/pom.xml)
+#### [MODIFY] [pom.xml](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/pom.xml)
 Add dependencies for all providers and model repository:
 - `golek-sdk-java-local` - Local SDK
 - `golek-model-repo-core` - Model repository
-- `golek-provider-ollama` - Ollama provider
-- `golek-provider-gemini` - Gemini provider
+- `golek-ext-cloud-ollama` - Ollama provider
+- `golek-ext-cloud-gemini` - Gemini provider
 - `golek-provider-huggingface` - HuggingFace for model downloads
-- `golek-inference-gguf` - Local GGUF inference
+- `golek-ext-format-gguf` - Local GGUF inference
 
 ---
 
 ### CLI Commands
 
-#### [MODIFY] [GolekCommand.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/GolekCommand.java)
+#### [MODIFY] [GolekCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/GolekCommand.java)
 Update to include all subcommands.
 
-#### [MODIFY] [RunCommand.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/RunCommand.java)
+#### [MODIFY] [RunCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/RunCommand.java)
 Enhanced run command with:
 - `--provider` option to select provider (litert, gguf, ollama, gemini)
 - `--stream` flag for streaming output
 - `--temperature`, `--max-tokens` options
 
-#### [NEW] [PullCommand.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/PullCommand.java)
+#### [NEW] [PullCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/PullCommand.java)
 ```java
 @Command(name = "pull", description = "Pull a model from registry")
 ```
@@ -254,35 +279,35 @@ Enhanced run command with:
 - Support Ollama: `golek pull ollama:llama2`
 - Progress bar display
 
-#### [NEW] [ListCommand.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/ListCommand.java)
+#### [NEW] [ListCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/ListCommand.java)
 ```java
 @Command(name = "list", aliases = "ls", description = "List local models")
 ```
 - Display: NAME, SIZE, FORMAT, MODIFIED
 
-#### [NEW] [ShowCommand.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/ShowCommand.java)
+#### [NEW] [ShowCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/ShowCommand.java)
 Show model details (parameters, license, architecture).
 
-#### [NEW] [ProvidersCommand.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/ProvidersCommand.java)
+#### [NEW] [ProvidersCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/ProvidersCommand.java)
 List available providers with status (healthy/unhealthy).
 
-#### [NEW] [ChatCommand.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/ChatCommand.java)
+#### [NEW] [ChatCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/ChatCommand.java)
 Interactive chat mode with conversation history.
 
-#### [NEW] [ServeCommand.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/ServeCommand.java)
+#### [NEW] [ServeCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/commands/ServeCommand.java)
 Start local API server (OpenAI-compatible).
 
 ---
 
 ### Supporting Classes
 
-#### [NEW] [ProgressBar.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/util/ProgressBar.java)
+#### [NEW] [ProgressBar.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/util/ProgressBar.java)
 Console progress bar for downloads.
 
-#### [NEW] [OutputFormatter.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/util/OutputFormatter.java)
+#### [NEW] [OutputFormatter.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/util/OutputFormatter.java)
 Format output as table, JSON, or plain text.
 
-#### [NEW] [ProviderResolver.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/service/ProviderResolver.java)
+#### [NEW] [ProviderResolver.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/src/main/java/tech/kayys/golek/cli/service/ProviderResolver.java)
 Resolve model name to appropriate provider.
 
 ---

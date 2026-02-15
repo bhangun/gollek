@@ -47,13 +47,30 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-inference-gguf</artifactId>
+            <artifactId>golek-ext-format-gguf</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-ext-format-libtorch</artifactId>
+            <version>${project.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>tech.kayys.golek</groupId>
+                    <artifactId>golek-inference-gguf</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>tech.kayys.golek</groupId>
             <artifactId>golek-sdk-java-local</artifactId>
             <version>${project.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>tech.kayys.golek</groupId>
+                    <artifactId>golek-inference-gguf</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>tech.kayys.golek</groupId>
@@ -62,17 +79,7 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-ollama</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
             <artifactId>golek-model-repo-local</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-gemini</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -90,12 +97,6 @@
             <artifactId>golek-provider-anthropic</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-cerebras</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-logging-json</artifactId>
@@ -154,6 +155,38 @@
     </build>
 
     <profiles>
+        <!-- Optional extension packaging profiles -->
+        <profile>
+            <id>ext-cloud-ollama</id>
+            <dependencies>
+                <dependency>
+                    <groupId>tech.kayys.golek</groupId>
+                    <artifactId>golek-ext-cloud-ollama</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>ext-cloud-gemini</id>
+            <dependencies>
+                <dependency>
+                    <groupId>tech.kayys.golek</groupId>
+                    <artifactId>golek-ext-cloud-gemini</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>ext-cloud-cerebras</id>
+            <dependencies>
+                <dependency>
+                    <groupId>tech.kayys.golek</groupId>
+                    <artifactId>golek-ext-cloud-cerebras</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+
         <!-- Native Image Profile -->
         <profile>
             <id>native</id>
