@@ -22,8 +22,8 @@ public class S3ModelStorageService implements ModelStorageService {
     private String pathPrefix;
 
     // Initialize with configuration
-    public void initialize(String accessKeyId, String secretAccessKey, String bucketName, 
-                          String region, String endpoint, String pathPrefix) {
+    public void initialize(String accessKeyId, String secretAccessKey, String bucketName,
+            String region, String endpoint, String pathPrefix) {
         this.bucketName = bucketName;
         this.region = region;
         this.pathPrefix = pathPrefix != null ? pathPrefix : "models/";
@@ -41,11 +41,11 @@ public class S3ModelStorageService implements ModelStorageService {
     }
 
     @Override
-    public Uni<String> uploadModel(String tenantId, String modelId, String version, byte[] data) {
+    public Uni<String> uploadModel(String requestId, String modelId, String version, byte[] data) {
         return Uni.createFrom().item(() -> {
             try {
-                String key = String.format("%s%s/%s/%s", pathPrefix, tenantId, modelId, version);
-                
+                String key = String.format("%s%s/%s/%s", pathPrefix, requestId, modelId, version);
+
                 PutObjectRequest request = PutObjectRequest.builder()
                         .bucket(bucketName)
                         .key(key)
@@ -66,7 +66,7 @@ public class S3ModelStorageService implements ModelStorageService {
             try {
                 // Extract key from S3 URI (format: s3://bucket/key)
                 String key = storageUri.substring(("s3://" + bucketName + "/").length());
-                
+
                 GetObjectRequest request = GetObjectRequest.builder()
                         .bucket(bucketName)
                         .key(key)
@@ -85,7 +85,7 @@ public class S3ModelStorageService implements ModelStorageService {
             try {
                 // Extract key from S3 URI (format: s3://bucket/key)
                 String key = storageUri.substring(("s3://" + bucketName + "/").length());
-                
+
                 DeleteObjectRequest request = DeleteObjectRequest.builder()
                         .bucket(bucketName)
                         .key(key)

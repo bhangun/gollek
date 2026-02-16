@@ -9,13 +9,13 @@ public interface AuthProfileRepository {
 
     Uni<List<AuthProfile>> listAllProfiles();
 
-    Uni<List<AuthProfile>> findByTenantId(String tenantId);
+    Uni<List<AuthProfile>> findByRequestId(String requestId);
 
-    Uni<List<AuthProfile>> findByTenantIdAndEnabled(String tenantId, boolean enabled);
+    Uni<List<AuthProfile>> findByRequestIdAndEnabled(String requestId, boolean enabled);
 
     Uni<AuthProfile> findById(String profileId);
 
-    Uni<AuthProfile> findByTenantIdAndProfileId(String tenantId, String profileId);
+    Uni<AuthProfile> findByRequestIdAndProfileId(String requestId, String profileId);
 
     Uni<AuthProfile> save(AuthProfile profile);
 
@@ -27,5 +27,5 @@ public interface AuthProfileRepository {
 
     Uni<Long> count();
 
-    Uni<Long> countByTenantId(String tenantId);
+    Uni<Long> countByRequestId(String requestId);
 }

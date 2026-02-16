@@ -2,7 +2,8 @@ package tech.kayys.golek.sdk.core.tenant;
 
 /**
  * Interface for resolving the current API key.
- * Implementations can extract API key from security context, headers, or other sources.
+ * Implementations can extract API key from security context, headers, or other
+ * sources.
  */
 public interface TenantResolver {
 
@@ -13,14 +14,14 @@ public interface TenantResolver {
      * @throws IllegalStateException if API key cannot be resolved
      */
     default String resolveApiKey() {
-        return resolveTenantId();
+        return resolveRequestId();
     }
 
     /**
      * @deprecated Use {@link #resolveApiKey()}.
      */
     @Deprecated
-    String resolveTenantId();
+    String resolveRequestId();
 
     /**
      * Default implementation that returns a fixed API key.
@@ -33,7 +34,7 @@ public interface TenantResolver {
             }
 
             @Override
-            public String resolveTenantId() {
+            public String resolveRequestId() {
                 return apiKey;
             }
         };
@@ -43,7 +44,7 @@ public interface TenantResolver {
      * @deprecated Use {@link #fixedApiKey(String)}.
      */
     @Deprecated
-    static TenantResolver fixed(String tenantId) {
-        return fixedApiKey(tenantId);
+    static TenantResolver fixed(String requestId) {
+        return fixedApiKey(requestId);
     }
 }

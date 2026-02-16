@@ -12,7 +12,6 @@ import io.smallrye.mutiny.Multi;
 import tech.kayys.golek.spi.stream.StreamChunk;
 import tech.kayys.golek.engine.observability.MetricsPublisher;
 import tech.kayys.golek.engine.routing.ModelRouterService;
-import tech.kayys.wayang.tenant.TenantContext;
 
 /**
  * Orchestrates inference requests across multiple runners with
@@ -39,17 +38,16 @@ public class InferenceOrchestrator {
          */
         public io.smallrye.mutiny.Uni<InferenceResponse> executeAsync(
                         String modelId,
-                        InferenceRequest request,
-                        TenantContext tenantContext) {
-                TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
+                        InferenceRequest request) {
                 var span = Span.current();
                 span.setAttribute("model.id", modelId);
-                span.setAttribute("tenant.id", effectiveTenantContext.getTenantId().value());
+                String tenantId = request.getMetadata().getOrDefault("tenantId", "community").toString();
+                span.setAttribute("tenant.id", tenantId);
 
                 LOG.infof("Orchestrating inference for model %s (tenant: %s)",
-                                modelId, effectiveTenantContext.getTenantId().value());
+                                modelId, tenantId);
 
-                return router.route(modelId, request, effectiveTenantContext)
+                return router.route(modelId, request)
                                 .onItem().invoke(response -> {
                                         metrics.recordSuccess("unified", modelId, 0); // Latency recorded in router
                                 })
@@ -64,11 +62,10 @@ public class InferenceOrchestrator {
          */
         public InferenceResponse execute(
                         String modelId,
-                        InferenceRequest request,
-                        TenantContext tenantContext) {
+                        InferenceRequest request) {
                 LOG.debugf("Starting synchronous inference for model: %s", modelId);
 
-                return executeAsync(modelId, request, tenantContext)
+                return executeAsync(modelId, request)
                                 .await().indefinitely(); // Note: Use with caution in reactive contexts
         }
 
@@ -77,14 +74,8 @@ public class InferenceOrchestrator {
          */
         public Multi<StreamChunk> streamExecute(
                         String modelId,
-                        InferenceRequest request,
-                        TenantContext tenantContext) {
-                TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
+                        InferenceRequest request) {
                 LOG.infof("Streaming inference orchestration for model %s", modelId);
-                return router.routeStream(modelId, request, effectiveTenantContext);
-        }
-
-        private TenantContext ensureTenantContext(TenantContext tenantContext) {
-                return tenantContext != null ? tenantContext : TenantContext.of("community");
+                return router.routeStream(modelId, request);
         }
 }

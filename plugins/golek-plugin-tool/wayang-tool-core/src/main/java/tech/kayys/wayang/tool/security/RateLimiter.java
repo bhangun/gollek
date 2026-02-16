@@ -5,7 +5,7 @@ import tech.kayys.wayang.tool.entity.ToolGuardrails;
 
 @ApplicationScoped
 public class RateLimiter {
-    public void checkLimit(String tenantId, String toolId, ToolGuardrails guardrails) {
+    public void checkLimit(String requestId, String toolId, ToolGuardrails guardrails) {
         // Stub implementation
     }
 }

@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * Configuration for multi-provider routing behavior.
@@ -25,9 +24,9 @@ public record RoutingConfig(
             defaultStrategy = SelectionStrategy.SCORED;
         }
         pools = pools != null ? List.copyOf(pools) : Collections.emptyList();
-        providerWeights = providerWeights != null 
-            ? Map.copyOf(providerWeights) 
-            : Collections.emptyMap();
+        providerWeights = providerWeights != null
+                ? Map.copyOf(providerWeights)
+                : Collections.emptyMap();
         if (maxRetries < 0) {
             maxRetries = 0;
         }
@@ -51,9 +50,9 @@ public record RoutingConfig(
      */
     public ProviderPool getPool(String poolId) {
         return pools.stream()
-            .filter(p -> p.poolId().equals(poolId))
-            .findFirst()
-            .orElse(null);
+                .filter(p -> p.poolId().equals(poolId))
+                .findFirst()
+                .orElse(null);
     }
 
     /**
@@ -61,8 +60,8 @@ public record RoutingConfig(
      */
     public List<ProviderPool> getPoolsForProvider(String providerId) {
         return pools.stream()
-            .filter(p -> p.containsProvider(providerId))
-            .toList();
+                .filter(p -> p.containsProvider(providerId))
+                .toList();
     }
 
     /**
@@ -70,9 +69,9 @@ public record RoutingConfig(
      */
     public List<String> getAllProviderIds() {
         return pools.stream()
-            .flatMap(p -> p.providerIds().stream())
-            .distinct()
-            .toList();
+                .flatMap(p -> p.providerIds().stream())
+                .distinct()
+                .toList();
     }
 
     /**
@@ -80,9 +79,9 @@ public record RoutingConfig(
      */
     public List<ProviderPool> getLocalPools() {
         return pools.stream()
-            .filter(p -> p.type() == ProviderPool.PoolType.LOCAL)
-            .sorted((a, b) -> Integer.compare(b.priority(), a.priority()))
-            .toList();
+                .filter(p -> p.type() == ProviderPool.PoolType.LOCAL)
+                .sorted((a, b) -> Integer.compare(b.priority(), a.priority()))
+                .toList();
     }
 
     /**
@@ -90,9 +89,9 @@ public record RoutingConfig(
      */
     public List<ProviderPool> getCloudPools() {
         return pools.stream()
-            .filter(p -> p.type() == ProviderPool.PoolType.CLOUD)
-            .sorted((a, b) -> Integer.compare(b.priority(), a.priority()))
-            .toList();
+                .filter(p -> p.type() == ProviderPool.PoolType.CLOUD)
+                .sorted((a, b) -> Integer.compare(b.priority(), a.priority()))
+                .toList();
     }
 
     /**
@@ -100,15 +99,14 @@ public record RoutingConfig(
      */
     public static RoutingConfig defaults() {
         return new RoutingConfig(
-            SelectionStrategy.SCORED,
-            Collections.emptyList(),
-            Collections.emptyMap(),
-            true,
-            3,
-            Duration.ofMillis(100),
-            Duration.ofSeconds(30),
-            false
-        );
+                SelectionStrategy.SCORED,
+                Collections.emptyList(),
+                Collections.emptyMap(),
+                true,
+                3,
+                Duration.ofMillis(100),
+                Duration.ofSeconds(30),
+                false);
     }
 
     /**
@@ -170,9 +168,8 @@ public record RoutingConfig(
 
         public RoutingConfig build() {
             return new RoutingConfig(
-                defaultStrategy, pools, providerWeights, autoFailover,
-                maxRetries, retryDelay, healthCheckInterval, preferLocal
-            );
+                    defaultStrategy, pools, providerWeights, autoFailover,
+                    maxRetries, retryDelay, healthCheckInterval, preferLocal);
         }
     }
 }

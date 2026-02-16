@@ -40,19 +40,23 @@ import java.util.*;
 public class ToolResource {
 
     // @Inject
-    // OpenApiToolGenerator toolGenerator; // Commented out until we verify parser module dependency
+    // OpenApiToolGenerator toolGenerator; // Commented out until we verify parser
+    // module dependency
 
     @Inject
     ToolExecutor toolExecutor;
 
     // @Inject
-    // TenantContext tenantContext; // Need to migrate or import correct TenantContext (likely from SPI or Infra)
-    // Assuming TenantContext is available in classpath, but likely needs import.
-    // If it was in tool.dto, I moved it? No, I didn't see TenantContext in the DTO list I moved.
-    // Logic below uses tenantContext.getCurrentTenantId().
-    // I need to check where TenantContext is. 
-    // It was in `find_by_name` list: `tech/kayys/wayang/tool/dto/TenantContext.java`.
-    // I missed it. I need to migrate TenantContext to golek-tool-execution (dto).
+    // RequestContext requestContext; // Need to migrate or import correct
+    // RequestContext (likely from SPI or Infra)
+    // Assuming RequestContext is available in classpath, but likely needs import.
+    // If it was in tool.dto, I moved it? No, I didn't see RequestContext in the DTO
+    // list I moved.
+    // Logic below uses requestContext.getCurrentRequestId().
+    // I need to check where RequestContext is.
+    // It was in `find_by_name` list:
+    // `tech/kayys/wayang/tool/dto/RequestContext.java`.
+    // I missed it. I need to migrate RequestContext to golek-tool-execution (dto).
 
     // @Inject
     // SpecFormatRegistry specFormatRegistry; // Missed this too.
@@ -61,44 +65,49 @@ public class ToolResource {
     ToolRepository mcpToolRepository;
 
     /*
-    @GET
-    @Path("/formats")
-    @Operation(summary = "List supported API specification formats")
-    public Map<String, SpecFormatRegistry.SpecFormatInfo> getSupportedFormats() {
-        return specFormatRegistry.getSupportedFormats();
-    }
-    */
+     * @GET
+     * 
+     * @Path("/formats")
+     * 
+     * @Operation(summary = "List supported API specification formats")
+     * public Map<String, SpecFormatRegistry.SpecFormatInfo> getSupportedFormats() {
+     * return specFormatRegistry.getSupportedFormats();
+     * }
+     */
 
     /*
-    @POST
-    @Path("/openapi")
-    @Operation(summary = "Generate MCP tools from OpenAPI spec")
-    public Uni<RestResponse<ToolGenerationResponse>> generateFromOpenApi(
-            @Valid OpenApiToolRequest request) { // OpenApiToolRequest missed?
-
-        String tenantId = tenantContext.getCurrentTenantId();
-
-        GenerateToolsRequest genRequest = new GenerateToolsRequest(
-                tenantId,
-                request.namespace(),
-                request.sourceType(),
-                request.source(),
-                request.authProfileId(),
-                "current-user",
-                request.guardrailsConfig() != null ? request.guardrailsConfig() : Map.of());
-
-        return toolGenerator.generateTools(genRequest)
-                .map(result -> RestResponse.ok(
-                        new ToolGenerationResponse(
-                                result.sourceId().toString(),
-                                result.namespace(),
-                                result.toolsGenerated(),
-                                result.toolIds(),
-                                result.warnings())))
-                .onFailure().transform(error ->
-                        new WayangException(ErrorCode.VALIDATION_FAILED, error.getMessage(), error));
-    }
-    */
+     * @POST
+     * 
+     * @Path("/openapi")
+     * 
+     * @Operation(summary = "Generate MCP tools from OpenAPI spec")
+     * public Uni<RestResponse<ToolGenerationResponse>> generateFromOpenApi(
+     * 
+     * @Valid OpenApiToolRequest request) { // OpenApiToolRequest missed?
+     * 
+     * String requestId = requestContext.getCurrentRequestId();
+     * 
+     * GenerateToolsRequest genRequest = new GenerateToolsRequest(
+     * requestId,
+     * request.namespace(),
+     * request.sourceType(),
+     * request.source(),
+     * request.authProfileId(),
+     * "current-user",
+     * request.guardrailsConfig() != null ? request.guardrailsConfig() : Map.of());
+     * 
+     * return toolGenerator.generateTools(genRequest)
+     * .map(result -> RestResponse.ok(
+     * new ToolGenerationResponse(
+     * result.sourceId().toString(),
+     * result.namespace(),
+     * result.toolsGenerated(),
+     * result.toolIds(),
+     * result.warnings())))
+     * .onFailure().transform(error ->
+     * new WayangException(ErrorCode.VALIDATION_FAILED, error.getMessage(), error));
+     * }
+     */
 
     /**
      * List tools for tenant
@@ -112,12 +121,12 @@ public class ToolResource {
             @QueryParam("enabled") Boolean enabled,
             @QueryParam("readOnly") Boolean readOnly) {
 
-        // Placeholder for tenantId until TenantContext is fixed
-        String tenantId = "default"; // tenantContext.getCurrentTenantId();
+        // Placeholder for requestId until RequestContext is fixed
+        String requestId = "default"; // requestContext.getCurrentRequestId();
 
-        String query = "tenantId = ?1";
+        String query = "requestId = ?1";
         List<Object> params = new ArrayList<>();
-        params.add(tenantId);
+        params.add(requestId);
 
         if (namespace != null) {
             query += " and namespace = ?" + (params.size() + 1);
@@ -154,9 +163,9 @@ public class ToolResource {
     public Uni<RestResponse<ToolDetailResponse>> getTool(
             @PathParam("toolId") String toolId) {
 
-        String tenantId = "default"; // tenantContext.getCurrentTenantId();
+        String requestId = "default"; // requestContext.getCurrentRequestId();
 
-        return mcpToolRepository.findByTenantIdAndToolId(tenantId, toolId)
+        return mcpToolRepository.findByRequestIdAndToolId(requestId, toolId)
                 .map(tool -> {
                     if (tool == null) {
                         return RestResponse.notFound();
@@ -186,10 +195,10 @@ public class ToolResource {
             @PathParam("toolId") String toolId,
             @Valid ToolExecuteRequest request) {
 
-        String tenantId = "default"; // tenantContext.getCurrentTenantId();
+        String requestId = "default"; // requestContext.getCurrentRequestId();
 
         ToolExecutionRequest execRequest = new ToolExecutionRequest(
-                tenantId,
+                requestId,
                 "current-user", // userId
                 toolId,
                 request.arguments(),
@@ -200,30 +209,30 @@ public class ToolResource {
         return toolExecutor.execute(toolId, request.arguments(), request.context()) // Adapted to ToolExecutor SPI
                 .map(output -> {
                     // Assuming success for simple SPI
-                     return RestResponse.ok(new ToolExecutionResponse(
-                                "success",
-                                output,
-                                null,
-                                null,
-                                null,
-                                0L));
+                    return RestResponse.ok(new ToolExecutionResponse(
+                            "success",
+                            output,
+                            null,
+                            null,
+                            null,
+                            0L));
                 });
-                /*
-                .map(result -> {
-                    if (result.status() == InvocationStatus.SUCCESS) {
-                        return RestResponse.ok(new ToolExecutionResponse(
-                                "success",
-                                result.output(),
-                                null,
-                                null,
-                                null,
-                                result.executionTimeMs()));
-                    } else {
-                        // ...
-                        return RestResponse.status(RestResponse.Status.BAD_REQUEST, ...);
-                    }
-                });
-                */
+        /*
+         * .map(result -> {
+         * if (result.status() == InvocationStatus.SUCCESS) {
+         * return RestResponse.ok(new ToolExecutionResponse(
+         * "success",
+         * result.output(),
+         * null,
+         * null,
+         * null,
+         * result.executionTimeMs()));
+         * } else {
+         * // ...
+         * return RestResponse.status(RestResponse.Status.BAD_REQUEST, ...);
+         * }
+         * });
+         */
     }
 
     /**
@@ -236,9 +245,9 @@ public class ToolResource {
             @PathParam("toolId") String toolId,
             @Valid ToolUpdateRequest request) {
 
-        String tenantId = "default"; // tenantContext.getCurrentTenantId();
+        String requestId = "default"; // requestContext.getCurrentRequestId();
 
-        return mcpToolRepository.findByTenantIdAndToolId(tenantId, toolId)
+        return mcpToolRepository.findByRequestIdAndToolId(requestId, toolId)
                 .flatMap(tool -> {
                     if (tool == null) {
                         return Uni.createFrom().item(RestResponse.notFound());
@@ -268,9 +277,9 @@ public class ToolResource {
     public Uni<RestResponse<Void>> deleteTool(
             @PathParam("toolId") String toolId) {
 
-        String tenantId = "default"; // tenantContext.getCurrentTenantId();
+        String requestId = "default"; // requestContext.getCurrentRequestId();
 
-        return mcpToolRepository.findByTenantIdAndToolId(tenantId, toolId)
+        return mcpToolRepository.findByRequestIdAndToolId(requestId, toolId)
                 .flatMap(tool -> {
                     if (tool == null) {
                         return Uni.createFrom().item(RestResponse.notFound());

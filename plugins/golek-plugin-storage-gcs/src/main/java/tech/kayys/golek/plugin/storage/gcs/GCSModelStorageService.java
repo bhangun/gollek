@@ -30,11 +30,11 @@ public class GCSModelStorageService implements ModelStorageService {
     }
 
     @Override
-    public Uni<String> uploadModel(String tenantId, String modelId, String version, byte[] data) {
+    public Uni<String> uploadModel(String requestId, String modelId, String version, byte[] data) {
         return Uni.createFrom().item(() -> {
             try {
-                String blobName = String.format("%s%s/%s/%s", pathPrefix, tenantId, modelId, version);
-                
+                String blobName = String.format("%s%s/%s/%s", pathPrefix, requestId, modelId, version);
+
                 BlobId blobId = BlobId.of(bucketName, blobName);
                 BlobInfo blobInfo = BlobInfo.newBuilder(blobId).build();
 
@@ -53,9 +53,9 @@ public class GCSModelStorageService implements ModelStorageService {
             try {
                 // Extract blob name from GCS URI (format: gs://bucket/blob-name)
                 String blobName = storageUri.substring(("gs://" + bucketName + "/").length());
-                
+
                 BlobId blobId = BlobId.of(bucketName, blobName);
-                
+
                 return storage.readAllBytes(blobId);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to download model from GCS", e);
@@ -69,9 +69,9 @@ public class GCSModelStorageService implements ModelStorageService {
             try {
                 // Extract blob name from GCS URI (format: gs://bucket/blob-name)
                 String blobName = storageUri.substring(("gs://" + bucketName + "/").length());
-                
+
                 BlobId blobId = BlobId.of(bucketName, blobName);
-                
+
                 storage.delete(blobId);
                 return null;
             } catch (Exception e) {

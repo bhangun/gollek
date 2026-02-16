@@ -50,12 +50,12 @@
         <!-- Local Providers -->
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-ollama</artifactId>
+            <artifactId>golek-ext-cloud-ollama</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-inference-litert</artifactId>
+            <artifactId>golek-ext-format-tflite</artifactId>
             <version>${project.version}</version>
         </dependency>
 

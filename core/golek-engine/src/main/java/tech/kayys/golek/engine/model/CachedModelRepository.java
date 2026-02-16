@@ -30,12 +30,12 @@ public class CachedModelRepository {
     @CacheResult(cacheName = "model-manifests")
     public Uni<ModelManifest> findById(
             @CacheKey String modelId,
-            @CacheKey String tenantId) {
+            @CacheKey String requestId) {
 
         // 1. Try all registered repositories first
         List<Uni<ModelManifest>> repositoryLookups = new java.util.ArrayList<>();
         for (var repo : repositories) {
-            repositoryLookups.add(repo.findById(modelId, tenantId)
+            repositoryLookups.add(repo.findById(modelId, requestId)
                     .onFailure().recoverWithNull());
         }
 
@@ -49,7 +49,7 @@ public class CachedModelRepository {
             // 2. Fallback to database if available
             if (dbRepository.isResolvable()) {
                 try {
-                    return dbRepository.get().findByTenantAndModelId(tenantId, modelId)
+                    return dbRepository.get().findByTenantAndModelId(requestId, modelId)
                             .map(m -> m != null ? m.toManifest() : null)
                             .onFailure().recoverWithNull();
                 } catch (Exception e) {
@@ -60,16 +60,16 @@ public class CachedModelRepository {
         });
     }
 
-    public Uni<List<ModelManifest>> list(String tenantId, Pageable pageable) {
+    public Uni<List<ModelManifest>> list(String requestId, Pageable pageable) {
         // Collect from all repositories
         List<Uni<List<ModelManifest>>> repositoryLists = new java.util.ArrayList<>();
         for (var repo : repositories) {
-            repositoryLists.add(repo.list(tenantId, pageable)
+            repositoryLists.add(repo.list(requestId, pageable)
                     .onFailure().recoverWithItem(List.of()));
         }
 
         if (dbRepository.isResolvable()) {
-            repositoryLists.add(dbRepository.get().findByTenant(tenantId)
+            repositoryLists.add(dbRepository.get().findByTenant(requestId)
                     .map(list -> list.stream().map(Model::toManifest).collect(java.util.stream.Collectors.toList()))
                     .onFailure().recoverWithItem(List.of()));
         }
@@ -95,10 +95,10 @@ public class CachedModelRepository {
                 .failure(new UnsupportedOperationException("Saving via CachedModelRepository not implemented yet"));
     }
 
-    public Uni<Void> delete(String modelId, String tenantId) {
+    public Uni<Void> delete(String modelId, String requestId) {
         List<Uni<Void>> deletions = new java.util.ArrayList<>();
         for (var repo : repositories) {
-            deletions.add(repo.delete(modelId, tenantId).onFailure().recoverWithNull());
+            deletions.add(repo.delete(modelId, requestId).onFailure().recoverWithNull());
         }
 
         if (dbRepository.isResolvable()) {

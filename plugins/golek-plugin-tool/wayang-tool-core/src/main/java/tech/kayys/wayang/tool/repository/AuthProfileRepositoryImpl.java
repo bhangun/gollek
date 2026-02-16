@@ -16,13 +16,13 @@ public class AuthProfileRepositoryImpl implements PanacheRepository<AuthProfile>
     }
 
     @Override
-    public Uni<List<AuthProfile>> findByTenantId(String tenantId) {
-        return list("tenantId", tenantId);
+    public Uni<List<AuthProfile>> findByRequestId(String requestId) {
+        return list("requestId", requestId);
     }
 
     @Override
-    public Uni<List<AuthProfile>> findByTenantIdAndEnabled(String tenantId, boolean enabled) {
-        return list("tenantId = ?1 AND enabled = ?2", tenantId, enabled);
+    public Uni<List<AuthProfile>> findByRequestIdAndEnabled(String requestId, boolean enabled) {
+        return list("requestId = ?1 AND enabled = ?2", requestId, enabled);
     }
 
     @Override
@@ -31,8 +31,8 @@ public class AuthProfileRepositoryImpl implements PanacheRepository<AuthProfile>
     }
 
     @Override
-    public Uni<AuthProfile> findByTenantIdAndProfileId(String tenantId, String profileId) {
-        return find("tenantId = ?1 AND profileId = ?2", tenantId, profileId).firstResult();
+    public Uni<AuthProfile> findByRequestIdAndProfileId(String requestId, String profileId) {
+        return find("requestId = ?1 AND profileId = ?2", requestId, profileId).firstResult();
     }
 
     @Override
@@ -61,7 +61,7 @@ public class AuthProfileRepositoryImpl implements PanacheRepository<AuthProfile>
     }
 
     @Override
-    public Uni<Long> countByTenantId(String tenantId) {
-        return count("tenantId", tenantId);
+    public Uni<Long> countByRequestId(String requestId) {
+        return count("requestId", requestId);
     }
 }

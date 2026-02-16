@@ -16,10 +16,10 @@
 
 package tech.kayys.golek.core.execution;
 
+import tech.kayys.golek.spi.context.RequestContext;
 import tech.kayys.golek.spi.context.EngineContext;
 import tech.kayys.golek.spi.execution.ExecutionStatus;
 import tech.kayys.golek.spi.inference.InferencePhase;
-import tech.kayys.wayang.tenant.TenantContext;
 
 import java.util.Map;
 import java.util.Optional;
@@ -43,7 +43,7 @@ public interface ExecutionContext {
     /**
      * Get tenant context
      */
-    TenantContext tenantContext();
+    RequestContext requestContext();
 
     /**
      * Update execution status (creates new token)

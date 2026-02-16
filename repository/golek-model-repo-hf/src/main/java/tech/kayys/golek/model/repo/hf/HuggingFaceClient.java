@@ -84,10 +84,18 @@ public class HuggingFaceClient {
                 HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
+            String body = response.body();
+            if (body == null) {
+                body = "";
+            }
+            body = body.replaceAll("\\s+", " ").trim();
+            if (body.length() > 512) {
+                body = body.substring(0, 512) + "...";
+            }
             throw new IOException(String.format(
                     "Failed to fetch model info: %d - %s",
                     response.statusCode(),
-                    response.body()));
+                    body));
         }
 
         String json = response.body();
@@ -135,9 +143,19 @@ public class HuggingFaceClient {
                 HttpResponse.BodyHandlers.ofInputStream());
 
         if (response.statusCode() != 200) {
+            String detail = "";
+            try (InputStream errorBody = response.body()) {
+                byte[] bytes = errorBody.readNBytes(512);
+                if (bytes.length > 0) {
+                    detail = " - " + new String(bytes, java.nio.charset.StandardCharsets.UTF_8).replaceAll("\\s+", " ").trim();
+                }
+            } catch (Exception ignored) {
+                // best effort
+            }
             throw new IOException(String.format(
-                    "Failed to download file: %d",
-                    response.statusCode()));
+                    "Failed to download file: %d%s",
+                    response.statusCode(),
+                    detail));
         }
 
         long contentLength = response.headers()

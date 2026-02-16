@@ -16,8 +16,8 @@ public class ToolRepositoryImpl implements PanacheRepository<McpTool>, ToolRepos
     }
 
     @Override
-    public Uni<List<McpTool>> findByTenantId(String tenantId) {
-        return find("tenantId", tenantId).list();
+    public Uni<List<McpTool>> findByRequestId(String requestId) {
+        return find("requestId", requestId).list();
     }
 
     @Override
@@ -26,8 +26,8 @@ public class ToolRepositoryImpl implements PanacheRepository<McpTool>, ToolRepos
     }
 
     @Override
-    public Uni<List<McpTool>> findByTenantIdAndNamespace(String tenantId, String namespace) {
-        return find("tenantId = ?1 AND namespace = ?2", tenantId, namespace).list();
+    public Uni<List<McpTool>> findByRequestIdAndNamespace(String requestId, String namespace) {
+        return find("requestId = ?1 AND namespace = ?2", requestId, namespace).list();
     }
 
     @Override
@@ -36,8 +36,8 @@ public class ToolRepositoryImpl implements PanacheRepository<McpTool>, ToolRepos
     }
 
     @Override
-    public Uni<McpTool> findByTenantIdAndToolId(String tenantId, String toolId) {
-        return find("tenantId = ?1 AND toolId = ?2", tenantId, toolId).firstResult();
+    public Uni<McpTool> findByRequestIdAndToolId(String requestId, String toolId) {
+        return find("requestId = ?1 AND toolId = ?2", requestId, toolId).firstResult();
     }
 
     @Override
@@ -67,7 +67,7 @@ public class ToolRepositoryImpl implements PanacheRepository<McpTool>, ToolRepos
     }
 
     @Override
-    public Uni<Long> countByTenantId(String tenantId) {
-        return count("tenantId", tenantId);
+    public Uni<Long> countByRequestId(String requestId) {
+        return count("requestId", requestId);
     }
 }

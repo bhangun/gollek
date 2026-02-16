@@ -8,8 +8,6 @@ import tech.kayys.golek.engine.reliability.CircuitBreaker;
 import tech.kayys.golek.engine.reliability.DefaultCircuitBreaker;
 import tech.kayys.golek.provider.core.ratelimit.RateLimiter;
 import tech.kayys.golek.engine.ratelimit.TokenBucketRateLimiter;
-import tech.kayys.wayang.tenant.TenantContext;
-import tech.kayys.wayang.tenant.TenantId;
 import tech.kayys.golek.spi.exception.ProviderException;
 import tech.kayys.golek.spi.exception.ProviderException.ProviderInitializationException;
 import tech.kayys.golek.spi.inference.InferenceResponse;
@@ -70,7 +68,7 @@ public abstract class AbstractProvider implements LLMProvider {
         this.configuration.putAll(config.getProperties());
 
         try {
-            doInitialize(config.getProperties(), TenantContext.of(TenantId.of("system")))
+            doInitialize(config.getProperties())
                     .await().indefinitely(); // Blocking for now as initialize is synchronous interface
             initialized.set(true);
             log.infof("Provider %s initialized successfully", id());
@@ -81,17 +79,17 @@ public abstract class AbstractProvider implements LLMProvider {
     }
 
     @Override
-    public final Uni<InferenceResponse> infer(ProviderRequest request, TenantContext context) {
+    public final Uni<InferenceResponse> infer(ProviderRequest request) {
         if (!initialized.get()) {
             return Uni.createFrom().failure(
                     new ProviderException(id(), "Provider not initialized"));
         }
 
-        String tenantId = context != null ? context.getTenantId().value() : "community";
+        String tenantId = resolveTenantId(request);
 
-        return checkQuota(context)
+        return checkQuota(tenantId)
                 .chain(() -> checkRateLimit(tenantId))
-                .chain(() -> executeWithCircuitBreaker(request, context))
+                .chain(() -> executeWithCircuitBreaker(request, tenantId))
                 .invoke(response -> quotaService.recordUsage(id(), response.getTokensUsed()))
                 .onFailure().transform(this::handleFailure);
     }
@@ -99,10 +97,9 @@ public abstract class AbstractProvider implements LLMProvider {
     /**
      * Check if provider has quota
      */
-    protected Uni<Void> checkQuota(TenantContext context) {
+    protected Uni<Void> checkQuota(String tenantId) {
         return Uni.createFrom().item(() -> {
             if (!quotaService.hasQuota(id())) {
-                String tenantId = context != null ? context.getTenantId().value() : "community";
                 throw new tech.kayys.golek.spi.routing.QuotaExhaustedException(id(),
                         "Provider quota exhausted for: " + id() + ", tenant: " + tenantId);
             }
@@ -147,7 +144,7 @@ public abstract class AbstractProvider implements LLMProvider {
     /**
      * Provider-specific initialization logic
      */
-    protected abstract Uni<Void> doInitialize(Map<String, Object> config, TenantContext tenant);
+    protected abstract Uni<Void> doInitialize(Map<String, Object> config);
 
     /**
      * Provider-specific inference logic
@@ -195,8 +192,7 @@ public abstract class AbstractProvider implements LLMProvider {
      */
     protected Uni<InferenceResponse> executeWithCircuitBreaker(
             ProviderRequest request,
-            TenantContext context) {
-        String tenantId = context != null ? context.getTenantId().value() : "community";
+            String tenantId) {
 
         CircuitBreaker circuitBreaker = circuitBreakers.computeIfAbsent(
                 tenantId,
@@ -256,6 +252,23 @@ public abstract class AbstractProvider implements LLMProvider {
                 "Provider execution failed: " + ex.getMessage(),
                 ex,
                 retryable);
+    }
+
+    protected String resolveTenantId(ProviderRequest request) {
+        // Try metadata "tenantId"
+        Object tenantId = request.getMetadata().get("tenantId");
+        if (tenantId instanceof String && !((String) tenantId).isBlank()) {
+            return (String) tenantId;
+        }
+        // Try userId
+        if (request.getUserId().isPresent()) {
+            return request.getUserId().get();
+        }
+        // Try apiKey
+        if (request.getApiKey().isPresent()) {
+            return request.getApiKey().get();
+        }
+        return "community";
     }
 
     /**

@@ -6,7 +6,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-import tech.kayys.wayang.tenant.TenantContext;
+import tech.kayys.golek.spi.context.RequestContext;
 
 /**
  * Context object passed to providers during execution
@@ -14,13 +14,13 @@ import tech.kayys.wayang.tenant.TenantContext;
 public final class ProviderContext {
 
     private final String requestId;
-    private final TenantContext tenantContext;
+    private final RequestContext requestContext;
     private final Instant startTime;
     private final Map<String, Object> attributes;
 
-    public ProviderContext(String requestId, TenantContext tenantContext) {
+    public ProviderContext(String requestId, RequestContext requestContext) {
         this.requestId = Objects.requireNonNull(requestId, "requestId");
-        this.tenantContext = tenantContext;
+        this.requestContext = requestContext;
         this.startTime = Instant.now();
         this.attributes = new ConcurrentHashMap<>();
     }
@@ -29,8 +29,8 @@ public final class ProviderContext {
         return requestId;
     }
 
-    public TenantContext getTenantContext() {
-        return tenantContext;
+    public RequestContext getRequestContext() {
+        return requestContext;
     }
 
     public Instant getStartTime() {
@@ -64,20 +64,20 @@ public final class ProviderContext {
 
     public static class Builder {
         private String requestId;
-        private TenantContext tenantContext;
+        private RequestContext requestContext;
 
         public Builder requestId(String requestId) {
             this.requestId = requestId;
             return this;
         }
 
-        public Builder tenantContext(TenantContext tenantContext) {
-            this.tenantContext = tenantContext;
+        public Builder requestContext(RequestContext requestContext) {
+            this.requestContext = requestContext;
             return this;
         }
 
         public ProviderContext build() {
-            return new ProviderContext(requestId, tenantContext);
+            return new ProviderContext(requestId, requestContext);
         }
     }
 
@@ -85,7 +85,7 @@ public final class ProviderContext {
     public String toString() {
         return "ProviderContext{" +
                 "requestId='" + requestId + '\'' +
-                ", tenant=" + (tenantContext != null ? tenantContext.getTenantId() : "null") +
+                ", tenant=" + (requestContext != null ? requestContext.getRequestId() : "null") +
                 ", elapsed=" + getElapsedMs() + "ms" +
                 '}';
     }

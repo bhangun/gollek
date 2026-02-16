@@ -65,7 +65,7 @@
         <!-- GGUF Inference (for conversion service) -->
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-inference-gguf</artifactId>
+            <artifactId>golek-ext-format-gguf</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -124,29 +124,6 @@
 
 
         <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-ollama</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
-
-
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-gemini</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-provider-cerebras</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
-
-
-        <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>3.14.0</version>
@@ -198,5 +175,38 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>ext-cloud-ollama</id>
+            <dependencies>
+                <dependency>
+                    <groupId>tech.kayys.golek</groupId>
+                    <artifactId>golek-ext-cloud-ollama</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>ext-cloud-gemini</id>
+            <dependencies>
+                <dependency>
+                    <groupId>tech.kayys.golek</groupId>
+                    <artifactId>golek-ext-cloud-gemini</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>ext-cloud-cerebras</id>
+            <dependencies>
+                <dependency>
+                    <groupId>tech.kayys.golek</groupId>
+                    <artifactId>golek-ext-cloud-cerebras</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 
 </project>

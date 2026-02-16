@@ -51,7 +51,7 @@ This module defines the **provider SPI** and shared contracts used by all model 
 Add quota checking before inference:
 ```java
 protected Uni<InferenceResponse> infer(...) {
-    return checkQuota(tenantId, providerId)
+    return checkQuota(requestId, providerId)
         .onItem().transformToUni(allowed -> {
             if (!allowed) {
                 throw new QuotaExhaustedException(providerId);
@@ -197,11 +197,11 @@ Implemented adapters for **Ollama** (local), **Gemini** (cloud), and **OpenAI** 
 
 | Provider | Key Classes | Features |
 |----------|-------------|----------|
-| **Ollama** | [OllamaProvider](inference-golek/provider/golek-provider-ollama/src/main/java/tech/kayys/golek/provider/ollama/OllamaProvider.java#32-234), [OllamaClient](inference-golek/provider/golek-provider-ollama/src/main/java/tech/kayys/golek/provider/ollama/OllamaClient.java#12-69), [OllamaConfig](inference-golek/provider/golek-provider-ollama/src/main/java/tech/kayys/golek/provider/ollama/OllamaConfig.java#13-64) | Local inference, embeddings, keep-alive control |
-| **Gemini** | [GeminiProvider](inference-golek/provider/golek-provider-gemini/src/main/java/tech/kayys/golek/provider/gemini/GeminiProvider.java#31-259), [GeminiClient](inference-golek/provider/golek-provider-gemini/src/main/java/tech/kayys/golek/provider/gemini/GeminiClient.java#12-82), [GeminiConfig](inference-golek/provider/golek-provider-gemini/src/main/java/tech/kayys/golek/provider/gemini/GeminiConfig.java#12-56) | 1M+ context, function calling, multimodal, safety settings |
+| **Ollama** | [OllamaProvider](inference-golek/provider/golek-ext-cloud-ollama/src/main/java/tech/kayys/golek/provider/ollama/OllamaProvider.java#32-234), [OllamaClient](inference-golek/provider/golek-ext-cloud-ollama/src/main/java/tech/kayys/golek/provider/ollama/OllamaClient.java#12-69), [OllamaConfig](inference-golek/provider/golek-ext-cloud-ollama/src/main/java/tech/kayys/golek/provider/ollama/OllamaConfig.java#13-64) | Local inference, embeddings, keep-alive control |
+| **Gemini** | [GeminiProvider](inference-golek/provider/golek-ext-cloud-gemini/src/main/java/tech/kayys/golek/provider/gemini/GeminiProvider.java#31-259), [GeminiClient](inference-golek/provider/golek-ext-cloud-gemini/src/main/java/tech/kayys/golek/provider/gemini/GeminiClient.java#12-82), [GeminiConfig](inference-golek/provider/golek-ext-cloud-gemini/src/main/java/tech/kayys/golek/provider/gemini/GeminiConfig.java#12-56) | 1M+ context, function calling, multimodal, safety settings |
 | **OpenAI** | [OpenAIProvider](inference-golek/provider/golek-provider-openai/src/main/java/tech/kayys/golek/provider/openai/OpenAIProvider.java#31-238), [OpenAIClient](inference-golek/provider/golek-provider-openai/src/main/java/tech/kayys/golek/provider/openai/OpenAIClient.java#12-58), [OpenAIConfig](inference-golek/provider/golek-provider-openai/src/main/java/tech/kayys/golek/provider/openai/OpenAIConfig.java#12-55) | GPT-4 Turbo, tool calling, structured outputs, embeddings |
 | **Embedding** | [EmbeddingProvider](inference-golek/provider/golek-provider-embedding/src/main/java/tech/kayys/golek/EmbeddingProvider.java#23-271), [EmbeddingConfig](inference-golek/provider/golek-provider-embedding/src/main/java/tech/kayys/golek/provider/embedding/EmbeddingConfig.java#9-40) | Local embeddings (Sentence Transformers), mock generation |
-| **Cerebras** | [CerebrasProvider](inference-golek/provider/golek-provider-cerebras/src/main/java/tech/kayys/golek/provider/cerebras/CerebrasProvider.java#31-206), [CerebrasClient](inference-golek/provider/golek-provider-cerebras/src/main/java/tech/kayys/golek/provider/cerebras/CerebrasClient.java#12-38), [CerebrasConfig](inference-golek/provider/golek-provider-cerebras/src/main/java/tech/kayys/golek/provider/cerebras/CerebrasConfig.java#12-56) | Extreme speed Llama 3 inference (wafer-scale engine) |
+| **Cerebras** | [CerebrasProvider](inference-golek/provider/golek-ext-cloud-cerebras/src/main/java/tech/kayys/golek/provider/cerebras/CerebrasProvider.java#31-206), [CerebrasClient](inference-golek/provider/golek-ext-cloud-cerebras/src/main/java/tech/kayys/golek/provider/cerebras/CerebrasClient.java#12-38), [CerebrasConfig](inference-golek/provider/golek-ext-cloud-cerebras/src/main/java/tech/kayys/golek/provider/cerebras/CerebrasConfig.java#12-56) | Extreme speed Llama 3 inference (wafer-scale engine) |
 
 ---
 
@@ -223,7 +223,7 @@ router.configure(config);
 // Route request
 RoutingContext ctx = RoutingContext.builder()
     .request(request)
-    .tenantContext(tenant)
+    .requestContext(tenant)
     .costSensitive(true)  // Prefer local
     .build();
 

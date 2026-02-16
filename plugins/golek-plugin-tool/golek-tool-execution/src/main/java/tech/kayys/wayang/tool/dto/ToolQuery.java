@@ -6,7 +6,7 @@ import java.util.Set;
  * Tool discovery and filtering criteria
  */
 public class ToolQuery {
-    private String tenantId;
+    private String requestId;
     private String namespace;
     private Set<String> tags;
     private Set<String> capabilities;
@@ -17,12 +17,12 @@ public class ToolQuery {
     private int page = 0;
     private int size = 50;
 
-    public String getTenantId() {
-        return tenantId;
+    public String getRequestId() {
+        return requestId;
     }
 
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
     }
 
     public String getNamespace() {

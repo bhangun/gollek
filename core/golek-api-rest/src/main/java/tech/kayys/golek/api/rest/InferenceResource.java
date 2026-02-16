@@ -25,10 +25,6 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.resteasy.reactive.RestStreamElementType;
 
 import tech.kayys.golek.spi.inference.InferenceRequest;
-import tech.kayys.golek.spi.inference.InferenceResponse;
-import tech.kayys.golek.spi.inference.StreamingInferenceChunk;
-import tech.kayys.wayang.error.ErrorResponse;
-import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.api.dto.AsyncJobResponse;
 import tech.kayys.golek.api.dto.InferenceResponseDTO;
 import tech.kayys.golek.api.dto.StreamChunkDTO;
@@ -37,10 +33,8 @@ import tech.kayys.golek.engine.model.PlatformInferenceService;
 import tech.kayys.golek.engine.inference.InferenceMetrics;
 import org.jboss.logging.Logger;
 import tech.kayys.golek.spi.error.ErrorPayload;
-import tech.kayys.golek.spi.error.ErrorCode;
-import tech.kayys.golek.spi.exception.InferenceException;
-import tech.kayys.wayang.tenant.TenantContextResolver;
-
+import tech.kayys.golek.spi.context.RequestContext;
+import tech.kayys.golek.spi.context.RequestContextResolver;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
@@ -62,7 +56,7 @@ public class InferenceResource {
         PlatformInferenceService platformInferenceService;
 
         @Inject
-        TenantContextResolver tenantResolver;
+        RequestContextResolver tenantResolver;
 
         /**
          * Execute synchronous inference.
@@ -74,7 +68,7 @@ public class InferenceResource {
         @SecurityRequirement(name = "bearer-jwt")
         @APIResponses({
                         @APIResponse(responseCode = "200", description = "Inference successful", content = @Content(schema = @Schema(implementation = InferenceResponseDTO.class))),
-                        @APIResponse(responseCode = "400", description = "Invalid request", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+                        @APIResponse(responseCode = "400", description = "Invalid request", content = @Content(schema = @Schema(implementation = ErrorPayload.class))),
                         @APIResponse(responseCode = "401", description = "Unauthorized"),
                         @APIResponse(responseCode = "429", description = "Rate limit exceeded"),
                         @APIResponse(responseCode = "500", description = "Internal server error")
@@ -87,14 +81,13 @@ public class InferenceResource {
                         @Parameter(description = "Request ID for tracing") @HeaderParam("X-Request-ID") String requestId,
                         @Valid @NotNull InferenceRequest request,
                         @Context SecurityContext securityContext,
-                        @Context ContainerRequestContext requestContext) {
+                        @Context ContainerRequestContext containerRequestContext) {
                 final String finalRequestId = requestId != null ? requestId : UUID.randomUUID().toString();
-                TenantContext tenantContext = resolveTenantContext(securityContext, requestContext);
-                String effectiveTenantId = tenantContext.getTenantId().value();
+                RequestContext effectiveContext = resolveRequestContext(securityContext, containerRequestContext);
+                String effectiveRequestId = effectiveContext.getRequestId();
 
                 InferenceRequest effectiveRequest = InferenceRequest.builder()
-                                .requestId(finalRequestId)
-                                .tenantId(effectiveTenantId)
+                                .requestId(effectiveRequestId)
                                 .model(request.getModel())
                                 .messages(request.getMessages())
                                 .tools(request.getTools())
@@ -104,15 +97,15 @@ public class InferenceResource {
                                 .priority(request.getPriority())
                                 .build();
 
-                LOG.infof("Inference request received: requestId=%s, tenantId=%s, model=%s",
-                                finalRequestId, effectiveTenantId, request.getModel());
+                LOG.infof("Inference request received: requestId=%s, effectiveRequestId=%s, model=%s",
+                                finalRequestId, effectiveRequestId, request.getModel());
 
-                return platformInferenceService.infer(effectiveRequest, tenantContext)
+                return platformInferenceService.infer(effectiveRequest, effectiveContext)
                                 .map(response -> {
                                         LOG.infof("Inference completed: requestId=%s, durationMs=%d, model=%s",
                                                         finalRequestId, response.getDurationMs(), response.getModel());
 
-                                        inferenceMetrics.recordSuccess(effectiveTenantId, request.getModel(),
+                                        inferenceMetrics.recordSuccess(effectiveRequestId, request.getModel(),
                                                         "unified", response.getDurationMs());
 
                                         return Response.ok(InferenceResponseDTO.from(response)).build();
@@ -120,7 +113,7 @@ public class InferenceResource {
                                 .onFailure().recoverWithItem(failure -> {
                                         LOG.errorf(failure, "Inference failed: requestId=%s", finalRequestId);
 
-                                        inferenceMetrics.recordFailure(effectiveTenantId, request.getModel(),
+                                        inferenceMetrics.recordFailure(effectiveRequestId, request.getModel(),
                                                         failure.getClass().getSimpleName());
 
                                         return buildErrorResponse(failure, finalRequestId);
@@ -137,16 +130,15 @@ public class InferenceResource {
         @SecurityRequirement(name = "bearer-jwt")
         public Uni<Response> inferAsync(
                         @HeaderParam("X-Request-ID") String requestId,
-                        @Valid @NotNull InferenceRequest request,
+                        @NotNull InferenceRequest request,
                         @Context SecurityContext securityContext,
-                        @Context ContainerRequestContext requestContext) {
-                TenantContext tenantContext = resolveTenantContext(securityContext, requestContext);
-                String effectiveTenantId = tenantContext.getTenantId().value();
+                        @Context ContainerRequestContext containerRequestContext) {
+                RequestContext effectiveContext = resolveRequestContext(securityContext, containerRequestContext);
+                String effectiveRequestId = effectiveContext.getRequestId();
                 final String finalRequestId = requestId != null ? requestId : UUID.randomUUID().toString();
 
                 InferenceRequest effectiveRequest = InferenceRequest.builder()
-                                .requestId(finalRequestId)
-                                .tenantId(effectiveTenantId)
+                                .requestId(effectiveRequestId)
                                 .model(request.getModel())
                                 .messages(request.getMessages())
                                 .tools(request.getTools())
@@ -156,7 +148,7 @@ public class InferenceResource {
                                 .priority(request.getPriority())
                                 .build();
 
-                return platformInferenceService.submitAsyncJob(effectiveRequest, tenantContext)
+                return platformInferenceService.submitAsyncJob(effectiveRequest, effectiveContext)
                                 .map(jobId -> Response.accepted()
                                                 .entity(new AsyncJobResponse(jobId, finalRequestId))
                                                 .build());
@@ -176,14 +168,13 @@ public class InferenceResource {
                         @HeaderParam("X-Request-ID") String requestId,
                         @Valid @NotNull InferenceRequest request,
                         @Context SecurityContext securityContext,
-                        @Context ContainerRequestContext requestContext) {
+                        @Context ContainerRequestContext containerRequestContext) {
                 final String finalRequestId = requestId != null ? requestId : UUID.randomUUID().toString();
-                TenantContext tenantContext = resolveTenantContext(securityContext, requestContext);
-                String effectiveTenantId = tenantContext.getTenantId().value();
+                RequestContext effectiveContext = resolveRequestContext(securityContext, containerRequestContext);
+                String effectiveRequestId = effectiveContext.getRequestId();
 
                 InferenceRequest effectiveRequest = InferenceRequest.builder()
-                                .requestId(finalRequestId)
-                                .tenantId(effectiveTenantId)
+                                .requestId(effectiveRequestId)
                                 .model(request.getModel())
                                 .messages(request.getMessages())
                                 .tools(request.getTools())
@@ -193,10 +184,10 @@ public class InferenceResource {
                                 .priority(request.getPriority())
                                 .build();
 
-                LOG.infof("Streaming inference request: requestId=%s, model=%s",
-                                finalRequestId, request.getModel());
+                LOG.infof("Streaming inference request: requestId=%s, effectiveRequestId=%s, model=%s",
+                                finalRequestId, effectiveRequestId, request.getModel());
 
-                return platformInferenceService.stream(effectiveRequest, tenantContext)
+                return platformInferenceService.stream(effectiveRequest, effectiveContext)
                                 .map(chunk -> new StreamChunkDTO(chunk.sequenceNumber(), chunk.token(),
                                                 chunk.isComplete()));
         }
@@ -212,10 +203,10 @@ public class InferenceResource {
         public Uni<Response> getAsyncJobStatus(
                         @PathParam("jobId") String jobId,
                         @Context SecurityContext securityContext,
-                        @Context ContainerRequestContext requestContext) {
-                TenantContext tenantContext = resolveTenantContext(securityContext, requestContext);
+                        @Context ContainerRequestContext containerRequestContext) {
+                RequestContext effectiveContext = resolveRequestContext(securityContext, containerRequestContext);
 
-                return platformInferenceService.getBatchStatus(jobId, tenantContext)
+                return platformInferenceService.getBatchStatus(jobId, effectiveContext)
                                 .map(status -> Response.ok(status).build());
         }
 
@@ -230,10 +221,10 @@ public class InferenceResource {
         public Uni<Response> batchInfer(
                         @Valid @NotNull BatchInferenceRequest batchRequest,
                         @Context SecurityContext securityContext,
-                        @Context ContainerRequestContext requestContext) {
-                TenantContext tenantContext = resolveTenantContext(securityContext, requestContext);
+                        @Context ContainerRequestContext containerRequestContext) {
+                RequestContext effectiveContext = resolveRequestContext(securityContext, containerRequestContext);
 
-                return platformInferenceService.batchInfer(batchRequest, tenantContext)
+                return platformInferenceService.batchInfer(batchRequest, effectiveContext)
                                 .map(batchId -> Response.accepted()
                                                 .entity(Map.of("batchId", batchId))
                                                 .build());
@@ -251,9 +242,9 @@ public class InferenceResource {
                         @Parameter(description = "Request ID") @PathParam("requestId") String requestId,
                         @Context SecurityContext securityContext) {
                 LOG.infof("Cancel request: %s", requestId);
-                TenantContext tenantContext = tenantResolver.resolve(securityContext);
+                RequestContext requestContext = tenantResolver.resolve(securityContext);
 
-                return platformInferenceService.cancel(requestId, tenantContext)
+                return platformInferenceService.cancel(requestId, requestContext)
                                 .map(cancelled -> Response
                                                 .ok(Map.of(
                                                                 "requestId", requestId,
@@ -261,11 +252,12 @@ public class InferenceResource {
                                                 .build());
         }
 
-        private TenantContext resolveTenantContext(SecurityContext securityContext,
-                        ContainerRequestContext requestContext) {
-                Object ctx = requestContext != null ? requestContext.getProperty("tenantContext") : null;
-                if (ctx instanceof TenantContext tenantContext) {
-                        return tenantContext;
+        private RequestContext resolveRequestContext(SecurityContext securityContext,
+                        ContainerRequestContext containerRequestContext) {
+                Object ctx = containerRequestContext != null ? containerRequestContext.getProperty("requestContext")
+                                : null;
+                if (ctx instanceof RequestContext effectiveContext) {
+                        return effectiveContext;
                 }
                 return tenantResolver.resolve(securityContext);
         }

@@ -21,37 +21,37 @@ import tech.kayys.golek.spi.error.ErrorCode;
 
 public class TenantQuotaExceededException extends InferenceException {
 
-    private final String tenantId;
+    private final String requestId;
     private final String resourceType;
 
-    public TenantQuotaExceededException(String tenantId, String resourceType, String message) {
+    public TenantQuotaExceededException(String requestId, String resourceType, String message) {
         super(ErrorCode.QUOTA_EXCEEDED, message);
-        this.tenantId = normalizeTenantId(tenantId);
+        this.requestId = normalizeRequestId(requestId);
         this.resourceType = resourceType;
     }
 
-    public TenantQuotaExceededException(String tenantId, String resourceType, String message, Throwable cause) {
+    public TenantQuotaExceededException(String requestId, String resourceType, String message, Throwable cause) {
         super(ErrorCode.QUOTA_EXCEEDED, message, cause);
-        this.tenantId = normalizeTenantId(tenantId);
+        this.requestId = normalizeRequestId(requestId);
         this.resourceType = resourceType;
     }
 
-    public String getTenantId() {
-        return tenantId;
+    public String getRequestId() {
+        return requestId;
     }
 
     public String getApiKey() {
-        return tenantId;
+        return requestId;
     }
 
     public String getResourceType() {
         return resourceType;
     }
 
-    private static String normalizeTenantId(String tenantId) {
-        if (tenantId == null || tenantId.isBlank()) {
+    private static String normalizeRequestId(String requestId) {
+        if (requestId == null || requestId.isBlank()) {
             return ApiKeyConstants.COMMUNITY_API_KEY;
         }
-        return tenantId;
+        return requestId;
     }
 }

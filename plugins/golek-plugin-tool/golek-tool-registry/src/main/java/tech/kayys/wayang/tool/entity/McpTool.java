@@ -42,7 +42,7 @@ public class McpTool extends PanacheEntityBase {
 
     @NotNull
     @Column(name = "tenant_id")
-    private String tenantId;
+    private String requestId;
 
     @NotNull
     @Column(name = "namespace")
@@ -141,12 +141,12 @@ public class McpTool extends PanacheEntityBase {
         this.toolId = toolId;
     }
 
-    public String getTenantId() {
-        return tenantId;
+    public String getRequestId() {
+        return requestId;
     }
 
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
     }
 
     public String getNamespace() {

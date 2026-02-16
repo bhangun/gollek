@@ -12,7 +12,6 @@ import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.core.engine.EngineMetadata;
 import tech.kayys.golek.spi.model.HealthStatus;
 import tech.kayys.golek.core.inference.InferenceEngine;
-import tech.kayys.wayang.tenant.TenantContext;
 
 import java.util.List;
 import java.util.UUID;
@@ -50,24 +49,23 @@ public class DefaultInferenceEngine implements InferenceEngine {
         }
 
         @Override
-        public Uni<InferenceResponse> infer(InferenceRequest request, TenantContext tenantContext) {
+        public Uni<InferenceResponse> infer(InferenceRequest request) {
                 if (!initialized) {
                         return Uni.createFrom().failure(new IllegalStateException("Engine not initialized"));
                 }
 
-                return orchestrator.executeAsync(request.getModel(), request, tenantContext)
+                return orchestrator.executeAsync(request.getModel(), request)
                                 .onItem().invoke(response -> totalInferences++)
                                 .onFailure().invoke(failure -> failedInferences++);
         }
 
         @Override
-        public Multi<StreamingInferenceChunk> stream(InferenceRequest request, TenantContext tenantContext) {
+        public Multi<StreamingInferenceChunk> stream(InferenceRequest request) {
                 if (!initialized || !healthy) {
                         return Multi.createFrom().failure(new IllegalStateException("Engine not ready"));
                 }
 
-                TenantContext effectiveTenant = tenantContext != null ? tenantContext : TenantContext.of("community");
-                return orchestrator.streamExecute(request.getModel(), request, effectiveTenant)
+                return orchestrator.streamExecute(request.getModel(), request)
                                 .map(chunk -> new StreamingInferenceChunk(
                                                 request.getRequestId(),
                                                 0, // sequence not easily available from StreamChunk

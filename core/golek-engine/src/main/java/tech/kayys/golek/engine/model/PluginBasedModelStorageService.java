@@ -17,7 +17,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Plugin-based model storage service that delegates to specific storage implementations.
+ * Plugin-based model storage service that delegates to specific storage
+ * implementations.
  *
  * <p>
  * Supports multiple storage backends through plugins:
@@ -54,12 +55,13 @@ public class PluginBasedModelStorageService implements ModelStorageService {
     }
 
     @Override
-    public Uni<String> uploadModel(String tenantId, String modelId, String version, byte[] data) {
+    public Uni<String> uploadModel(String requestId, String modelId, String version, byte[] data) {
         ModelStorageService service = getStorageService();
         if (service == null) {
-            return Uni.createFrom().failure(new IllegalStateException("No storage service available for provider: " + storageProvider));
+            return Uni.createFrom().failure(
+                    new IllegalStateException("No storage service available for provider: " + storageProvider));
         }
-        return service.uploadModel(tenantId, modelId, version, data);
+        return service.uploadModel(requestId, modelId, version, data);
     }
 
     @Override
@@ -67,7 +69,8 @@ public class PluginBasedModelStorageService implements ModelStorageService {
         String provider = determineProviderFromUri(storageUri);
         ModelStorageService service = getStorageService(provider);
         if (service == null) {
-            return Uni.createFrom().failure(new IllegalStateException("No storage service available for URI: " + storageUri));
+            return Uni.createFrom()
+                    .failure(new IllegalStateException("No storage service available for URI: " + storageUri));
         }
         return service.downloadModel(storageUri);
     }
@@ -77,7 +80,8 @@ public class PluginBasedModelStorageService implements ModelStorageService {
         String provider = determineProviderFromUri(storageUri);
         ModelStorageService service = getStorageService(provider);
         if (service == null) {
-            return Uni.createFrom().failure(new IllegalStateException("No storage service available for URI: " + storageUri));
+            return Uni.createFrom()
+                    .failure(new IllegalStateException("No storage service available for URI: " + storageUri));
         }
         return service.deleteModel(storageUri);
     }
@@ -94,14 +98,16 @@ public class PluginBasedModelStorageService implements ModelStorageService {
         }
 
         // Try to find an available service implementation for this provider
-        // This is a simplified approach - in a real implementation, you'd have more sophisticated discovery
+        // This is a simplified approach - in a real implementation, you'd have more
+        // sophisticated discovery
         synchronized (storageServices) {
             service = storageServices.get(provider);
             if (service != null) {
                 return service;
             }
 
-            // For now, we'll just return the local service if the requested provider isn't available
+            // For now, we'll just return the local service if the requested provider isn't
+            // available
             // In a real implementation, you'd dynamically load the appropriate plugin
             log.warn("Requested storage provider '{}' not available, falling back to local storage", provider);
             return storageServices.get("local");
@@ -138,10 +144,10 @@ public class PluginBasedModelStorageService implements ModelStorageService {
         }
 
         @Override
-        public Uni<String> uploadModel(String tenantId, String modelId, String version, byte[] data) {
+        public Uni<String> uploadModel(String requestId, String modelId, String version, byte[] data) {
             return Uni.createFrom().item(() -> {
                 try {
-                    Path tenantPath = Paths.get(basePath, tenantId);
+                    Path tenantPath = Paths.get(basePath, requestId);
                     Path modelPath = tenantPath.resolve(modelId);
                     Path versionPath = modelPath.resolve(version);
 

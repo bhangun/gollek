@@ -7,12 +7,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import tech.kayys.golek.spi.context.RequestContext;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.engine.observability.MetricsPublisher;
 import tech.kayys.golek.engine.routing.ModelRouterService;
-import tech.kayys.wayang.tenant.TenantContext;
-import tech.kayys.wayang.tenant.TenantId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,10 +30,10 @@ class InferenceOrchestratorTest {
         private InferenceRequest request;
 
         @Mock
-        private TenantContext tenantContext;
+        private RequestContext requestContext;
 
         @Mock
-        private TenantId tenantId;
+        private String requestId;
 
         private InferenceOrchestrator orchestrator;
 
@@ -42,19 +41,19 @@ class InferenceOrchestratorTest {
         void setUp() {
                 orchestrator = new InferenceOrchestrator(router, metrics);
 
-                when(tenantContext.getTenantId()).thenReturn(tenantId);
-                when(tenantId.value()).thenReturn("test-tenant");
+                when(requestContext.requestId()).thenReturn(requestId);
+                when(requestId).thenReturn("test-tenant");
         }
 
         @Test
         void testExecuteAsync_SuccessfulExecution() {
                 // Arrange
                 InferenceResponse expectedResponse = mock(InferenceResponse.class);
-                when(router.route(anyString(), any(InferenceRequest.class), any(TenantContext.class)))
+                when(router.route(anyString(), any(InferenceRequest.class), any(RequestContext.class)))
                                 .thenReturn(Uni.createFrom().item(expectedResponse));
 
                 // Act
-                var result = orchestrator.executeAsync("test-model", request, tenantContext);
+                var result = orchestrator.executeAsync("test-model", request, requestContext);
 
                 // Assert
                 InferenceResponse actualResponse = result.await().indefinitely();
@@ -66,12 +65,12 @@ class InferenceOrchestratorTest {
         @Test
         void testExecuteAsync_Failure() {
                 // Arrange
-                when(router.route(anyString(), any(InferenceRequest.class), any(TenantContext.class)))
+                when(router.route(anyString(), any(InferenceRequest.class), any(RequestContext.class)))
                                 .thenReturn(Uni.createFrom().failure(new RuntimeException("Test failure")));
 
                 // Act & Assert
                 assertThrows(RuntimeException.class, () -> {
-                        orchestrator.executeAsync("test-model", request, tenantContext).await().indefinitely();
+                        orchestrator.executeAsync("test-model", request, requestContext).await().indefinitely();
                 });
 
                 verify(metrics).recordFailure(eq("unified"), eq("test-model"), anyString());

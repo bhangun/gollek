@@ -10,12 +10,12 @@ import java.util.UUID;
 @ApplicationScoped
 public class ModelRepository implements PanacheRepository<Model> {
 
-    public Uni<Model> findByTenantAndModelId(String tenantId, String modelId) {
-        return find("tenant.tenantId = ?1 and modelId = ?2", tenantId, modelId).firstResult();
+    public Uni<Model> findByTenantAndModelId(String requestId, String modelId) {
+        return find("tenant.requestId = ?1 and modelId = ?2", requestId, modelId).firstResult();
     }
 
-    public Uni<List<Model>> findByTenant(String tenantId) {
-        return list("tenant.tenantId", tenantId);
+    public Uni<List<Model>> findByTenant(String requestId) {
+        return list("tenant.requestId", requestId);
     }
 
     public Uni<List<Model>> findByStage(Model.ModelStage stage) {

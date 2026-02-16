@@ -38,12 +38,6 @@
             <artifactId>golek-gguf-converter</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>tech.kayys.wayang</groupId>
-            <artifactId>tenant-core</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-
 
         <!-- Quarkus -->
         <dependency>

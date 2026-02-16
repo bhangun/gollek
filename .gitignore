@@ -96,3 +96,5 @@ application-dev.properties
 Thumbs.db
 .quarkus/
 .DS_Store
+
+.venv-gguf

@@ -1,0 +1,7 @@
+{
+	"InstallScripts": [
+		"~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/cmake_install.cmake",
+		"~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/inference/format/gguf/gguf-bridge/build/tests/cmake_install.cmake"
+	],
+	"Parallel": false
+}

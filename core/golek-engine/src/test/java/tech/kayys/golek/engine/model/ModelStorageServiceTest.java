@@ -32,30 +32,30 @@ class ModelStorageServiceTest {
 
     @Test
     void testUploadModelWithValidInputs() {
-        String tenantId = "test-tenant";
+        String requestId = "test-tenant";
         String modelId = "test-model";
         String version = "v1.0.0";
         byte[] modelData = "test model data".getBytes();
 
         // Since we're using local storage in test, this should work
-        Uni<String> result = golekModelStorageService.uploadModel(tenantId, modelId, version, modelData);
+        Uni<String> result = golekModelStorageService.uploadModel(requestId, modelId, version, modelData);
 
         // Wait for the async operation to complete
         String storageUri = result.await().indefinitely();
 
         assertNotNull(storageUri);
         assertTrue(storageUri.startsWith("file://"));
-        assertTrue(storageUri.contains("/tmp/test-models/" + tenantId + "/" + modelId + "/" + version));
+        assertTrue(storageUri.contains("/tmp/test-models/" + requestId + "/" + modelId + "/" + version));
     }
 
     @Test
-    void testUploadModelWithNullTenantId() {
-        String tenantId = null;
+    void testUploadModelWithNullRequestId() {
+        String requestId = null;
         String modelId = "test-model";
         String version = "v1.0.0";
         byte[] modelData = "test model data".getBytes();
 
-        Uni<String> result = golekModelStorageService.uploadModel(tenantId, modelId, version, modelData);
+        Uni<String> result = golekModelStorageService.uploadModel(requestId, modelId, version, modelData);
 
         Exception exception = assertThrows(RuntimeException.class, () -> {
             result.await().indefinitely();
@@ -69,12 +69,12 @@ class ModelStorageServiceTest {
 
     @Test
     void testUploadModelWithEmptyModelId() {
-        String tenantId = "test-tenant";
+        String requestId = "test-tenant";
         String modelId = "";
         String version = "v1.0.0";
         byte[] modelData = "test model data".getBytes();
 
-        Uni<String> result = golekModelStorageService.uploadModel(tenantId, modelId, version, modelData);
+        Uni<String> result = golekModelStorageService.uploadModel(requestId, modelId, version, modelData);
 
         Exception exception = assertThrows(RuntimeException.class, () -> {
             result.await().indefinitely();
@@ -88,12 +88,12 @@ class ModelStorageServiceTest {
 
     @Test
     void testUploadModelWithNullModelData() {
-        String tenantId = "test-tenant";
+        String requestId = "test-tenant";
         String modelId = "test-model";
         String version = "v1.0.0";
         byte[] modelData = null;
 
-        Uni<String> result = golekModelStorageService.uploadModel(tenantId, modelId, version, modelData);
+        Uni<String> result = golekModelStorageService.uploadModel(requestId, modelId, version, modelData);
 
         Exception exception = assertThrows(RuntimeException.class, () -> {
             result.await().indefinitely();
@@ -108,12 +108,12 @@ class ModelStorageServiceTest {
     @Test
     void testDownloadModelWithValidUri() {
         // First upload a model to get a valid URI
-        String tenantId = "test-tenant";
+        String requestId = "test-tenant";
         String modelId = "test-model";
         String version = "v1.0.0";
         byte[] originalData = "test model data for download".getBytes();
 
-        String storageUri = golekModelStorageService.uploadModel(tenantId, modelId, version, originalData)
+        String storageUri = golekModelStorageService.uploadModel(requestId, modelId, version, originalData)
                 .await().indefinitely();
 
         // Now download the model
@@ -142,12 +142,12 @@ class ModelStorageServiceTest {
     @Test
     void testModelExistsWithExistingModel() {
         // First upload a model to get a valid URI
-        String tenantId = "test-tenant";
+        String requestId = "test-tenant";
         String modelId = "test-model";
         String version = "v1.0.0";
         byte[] modelData = "test model data for exists check".getBytes();
 
-        String storageUri = golekModelStorageService.uploadModel(tenantId, modelId, version, modelData)
+        String storageUri = golekModelStorageService.uploadModel(requestId, modelId, version, modelData)
                 .await().indefinitely();
 
         // Check if the model exists
@@ -160,12 +160,12 @@ class ModelStorageServiceTest {
     @Test
     void testDeleteModel() {
         // First upload a model to get a valid URI
-        String tenantId = "test-tenant";
+        String requestId = "test-tenant";
         String modelId = "test-model";
         String version = "v1.0.0";
         byte[] modelData = "test model data for deletion".getBytes();
 
-        String storageUri = golekModelStorageService.uploadModel(tenantId, modelId, version, modelData)
+        String storageUri = golekModelStorageService.uploadModel(requestId, modelId, version, modelData)
                 .await().indefinitely();
 
         // Verify the model exists before deletion
@@ -180,8 +180,5 @@ class ModelStorageServiceTest {
         Boolean existsAfter = golekModelStorageService.modelExists(storageUri).await().indefinitely();
         assertFalse(existsAfter);
     }
-
-
-
 
 }

@@ -19,7 +19,7 @@ public class CachedModelRepositoryTest {
     @Test
     void testFindById_ReturnsEmpty() {
         try {
-            // Fix: pass String instead of TenantId
+            // Fix: pass String instead of RequestId
             repository.findById("m1", "t1").await().atMost(Duration.ofSeconds(5));
         } catch (Exception e) {
             // expected

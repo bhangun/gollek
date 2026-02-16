@@ -52,14 +52,8 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.golek</groupId>
-            <artifactId>golek-ext-format-libtorch</artifactId>
+            <artifactId>golek-ext-format-djl</artifactId>
             <version>${project.version}</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>tech.kayys.golek</groupId>
-                    <artifactId>golek-inference-gguf</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>tech.kayys.golek</groupId>
@@ -156,6 +150,22 @@
 
     <profiles>
         <!-- Optional extension packaging profiles -->
+        <profile>
+            <id>ext-format-libtorch</id>
+            <dependencies>
+                <dependency>
+                    <groupId>tech.kayys.golek</groupId>
+                    <artifactId>golek-ext-format-libtorch</artifactId>
+                    <version>${project.version}</version>
+                    <exclusions>
+                        <exclusion>
+                            <groupId>tech.kayys.golek</groupId>
+                            <artifactId>golek-inference-gguf</artifactId>
+                        </exclusion>
+                    </exclusions>
+                </dependency>
+            </dependencies>
+        </profile>
         <profile>
             <id>ext-cloud-ollama</id>
             <dependencies>

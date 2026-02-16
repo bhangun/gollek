@@ -151,6 +151,18 @@ The compiled library will be copied to `src/main/resources/native/`.
 mvn clean package
 ```
 
+
+### 3. Set Library Path
+
+```bash
+export LD_LIBRARY_PATH=$LIBTORCH_PATH/lib:$PWD/build/lib:$LD_LIBRARY_PATH
+```
+
+When you run the application, you may encounter a permission error. To resolve this, run the following command:
+```bash
+xattr -dr com.apple.quarantine <YOUR-LIBTORCH-PATH>/libtorch/libtorch-macos/lib
+```
+
 ### 4. Run Example
 
 ```bash

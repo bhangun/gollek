@@ -45,7 +45,7 @@ public class ModelSyncService {
     /**
      * Sync model from remote to local
      */
-    public Uni<ModelManifest> sync(String modelId, String tenantId, String remoteType,
+    public Uni<ModelManifest> sync(String modelId, String requestId, String remoteType,
             DownloadProgressListener listener) {
         RemoteModelRepository remoteRepo = findRemoteRepo(remoteType)
                 .orElseThrow(() -> new InferenceException(
@@ -55,7 +55,7 @@ public class ModelSyncService {
 
         LOG.infof("Starting sync for model %s from %s", modelId, remoteType);
 
-        return remoteRepo.fetchMetadata(modelId, tenantId)
+        return remoteRepo.fetchMetadata(modelId, requestId)
                 .flatMap(manifest -> {
                     // Start download
                     // For now, we assume we download all artifacts in the manifest

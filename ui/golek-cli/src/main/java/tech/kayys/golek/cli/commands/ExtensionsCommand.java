@@ -25,7 +25,9 @@ public class ExtensionsCommand implements Runnable {
 
     private static final List<ExtensionDef> EXTENSIONS = List.of(
             new ExtensionDef("runtime", "GGUF", "base", "tech.kayys.golek.inference.gguf.GGUFProvider", "gguf"),
-            new ExtensionDef("runtime", "LibTorch", "base", "tech.kayys.golek.inference.libtorch.LibTorchProvider",
+            new ExtensionDef("runtime", "DJL", "base", "tech.kayys.golek.inference.djl.DjlProvider", "djl"),
+            new ExtensionDef("runtime", "LibTorch", "experimental",
+                    "tech.kayys.golek.inference.libtorch.LibTorchProvider",
                     "libtorch"),
             new ExtensionDef("cloud", "Ollama", "ext-cloud-ollama", "tech.kayys.golek.provider.ollama.OllamaProvider",
                     "ollama"),

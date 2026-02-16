@@ -2,7 +2,7 @@ package tech.kayys.golek.spi.provider;
 
 import io.smallrye.mutiny.Uni;
 import tech.kayys.golek.spi.inference.InferenceResponse;
-import tech.kayys.wayang.tenant.TenantContext;
+
 import tech.kayys.golek.spi.exception.ProviderException;
 
 import java.util.Optional;
@@ -48,22 +48,18 @@ public interface LLMProvider {
     /**
      * Check if provider supports the requested model.
      */
-    boolean supports(String modelId, TenantContext tenantContext);
+    boolean supports(String modelId, ProviderRequest request);
 
     /**
      * Execute inference request (reactive).
      */
-    Uni<InferenceResponse> infer(
-            ProviderRequest request,
-            TenantContext context);
+    Uni<InferenceResponse> infer(ProviderRequest request);
 
     /**
      * Execute inference request (blocking).
      */
-    default InferenceResponse inferBlocking(
-            ProviderRequest request,
-            TenantContext context) throws ProviderException {
-        return infer(request, context)
+    default InferenceResponse inferBlocking(ProviderRequest request) throws ProviderException {
+        return infer(request)
                 .await()
                 .atMost(java.time.Duration.ofSeconds(30));
     }

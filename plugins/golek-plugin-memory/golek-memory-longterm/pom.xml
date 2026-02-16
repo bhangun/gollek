@@ -10,7 +10,6 @@
     </parent>
 
     <artifactId>golek-memory-longterm</artifactId>
-    <packaging>jar</packaging>
 
     <dependencies>
         <dependency>

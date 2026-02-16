@@ -1,6 +1,5 @@
 package tech.kayys.golek.model.repo.hf;
 
-
 import io.smallrye.mutiny.Uni;
 import java.nio.file.Path;
 import java.util.List;
@@ -59,12 +58,12 @@ public final class HuggingFaceRepository implements ModelRepository {
     }
 
     @Override
-    public Uni<ModelManifest> findById(String modelId, String tenantId) {
+    public Uni<ModelManifest> findById(String modelId, String requestId) {
         return Uni.createFrom().failure(new UnsupportedOperationException("HF findById not yet implemented"));
     }
 
     @Override
-    public Uni<List<ModelManifest>> list(String tenantId, Pageable pageable) {
+    public Uni<List<ModelManifest>> list(String requestId, Pageable pageable) {
         return Uni.createFrom().item(Collections.emptyList());
     }
 
@@ -74,7 +73,7 @@ public final class HuggingFaceRepository implements ModelRepository {
     }
 
     @Override
-    public Uni<Void> delete(String modelId, String tenantId) {
+    public Uni<Void> delete(String modelId, String requestId) {
         return Uni.createFrom().failure(new UnsupportedOperationException("Cannot delete from HuggingFace repository"));
     }
 

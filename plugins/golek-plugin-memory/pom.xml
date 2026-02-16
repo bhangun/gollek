@@ -12,9 +12,6 @@
     <artifactId>wayang-memory-parent</artifactId>
     <packaging>pom</packaging>
     <modules>
-        <!-- TODO: Fix Java compiler error in wayang-mcp-runtime (TypeTag::UNKNOWN)
-        <module>memory-runtime</module>
-        -->
         <module>memory-core</module>
         <module>golek-memory-context-engineering</module>
         <module>golek-memory-episodic</module>
@@ -22,6 +19,7 @@
         <module>golek-memory-short</module>
         <module>golek-memory-semantic</module>
         <module>golek-memory-working</module>
+        <module>memory-runtime</module>
     </modules>
 
     <properties>

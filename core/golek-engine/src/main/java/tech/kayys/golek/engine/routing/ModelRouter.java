@@ -78,8 +78,8 @@ public class ModelRouter {
                 request.getModel(), request.getRequestId());
 
         // 1. Get model manifest
-        String tenantId = "community";
-        ModelManifest manifest = getModelManifest(tenantId, request.getModel());
+        String requestId = "community";
+        ModelManifest manifest = getModelManifest(requestId, request.getModel());
 
         // 2. Select runner candidates
         List<String> candidates = selectRunnerCandidates(request, manifest);
@@ -163,8 +163,8 @@ public class ModelRouter {
      * Select runner for streaming inference.
      */
     public ModelRunner selectRunner(InferenceRequest request, boolean requiresStreaming) {
-        String tenantId = "community";
-        ModelManifest manifest = getModelManifest(tenantId, request.getModel());
+        String requestId = "community";
+        ModelManifest manifest = getModelManifest(requestId, request.getModel());
         List<String> candidates = selectRunnerCandidates(request, manifest);
 
         for (String runnerName : candidates) {
@@ -289,14 +289,14 @@ public class ModelRouter {
     /**
      * Get model manifest from registry.
      */
-    private ModelManifest getModelManifest(String tenantId, String modelId) {
+    private ModelManifest getModelManifest(String requestId, String modelId) {
         try {
             // Parse model ID (format: "name:version" or just "name")
             String[] parts = modelId.split(":");
             String modelName = parts[0];
             String version = parts.length > 1 ? parts[1] : "latest";
 
-            ModelManifest manifest = registryService.getManifest(tenantId, modelName, version).await().indefinitely();
+            ModelManifest manifest = registryService.getManifest(requestId, modelName, version).await().indefinitely();
 
             if (manifest == null) {
                 throw new ModelException(

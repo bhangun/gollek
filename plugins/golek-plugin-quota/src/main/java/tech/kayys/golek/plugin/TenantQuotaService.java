@@ -1,6 +1,6 @@
 package tech.kayys.golek.plugin;
 
-import tech.kayys.wayang.tenant.TenantId;
+import tech.kayys.wayang.tenant.RequestId;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Default;
@@ -15,20 +15,20 @@ public interface TenantQuotaService {
     /**
      * Check current quota status for a tenant
      */
-    QuotaInfo checkQuota(TenantId tenantId);
+    QuotaInfo checkQuota(RequestId requestId);
 
     /**
      * Reserve quota for a specific request
      */
-    void reserve(TenantId tenantId, int amount);
+    void reserve(RequestId requestId, int amount);
 
     /**
      * Release previously reserved quota
      */
-    void release(TenantId tenantId, int amount);
+    void release(RequestId requestId, int amount);
 
     /**
      * Get quota configuration for a tenant
      */
-    QuotaConfig getConfig(TenantId tenantId);
+    QuotaConfig getConfig(RequestId requestId);
 }

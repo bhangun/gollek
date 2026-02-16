@@ -45,9 +45,9 @@ public interface ObservabilityPlugin extends GolekPlugin {
      * @param inputTokens  number of input tokens
      * @param outputTokens number of output tokens
      * @param modelId      the model identifier
-     * @param tenantId     the tenant identifier
+     * @param apiKey       the tenant identifier
      */
-    void recordTokenUsage(int inputTokens, int outputTokens, String modelId, String tenantId);
+    void recordTokenUsage(int inputTokens, int outputTokens, String modelId, String apiKey);
 
     /**
      * API-key-first alias for {@link #recordTokenUsage(int, int, String, String)}.

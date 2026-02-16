@@ -58,9 +58,9 @@ public class InferenceMetrics {
     /**
      * Record successful inference request.
      */
-    public void recordSuccess(String tenantId, String modelId, String runnerName, long latencyMs) {
+    public void recordSuccess(String requestId, String modelId, String runnerName, long latencyMs) {
         Tags tags = Tags.of(
-                "tenant", tenantId,
+                "tenant", requestId,
                 "model", modelId,
                 "runner", runnerName,
                 "status", "success");
@@ -89,18 +89,18 @@ public class InferenceMetrics {
                 .record(Duration.ofMillis(latencyMs));
 
         // Decrement active requests
-        decrementActiveRequests(tenantId, modelId);
+        decrementActiveRequests(requestId, modelId);
 
         log.debug("Metrics recorded: tenant={}, model={}, runner={}, latencyMs={}",
-                tenantId, modelId, runnerName, latencyMs);
+                requestId, modelId, runnerName, latencyMs);
     }
 
     /**
      * Record failed inference request.
      */
-    public void recordFailure(String tenantId, String modelId, String errorType) {
+    public void recordFailure(String requestId, String modelId, String errorType) {
         Tags tags = Tags.of(
-                "tenant", tenantId,
+                "tenant", requestId,
                 "model", modelId,
                 "error_type", errorType,
                 "status", "failure");
@@ -120,22 +120,22 @@ public class InferenceMetrics {
                 .increment();
 
         // Decrement active requests
-        decrementActiveRequests(tenantId, modelId);
+        decrementActiveRequests(requestId, modelId);
     }
 
     /**
      * Record request started (increment active requests).
      */
-    public void recordRequestStarted(String tenantId, String modelId) {
-        incrementActiveRequests(tenantId, modelId);
+    public void recordRequestStarted(String requestId, String modelId) {
+        incrementActiveRequests(requestId, modelId);
     }
 
     /**
      * Record input data size.
      */
-    public void recordInputSize(String tenantId, String modelId, long bytes) {
+    public void recordInputSize(String requestId, String modelId, long bytes) {
         DistributionSummary.builder(INPUT_SIZE)
-                .tags("tenant", tenantId, "model", modelId)
+                .tags("tenant", requestId, "model", modelId)
                 .description("Size of input data in bytes")
                 .baseUnit("bytes")
                 .register(registry)
@@ -145,9 +145,9 @@ public class InferenceMetrics {
     /**
      * Record output data size.
      */
-    public void recordOutputSize(String tenantId, String modelId, long bytes) {
+    public void recordOutputSize(String requestId, String modelId, long bytes) {
         DistributionSummary.builder(OUTPUT_SIZE)
-                .tags("tenant", tenantId, "model", modelId)
+                .tags("tenant", requestId, "model", modelId)
                 .description("Size of output data in bytes")
                 .baseUnit("bytes")
                 .register(registry)
@@ -177,8 +177,8 @@ public class InferenceMetrics {
     /**
      * Record quota usage.
      */
-    public void recordQuotaUsage(String tenantId, String resourceType, long used, long limit) {
-        Tags tags = Tags.of("tenant", tenantId, "resource", resourceType);
+    public void recordQuotaUsage(String requestId, String resourceType, long used, long limit) {
+        Tags tags = Tags.of("tenant", requestId, "resource", resourceType);
 
         Gauge.builder(QUOTA_USAGE, () -> used)
                 .tags(tags)
@@ -194,8 +194,8 @@ public class InferenceMetrics {
     /**
      * Get current active request count.
      */
-    public long getActiveRequestCount(String tenantId, String modelId) {
-        String key = tenantId + ":" + modelId;
+    public long getActiveRequestCount(String requestId, String modelId) {
+        String key = requestId + ":" + modelId;
         AtomicLong counter = activeRequests.get(key);
         return counter != null ? counter.get() : 0;
     }
@@ -218,14 +218,14 @@ public class InferenceMetrics {
 
     // ===== Private Helper Methods =====
 
-    private void incrementActiveRequests(String tenantId, String modelId) {
-        String key = tenantId + ":" + modelId;
+    private void incrementActiveRequests(String requestId, String modelId) {
+        String key = requestId + ":" + modelId;
         AtomicLong counter = activeRequests.computeIfAbsent(key, k -> {
             AtomicLong newCounter = new AtomicLong(0);
 
             // Register gauge for this tenant+model combination
             Gauge.builder(ACTIVE_REQUESTS, newCounter, AtomicLong::get)
-                    .tags("tenant", tenantId, "model", modelId)
+                    .tags("tenant", requestId, "model", modelId)
                     .description("Number of active inference requests")
                     .register(registry);
 
@@ -235,8 +235,8 @@ public class InferenceMetrics {
         counter.incrementAndGet();
     }
 
-    private void decrementActiveRequests(String tenantId, String modelId) {
-        String key = tenantId + ":" + modelId;
+    private void decrementActiveRequests(String requestId, String modelId) {
+        String key = requestId + ":" + modelId;
         AtomicLong counter = activeRequests.get(key);
         if (counter != null && counter.get() > 0) {
             counter.decrementAndGet();
@@ -246,15 +246,15 @@ public class InferenceMetrics {
     /**
      * Get metrics summary for monitoring dashboard.
      */
-    public MetricsSummary getSummary(String tenantId, String modelId) {
-        String key = tenantId + ":" + modelId;
+    public MetricsSummary getSummary(String requestId, String modelId) {
+        String key = requestId + ":" + modelId;
 
         // These would ideally come from actual metric queries
         // For now, returning current active count
         return new MetricsSummary(
-                tenantId,
+                requestId,
                 modelId,
-                getActiveRequestCount(tenantId, modelId),
+                getActiveRequestCount(requestId, modelId),
                 0, // Total requests (would query from Counter)
                 0, // Success count
                 0, // Failure count
@@ -265,7 +265,7 @@ public class InferenceMetrics {
     }
 
     public record MetricsSummary(
-            String tenantId,
+            String requestId,
             String modelId,
             long activeRequests,
             long totalRequests,

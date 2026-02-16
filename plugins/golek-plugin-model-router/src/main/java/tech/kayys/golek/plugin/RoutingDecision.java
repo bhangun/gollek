@@ -7,20 +7,20 @@ import java.util.Map;
  * Represents the outcome of a routing decision.
  */
 public class RoutingDecision {
-    
+
     private final String modelId;
     private final String providerId;
-    private final String tenantId;
+    private final String requestId;
     private final double score;
     private final List<String> candidates;
     private final Map<String, Object> metadata;
     private final long timestamp;
 
-    public RoutingDecision(String modelId, String providerId, String tenantId, 
-                         double score, List<String> candidates, Map<String, Object> metadata) {
+    public RoutingDecision(String modelId, String providerId, String requestId,
+            double score, List<String> candidates, Map<String, Object> metadata) {
         this.modelId = modelId;
         this.providerId = providerId;
-        this.tenantId = tenantId;
+        this.requestId = requestId;
         this.score = score;
         this.candidates = candidates != null ? candidates : List.of();
         this.metadata = metadata != null ? metadata : Map.of();
@@ -35,8 +35,8 @@ public class RoutingDecision {
         return providerId;
     }
 
-    public String getTenantId() {
-        return tenantId;
+    public String getRequestId() {
+        return requestId;
     }
 
     public double getScore() {
@@ -66,7 +66,7 @@ public class RoutingDecision {
     public static class RoutingDecisionBuilder {
         private String modelId;
         private String providerId;
-        private String tenantId;
+        private String requestId;
         private double score = 0.0;
         private List<String> candidates = List.of();
         private Map<String, Object> metadata = Map.of();
@@ -81,8 +81,8 @@ public class RoutingDecision {
             return this;
         }
 
-        public RoutingDecisionBuilder tenantId(String tenantId) {
-            this.tenantId = tenantId;
+        public RoutingDecisionBuilder requestId(String requestId) {
+            this.requestId = requestId;
             return this;
         }
 
@@ -102,7 +102,7 @@ public class RoutingDecision {
         }
 
         public RoutingDecision build() {
-            return new RoutingDecision(modelId, providerId, tenantId, score, candidates, metadata);
+            return new RoutingDecision(modelId, providerId, requestId, score, candidates, metadata);
         }
     }
 }

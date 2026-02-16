@@ -40,7 +40,7 @@ public class DefaultInferenceObserver implements InferenceObserver {
         // Start trace span
         Span span = tracer.spanBuilder("inference.execute")
                 .setAttribute("request.id", context.token().getRequestId())
-                .setAttribute("tenant.id", context.tenantContext().getTenantId().value())
+                .setAttribute("tenant.id", context.requestContext().getRequestId())
                 .setAttribute("execution.id", executionId)
                 .startSpan();
 
@@ -74,7 +74,7 @@ public class DefaultInferenceObserver implements InferenceObserver {
         meterRegistry.counter(
                 "inference.phase.started",
                 "phase", phase.name(),
-                "tenant", context.tenantContext().getTenantId().value()).increment();
+                "tenant", context.requestContext().getRequestId()).increment();
     }
 
     @Override
@@ -87,7 +87,7 @@ public class DefaultInferenceObserver implements InferenceObserver {
             timer.stop(meterRegistry.timer(
                     "inference.duration",
                     "status", "success",
-                    "tenant", context.tenantContext().getTenantId().value()));
+                    "tenant", context.requestContext().getRequestId()));
         }
 
         // Close all spans
@@ -97,7 +97,7 @@ public class DefaultInferenceObserver implements InferenceObserver {
         meterRegistry.counter(
                 "inference.completed",
                 "status", "success",
-                "tenant", context.tenantContext().getTenantId().value()).increment();
+                "tenant", context.requestContext().getRequestId()).increment();
 
         LOG.infof("Inference completed: %s", executionId);
     }
@@ -112,7 +112,7 @@ public class DefaultInferenceObserver implements InferenceObserver {
             timer.stop(meterRegistry.timer(
                     "inference.duration",
                     "status", "failure",
-                    "tenant", context.tenantContext().getTenantId().value()));
+                    "tenant", context.requestContext().getRequestId()));
         }
 
         // Record error in span
@@ -129,7 +129,7 @@ public class DefaultInferenceObserver implements InferenceObserver {
                 "inference.completed",
                 "status", "failure",
                 "error.type", error.getClass().getSimpleName(),
-                "tenant", context.tenantContext().getTenantId().value()).increment();
+                "tenant", context.requestContext().getRequestId()).increment();
 
         LOG.errorf(error, "Inference failed: %s", executionId);
     }
@@ -139,7 +139,7 @@ public class DefaultInferenceObserver implements InferenceObserver {
         meterRegistry.counter(
                 "inference.provider.invoked",
                 "provider", providerId,
-                "tenant", context.tenantContext().getTenantId().value()).increment();
+                "tenant", context.requestContext().getRequestId()).increment();
     }
 
     private void closeAllSpans(String executionId) {

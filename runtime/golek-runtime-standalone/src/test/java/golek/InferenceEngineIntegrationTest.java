@@ -4,7 +4,7 @@ import tech.kayys.golek.core.inference.InferenceEngine;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.Message;
-import tech.kayys.wayang.tenant.TenantContext;
+import tech.kayys.golek.spi.context.RequestContext;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
@@ -23,11 +23,11 @@ class InferenceEngineIntegrationTest {
         @Inject
         InferenceEngine engine;
 
-        private TenantContext testTenant;
+        private RequestContext testTenant;
 
         @BeforeEach
         void setup() {
-                testTenant = TenantContext.of("test-tenant");
+                testTenant = RequestContext.of("test-tenant");
         }
 
         @Test

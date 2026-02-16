@@ -9,15 +9,15 @@ public interface ToolRepository {
 
     Uni<List<McpTool>> listAllTools();
 
-    Uni<List<McpTool>> findByTenantId(String tenantId);
+    Uni<List<McpTool>> findByRequestId(String requestId);
 
     Uni<List<McpTool>> findByNamespace(String namespace);
 
-    Uni<List<McpTool>> findByTenantIdAndNamespace(String tenantId, String namespace);
+    Uni<List<McpTool>> findByRequestIdAndNamespace(String requestId, String namespace);
 
     Uni<McpTool> findById(String toolId);
 
-    Uni<McpTool> findByTenantIdAndToolId(String tenantId, String toolId);
+    Uni<McpTool> findByRequestIdAndToolId(String requestId, String toolId);
 
     Uni<McpTool> save(McpTool tool);
 
@@ -29,5 +29,5 @@ public interface ToolRepository {
 
     Uni<Long> count();
 
-    Uni<Long> countByTenantId(String tenantId);
+    Uni<Long> countByRequestId(String requestId);
 }

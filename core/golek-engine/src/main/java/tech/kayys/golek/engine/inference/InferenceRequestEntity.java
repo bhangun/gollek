@@ -14,7 +14,6 @@ import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
 import io.quarkus.panache.common.Page;
 
 import tech.kayys.golek.engine.model.Model;
-import tech.kayys.wayang.tenant.Tenant;
 import io.smallrye.mutiny.Uni;
 
 import jakarta.persistence.AttributeConverter;
@@ -31,10 +30,6 @@ public class InferenceRequestEntity extends PanacheEntityBase {
 
     @Column(unique = true, nullable = false)
     public String requestId;
-
-    @ManyToOne
-    @JoinColumn(name = "tenant_id", nullable = false)
-    public Tenant tenant;
 
     @ManyToOne
     @JoinColumn(name = "model_id", nullable = false)
@@ -61,13 +56,12 @@ public class InferenceRequestEntity extends PanacheEntityBase {
     public InferenceRequestEntity() {
     }
 
-    public InferenceRequestEntity(UUID id, String requestId, Tenant tenant, Model model, RequestStatus status,
+    public InferenceRequestEntity(UUID id, String requestId, Model model, RequestStatus status,
             String runnerName, Long latencyMs, Long inputSizeBytes, Long outputSizeBytes,
             String errorCode, String errorMessage, Map<String, Object> metadata,
             LocalDateTime createdAt, LocalDateTime completedAt) {
         this.id = id;
         this.requestId = requestId;
-        this.tenant = tenant;
         this.model = model;
         this.status = status;
         this.runnerName = runnerName;
@@ -88,10 +82,6 @@ public class InferenceRequestEntity extends PanacheEntityBase {
 
     public String getRequestId() {
         return requestId;
-    }
-
-    public Tenant getTenant() {
-        return tenant;
     }
 
     public Model getModel() {
@@ -147,10 +137,6 @@ public class InferenceRequestEntity extends PanacheEntityBase {
         this.requestId = requestId;
     }
 
-    public void setTenant(Tenant tenant) {
-        this.tenant = tenant;
-    }
-
     public void setModel(Model model) {
         this.model = model;
     }
@@ -204,7 +190,6 @@ public class InferenceRequestEntity extends PanacheEntityBase {
         InferenceRequestEntity that = (InferenceRequestEntity) o;
         return Objects.equals(id, that.id) &&
                 Objects.equals(requestId, that.requestId) &&
-                Objects.equals(tenant, that.tenant) &&
                 Objects.equals(model, that.model) &&
                 status == that.status &&
                 Objects.equals(runnerName, that.runnerName) &&
@@ -220,7 +205,7 @@ public class InferenceRequestEntity extends PanacheEntityBase {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, requestId, tenant, model, status, runnerName, latencyMs,
+        return Objects.hash(id, requestId, model, status, runnerName, latencyMs,
                 inputSizeBytes, outputSizeBytes, errorCode, errorMessage,
                 metadata, createdAt, completedAt);
     }
@@ -235,8 +220,8 @@ public class InferenceRequestEntity extends PanacheEntityBase {
     }
 
     // Panache queries
-    public static Uni<List<InferenceRequestEntity>> findByTenant(String tenantId, int page, int size) {
-        return find("tenant.tenantId = ?1 order by createdAt desc", tenantId)
+    public static Uni<List<InferenceRequestEntity>> findByTenant(String requestId, int page, int size) {
+        return find("tenant.requestId = ?1 order by createdAt desc", requestId)
                 .page(Page.of(page, size))
                 .list();
     }
@@ -276,11 +261,11 @@ public class InferenceRequestEntity extends PanacheEntityBase {
     }
 
     public static Uni<Long> countByTenantAndTimeRange(
-            String tenantId,
+            String requestId,
             LocalDateTime start,
             LocalDateTime end) {
-        return count("tenant.tenantId = ?1 and createdAt between ?2 and ?3",
-                tenantId, start, end);
+        return count("tenant.requestId = ?1 and createdAt between ?2 and ?3",
+                requestId, start, end);
     }
 
     public static Builder builder() {
@@ -290,7 +275,6 @@ public class InferenceRequestEntity extends PanacheEntityBase {
     public static class Builder {
         private UUID id;
         private String requestId;
-        private Tenant tenant;
         private Model model;
         private RequestStatus status;
         private String runnerName;
@@ -310,11 +294,6 @@ public class InferenceRequestEntity extends PanacheEntityBase {
 
         public Builder requestId(String requestId) {
             this.requestId = requestId;
-            return this;
-        }
-
-        public Builder tenant(Tenant tenant) {
-            this.tenant = tenant;
             return this;
         }
 
@@ -374,7 +353,7 @@ public class InferenceRequestEntity extends PanacheEntityBase {
         }
 
         public InferenceRequestEntity build() {
-            return new InferenceRequestEntity(id, requestId, tenant, model, status, runnerName,
+            return new InferenceRequestEntity(id, requestId, model, status, runnerName,
                     latencyMs, inputSizeBytes, outputSizeBytes, errorCode,
                     errorMessage, metadata, createdAt, completedAt);
         }

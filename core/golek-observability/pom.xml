@@ -42,13 +42,6 @@
 
 
         <dependency>
-            <groupId>tech.kayys.wayang</groupId>
-            <artifactId>tenant-spi</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-
-
-        <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-micrometer</artifactId>
         </dependency>

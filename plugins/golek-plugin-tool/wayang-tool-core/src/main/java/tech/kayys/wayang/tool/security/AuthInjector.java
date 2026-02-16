@@ -42,7 +42,7 @@ public class AuthInjector {
                     // Retrieve secret from Vault
                     return vaultManager.retrieve(
                             tech.kayys.wayang.security.secrets.dto.RetrieveSecretRequest.latest(
-                                    profile.getTenantId(),
+                                    profile.getRequestId(),
                                     profile.getVaultPath()))
                             .map(secret -> {
                                 String secretValue = secret.data().get("auth_secret");

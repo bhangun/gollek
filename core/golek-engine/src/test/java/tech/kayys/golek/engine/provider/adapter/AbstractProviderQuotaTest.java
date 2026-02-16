@@ -12,8 +12,8 @@ import tech.kayys.golek.spi.provider.ProviderHealth;
 import tech.kayys.golek.spi.provider.ProviderMetadata;
 import tech.kayys.golek.spi.provider.ProviderRequest;
 import tech.kayys.golek.spi.Message;
+
 import tech.kayys.golek.provider.core.quota.ProviderQuotaService;
-import tech.kayys.wayang.tenant.TenantContext;
 
 import java.util.Map;
 
@@ -62,11 +62,12 @@ public class AbstractProviderQuotaTest {
                 .model("test-model")
                 .requestId("test-req-id")
                 .message(Message.user("hello"))
+                .metadata("tenantId", "tenant-1") // Set tenantId via metadata
                 .build();
-        TenantContext context = TenantContext.of("tenant-1");
+        // RequestContext context = RequestContext.of("tenant-1"); // Removed
 
         // Act
-        UniAssertSubscriber<InferenceResponse> subscriber = provider.infer(request, context)
+        UniAssertSubscriber<InferenceResponse> subscriber = provider.infer(request)
                 .subscribe().withSubscriber(UniAssertSubscriber.create())
                 .awaitItem();
 
@@ -86,11 +87,12 @@ public class AbstractProviderQuotaTest {
                 .model("test-model")
                 .requestId("test-req-id")
                 .message(Message.user("hello"))
+                .metadata("tenantId", "tenant-1")
                 .build();
-        TenantContext context = TenantContext.of("tenant-1");
+        // RequestContext context = RequestContext.of("tenant-1"); // Removed
 
         // Act & Assert
-        provider.infer(request, context)
+        provider.infer(request)
                 .subscribe().withSubscriber(UniAssertSubscriber.create())
                 .awaitFailure()
                 .assertFailedWith(tech.kayys.golek.spi.routing.QuotaExhaustedException.class);
@@ -126,12 +128,12 @@ public class AbstractProviderQuotaTest {
         }
 
         @Override
-        public boolean supports(String modelId, TenantContext tenantContext) {
+        public boolean supports(String modelId, ProviderRequest request) {
             return true;
         }
 
         @Override
-        protected Uni<Void> doInitialize(Map<String, Object> config, TenantContext tenant) {
+        protected Uni<Void> doInitialize(Map<String, Object> config) {
             return Uni.createFrom().voidItem();
         }
 

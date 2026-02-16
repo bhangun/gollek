@@ -37,8 +37,8 @@ public class SessionManager {
     /**
      * Acquire session for model and tenant
      */
-    public Optional<Session> acquireSession(String modelId, String tenantId) {
-        return acquireSession(modelId, tenantId, 5000);
+    public Optional<Session> acquireSession(String modelId, String requestId) {
+        return acquireSession(modelId, requestId, 5000);
     }
 
     /**
@@ -46,15 +46,15 @@ public class SessionManager {
      */
     public Optional<Session> acquireSession(
             String modelId,
-            String tenantId,
+            String requestId,
             long timeoutMs) {
         if (shutdown) {
             return Optional.empty();
         }
 
-        String poolKey = getPoolKey(modelId, tenantId);
+        String poolKey = getPoolKey(modelId, requestId);
         SessionPool pool = pools.computeIfAbsent(poolKey,
-                k -> createPool(modelId, tenantId));
+                k -> createPool(modelId, requestId));
 
         return pool.acquire(timeoutMs);
     }
@@ -67,7 +67,7 @@ public class SessionManager {
             return;
         }
 
-        String poolKey = getPoolKey(session.getModelId(), session.getTenantId());
+        String poolKey = getPoolKey(session.getModelId(), session.getRequestId());
         SessionPool pool = pools.get(poolKey);
 
         if (pool != null) {
@@ -99,8 +99,8 @@ public class SessionManager {
     /**
      * Get pool statistics for model
      */
-    public Optional<SessionPool.PoolStats> getPoolStats(String modelId, String tenantId) {
-        String poolKey = getPoolKey(modelId, tenantId);
+    public Optional<SessionPool.PoolStats> getPoolStats(String modelId, String requestId) {
+        String poolKey = getPoolKey(modelId, requestId);
         SessionPool pool = pools.get(poolKey);
         return pool != null ? Optional.of(pool.getStats()) : Optional.empty();
     }
@@ -142,12 +142,12 @@ public class SessionManager {
         LOG.info("Session manager shutdown complete");
     }
 
-    private SessionPool createPool(String modelId, String tenantId) {
-        LOG.infof("Creating session pool for model %s, tenant %s", modelId, tenantId);
-        return new SessionPool(modelId, tenantId, config);
+    private SessionPool createPool(String modelId, String requestId) {
+        LOG.infof("Creating session pool for model %s, tenant %s", modelId, requestId);
+        return new SessionPool(modelId, requestId, config);
     }
 
-    private String getPoolKey(String modelId, String tenantId) {
-        return modelId + ":" + tenantId;
+    private String getPoolKey(String modelId, String requestId) {
+        return modelId + ":" + requestId;
     }
 }

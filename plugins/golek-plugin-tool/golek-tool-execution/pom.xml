@@ -17,8 +17,18 @@
             <artifactId>mutiny</artifactId>
         </dependency>
         <dependency>
+            <groupId>tech.kayys.golek</groupId>
+            <artifactId>golek-spi</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>tech.kayys.wayang</groupId>
             <artifactId>wayang-error-spi</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys.wayang</groupId>
+            <artifactId>wayang-tool-core</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

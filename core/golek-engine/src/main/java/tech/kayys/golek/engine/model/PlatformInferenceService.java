@@ -8,11 +8,12 @@ import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
 import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 import org.jboss.logging.Logger;
+
+import tech.kayys.golek.spi.context.RequestContext;
 import tech.kayys.golek.spi.inference.*;
-import tech.kayys.wayang.tenant.QuotaEnforcer;
-import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.core.inference.InferenceEngine;
 import tech.kayys.golek.engine.inference.InferenceMetrics;
+import tech.kayys.golek.engine.security.EngineQuotaEnforcer;
 import tech.kayys.golek.observability.AuditService;
 import jakarta.ws.rs.NotFoundException;
 
@@ -35,9 +36,6 @@ public class PlatformInferenceService {
     private static final Logger LOG = Logger.getLogger(PlatformInferenceService.class);
 
     @Inject
-    QuotaEnforcer quotaEnforcer;
-
-    @Inject
     InferenceEngine engine;
 
     @Inject
@@ -46,16 +44,19 @@ public class PlatformInferenceService {
     @Inject
     AuditService auditService;
 
+    @Inject
+    EngineQuotaEnforcer quotaEnforcer;
+
     private final Map<String, BatchStatus> batchStatuses = new ConcurrentHashMap<>();
 
-    private UUID parseTenantId(String tenantId) {
-        if (tenantId == null || tenantId.isEmpty() || "community".equalsIgnoreCase(tenantId)) {
-            return UUID.nameUUIDFromBytes("community".getBytes());
+    private UUID parseRequestId(String requestId) {
+        if (requestId == null || requestId.isBlank()) {
+            return UUID.randomUUID();
         }
         try {
-            return UUID.fromString(tenantId);
+            return UUID.fromString(requestId);
         } catch (IllegalArgumentException e) {
-            return UUID.nameUUIDFromBytes(tenantId.getBytes());
+            return UUID.nameUUIDFromBytes(requestId.getBytes());
         }
     }
 
@@ -67,10 +68,12 @@ public class PlatformInferenceService {
     @CircuitBreaker(requestVolumeThreshold = 10, failureRatio = 0.5, delay = 5000)
     public Uni<InferenceResponse> infer(
             InferenceRequest request,
-            TenantContext tenantContext) {
+            RequestContext requestContext) {
+        RequestContext effectiveContext = ensureRequestContext(requestContext, request.getRequestId());
+
         // 1. Pre-execution quota check
         return quotaEnforcer
-                .checkAndIncrementQuota(parseTenantId(tenantContext.getTenantId().value()), "requests", 1)
+                .checkAndIncrementQuota(parseRequestId(effectiveContext.getRequestId()), "requests", 1)
                 .onItem().transformToUni(quotaOk -> {
                     if (!quotaOk) {
                         return Uni.createFrom().failure(
@@ -78,17 +81,25 @@ public class PlatformInferenceService {
                     }
 
                     // 2. Audit start
-                    auditService.logInferenceStart(request, tenantContext);
+                    auditService.logInferenceStart(request, effectiveContext);
 
                     // 3. Execute inference
                     long startTime = System.nanoTime();
 
-                    return engine.infer(request, tenantContext)
+                    // Enrich request with context info for downward layers (Providers)
+                    InferenceRequest enrichedRequest = request.toBuilder()
+                            .userId(effectiveContext.userId())
+                            .sessionId(effectiveContext.sessionId())
+                            .traceId(effectiveContext.traceId())
+                            .metadata("tenantId", effectiveContext.tenantId())
+                            .build();
+
+                    return engine.infer(enrichedRequest)
                             .onItem().invoke(response -> {
                                 // 4. Record metrics
                                 long durationMs = (System.nanoTime() - startTime) / 1_000_000;
                                 metrics.recordSuccess(
-                                        tenantContext.getTenantId().value(),
+                                        effectiveContext.getRequestId(),
                                         request.getModel(),
                                         "default",
                                         durationMs);
@@ -97,12 +108,12 @@ public class PlatformInferenceService {
                                 auditService.logInferenceComplete(
                                         request,
                                         response,
-                                        tenantContext);
+                                        effectiveContext);
                             })
                             .onFailure().invoke(error -> {
                                 // 6. Record failure metrics
                                 metrics.recordFailure(
-                                        tenantContext.getTenantId().value(),
+                                        effectiveContext.getRequestId(),
                                         request.getModel(),
                                         error.getClass().getSimpleName());
 
@@ -110,7 +121,7 @@ public class PlatformInferenceService {
                                 auditService.logInferenceFailure(
                                         request,
                                         error,
-                                        tenantContext);
+                                        effectiveContext);
                             });
                 });
     }
@@ -120,33 +131,41 @@ public class PlatformInferenceService {
      */
     public Multi<StreamingInferenceChunk> stream(
             InferenceRequest request,
-            TenantContext tenantContext) {
+            RequestContext requestContext) {
+        RequestContext effectiveContext = ensureRequestContext(requestContext, request.getRequestId());
         // Quota check
         return quotaEnforcer
-                .checkAndIncrementQuota(parseTenantId(tenantContext.getTenantId().value()), "requests", 1)
+                .checkAndIncrementQuota(parseRequestId(effectiveContext.getRequestId()), "requests", 1)
                 .onItem().transformToMulti(quotaOk -> {
                     if (!quotaOk) {
                         return Multi.createFrom().failure(
                                 new RuntimeException("Tenant quota exceeded"));
                     }
 
-                    auditService.logStreamStart(request, tenantContext);
+                    auditService.logStreamStart(request, effectiveContext);
 
-                    return engine.stream(request, tenantContext)
+                    InferenceRequest enrichedRequest = request.toBuilder()
+                            .userId(effectiveContext.userId())
+                            .sessionId(effectiveContext.sessionId())
+                            .traceId(effectiveContext.traceId())
+                            .metadata("tenantId", effectiveContext.tenantId())
+                            .build();
+
+                    return engine.stream(enrichedRequest)
                             .map(chunk -> (StreamingInferenceChunk) chunk)
                             .onItem().invoke(chunk -> {
                                 metrics.recordRequestStarted(
-                                        tenantContext.getTenantId().value(),
+                                        effectiveContext.getRequestId(),
                                         request.getModel());
                             })
                             .onCompletion().invoke(() -> {
-                                auditService.logStreamComplete(request, tenantContext);
+                                auditService.logStreamComplete(request, effectiveContext);
                             })
                             .onFailure().invoke(error -> {
                                 auditService.logStreamFailure(
                                         request,
                                         error,
-                                        tenantContext);
+                                        effectiveContext);
                             });
                 });
     }
@@ -156,10 +175,11 @@ public class PlatformInferenceService {
      */
     public Uni<String> submitAsyncJob(
             InferenceRequest request,
-            TenantContext tenantContext) {
+            RequestContext requestContext) {
+        RequestContext effectiveContext = ensureRequestContext(requestContext, request.getRequestId());
         // Quota check
         return quotaEnforcer
-                .checkAndIncrementQuota(parseTenantId(tenantContext.getTenantId().value()), "requests", 1)
+                .checkAndIncrementQuota(parseRequestId(effectiveContext.getRequestId()), "requests", 1)
                 .onItem().transformToUni(quotaOk -> {
                     if (!quotaOk) {
                         return Uni.createFrom().failure(
@@ -167,7 +187,13 @@ public class PlatformInferenceService {
                     }
 
                     // Submit to engine's async handler
-                    return engine.submitAsyncJob(request);
+                    InferenceRequest enrichedRequest = request.toBuilder()
+                            .userId(effectiveContext.userId())
+                            .sessionId(effectiveContext.sessionId())
+                            .traceId(effectiveContext.traceId())
+                            .metadata("tenantId", effectiveContext.tenantId())
+                            .build();
+                    return engine.submitAsyncJob(enrichedRequest);
                 });
     }
 
@@ -176,7 +202,8 @@ public class PlatformInferenceService {
      */
     public Uni<String> batchInfer(
             BatchInferenceRequest batchRequest,
-            TenantContext tenantContext) {
+            RequestContext requestContext) {
+        RequestContext effectiveContext = ensureRequestContext(requestContext, UUID.randomUUID().toString());
         String batchId = UUID.randomUUID().toString();
 
         BatchStatus status = new BatchStatus(
@@ -187,7 +214,7 @@ public class PlatformInferenceService {
 
         // Process batch asynchronously
         Multi.createFrom().iterable(batchRequest.getRequests())
-                .onItem().transformToUniAndConcatenate(req -> infer(req, tenantContext)
+                .onItem().transformToUniAndConcatenate(req -> infer(req, effectiveContext)
                         .onItem().invoke(resp -> status.incrementCompleted())
                         .onFailure().invoke(err -> status.incrementFailed()))
                 .subscribe().with(
@@ -210,7 +237,8 @@ public class PlatformInferenceService {
      */
     public Uni<BatchStatus> getBatchStatus(
             String batchId,
-            TenantContext tenantContext) {
+            RequestContext requestContext) {
+        ensureRequestContext(requestContext, batchId);
         BatchStatus status = batchStatuses.get(batchId);
         if (status == null) {
             return Uni.createFrom().failure(
@@ -224,12 +252,20 @@ public class PlatformInferenceService {
      */
     public Uni<Boolean> cancel(
             String requestId,
-            TenantContext tenantContext) {
+            RequestContext requestContext) {
+        RequestContext effectiveContext = ensureRequestContext(requestContext, requestId);
         // Implementation depends on execution model
         // For now, just log
         LOG.infof("Cancellation requested for: %s", requestId);
-        auditService.logCancellation(requestId, tenantContext);
+        auditService.logCancellation(requestId, effectiveContext);
         return Uni.createFrom().item(true);
+    }
+
+    private RequestContext ensureRequestContext(RequestContext requestContext, String requestId) {
+        if (requestContext != null) {
+            return requestContext;
+        }
+        return RequestContext.of(requestId);
     }
 
     /**

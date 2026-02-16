@@ -9,10 +9,13 @@ import tech.kayys.golek.sdk.core.GolekSdk;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.Message;
+import tech.kayys.golek.spi.provider.ProviderHealth;
+import tech.kayys.golek.spi.provider.ProviderInfo;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
@@ -36,7 +39,7 @@ public class RunCommand implements Runnable {
     String prompt;
 
     @Option(names = {
-            "--provider" }, description = "Provider: litert, gguf, ollama, gemini, openai, anthropic, cerebras")
+            "--provider" }, description = "Provider: litert, gguf, djl, libtorch(experimental), ollama, gemini, openai, anthropic, cerebras")
     String providerId;
 
     @Option(names = { "-s", "--stream" }, description = "Stream output", defaultValue = "true")
@@ -79,6 +82,12 @@ public class RunCommand implements Runnable {
     @Option(names = { "--model-path" }, description = "Path to a custom model file (bypasses repository lookup)")
     String modelPath;
 
+    @Option(names = { "--convert-mode" }, description = "Checkpoint conversion mode: auto or off", defaultValue = "auto")
+    String convertMode;
+
+    @Option(names = { "--gguf-outtype" }, description = "GGUF converter outtype (e.g. f16, q8_0, f32)")
+    String ggufOutType;
+
     private static final String RESET = "\u001B[0m";
     private static final String GREEN = "\u001B[32m";
     private static final String CYAN = "\u001B[36m";
@@ -91,6 +100,8 @@ public class RunCommand implements Runnable {
         long startTime = System.currentTimeMillis();
 
         try {
+            configureCheckpointConversionPreference();
+
             boolean customModelPathUsed = false;
             System.out.println(BOLD + YELLOW + "  _____       _      _    " + RESET);
             System.out.println(BOLD + YELLOW + " / ____|     | |    | |   " + RESET);
@@ -157,10 +168,13 @@ public class RunCommand implements Runnable {
                                 break;
                             } catch (Exception e) {
                                 lastPullError = e;
+                                if (isFatalPullError(e)) {
+                                    break;
+                                }
                             }
                         }
                         if (!pulled) {
-                            String reason = lastPullError != null ? lastPullError.getMessage() : "unknown error";
+                            String reason = lastPullError != null ? describeError(lastPullError) : "unknown error";
                             System.err.println("Error: Failed to download from Hugging Face. " + reason);
                             return;
                         }
@@ -203,6 +217,7 @@ public class RunCommand implements Runnable {
                     }
                 } else {
                     System.out.println("found locally.");
+                    modelInfoOpt.ifPresent(this::maybeUpgradeDjlLayout);
                 }
 
                 // Print model path if available
@@ -215,6 +230,9 @@ public class RunCommand implements Runnable {
                 sdk.setPreferredProvider(providerId);
             } else {
                 maybeAutoSelectProvider();
+            }
+            if (!ensureProviderReady()) {
+                return;
             }
 
             // Build request
@@ -338,6 +356,9 @@ public class RunCommand implements Runnable {
             if (inferredProvider == null || inferredProvider.isBlank()) {
                 return;
             }
+            if (!isProviderHealthy(inferredProvider)) {
+                return;
+            }
             sdk.setPreferredProvider(inferredProvider);
             providerId = inferredProvider;
         } catch (Exception ignored) {
@@ -352,9 +373,242 @@ public class RunCommand implements Runnable {
         String normalized = format.trim().toUpperCase();
         return switch (normalized) {
             case "GGUF" -> "gguf";
-            case "TORCHSCRIPT", "PYTORCH", "SAFETENSORS" -> "libtorch";
+            case "TORCHSCRIPT" -> "djl";
             case "ONNX" -> "onnx";
             default -> null;
         };
+    }
+
+    private void maybeUpgradeDjlLayout(tech.kayys.golek.sdk.core.model.ModelInfo info) {
+        if (info == null || info.getFormat() == null) {
+            return;
+        }
+        String format = info.getFormat().trim().toUpperCase();
+        if (!format.equals("TORCHSCRIPT")) {
+            return;
+        }
+        Object rawPath = info.getMetadata() != null ? info.getMetadata().get("path") : null;
+        String path = rawPath != null ? String.valueOf(rawPath).toLowerCase() : "";
+        if (!path.contains("/models/torchscript/")) {
+            return;
+        }
+        if (!(modelId.contains("/") || modelId.startsWith("hf:"))) {
+            return;
+        }
+        try {
+            System.out.println("Upgrading local model layout for DJL runtime: " + modelId);
+            for (String spec : buildPullSpecs(modelId)) {
+                try {
+                    sdk.pullModel(spec, null);
+                    break;
+                } catch (Exception ignored) {
+                    // try next variant
+                }
+            }
+        } catch (Exception ignored) {
+            // keep existing model when upgrade is unavailable
+        }
+    }
+
+    private boolean isProviderHealthy(String id) {
+        try {
+            return sdk.listAvailableProviders().stream()
+                    .filter(p -> id.equalsIgnoreCase(p.id()))
+                    .findFirst()
+                    .map(p -> p.healthStatus() == tech.kayys.golek.spi.provider.ProviderHealth.Status.HEALTHY)
+                    .orElse(false);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean ensureProviderReady() {
+        try {
+            if (providerId != null && !providerId.isBlank()) {
+                return ensureProviderHealthy(providerId);
+            }
+            var modelInfoOpt = sdk.getModelInfo(modelId);
+            if (modelInfoOpt.isEmpty()) {
+                return true;
+            }
+            var modelInfo = modelInfoOpt.get();
+            String format = modelInfo.getFormat();
+            if (isCheckpointOnlyFormat(format)) {
+                if (offline) {
+                    System.err.printf("Model '%s' uses checkpoint format '%s' and cannot run in offline Java runtime.%n",
+                            modelId, format);
+                    System.err.println("Use a GGUF or TorchScript model, or rerun without --offline for fallback pull.");
+                    return false;
+                }
+                if (tryRefreshCompatibleModel()) {
+                    modelInfoOpt = sdk.getModelInfo(modelId);
+                    if (modelInfoOpt.isPresent()) {
+                        format = modelInfoOpt.get().getFormat();
+                    }
+                }
+            }
+
+            if (isCheckpointOnlyFormat(format)) {
+                System.err.printf("Model '%s' uses unsupported runtime format '%s'.%n", modelId, format);
+                System.err.println("Use a GGUF or TorchScript model.");
+                return false;
+            }
+
+            String inferredProvider = providerForFormat(format);
+            if (inferredProvider == null || inferredProvider.isBlank()) {
+                return true;
+            }
+            return ensureProviderHealthy(inferredProvider);
+        } catch (Exception ignored) {
+            return true;
+        }
+    }
+
+    private boolean isCheckpointOnlyFormat(String format) {
+        if (format == null) {
+            return false;
+        }
+        String normalized = format.trim().toUpperCase();
+        return normalized.equals("PYTORCH") || normalized.equals("SAFETENSORS");
+    }
+
+    private void configureCheckpointConversionPreference() {
+        String mode = convertMode == null ? "auto" : convertMode.trim().toLowerCase();
+        if (mode.equals("off")) {
+            System.setProperty("golek.gguf.converter.auto", "false");
+        } else {
+            System.setProperty("golek.gguf.converter.auto", "true");
+        }
+        if (ggufOutType != null && !ggufOutType.isBlank()) {
+            System.setProperty("golek.gguf.converter.outtype", ggufOutType.trim().toLowerCase());
+        }
+    }
+
+    private boolean tryRefreshCompatibleModel() {
+        if (!(modelId.contains("/") || modelId.startsWith("hf:"))) {
+            return false;
+        }
+        System.out.println("Checkpoint-only model detected. Trying GGUF/TorchScript fallback...");
+        for (String spec : buildPullSpecs(modelId)) {
+            try {
+                sdk.pullModel(spec, null);
+            } catch (Exception e) {
+                if (isFatalPullError(e)) {
+                    break;
+                }
+            }
+        }
+        String normalized = modelId.startsWith("hf:") ? modelId.substring(3) : modelId;
+        for (String candidate : java.util.List.of(modelId, normalized, modelId + "-GGUF", normalized + "-GGUF")) {
+            try {
+                var info = sdk.getModelInfo(candidate);
+                if (info.isPresent()) {
+                    String fmt = info.get().getFormat();
+                    if (!isCheckpointOnlyFormat(fmt)) {
+                        modelId = candidate;
+                        System.out.println("Using compatible model: " + modelId);
+                        return true;
+                    }
+                }
+            } catch (Exception ignored) {
+                // continue
+            }
+        }
+        return false;
+    }
+
+    private boolean ensureProviderHealthy(String provider) {
+        Optional<ProviderInfo> info = findProviderInfo(provider);
+        if (info.isEmpty()) {
+            System.err.printf("Required provider is not available: %s%n", provider);
+            return false;
+        }
+        if (info.get().healthStatus() != ProviderHealth.Status.UNHEALTHY) {
+            return true;
+        }
+        printProviderSetupHint(info.get());
+        return false;
+    }
+
+    private Optional<ProviderInfo> findProviderInfo(String id) {
+        try {
+            return sdk.listAvailableProviders().stream()
+                    .filter(p -> id.equalsIgnoreCase(p.id()))
+                    .findFirst();
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    private void printProviderSetupHint(ProviderInfo provider) {
+        String id = provider.id();
+        System.err.printf("Provider '%s' is installed but not healthy.%n", id);
+        String healthMessage = null;
+        if (provider.metadata() != null) {
+            Object value = provider.metadata().get("healthMessage");
+            if (value != null) {
+                healthMessage = String.valueOf(value);
+            }
+        }
+        if (healthMessage != null && !healthMessage.isBlank()) {
+            System.err.println("Reason: " + healthMessage);
+        }
+        if (provider.metadata() != null) {
+            Object details = provider.metadata().get("healthDetails");
+            if (details instanceof java.util.Map<?, ?> map) {
+                Object reason = map.get("reason");
+                if (reason != null) {
+                    System.err.println("Detail: " + reason);
+                }
+            }
+        }
+        if ("djl".equalsIgnoreCase(id)) {
+            System.err.println(
+                    "DJL PyTorch engine is unavailable. Ensure internet access for first-run native download or pre-install DJL native runtime.");
+        } else if ("libtorch".equalsIgnoreCase(id)) {
+            System.err.println("Set LIBTORCH_PATH to your libtorch native library directory.");
+        } else if ("gguf".equalsIgnoreCase(id)) {
+            System.err.println("Set GOLEK_LLAMA_LIB_DIR or GOLEK_LLAMA_LIB_PATH to llama.cpp native libraries.");
+        }
+    }
+
+    private String describeError(Throwable throwable) {
+        if (throwable == null) {
+            return "unknown error";
+        }
+        StringBuilder sb = new StringBuilder();
+        Throwable current = throwable;
+        int guard = 0;
+        while (current != null && guard++ < 8) {
+            String msg = current.getMessage();
+            if (msg != null && !msg.isBlank()) {
+                if (sb.length() > 0) {
+                    sb.append(" | ");
+                }
+                sb.append(msg);
+            }
+            current = current.getCause();
+        }
+        if (sb.length() == 0) {
+            return throwable.getClass().getSimpleName();
+        }
+        return sb.toString();
+    }
+
+    private boolean isFatalPullError(Throwable throwable) {
+        String detail = describeError(throwable).toLowerCase();
+        return detail.contains("401")
+                || detail.contains("403")
+                || detail.contains("404")
+                || detail.contains("unauthorized")
+                || detail.contains("forbidden")
+                || detail.contains("gated")
+                || detail.contains("access denied")
+                || detail.contains("not found")
+                || detail.contains("model conversion service not available")
+                || detail.contains("conversion process failed")
+                || detail.contains("no gguf found")
+                || detail.contains("unsupported runtime format")
+                || detail.contains("checkpoint-only model");
     }
 }

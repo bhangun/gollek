@@ -17,8 +17,8 @@ public class OpenApiSourceRepositoryImpl implements PanacheRepository<OpenApiSou
     }
 
     @Override
-    public Uni<List<OpenApiSource>> findByTenantId(String tenantId) {
-        return list("tenantId", tenantId);
+    public Uni<List<OpenApiSource>> findByRequestId(String requestId) {
+        return list("requestId", requestId);
     }
 
     @Override
@@ -27,8 +27,8 @@ public class OpenApiSourceRepositoryImpl implements PanacheRepository<OpenApiSou
     }
 
     @Override
-    public Uni<List<OpenApiSource>> findByTenantIdAndNamespace(String tenantId, String namespace) {
-        return list("tenantId = ?1 AND namespace = ?2", tenantId, namespace);
+    public Uni<List<OpenApiSource>> findByRequestIdAndNamespace(String requestId, String namespace) {
+        return list("requestId = ?1 AND namespace = ?2", requestId, namespace);
     }
 
     @Override
@@ -37,8 +37,8 @@ public class OpenApiSourceRepositoryImpl implements PanacheRepository<OpenApiSou
     }
 
     @Override
-    public Uni<OpenApiSource> findByTenantIdAndSourceId(String tenantId, UUID sourceId) {
-        return find("tenantId = ?1 AND sourceId = ?2", tenantId, sourceId).firstResult();
+    public Uni<OpenApiSource> findByRequestIdAndSourceId(String requestId, UUID sourceId) {
+        return find("requestId = ?1 AND sourceId = ?2", requestId, sourceId).firstResult();
     }
 
     @Override
@@ -67,7 +67,7 @@ public class OpenApiSourceRepositoryImpl implements PanacheRepository<OpenApiSou
     }
 
     @Override
-    public Uni<Long> countByTenantId(String tenantId) {
-        return count("tenantId", tenantId);
+    public Uni<Long> countByRequestId(String requestId) {
+        return count("requestId", requestId);
     }
 }

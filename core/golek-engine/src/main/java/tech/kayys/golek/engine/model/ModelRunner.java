@@ -2,9 +2,7 @@ package tech.kayys.golek.engine.model;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
-import tech.kayys.golek.spi.context.RequestContext;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.model.DeviceType;
@@ -142,31 +140,14 @@ public interface ModelRunner extends AutoCloseable {
      * @throws tech.kayys.golek.spi.exception.InferenceException if execution fails
      */
     InferenceResponse infer(
-            InferenceRequest request,
-            RequestContext context) throws InferenceException;
-
-    /**
-     * Execute synchronous inference on the model with default context.
-     *
-     * @param request Inference request with inputs
-     * @return Inference response with outputs
-     * @throws tech.kayys.golek.spi.exception.InferenceException if execution fails
-     */
-    default InferenceResponse infer(InferenceRequest request) throws InferenceException {
-        return infer(request, null);
-    }
+            InferenceRequest request) throws InferenceException;
 
     /**
      * Execute asynchronous inference with callback
      * 
      * @param request Inference request
-     * @param context Request context
      * @return CompletionStage for async processing
      */
-    CompletionStage<InferenceResponse> inferAsync(
-            InferenceRequest request,
-            RequestContext context);
-
     /**
      * Execute asynchronous inference on the model.
      * 

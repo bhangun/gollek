@@ -51,7 +51,7 @@ public class AuditLoggerPlugin implements InferencePhasePlugin {
                 .event(determineEvent(context))
                 .level(determineLevel(context))
                 .tag("inference")
-                .tag(context.tenantContext().getTenantId().value())
+                .tag(context.requestContext().requestId())
                 .metadata("modelId", context.getVariable("request", InferenceRequest.class)
                         .map(InferenceRequest::getModel).orElse("unknown"))
                 .metadata("providerId", getProviderId(context))
@@ -126,7 +126,7 @@ public class AuditLoggerPlugin implements InferencePhasePlugin {
     private Map<String, Object> buildSnapshot(ExecutionContext context) {
         Map<String, Object> snapshot = new HashMap<>();
         snapshot.put("requestId", context.token().getRequestId());
-        snapshot.put("tenantId", context.tenantContext().getTenantId().value());
+        snapshot.put("requestId", context.requestContext().requestId());
 
         context.getVariable("request", InferenceRequest.class)
                 .ifPresent(req -> snapshot.put("model", req.getModel()));

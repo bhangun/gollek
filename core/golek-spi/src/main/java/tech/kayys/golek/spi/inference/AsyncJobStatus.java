@@ -10,7 +10,7 @@ import tech.kayys.golek.spi.auth.ApiKeyConstants;
 public record AsyncJobStatus(
         String jobId,
         String requestId,
-        @Deprecated String tenantId,
+        @Deprecated String apiKey,
         String status,
         InferenceResponse result,
         String error,
@@ -25,9 +25,9 @@ public record AsyncJobStatus(
     }
 
     public String apiKey() {
-        if (tenantId == null || tenantId.isBlank()) {
+        if (apiKey == null || apiKey.isBlank()) {
             return ApiKeyConstants.COMMUNITY_API_KEY;
         }
-        return tenantId;
+        return apiKey;
     }
 }

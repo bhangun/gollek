@@ -10,7 +10,6 @@
     </parent>
 
     <artifactId>golek-memory-episodic</artifactId>
-    <packaging>jar</packaging>
 
     <dependencies>
         <dependency>

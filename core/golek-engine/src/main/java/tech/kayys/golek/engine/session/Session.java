@@ -14,7 +14,7 @@ public final class Session implements AutoCloseable {
 
     private final String sessionId;
     private final String modelId;
-    private final String tenantId;
+    private final String requestId;
     private final Instant createdAt;
     private final SessionConfig config;
     private final AtomicBoolean active;
@@ -23,10 +23,10 @@ public final class Session implements AutoCloseable {
 
     private volatile Object nativeHandle; // Provider-specific handle
 
-    public Session(String modelId, String tenantId, SessionConfig config) {
+    public Session(String modelId, String requestId, SessionConfig config) {
         this.sessionId = UUID.randomUUID().toString();
         this.modelId = Objects.requireNonNull(modelId, "modelId");
-        this.tenantId = Objects.requireNonNull(tenantId, "tenantId");
+        this.requestId = Objects.requireNonNull(requestId, "requestId");
         this.config = Objects.requireNonNull(config, "config");
         this.createdAt = Instant.now();
         this.active = new AtomicBoolean(true);
@@ -42,8 +42,8 @@ public final class Session implements AutoCloseable {
         return modelId;
     }
 
-    public String getTenantId() {
-        return tenantId;
+    public String getRequestId() {
+        return requestId;
     }
 
     public Instant getCreatedAt() {
@@ -155,7 +155,7 @@ public final class Session implements AutoCloseable {
         return "Session{" +
                 "id='" + sessionId + '\'' +
                 ", model='" + modelId + '\'' +
-                ", tenant='" + tenantId + '\'' +
+                ", tenant='" + requestId + '\'' +
                 ", requests=" + requestCount.get() +
                 ", idleMs=" + getIdleTimeMs() +
                 ", active=" + active.get() +

@@ -15,7 +15,6 @@ import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.Map;
-import tech.kayys.wayang.tenant.TenantConfig;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,6 +40,19 @@ public class SystemModule {
 
     private volatile boolean initialized = false;
     private volatile boolean started = false;
+
+    public interface RequestConfigRepository {
+        Map<String, Object> getRunnerConfig(String requestId, String runnerId);
+
+        boolean isQuotaExhausted(String requestId, String providerId);
+
+        boolean isCostSensitive(String requestId);
+
+        void updateConfig(String requestId, RequestConfig config);
+    }
+
+    public record RequestConfig(Map<String, Object> properties) {
+    }
 
     @Inject
     public SystemModule(ProviderRegistry providerRegistry,
@@ -263,25 +275,25 @@ public class SystemModule {
 
     @Produces
     @Singleton
-    public tech.kayys.wayang.tenant.TenantConfigRepository produceTenantConfigRepository() {
-        return new tech.kayys.wayang.tenant.TenantConfigRepository() {
+    public RequestConfigRepository produceTenantConfigRepository() {
+        return new RequestConfigRepository() {
             @Override
-            public Map<String, Object> getRunnerConfig(String tenantId, String runnerId) {
+            public Map<String, Object> getRunnerConfig(String requestId, String runnerId) {
                 return Map.of();
             }
 
             @Override
-            public boolean isQuotaExhausted(String tenantId, String providerId) {
+            public boolean isQuotaExhausted(String requestId, String providerId) {
                 return false;
             }
 
             @Override
-            public boolean isCostSensitive(String tenantId) {
+            public boolean isCostSensitive(String requestId) {
                 return false;
             }
 
             @Override
-            public void updateConfig(String tenantId, TenantConfig config) {
+            public void updateConfig(String requestId, RequestConfig config) {
                 // No-op
             }
         };

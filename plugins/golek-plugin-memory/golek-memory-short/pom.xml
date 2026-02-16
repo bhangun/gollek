@@ -10,7 +10,6 @@
     </parent>
 
     <artifactId>golek-memory-short</artifactId>
-    <packaging>jar</packaging>
 
     <dependencies>
         <dependency>

@@ -7,13 +7,12 @@ import tech.kayys.golek.spi.auth.ApiKeyConstants;
 public record StreamingSession(
         String sessionId,
         String modelId,
-        @Deprecated String tenantId,
-        Multi<Message> stream
-) {
+        @Deprecated String apiKey,
+        Multi<Message> stream) {
     public String apiKey() {
-        if (tenantId == null || tenantId.isBlank()) {
+        if (apiKey == null || apiKey.isBlank()) {
             return ApiKeyConstants.COMMUNITY_API_KEY;
         }
-        return tenantId;
+        return apiKey;
     }
 }

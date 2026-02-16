@@ -130,15 +130,15 @@ public class QuotaPlugin implements InferencePlugin {
   
   @Override
   public Uni<ProviderRequest> preProcess(ProviderRequest request) {
-    String tenantId = request.getTenantContext().getTenantId();
+    String requestId = request.getRequestContext().getRequestId();
     QuotaManager manager = quotas.computeIfAbsent(
-      tenantId,
+      requestId,
       t -> new QuotaManager()
     );
     
     if (manager.isExceeded()) {
       return Uni.createFrom().failure(
-        new QuotaExceededException(tenantId)
+        new QuotaExceededException(requestId)
       );
     }
     
@@ -230,7 +230,7 @@ void testQuotaEnforcement() {
   plugin.initialize(Map.of("quota_tokens", "1000"));
   
   ProviderRequest request = ProviderRequest.builder()
-    .tenantId("tenant-1")
+    .requestId("tenant-1")
     .estimatedTokens(500)
     .build();
   

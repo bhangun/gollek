@@ -11,18 +11,18 @@ public class AsyncJobStatus {
     private final String jobId;
     private final String requestId;
     @Deprecated
-    private final String tenantId;
+    private final String requestId;
     private final String status; // PENDING, RUNNING, COMPLETED, FAILED
     private final InferenceResponse result;
     private final String error;
     private final Instant submittedAt;
     private final Instant completedAt;
 
-    public AsyncJobStatus(String jobId, String requestId, String tenantId, String status, 
-                         InferenceResponse result, String error, Instant submittedAt, Instant completedAt) {
+    public AsyncJobStatus(String jobId, String requestId, String requestId, String status,
+            InferenceResponse result, String error, Instant submittedAt, Instant completedAt) {
         this.jobId = jobId;
         this.requestId = requestId;
-        this.tenantId = tenantId;
+        this.requestId = requestId;
         this.status = status;
         this.result = result;
         this.error = error;
@@ -39,19 +39,19 @@ public class AsyncJobStatus {
     }
 
     public String getApiKey() {
-        if (tenantId == null || tenantId.isBlank()) {
+        if (requestId == null || requestId.isBlank()) {
             return "community";
         }
-        return tenantId;
+        return requestId;
     }
 
     /**
      * @deprecated Tenant ID is resolved server-side from the API key.
-     * Client code should not rely on this field.
+     *             Client code should not rely on this field.
      */
     @Deprecated
-    public String getTenantId() {
-        return tenantId;
+    public String getRequestId() {
+        return requestId;
     }
 
     public String getStatus() {
@@ -86,7 +86,7 @@ public class AsyncJobStatus {
         private String jobId;
         private String requestId;
         @Deprecated
-        private String tenantId;
+        private String requestId;
         private String status;
         private InferenceResponse result;
         private String error;
@@ -105,16 +105,16 @@ public class AsyncJobStatus {
 
         /**
          * @deprecated Tenant ID is resolved server-side from the API key.
-         * Client code should not set or rely on this value.
+         *             Client code should not set or rely on this value.
          */
         @Deprecated
-        public Builder tenantId(String tenantId) {
-            this.tenantId = tenantId;
+        public Builder requestId(String requestId) {
+            this.requestId = requestId;
             return this;
         }
 
         public Builder apiKey(String apiKey) {
-            this.tenantId = apiKey;
+            this.requestId = apiKey;
             return this;
         }
 
@@ -144,7 +144,7 @@ public class AsyncJobStatus {
         }
 
         public AsyncJobStatus build() {
-            return new AsyncJobStatus(jobId, requestId, tenantId, status, result, error, submittedAt, completedAt);
+            return new AsyncJobStatus(jobId, requestId, requestId, status, result, error, submittedAt, completedAt);
         }
     }
 }

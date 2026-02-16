@@ -28,7 +28,7 @@
     </properties>
 
     <modules>
-        <module>inference</module>
+        <module>extension</module>
         <module>repository/golek-model-repo-hf</module>
         <module>repository/golek-model-repo-local</module>
         <module>plugins</module>
@@ -36,6 +36,7 @@
 
         <module>runtime/golek-runtime-cloud</module>
         <module>runtime/golek-runtime-standalone</module>
+        <module>runtime/golek-runtime-unified</module>
         <!--  <module>ui/golek-cli</module> -->
         <module>sdk</module>
     </modules>

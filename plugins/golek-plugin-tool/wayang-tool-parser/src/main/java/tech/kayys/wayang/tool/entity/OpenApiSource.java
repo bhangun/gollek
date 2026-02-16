@@ -35,7 +35,7 @@ public class OpenApiSource extends PanacheEntityBase {
 
     @NotNull
     @Column(name = "tenant_id")
-    private String tenantId;
+    private String requestId;
 
     @NotNull
     @Column(name = "namespace")
@@ -106,12 +106,12 @@ public class OpenApiSource extends PanacheEntityBase {
         this.sourceId = sourceId;
     }
 
-    public String getTenantId() {
-        return tenantId;
+    public String getRequestId() {
+        return requestId;
     }
 
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
     }
 
     public String getNamespace() {
