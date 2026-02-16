@@ -277,9 +277,6 @@ public final class ProviderRequest {
 
         public ProviderRequest build() {
             Objects.requireNonNull(model, "model is required");
-            if (messages.isEmpty()) {
-                throw new IllegalStateException("At least one message is required");
-            }
             return new ProviderRequest(
                     requestId, model, messages, parameters, tools, toolChoice, streaming, timeout,
                     userId, sessionId, traceId, apiKey, metadata);
