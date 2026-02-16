@@ -192,8 +192,28 @@ public class ModelRouterService {
                 // For now, let's construct a minimal ProviderRequest
                 ProviderRequest checkRequest = ProviderRequest.builder()
                                 .model(manifest.modelId())
+                                .messages(context.request().getMessages())
                                 .metadata("tenantId", getTenantId(context.request()))
                                 .build();
+
+                // Explicit provider pinning from request should be honored strictly.
+                if (context.preferredProvider().isPresent()) {
+                        String preferred = context.preferredProvider().get();
+                        Optional<LLMProvider> pinned = providers.stream()
+                                        .filter(p -> p.id().equalsIgnoreCase(preferred))
+                                        .findFirst();
+                        if (pinned.isPresent()) {
+                                LLMProvider provider = pinned.get();
+                                return RoutingDecision.builder()
+                                                .providerId(provider.id())
+                                                .provider(provider)
+                                                .score(10_000)
+                                                .fallbackProviders(java.util.List.of())
+                                                .manifest(manifest)
+                                                .context(context)
+                                                .build();
+                        }
+                }
 
                 for (LLMProvider p : providers) {
                         boolean supported = p.supports(manifest.modelId(), checkRequest);
@@ -228,6 +248,30 @@ public class ModelRouterService {
                                         providers.stream().map(LLMProvider::id).collect(Collectors.joining(", ")));
                         throw new NoCompatibleProviderException(
                                         "No compatible provider found for model: " + manifest.modelId());
+                }
+
+                // Honor explicit preferred provider when it is compatible.
+                if (context.preferredProvider().isPresent()) {
+                        String preferred = context.preferredProvider().get();
+                        Optional<ProviderCandidate> preferredCandidate = candidates.stream()
+                                        .filter(c -> c.providerId().equalsIgnoreCase(preferred))
+                                        .findFirst();
+                        if (preferredCandidate.isPresent()) {
+                                ProviderCandidate selected = preferredCandidate.get();
+                                return RoutingDecision.builder()
+                                                .providerId(selected.providerId())
+                                                .provider(selected.provider())
+                                                .score(selected.score())
+                                                .fallbackProviders(candidates.stream()
+                                                                .filter(c -> !c.providerId()
+                                                                                .equalsIgnoreCase(selected.providerId()))
+                                                                .limit(2)
+                                                                .map(ProviderCandidate::providerId)
+                                                                .collect(Collectors.toList()))
+                                                .manifest(manifest)
+                                                .context(context)
+                                                .build();
+                        }
                 }
 
                 // Sort by score descending
@@ -277,6 +321,18 @@ public class ModelRouterService {
                 // 1. Streaming support match
                 if (caps.isStreaming() && context.request().isStreaming()) {
                         score += 20;
+                }
+                if (!caps.isStreaming() && context.request().isStreaming()) {
+                        score -= 15;
+                }
+
+                // Strong preference for user/provider-pinned routing.
+                if (context.preferredProvider().isPresent()) {
+                        if (provider.id().equalsIgnoreCase(context.preferredProvider().get())) {
+                                score += 1_000;
+                        } else {
+                                score -= 100;
+                        }
                 }
 
                 // 2. Device preference match

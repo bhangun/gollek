@@ -1,0 +1,100 @@
+# --------------------
+# Quarkus / Maven Multi-Module Specific
+# --------------------
+
+# Maven Build Output (applies to all modules, including root target)
+# The `target` directory in the root and all submodules.
+target/
+**/target/
+
+# The generated Quarkus application runner JAR structure (inside target/)
+# This ensures that the final packaged application (which includes lib/) is ignored.
+quarkus-app/
+
+# Quarkus native executable
+*-runner
+*-runner.exe
+*-runner.native
+*-runner.build-artifacts.zip
+
+# Native Image specific build files
+**/*.graal.log
+**/*.build.log
+**/*.o
+**/*.d
+**/*.gc.log
+
+# Maven Wrapper files (usually checked in, but sometimes people exclude the whole .mvn)
+# If you check in the wrapper scripts (mvnw, mvnw.cmd), keep these commented out.
+# .mvn/wrapper/maven-wrapper.jar
+
+# Log files generated during development or testing
+*.log
+log/
+tmp/
+logs/
+
+# --------------------
+# Java Specific
+# --------------------
+
+# Compiled class files
+*.class
+
+# Package Files (should be in target/, but for completeness)
+# *.jar
+# *.war
+# *.ear
+# *.zip
+# *.tar.gz
+
+# Virtual machine crash logs
+hs_err_pid*
+
+# --------------------
+# IDE / Tooling Specific
+# --------------------
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+*.launch
+.metadata
+
+# VS Code
+.vscode/
+
+# Build Dependency Caching (usually for CI/local builds)
+.m2/
+.gradle/
+.project
+.settings
+
+# --------------------
+# Security / Local Files
+# --------------------
+
+# Environment variable files
+.env
+.env.*
+application-local.properties
+application-dev.properties
+# If you have specific secret files:
+# *.key
+# *.pem
+# *.secrets
+
+# Windows files
+Thumbs.db
+.quarkus/
+.DS_Store
+
+.venv-gguf
