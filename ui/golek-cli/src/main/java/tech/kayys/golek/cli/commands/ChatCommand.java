@@ -2,6 +2,7 @@ package tech.kayys.golek.cli.commands;
 
 import io.quarkus.arc.Unremovable;
 import jakarta.enterprise.context.Dependent;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -9,15 +10,21 @@ import tech.kayys.golek.sdk.core.GolekSdk;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.Message;
+import tech.kayys.golek.spi.provider.LLMProvider;
 import tech.kayys.golek.spi.provider.ProviderInfo;
 import tech.kayys.golek.spi.provider.ProviderHealth;
+import tech.kayys.golek.spi.provider.ProviderRegistry;
+import tech.kayys.golek.spi.provider.ProviderRequest;
+import tech.kayys.golek.model.repo.hf.HuggingFaceClient;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Scanner;
 import java.util.UUID;
 
 /**
@@ -31,6 +38,10 @@ public class ChatCommand implements Runnable {
 
     @Inject
     GolekSdk sdk;
+    @Inject
+    Instance<HuggingFaceClient> hfClientInstance;
+    @Inject
+    ProviderRegistry providerRegistry;
 
     @Option(names = { "-m", "--model" }, description = "Model ID or path", required = true)
     String modelId;
@@ -41,6 +52,9 @@ public class ChatCommand implements Runnable {
 
     @Option(names = { "--system" }, description = "System prompt")
     String systemPrompt;
+
+    @Option(names = { "--concise" }, description = "Prefer concise answers for lower latency", defaultValue = "true", negatable = true)
+    boolean concise;
 
     @Option(names = { "--temperature" }, description = "Sampling temperature", defaultValue = "0.2")
     double temperature;
@@ -78,10 +92,10 @@ public class ChatCommand implements Runnable {
     @Option(names = { "--grammar" }, description = "GBNF grammar string")
     String grammar;
 
-    @Option(names = { "--max-tokens" }, description = "Maximum tokens to generate per response", defaultValue = "64")
+    @Option(names = { "--max-tokens" }, description = "Maximum tokens to generate per response", defaultValue = "48")
     int maxTokens;
 
-    @Option(names = { "--inference-timeout-ms" }, description = "Hard timeout for one inference call in milliseconds", defaultValue = "30000")
+    @Option(names = { "--inference-timeout-ms" }, description = "Hard timeout for one inference call in milliseconds", defaultValue = "180000")
     long inferenceTimeoutMs;
 
     @Option(names = { "-q", "--quiet" }, description = "Minimal output (no banner/spinner/stats)")
@@ -99,8 +113,12 @@ public class ChatCommand implements Runnable {
     private static final String YELLOW = "\u001B[33m";
     private static final String DIM = "\u001B[2m";
     private static final String BOLD = "\u001B[1m";
+    private static final String DEFAULT_CONCISE_SYSTEM_PROMPT =
+            "Answer briefly and directly. Keep responses relevant to the question. "
+                    + "Prefer 1-4 short sentences unless the user asks for detail.";
 
     private String sessionId;
+    private String modelPathOverride;
 
     private final List<Message> conversationHistory = new ArrayList<>();
 
@@ -134,10 +152,7 @@ public class ChatCommand implements Runnable {
                 return;
             }
 
-            // Add system prompt if provided
-            if (systemPrompt != null && !systemPrompt.isEmpty()) {
-                conversationHistory.add(Message.system(systemPrompt));
-            }
+            addInitialSystemPromptIfNeeded();
 
             if (!quiet) {
                 System.out.println(BOLD + YELLOW + "  _____       _      _    " + RESET);
@@ -167,6 +182,13 @@ public class ChatCommand implements Runnable {
             }
 
             boolean effectiveStream = stream;
+            if (effectiveStream && "djl".equalsIgnoreCase(providerId)) {
+                effectiveStream = false;
+                if (!quiet) {
+                    System.out.println(DIM + "Provider 'djl' does not support streaming; using non-streaming mode."
+                            + RESET);
+                }
+            }
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
             String line;
@@ -192,6 +214,7 @@ public class ChatCommand implements Runnable {
                 } else {
                     System.out.print("\n" + BOLD + CYAN + ">>> " + RESET);
                 }
+                System.out.flush();
                 StringBuilder inputBuffer = new StringBuilder();
 
                 while (true) {
@@ -206,6 +229,7 @@ public class ChatCommand implements Runnable {
                         } else {
                             System.out.print(DIM + "... " + RESET);
                         }
+                        System.out.flush();
                     } else {
                         inputBuffer.append(line);
                         break;
@@ -236,9 +260,7 @@ public class ChatCommand implements Runnable {
                 // Handle special commands
                 if (finalInput.equalsIgnoreCase("/reset")) {
                     conversationHistory.clear();
-                    if (systemPrompt != null && !systemPrompt.isEmpty()) {
-                        conversationHistory.add(Message.system(systemPrompt));
-                    }
+                    addInitialSystemPromptIfNeeded();
                     System.out.println(YELLOW + "[Conversation reset]" + RESET);
                     if (fileWriter != null)
                         fileWriter.println("[Conversation reset]");
@@ -306,6 +328,9 @@ public class ChatCommand implements Runnable {
                 if (grammar != null && !grammar.isEmpty()) {
                     reqBuilder.parameter("grammar", grammar);
                 }
+                if (modelPathOverride != null && !modelPathOverride.isBlank()) {
+                    reqBuilder.parameter("model_path", modelPathOverride);
+                }
 
                 if (enableSession && sessionId != null) {
                     reqBuilder.parameter("session_id", sessionId);
@@ -314,17 +339,15 @@ public class ChatCommand implements Runnable {
                 InferenceRequest request = reqBuilder.build();
 
                 try {
-                    if (fileWriter == null) {
-                        if (quiet) {
-                            System.out.print("\nAssistant: ");
-                        } else {
-                            System.out.print("\n" + BOLD + GREEN + "Assistant: " + RESET);
-                        }
-                    } else {
+                    if (fileWriter != null) {
                         if (!quiet) {
                             System.out.print(DIM + "Thinking... (Outputting to file)" + RESET);
+                            System.out.flush();
                         }
                         fileWriter.println("Assistant: ");
+                    } else {
+                        System.out.print("\n");
+                        System.out.flush();
                     }
 
                     if (verbose) {
@@ -342,157 +365,74 @@ public class ChatCommand implements Runnable {
 
                     if (effectiveStream) {
                         java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
-                        java.util.concurrent.atomic.AtomicBoolean firstTokenReceived = new java.util.concurrent.atomic.AtomicBoolean(
-                                false);
                         java.util.concurrent.atomic.AtomicInteger tokenCount = new java.util.concurrent.atomic.AtomicInteger(
                                 0);
                         long startTime = System.currentTimeMillis();
                         StringBuilder fullResponse = new StringBuilder();
-
-                        // Synchronization object for printing
-                        Object printLock = new Object();
-
-                        // Capture standard out for potential restoration
                         final java.io.PrintWriter finalFileWriter = fileWriter;
+
+                        if (!quiet && finalFileWriter == null) {
+                            System.out.print(BOLD + GREEN + "Assistant: " + RESET);
+                            System.out.flush();
+                        }
 
                         sdk.streamCompletion(request)
                                 .subscribe().with(
                                         chunk -> {
                                             String delta = chunk.getDelta();
-                                            if (delta != null) {
-                                                synchronized (printLock) {
-                                                    if (!firstTokenReceived.get()) {
-                                                        // Clear the spinner line completely
-                                                        if (quiet && finalFileWriter == null) {
-                                                            firstTokenReceived.set(true);
-                                                        } else if (finalFileWriter == null) {
-                                                            System.out.print("\r" + BOLD + GREEN + "Assistant: " + RESET
-                                                                    + "          \r" + BOLD + GREEN + "Assistant: "
-                                                                    + RESET);
-                                                        } else {
-                                                            if (!quiet) {
-                                                                System.out.print("\r" + BOLD + GREEN
-                                                                        + "Received response. Writing to file..." + RESET
-                                                                        + "   ");
-                                                            }
-                                                        }
-                                                        firstTokenReceived.set(true);
-                                                    }
-
-                                                    if (finalFileWriter != null) {
-                                                        // Write to file only
-                                                        finalFileWriter.print(delta);
-                                                        finalFileWriter.flush();
-                                                    } else {
-                                                        // Write to console
-                                                        System.out.print(delta);
-                                                    }
-                                                }
-                                                fullResponse.append(delta);
-                                                tokenCount.incrementAndGet();
+                                            if (delta == null) {
+                                                return;
                                             }
+                                            if (finalFileWriter != null) {
+                                                finalFileWriter.print(delta);
+                                                finalFileWriter.flush();
+                                            } else {
+                                                System.out.print(delta);
+                                                System.out.flush();
+                                            }
+                                            fullResponse.append(delta);
+                                            tokenCount.incrementAndGet();
                                         },
                                         error -> {
-                                            synchronized (printLock) {
-                                                    if (!firstTokenReceived.get() && !quiet) {
-                                                        System.out.print("\r" + "                                    \r"); // Clear
-                                                                                                                       // line
-                                                    }
-                                                    if (quiet) {
-                                                        System.err.println("\nStream error: " + error.getMessage());
-                                                    } else {
-                                                        System.err.println(
-                                                                "\n" + YELLOW + "Stream error: " + RESET
-                                                                        + error.getMessage());
-                                                    }
-                                                    if (finalFileWriter != null) {
-                                                        finalFileWriter.println("\n[Error: " + error.getMessage() + "]");
-                                                    }
+                                            if (quiet) {
+                                                System.err.println("\nStream error: " + error.getMessage());
+                                            } else {
+                                                System.err.println("\n" + YELLOW + "Stream error: " + RESET
+                                                        + error.getMessage());
+                                            }
+                                            printProviderHintFromError(error);
+                                            if (finalFileWriter != null) {
+                                                finalFileWriter.println("\n[Error: " + error.getMessage() + "]");
                                             }
                                             latch.countDown();
                                         },
                                         () -> {
-                                            synchronized (printLock) {
-                                                if (!firstTokenReceived.get()) {
-                                                    // Needed if response was empty but successful
-                                                    if (quiet && finalFileWriter == null) {
-                                                        // Keep output stable in quiet mode.
-                                                    } else if (finalFileWriter == null) {
-                                                        System.out.print("\r" + BOLD + GREEN + "Assistant: " + RESET
-                                                                + "          \r" + BOLD + GREEN + "Assistant: "
-                                                                + RESET);
-                                                    }
-                                                    firstTokenReceived.set(true);
-                                                }
-                                                long duration = System.currentTimeMillis() - startTime;
-                                                double tps = (tokenCount.get() / (duration / 1000.0));
+                                            long duration = System.currentTimeMillis() - startTime;
+                                            double tps = (tokenCount.get() / (duration / 1000.0));
 
-                                                if (finalFileWriter != null) {
-                                                    if (!quiet) {
-                                                        System.out.printf(DIM + "\n[Done. Tokens: %d, Speed: %.2f t/s]"
-                                                                + RESET + "%n", tokenCount.get(), tps);
-                                                    }
-                                                    finalFileWriter.println(); // newline in file
-                                                    finalFileWriter.printf(
-                                                            "\n[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]%n",
+                                            if (finalFileWriter != null) {
+                                                if (!quiet) {
+                                                    System.out.printf(DIM + "\n[Done. Tokens: %d, Speed: %.2f t/s]"
+                                                            + RESET + "%n", tokenCount.get(), tps);
+                                                }
+                                                finalFileWriter.println();
+                                                finalFileWriter.printf(
+                                                        "\n[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]%n",
+                                                        tokenCount.get(), duration / 1000.0, tps);
+                                                finalFileWriter.println("-".repeat(30));
+                                            } else {
+                                                System.out.println();
+                                                if (!quiet) {
+                                                    System.out.printf(
+                                                            DIM + "\n[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]"
+                                                                    + RESET + "%n",
                                                             tokenCount.get(), duration / 1000.0, tps);
-                                                    finalFileWriter.println("-".repeat(30));
-                                                } else {
-                                                    System.out.println();
-                                                    if (!quiet) {
-                                                        System.out.printf(
-                                                                DIM + "\n[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]"
-                                                                        + RESET
-                                                                        + "%n",
-                                                                tokenCount.get(), duration / 1000.0, tps);
-                                                    }
                                                 }
                                             }
                                             conversationHistory.add(Message.assistant(fullResponse.toString()));
                                             latch.countDown();
                                         });
 
-                        // Spinner loop
-                        String[] spinner = { "|", "/", "-", "\\" };
-                        int i = 0;
-
-                        // Initial print
-                        if (!quiet) {
-                            synchronized (printLock) {
-                                if (!firstTokenReceived.get()) {
-                                    System.out.print(DIM + "Thinking... " + spinner[0] + RESET);
-                                }
-                            }
-                        }
-
-                        while (!firstTokenReceived.get() && latch.getCount() > 0) {
-                            try {
-                                if (latch.await(100, java.util.concurrent.TimeUnit.MILLISECONDS)) {
-                                    break;
-                                }
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                                break;
-                            }
-
-                            if (quiet) {
-                                continue;
-                            }
-                            synchronized (printLock) {
-                                if (!firstTokenReceived.get()) {
-                                    // Move cursor back to update spinner without rewriting "Assistant:"
-                                    if (finalFileWriter == null) {
-                                        System.out.print(
-                                                "\r" + BOLD + GREEN + "Assistant: " + RESET + DIM + "Thinking... "
-                                                        + spinner[i++ % spinner.length] + RESET);
-                                    } else {
-                                        System.out.print(
-                                                "\r" + DIM + "Thinking... " + spinner[i++ % spinner.length] + RESET);
-                                    }
-                                }
-                            }
-                        }
-                        // Wait for stream to complete
                         try {
                             latch.await();
                         } catch (InterruptedException e) {
@@ -501,7 +441,6 @@ public class ChatCommand implements Runnable {
                                 System.out.println("\nInterrupted.");
                             }
                         }
-
                     } else {
                         // Non-streaming logic
                         if (verbose && !quiet) {
@@ -509,7 +448,9 @@ public class ChatCommand implements Runnable {
                         }
 
                         long startTime = System.currentTimeMillis();
-                        InferenceResponse response = sdk.createCompletion(request);
+                        InferenceResponse response = shouldDirectProviderBypass(effectiveStream)
+                                ? inferDirectWithProvider(providerId, request)
+                                : sdk.createCompletion(request);
                         long duration = System.currentTimeMillis() - startTime;
                         String content = response.getContent();
 
@@ -548,6 +489,7 @@ public class ChatCommand implements Runnable {
                     } else {
                         System.err.println("\n" + YELLOW + "Error: " + RESET + e.getMessage());
                     }
+                    printProviderHintFromError(e);
                 }
             }
 
@@ -560,20 +502,18 @@ public class ChatCommand implements Runnable {
             } else {
                 System.err.println("Chat failed: " + e.getMessage());
             }
+            printProviderHintFromError(e);
         }
     }
 
     private boolean ensureModelAvailable() {
         try {
-            var localInfo = sdk.getModelInfo(modelId);
-            if (localInfo.isPresent()) {
-                maybeUpgradeDjlLayout(localInfo.get());
-                return true;
-            }
-
-            String fallbackId = modelId + "-GGUF";
-            if (sdk.getModelInfo(fallbackId).isPresent()) {
-                modelId = fallbackId;
+            var resolved = LocalModelResolver.resolve(sdk, modelId);
+            if (resolved.isPresent()) {
+                var found = resolved.get();
+                modelId = found.modelId();
+                modelPathOverride = found.localPath() != null ? found.localPath().toString() : null;
+                maybeUpgradeDjlLayout(found.info());
                 return true;
             }
 
@@ -620,22 +560,37 @@ public class ChatCommand implements Runnable {
 
             if (!pulled) {
                 String reason = lastPullError != null ? describeError(lastPullError) : "unknown error";
+                if (HuggingFaceCheckpointStore.shouldStoreOnPullFailure(reason)) {
+                    var stored = HuggingFaceCheckpointStore.storeCheckpointArtifacts(
+                            hfClientInstance,
+                            modelId,
+                            progress -> {
+                                if (!quiet) {
+                                    System.out.print("\r" + progress.getStatus());
+                                }
+                            });
+                    if (stored.isPresent() && stored.get().hasWeights()) {
+                        if (!quiet) {
+                            System.out.println();
+                        }
+                        System.out.println("Checkpoint artifacts saved to: " + stored.get().rootDir().toAbsolutePath());
+                        System.err.println(
+                                "Model was downloaded in origin checkpoint format (.safetensors/.bin) and is not runnable yet in local Java runtime.");
+                        System.err.println("Use conversion (GGUF/TorchScript) when you want to run this model.");
+                        return false;
+                    }
+                }
                 System.err.println("Failed to pull model from Hugging Face: " + reason);
                 return false;
             }
 
-            String normalized = modelId.startsWith("hf:") ? modelId.substring(3) : modelId;
-            java.util.List<String> candidates = java.util.List.of(
-                    modelId,
-                    modelId + "-GGUF",
-                    normalized,
-                    normalized + "-GGUF");
-            for (String candidate : candidates) {
-                if (sdk.getModelInfo(candidate).isPresent()) {
-                    modelId = candidate;
-                    sdk.getModelInfo(modelId).ifPresent(this::maybeUpgradeDjlLayout);
-                    return true;
-                }
+            resolved = LocalModelResolver.resolve(sdk, modelId);
+            if (resolved.isPresent()) {
+                var found = resolved.get();
+                modelId = found.modelId();
+                modelPathOverride = found.localPath() != null ? found.localPath().toString() : null;
+                maybeUpgradeDjlLayout(found.info());
+                return true;
             }
 
             System.err.println("Model download finished but local registration was not found: " + modelId);
@@ -643,6 +598,16 @@ public class ChatCommand implements Runnable {
         } catch (Exception e) {
             System.err.println("Failed to resolve model: " + e.getMessage());
             return false;
+        }
+    }
+
+    private void addInitialSystemPromptIfNeeded() {
+        if (systemPrompt != null && !systemPrompt.isEmpty()) {
+            conversationHistory.add(Message.system(systemPrompt));
+            return;
+        }
+        if (concise) {
+            conversationHistory.add(Message.system(DEFAULT_CONCISE_SYSTEM_PROMPT));
         }
     }
 
@@ -685,17 +650,14 @@ public class ChatCommand implements Runnable {
         }
         System.setProperty("golek.gguf.converter.prompted", "true");
 
-        Scanner scanner = new Scanner(System.in);
-        System.out.print("If this model has no GGUF artifact, convert checkpoints to GGUF? [Y/n]: ");
-        String answer = scanner.nextLine();
+        String answer = promptConsoleLine("If this model has no GGUF artifact, convert checkpoints to GGUF? [Y/n]: ");
         if (answer != null && answer.trim().equalsIgnoreCase("n")) {
             System.setProperty("golek.gguf.converter.auto", "false");
             return;
         }
 
         String current = System.getProperty("golek.gguf.converter.outtype", defaultGgufOutType());
-        System.out.print("Select GGUF outtype [q4_0/q8_0/f16/f32] (default " + current + "): ");
-        String outType = scanner.nextLine();
+        String outType = promptConsoleLine("Select GGUF outtype [q4_0/q8_0/f16/f32] (default " + current + "): ");
         if (outType == null || outType.isBlank()) {
             outType = current;
         }
@@ -704,6 +666,15 @@ public class ChatCommand implements Runnable {
             outType = defaultGgufOutType();
         }
         System.setProperty("golek.gguf.converter.outtype", outType);
+    }
+
+    private String promptConsoleLine(String prompt) {
+        java.io.Console console = System.console();
+        if (console == null) {
+            return "";
+        }
+        String value = console.readLine("%s", prompt);
+        return value != null ? value : "";
     }
 
     private String defaultGgufOutType() {
@@ -753,7 +724,7 @@ public class ChatCommand implements Runnable {
             return;
         }
         try {
-            var modelInfoOpt = sdk.getModelInfo(modelId);
+            var modelInfoOpt = LocalModelResolver.resolve(sdk, modelId).map(LocalModelResolver.ResolvedModel::info);
             if (modelInfoOpt.isEmpty()) {
                 return;
             }
@@ -780,6 +751,7 @@ public class ChatCommand implements Runnable {
         return switch (normalized) {
             case "GGUF" -> "gguf";
             case "TORCHSCRIPT" -> "djl";
+            case "PYTORCH", "SAFETENSORS" -> "djl";
             case "ONNX" -> "onnx";
             default -> null;
         };
@@ -836,21 +808,42 @@ public class ChatCommand implements Runnable {
                 return ensureProviderHealthy(providerId);
             }
 
-            var modelInfoOpt = sdk.getModelInfo(modelId);
+            var modelInfoOpt = LocalModelResolver.resolve(sdk, modelId).map(LocalModelResolver.ResolvedModel::info);
             if (modelInfoOpt.isEmpty()) {
                 return true;
             }
             var modelInfo = modelInfoOpt.get();
             String format = modelInfo.getFormat();
-            if (isCheckpointOnlyFormat(format) && tryRefreshCompatibleModel()) {
-                modelInfoOpt = sdk.getModelInfo(modelId);
-                if (modelInfoOpt.isPresent()) {
-                    format = modelInfoOpt.get().getFormat();
+            if (isCheckpointOnlyFormat(format)) {
+                String checkpointProvider = providerForFormat(format);
+                if (checkpointProvider != null && ensureProviderHealthy(checkpointProvider)) {
+                    providerId = checkpointProvider;
+                    sdk.setPreferredProvider(checkpointProvider);
+                    return true;
+                }
+                if (tryRefreshCompatibleModel()) {
+                    modelInfoOpt = LocalModelResolver.resolve(sdk, modelId).map(LocalModelResolver.ResolvedModel::info);
+                    if (modelInfoOpt.isPresent()) {
+                        format = modelInfoOpt.get().getFormat();
+                    }
                 }
             }
             if (isCheckpointOnlyFormat(format)) {
+                String checkpointProvider = providerForFormat(format);
+                if (checkpointProvider != null && ensureProviderHealthy(checkpointProvider)) {
+                    providerId = checkpointProvider;
+                    sdk.setPreferredProvider(checkpointProvider);
+                    return true;
+                }
+                // experimental fallback
+                if (ensureProviderHealthy("libtorch")) {
+                    providerId = "libtorch";
+                    sdk.setPreferredProvider("libtorch");
+                    return true;
+                }
                 System.err.printf("Model '%s' uses unsupported runtime format '%s'.%n", modelId, format);
-                System.err.println("Use a GGUF or TorchScript model.");
+                System.err.println(
+                        "Use a GGUF/TorchScript model. Checkpoint runtime requires DJL (recommended) or --provider libtorch (experimental).");
                 return false;
             }
 
@@ -890,9 +883,10 @@ public class ChatCommand implements Runnable {
         String normalized = modelId.startsWith("hf:") ? modelId.substring(3) : modelId;
         for (String candidate : java.util.List.of(modelId, normalized, modelId + "-GGUF", normalized + "-GGUF")) {
             try {
-                var info = sdk.getModelInfo(candidate);
-                if (info.isPresent() && !isCheckpointOnlyFormat(info.get().getFormat())) {
-                    modelId = candidate;
+                var resolved = LocalModelResolver.resolve(sdk, candidate);
+                if (resolved.isPresent() && !isCheckpointOnlyFormat(resolved.get().info().getFormat())) {
+                    modelId = resolved.get().modelId();
+                    modelPathOverride = resolved.get().localPath() != null ? resolved.get().localPath().toString() : null;
                     if (!quiet) {
                         System.out.println("Using compatible model: " + modelId);
                     }
@@ -909,6 +903,7 @@ public class ChatCommand implements Runnable {
         Optional<ProviderInfo> info = findProviderInfo(provider);
         if (info.isEmpty()) {
             System.err.printf("Required provider is not available: %s%n", provider);
+            printGenericProviderSetupHint(provider);
             return false;
         }
 
@@ -918,6 +913,28 @@ public class ChatCommand implements Runnable {
 
         printProviderSetupHint(info.get());
         return false;
+    }
+
+    private void printGenericProviderSetupHint(String providerId) {
+        if ("djl".equalsIgnoreCase(providerId)) {
+            System.err.println(
+                    "DJL runtime is not loaded. Ensure golek-ext-format-djl is on classpath and DJL native runtime can initialize.");
+        } else if ("libtorch".equalsIgnoreCase(providerId)) {
+            System.err.println("LibTorch runtime is not loaded. Set LIBTORCH_PATH and include golek-ext-format-libtorch.");
+        } else if ("gguf".equalsIgnoreCase(providerId)) {
+            System.err.println("GGUF runtime is not loaded. Set GOLEK_LLAMA_LIB_DIR/GOLEK_LLAMA_LIB_PATH and include golek-ext-format-gguf.");
+        }
+    }
+
+    private void printProviderHintFromError(Throwable throwable) {
+        String detail = describeError(throwable).toLowerCase();
+        if (detail.contains("provider not available: libtorch")) {
+            printGenericProviderSetupHint("libtorch");
+        } else if (detail.contains("provider not available: djl")) {
+            printGenericProviderSetupHint("djl");
+        } else if (detail.contains("provider not available: gguf")) {
+            printGenericProviderSetupHint("gguf");
+        }
     }
 
     private String describeError(Throwable throwable) {
@@ -1002,5 +1019,87 @@ public class ChatCommand implements Runnable {
         } else if ("gguf".equalsIgnoreCase(id)) {
             System.err.println("Set GOLEK_LLAMA_LIB_DIR or GOLEK_LLAMA_LIB_PATH to llama.cpp native libraries.");
         }
+    }
+
+    private boolean shouldDirectProviderBypass(boolean effectiveStream) {
+        if (effectiveStream || providerId == null || providerId.isBlank()) {
+            return false;
+        }
+        return "djl".equalsIgnoreCase(providerId) || "libtorch".equalsIgnoreCase(providerId);
+    }
+
+    private InferenceResponse inferDirectWithProvider(String id, InferenceRequest request) {
+        String providerModel = (modelPathOverride != null && !modelPathOverride.isBlank())
+                ? modelPathOverride
+                : request.getModel();
+        ProviderRequest providerRequest = ProviderRequest.builder()
+                .model(providerModel)
+                .messages(request.getMessages())
+                .parameters(request.getParameters())
+                .streaming(false)
+                .timeout(Duration.ofMillis(Math.max(inferenceTimeoutMs, 30_000L)))
+                .metadata("request_id", request.getRequestId())
+                .metadata("tenantId", "community")
+                .build();
+        try {
+            return inferDirect(id, providerRequest);
+        } catch (RuntimeException primary) {
+            if (shouldFallbackToLibtorch(id, providerModel)) {
+                if (!quiet) {
+                    System.out.println(DIM + "DJL checkpoint load failed; trying libtorch (experimental)..." + RESET);
+                }
+                try {
+                    return inferDirect("libtorch", providerRequest);
+                } catch (RuntimeException fallback) {
+                    throw new RuntimeException(
+                            "DJL checkpoint load failed and libtorch fallback also failed: " + fallback.getMessage(),
+                            primary);
+                }
+            }
+            throw primary;
+        }
+    }
+
+    private InferenceResponse inferDirect(String id, ProviderRequest providerRequest) {
+        Optional<LLMProvider> providerOpt = providerRegistry.getProvider(id);
+        if (providerOpt.isEmpty()) {
+            throw new RuntimeException("Provider not available: " + id);
+        }
+        return providerOpt.get()
+                .infer(providerRequest)
+                .await()
+                .atMost(Duration.ofMillis(Math.max(inferenceTimeoutMs + 60_000L, 90_000L)));
+    }
+
+    private boolean shouldFallbackToLibtorch(String providerId, String providerModel) {
+        if (!"djl".equalsIgnoreCase(providerId) || providerModel == null || providerModel.isBlank()) {
+            return false;
+        }
+        String normalized = providerModel.toLowerCase();
+        if (normalized.endsWith(".safetensors")
+                || normalized.endsWith(".safetensor")
+                || normalized.endsWith(".bin")
+                || normalized.endsWith(".pth")
+                || normalized.contains("/.golek/models/djl/")
+                || normalized.contains("\\.golek\\models\\djl\\")) {
+            return true;
+        }
+        try {
+            Path modelPath = Path.of(providerModel);
+            if (Files.isDirectory(modelPath)) {
+                try (var files = Files.walk(modelPath, 3)) {
+                    return files
+                            .filter(Files::isRegularFile)
+                            .map(path -> path.getFileName().toString().toLowerCase())
+                            .anyMatch(name -> name.endsWith(".safetensors")
+                                    || name.endsWith(".safetensor")
+                                    || name.endsWith(".bin")
+                                    || name.endsWith(".pth"));
+                }
+            }
+        } catch (Exception ignored) {
+            // best effort only
+        }
+        return false;
     }
 }

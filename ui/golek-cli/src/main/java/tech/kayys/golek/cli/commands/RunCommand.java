@@ -2,6 +2,7 @@ package tech.kayys.golek.cli.commands;
 
 import io.quarkus.arc.Unremovable;
 import jakarta.enterprise.context.Dependent;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -9,12 +10,17 @@ import tech.kayys.golek.sdk.core.GolekSdk;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.Message;
+import tech.kayys.golek.spi.provider.LLMProvider;
+import tech.kayys.golek.spi.provider.ProviderRegistry;
+import tech.kayys.golek.spi.provider.ProviderRequest;
 import tech.kayys.golek.spi.provider.ProviderHealth;
 import tech.kayys.golek.spi.provider.ProviderInfo;
+import tech.kayys.golek.model.repo.hf.HuggingFaceClient;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -31,6 +37,10 @@ public class RunCommand implements Runnable {
 
     @Inject
     GolekSdk sdk;
+    @Inject
+    Instance<HuggingFaceClient> hfClientInstance;
+    @Inject
+    ProviderRegistry providerRegistry;
 
     @Option(names = { "-m", "--model" }, description = "Model ID or path", required = true)
     String modelId;
@@ -124,20 +134,9 @@ public class RunCommand implements Runnable {
             } else {
                 // Check if model exists locally
                 System.out.printf("Checking model: %s... ", modelId);
-                var modelInfoOpt = sdk.getModelInfo(modelId);
-                boolean exists = modelInfoOpt.isPresent();
-
-                // Smart fallback: check for -GGUF variant locally if base not found
-                if (!exists) {
-                    String fallbackId = modelId + "-GGUF";
-                    var fallbackInfoOpt = sdk.getModelInfo(fallbackId);
-                    if (fallbackInfoOpt.isPresent()) {
-                        System.out.println("found local variant: " + fallbackId);
-                        modelId = fallbackId;
-                        modelInfoOpt = fallbackInfoOpt;
-                        exists = true;
-                    }
-                }
+                var resolvedModel = LocalModelResolver.resolve(sdk, modelId);
+                var modelInfoOpt = resolvedModel.map(LocalModelResolver.ResolvedModel::info);
+                boolean exists = resolvedModel.isPresent();
 
                 if (!exists) {
                     System.out.println("not found locally.");
@@ -175,34 +174,31 @@ public class RunCommand implements Runnable {
                         }
                         if (!pulled) {
                             String reason = lastPullError != null ? describeError(lastPullError) : "unknown error";
+                            if (HuggingFaceCheckpointStore.shouldStoreOnPullFailure(reason)) {
+                                var stored = HuggingFaceCheckpointStore.storeCheckpointArtifacts(
+                                        hfClientInstance,
+                                        modelId,
+                                        progress -> System.out.print("\r" + progress.getStatus()));
+                                if (stored.isPresent() && stored.get().hasWeights()) {
+                                    System.out.println();
+                                    System.out.println(
+                                            "Checkpoint artifacts saved to: " + stored.get().rootDir().toAbsolutePath());
+                                    System.err.println(
+                                            "Model was downloaded in origin checkpoint format (.safetensors/.bin) and is not runnable yet in local Java runtime.");
+                                    System.err.println(
+                                            "Use conversion (GGUF/TorchScript) when you want to run this model.");
+                                    return;
+                                }
+                            }
                             System.err.println("Error: Failed to download from Hugging Face. " + reason);
                             return;
                         }
                         System.out.println("\nDownload complete!");
 
-                        // Refresh model info after download
-                        modelInfoOpt = sdk.getModelInfo(modelId);
-                        if (modelInfoOpt.isEmpty()) {
-                            // Check fallback again if download resolved to fallback
-                            String fallbackId = modelId + "-GGUF";
-                            if (sdk.getModelInfo(fallbackId).isPresent()) {
-                                modelId = fallbackId;
-                                modelInfoOpt = sdk.getModelInfo(modelId);
-                            }
-                        }
-                        if (modelInfoOpt.isEmpty() && modelId.startsWith("hf:")) {
-                            String normalizedId = modelId.substring(3);
-                            modelInfoOpt = sdk.getModelInfo(normalizedId);
-                            if (modelInfoOpt.isPresent()) {
-                                modelId = normalizedId;
-                            }
-                        }
-                        if (modelInfoOpt.isEmpty() && modelId.startsWith("hf:")) {
-                            String normalizedFallback = modelId.substring(3) + "-GGUF";
-                            modelInfoOpt = sdk.getModelInfo(normalizedFallback);
-                            if (modelInfoOpt.isPresent()) {
-                                modelId = normalizedFallback;
-                            }
+                        resolvedModel = LocalModelResolver.resolve(sdk, modelId);
+                        modelInfoOpt = resolvedModel.map(LocalModelResolver.ResolvedModel::info);
+                        if (resolvedModel.isPresent()) {
+                            modelId = resolvedModel.get().modelId();
                         }
                         if (modelInfoOpt.isEmpty()) {
                             System.err.println(
@@ -216,13 +212,24 @@ public class RunCommand implements Runnable {
                         return;
                     }
                 } else {
-                    System.out.println("found locally.");
+                    if (resolvedModel.get().fromSdk()) {
+                        System.out.println("found locally.");
+                    } else {
+                        Path localPath = resolvedModel.get().localPath();
+                        if (localPath != null) {
+                            modelId = localPath.toString();
+                            customModelPathUsed = true;
+                            System.out.println("found local file.");
+                        } else {
+                            System.out.println("found locally.");
+                        }
+                    }
                     modelInfoOpt.ifPresent(this::maybeUpgradeDjlLayout);
                 }
 
                 // Print model path if available
-                modelInfoOpt.flatMap(info -> java.util.Optional.ofNullable(info.getMetadata().get("path")))
-                        .ifPresent(path -> System.out.println("Model path: " + path));
+                modelInfoOpt.flatMap(LocalModelResolver::extractPath)
+                        .ifPresent(path -> System.out.println("Model path: " + path.toAbsolutePath()));
             }
 
             // Set preferred provider if specified
@@ -233,6 +240,10 @@ public class RunCommand implements Runnable {
             }
             if (!ensureProviderReady()) {
                 return;
+            }
+            if (stream && "djl".equalsIgnoreCase(providerId)) {
+                System.out.println("Provider 'djl' does not support streaming; switching to non-streaming mode.");
+                stream = false;
             }
 
             // Build request
@@ -269,11 +280,18 @@ public class RunCommand implements Runnable {
             requestBuilder.cacheBypass(noCache);
 
             InferenceRequest request = requestBuilder.build();
+            boolean directProviderBypass = "djl".equalsIgnoreCase(providerId);
 
             System.out.printf(BOLD + "Model: " + RESET + CYAN + "%s" + RESET + "%n", modelId);
             System.out.printf(BOLD + "Provider: " + RESET + YELLOW + "%s" + RESET + "%n",
                     providerId != null ? providerId : "auto-select");
             System.out.println(DIM + "-".repeat(50) + RESET);
+
+            if (directProviderBypass) {
+                InferenceResponse response = inferDirectWithProvider(providerId, request);
+                printResponse(response, startTime);
+                return;
+            }
 
             if (stream) {
                 CountDownLatch latch = new CountDownLatch(1);
@@ -292,6 +310,7 @@ public class RunCommand implements Runnable {
                                 },
                                 error -> {
                                     System.err.println("\n" + YELLOW + "Error: " + RESET + error.getMessage());
+                                    printProviderHintFromError(error);
                                     latch.countDown();
                                 },
                                 () -> {
@@ -319,6 +338,7 @@ public class RunCommand implements Runnable {
             if (e.getCause() != null && !e.getMessage().contains(e.getCause().getMessage())) {
                 System.err.println("Detail: " + e.getCause().getMessage());
             }
+            printProviderHintFromError(e);
         }
     }
 
@@ -345,9 +365,73 @@ public class RunCommand implements Runnable {
                 (response.getTokensUsed() / (response.getDurationMs() / 1000.0)));
     }
 
+    private InferenceResponse inferDirectWithProvider(String id, InferenceRequest request) {
+        String providerModel = resolveProviderModel(request);
+        ProviderRequest providerRequest = buildDirectProviderRequest(request, providerModel);
+        try {
+            return inferDirect(id, providerRequest);
+        } catch (RuntimeException primary) {
+            if (shouldFallbackToLibtorch(id, providerModel)) {
+                try {
+                    System.out.println("DJL checkpoint load failed; falling back to libtorch (experimental)...");
+                    return inferDirect("libtorch", providerRequest);
+                } catch (RuntimeException fallback) {
+                    throw new RuntimeException(
+                            "DJL checkpoint load failed and libtorch fallback also failed: " + fallback.getMessage(),
+                            primary);
+                }
+            }
+            throw primary;
+        }
+    }
+
+    private InferenceResponse inferDirect(String id, ProviderRequest providerRequest) {
+        Optional<LLMProvider> providerOpt = providerRegistry.getProvider(id);
+        if (providerOpt.isEmpty()) {
+            throw new RuntimeException("Provider not available: " + id);
+        }
+        LLMProvider provider = providerOpt.get();
+        return provider.infer(providerRequest)
+                .await()
+                .atMost(Duration.ofSeconds(180));
+    }
+
+    private ProviderRequest buildDirectProviderRequest(InferenceRequest request, String providerModel) {
+        return ProviderRequest.builder()
+                .model(providerModel)
+                .messages(request.getMessages())
+                .parameters(request.getParameters())
+                .streaming(false)
+                .timeout(Duration.ofSeconds(120))
+                .metadata("request_id", request.getRequestId())
+                .metadata("tenantId", "community")
+                .build();
+    }
+
+    private String resolveProviderModel(InferenceRequest request) {
+        Object modelPathParam = request.getParameters().get("model_path");
+        if (modelPathParam != null && !String.valueOf(modelPathParam).isBlank()) {
+            return String.valueOf(modelPathParam);
+        }
+        return request.getModel();
+    }
+
+    private boolean shouldFallbackToLibtorch(String providerId, String providerModel) {
+        if (!"djl".equalsIgnoreCase(providerId) || providerModel == null) {
+            return false;
+        }
+        String normalized = providerModel.toLowerCase();
+        return normalized.endsWith(".safetensors")
+                || normalized.endsWith(".safetensor")
+                || normalized.endsWith(".bin")
+                || normalized.endsWith(".pth")
+                || normalized.contains("/.golek/models/djl/")
+                || normalized.contains("\\.golek\\models\\djl\\");
+    }
+
     private void maybeAutoSelectProvider() {
         try {
-            var modelInfoOpt = sdk.getModelInfo(modelId);
+            var modelInfoOpt = LocalModelResolver.resolve(sdk, modelId).map(LocalModelResolver.ResolvedModel::info);
             if (modelInfoOpt.isEmpty()) {
                 return;
             }
@@ -374,6 +458,7 @@ public class RunCommand implements Runnable {
         return switch (normalized) {
             case "GGUF" -> "gguf";
             case "TORCHSCRIPT" -> "djl";
+            case "PYTORCH", "SAFETENSORS" -> "djl";
             case "ONNX" -> "onnx";
             default -> null;
         };
@@ -427,13 +512,19 @@ public class RunCommand implements Runnable {
             if (providerId != null && !providerId.isBlank()) {
                 return ensureProviderHealthy(providerId);
             }
-            var modelInfoOpt = sdk.getModelInfo(modelId);
+            var modelInfoOpt = LocalModelResolver.resolve(sdk, modelId).map(LocalModelResolver.ResolvedModel::info);
             if (modelInfoOpt.isEmpty()) {
                 return true;
             }
             var modelInfo = modelInfoOpt.get();
             String format = modelInfo.getFormat();
             if (isCheckpointOnlyFormat(format)) {
+                String checkpointProvider = providerForFormat(format);
+                if (checkpointProvider != null && ensureProviderHealthy(checkpointProvider)) {
+                    providerId = checkpointProvider;
+                    sdk.setPreferredProvider(checkpointProvider);
+                    return true;
+                }
                 if (offline) {
                     System.err.printf("Model '%s' uses checkpoint format '%s' and cannot run in offline Java runtime.%n",
                             modelId, format);
@@ -441,17 +532,29 @@ public class RunCommand implements Runnable {
                     return false;
                 }
                 if (tryRefreshCompatibleModel()) {
-                    modelInfoOpt = sdk.getModelInfo(modelId);
+                    modelInfoOpt = LocalModelResolver.resolve(sdk, modelId).map(LocalModelResolver.ResolvedModel::info);
                     if (modelInfoOpt.isPresent()) {
                         format = modelInfoOpt.get().getFormat();
                     }
                 }
-            }
-
-            if (isCheckpointOnlyFormat(format)) {
-                System.err.printf("Model '%s' uses unsupported runtime format '%s'.%n", modelId, format);
-                System.err.println("Use a GGUF or TorchScript model.");
-                return false;
+                if (isCheckpointOnlyFormat(format)) {
+                    checkpointProvider = providerForFormat(format);
+                    if (checkpointProvider != null && ensureProviderHealthy(checkpointProvider)) {
+                        providerId = checkpointProvider;
+                        sdk.setPreferredProvider(checkpointProvider);
+                        return true;
+                    }
+                    // experimental fallback
+                    if (ensureProviderHealthy("libtorch")) {
+                        providerId = "libtorch";
+                        sdk.setPreferredProvider("libtorch");
+                        return true;
+                    }
+                    System.err.printf("Model '%s' uses unsupported runtime format '%s'.%n", modelId, format);
+                    System.err.println(
+                            "Use a GGUF/TorchScript model. Checkpoint runtime requires DJL (recommended) or --provider libtorch (experimental).");
+                    return false;
+                }
             }
 
             String inferredProvider = providerForFormat(format);
@@ -501,11 +604,11 @@ public class RunCommand implements Runnable {
         String normalized = modelId.startsWith("hf:") ? modelId.substring(3) : modelId;
         for (String candidate : java.util.List.of(modelId, normalized, modelId + "-GGUF", normalized + "-GGUF")) {
             try {
-                var info = sdk.getModelInfo(candidate);
-                if (info.isPresent()) {
-                    String fmt = info.get().getFormat();
+                var resolved = LocalModelResolver.resolve(sdk, candidate);
+                if (resolved.isPresent()) {
+                    String fmt = resolved.get().info().getFormat();
                     if (!isCheckpointOnlyFormat(fmt)) {
-                        modelId = candidate;
+                        modelId = resolved.get().modelId();
                         System.out.println("Using compatible model: " + modelId);
                         return true;
                     }
@@ -521,6 +624,7 @@ public class RunCommand implements Runnable {
         Optional<ProviderInfo> info = findProviderInfo(provider);
         if (info.isEmpty()) {
             System.err.printf("Required provider is not available: %s%n", provider);
+            printGenericProviderSetupHint(provider);
             return false;
         }
         if (info.get().healthStatus() != ProviderHealth.Status.UNHEALTHY) {
@@ -528,6 +632,28 @@ public class RunCommand implements Runnable {
         }
         printProviderSetupHint(info.get());
         return false;
+    }
+
+    private void printGenericProviderSetupHint(String providerId) {
+        if ("djl".equalsIgnoreCase(providerId)) {
+            System.err.println(
+                    "DJL runtime is not loaded. Ensure golek-ext-format-djl is on classpath and DJL native runtime can initialize.");
+        } else if ("libtorch".equalsIgnoreCase(providerId)) {
+            System.err.println("LibTorch runtime is not loaded. Set LIBTORCH_PATH and include golek-ext-format-libtorch.");
+        } else if ("gguf".equalsIgnoreCase(providerId)) {
+            System.err.println("GGUF runtime is not loaded. Set GOLEK_LLAMA_LIB_DIR/GOLEK_LLAMA_LIB_PATH and include golek-ext-format-gguf.");
+        }
+    }
+
+    private void printProviderHintFromError(Throwable throwable) {
+        String detail = describeError(throwable).toLowerCase();
+        if (detail.contains("provider not available: libtorch")) {
+            printGenericProviderSetupHint("libtorch");
+        } else if (detail.contains("provider not available: djl")) {
+            printGenericProviderSetupHint("djl");
+        } else if (detail.contains("provider not available: gguf")) {
+            printGenericProviderSetupHint("gguf");
+        }
     }
 
     private Optional<ProviderInfo> findProviderInfo(String id) {
