@@ -9,12 +9,14 @@ import java.util.List;
 import java.util.Map;
 import picocli.CommandLine.Command;
 import tech.kayys.golek.cli.commands.ChatCommand;
+import tech.kayys.golek.cli.commands.DeleteCommand;
 import tech.kayys.golek.cli.commands.ExtensionsCommand;
 import tech.kayys.golek.cli.commands.InfoCommand;
 import tech.kayys.golek.cli.commands.ListCommand;
 import tech.kayys.golek.cli.commands.ProvidersCommand;
 import tech.kayys.golek.cli.commands.PullCommand;
 import tech.kayys.golek.cli.commands.RunCommand;
+import tech.kayys.golek.cli.commands.SafetensorsCommand;
 import tech.kayys.golek.cli.commands.ShowCommand;
 
 import picocli.CommandLine;
@@ -27,9 +29,11 @@ import picocli.CommandLine.Option;
         PullCommand.class,
         ListCommand.class,
         ShowCommand.class,
+        DeleteCommand.class,
         ProvidersCommand.class,
         ExtensionsCommand.class,
-        InfoCommand.class
+        InfoCommand.class,
+        SafetensorsCommand.class
 })
 public class GolekCommand implements Runnable {
     private static final String HF_TOKEN_PROPERTY = "wayang.inference.repository.huggingface.token";

@@ -164,6 +164,12 @@ HuggingFaceTB/SmolLM2-135M
 meta-llama/Llama-3.2-1B
 google/gemma-2b-it
 
+
+GGUF_GPU_ENABLED=true \GGUF_GPU_LAYERS=8 \GGUF_BATCH_SIZE=64 \
+GGUF_THREADS=8 \
+java -jar /Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-golek/ui/golek-cli/target/golek-cli-1.0.0-SNAPSHOT-runner.jar \
+chat --model meta-llama/Llama-3.2-1B-Instruct
+
 # Run with different providers
 java -jar ui/golek-cli/target/quarkus-app/quarkus-run.jar run \
   --provider openai --model gpt-4 --prompt "Hello"

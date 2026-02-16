@@ -2,10 +2,12 @@ package tech.kayys.golek.cli.commands;
 
 import io.quarkus.arc.Unremovable;
 import jakarta.enterprise.context.Dependent;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
+import tech.kayys.golek.model.repo.hf.HuggingFaceClient;
 import tech.kayys.golek.sdk.core.GolekSdk;
 
 /**
@@ -23,6 +25,8 @@ public class PullCommand implements Runnable {
 
     @Inject
     GolekSdk sdk;
+    @Inject
+    Instance<HuggingFaceClient> hfClientInstance;
 
     @Parameters(index = "0", description = "Model specification (e.g., ollama:llama2, llama2)")
     String modelSpec;
@@ -58,8 +62,21 @@ public class PullCommand implements Runnable {
             System.out.println("\nPull complete: " + modelSpec);
 
         } catch (Exception e) {
+            String reason = describeError(e);
+            if (HuggingFaceCheckpointStore.shouldStoreOnPullFailure(reason)) {
+                var stored = HuggingFaceCheckpointStore.storeCheckpointArtifacts(
+                        hfClientInstance,
+                        modelSpec,
+                        progress -> System.out.printf("\r%s...", progress.getStatus()));
+                if (stored.isPresent() && stored.get().hasWeights()) {
+                    System.out.println("\nCheckpoint artifacts stored: " + stored.get().rootDir().toAbsolutePath());
+                    System.out.println(
+                            "Model is stored in origin checkpoint format and not directly runnable in local Java runtime.");
+                    return;
+                }
+            }
             System.err.println("\nFailed to pull model: " + e.getMessage());
-            System.err.println("Detail: " + describeError(e));
+            System.err.println("Detail: " + reason);
         }
     }
 
