@@ -51,6 +51,12 @@
             <artifactId>quarkus-smallrye-context-propagation</artifactId>
         </dependency>
 
+        <!-- JSON Parsing (for safetensors header) -->
+        <dependency>
+            <groupId>jakarta.json</groupId>
+            <artifactId>jakarta.json-api</artifactId>
+        </dependency>
+
         <!-- Observability -->
         <dependency>
             <groupId>io.quarkus</groupId>

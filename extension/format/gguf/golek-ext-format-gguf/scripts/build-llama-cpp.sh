@@ -112,9 +112,19 @@ mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
 if command -v cmake &> /dev/null; then
-    # Default to CPU-safe build on macOS; can be overridden by GOLEK_GGML_METAL=ON.
-    GGML_METAL_FLAG="${GOLEK_GGML_METAL:-OFF}"
-    cmake "$VENDOR_DIR" -DBUILD_SHARED_LIBS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DGGML_METAL="$GGML_METAL_FLAG"
+    # On macOS, default to Metal for much faster local inference.
+    if [ "$(uname -s)" = "Darwin" ]; then
+        GGML_METAL_FLAG="${GOLEK_GGML_METAL:-ON}"
+    else
+        GGML_METAL_FLAG="${GOLEK_GGML_METAL:-OFF}"
+    fi
+    cmake "$VENDOR_DIR" \
+        -DBUILD_SHARED_LIBS=ON \
+        -DLLAMA_BUILD_TESTS=OFF \
+        -DLLAMA_BUILD_EXAMPLES=OFF \
+        -DLLAMA_BUILD_TOOLS=OFF \
+        -DLLAMA_BUILD_SERVER=OFF \
+        -DGGML_METAL="$GGML_METAL_FLAG"
     cmake --build . --config Release -j 4
 else
     echo "Error: cmake not found. Cannot build llama.cpp."

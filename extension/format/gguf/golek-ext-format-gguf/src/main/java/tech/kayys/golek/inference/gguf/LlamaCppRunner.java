@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 /**
  * Production-ready GGUF/llama.cpp model runner implementation
@@ -101,6 +102,12 @@ public class LlamaCppRunner {
             if (!modelPath.toFile().exists()) {
                 throw new RuntimeException("Model file not found: " + modelPath);
             }
+            if (!hasGgufHeader(modelPath)) {
+                throw new RuntimeException(
+                        "Model file is not a valid GGUF binary (missing GGUF header): "
+                                + modelPath
+                                + ". Re-pull or re-convert the model.");
+            }
 
             log.infof("Loading GGUF model from: %s", modelPath);
 
@@ -117,7 +124,6 @@ public class LlamaCppRunner {
             // In real impl, we would use binding.loadModel etc.
             // For now, we trust the binding handles are correct.
 
-            MemorySegment modelParams = binding.getDefaultModelParams();
             int configuredGpuLayers = getIntConfig(runnerConfig, "nGpuLayers",
                     providerConfig.gpuEnabled() ? providerConfig.gpuLayers() : 0);
             int configuredThreads = Math.max(1,
@@ -131,18 +137,36 @@ public class LlamaCppRunner {
 
             long modelSizeBytes = safeFileSize(modelPath);
             long largeModelThreshold = 4L * 1024L * 1024L * 1024L; // 4 GiB
+            boolean forceGpuForLargeModel = Boolean.parseBoolean(
+                    System.getProperty(
+                            "golek.gguf.force.gpu.large-model",
+                            System.getenv().getOrDefault("GOLEK_GGUF_FORCE_GPU_FOR_LARGE_MODEL", "false")));
 
-            // Safety fallback: large F16 models + GPU offload can hard-abort on some macOS
-            // setups.
-            if (configuredGpuLayers > 0 && modelSizeBytes >= largeModelThreshold) {
-                log.warnf("Large GGUF model detected (%.2f GiB). For stability, disabling GPU layers (requested=%d).",
-                        modelSizeBytes / (1024.0 * 1024.0 * 1024.0), configuredGpuLayers);
-                configuredGpuLayers = 0;
+            // Preserve llama.cpp semantics: -1 = all layers.
+            if (configuredGpuLayers < -1) {
+                configuredGpuLayers = -1;
+            }
+            if (configuredGpuLayers != 0 && modelSizeBytes >= largeModelThreshold && !forceGpuForLargeModel) {
+                int capped = configuredGpuLayers == -1 ? 8 : Math.min(configuredGpuLayers, 8);
+                if (capped != configuredGpuLayers) {
+                    log.warnf(
+                            "Large GGUF model detected (%.2f GiB). Capping initial GPU layers from %d to %d "
+                                    + "for faster and safer startup. Set GOLEK_GGUF_FORCE_GPU_FOR_LARGE_MODEL=true "
+                                    + "to keep requested layers.",
+                            modelSizeBytes / (1024.0 * 1024.0 * 1024.0),
+                            configuredGpuLayers,
+                            capped);
+                }
+                configuredGpuLayers = capped;
             }
 
             int effectiveBatch = Math.min(configuredBatch, 128);
 
-            binding.setModelParam(modelParams, "n_gpu_layers", Math.max(0, configuredGpuLayers));
+            this.runtimeBatchSize = effectiveBatch;
+
+            MemorySegment modelParams = binding.getDefaultModelParams();
+            int activeGpuLayers = configuredGpuLayers;
+            binding.setModelParam(modelParams, "n_gpu_layers", activeGpuLayers);
             binding.setModelParam(modelParams, "main_gpu", providerConfig.gpuDeviceId());
             binding.setModelParam(modelParams, "use_mmap", useMmap);
             binding.setModelParam(modelParams, "use_direct_io", false);
@@ -151,26 +175,51 @@ public class LlamaCppRunner {
             binding.setModelParam(modelParams, "use_extra_bufts", false);
             binding.setModelParam(modelParams, "no_host", false);
             binding.setModelParam(modelParams, "no_alloc", false);
-
             this.model = binding.loadModel(modelPath.toString(), modelParams);
 
             MemorySegment contextParams = binding.getDefaultContextParams();
-            this.runtimeBatchSize = effectiveBatch;
             binding.setContextParam(contextParams, "n_ctx", configuredCtx);
             binding.setContextParam(contextParams, "n_batch", this.runtimeBatchSize);
             binding.setContextParam(contextParams, "n_ubatch", this.runtimeBatchSize);
             binding.setContextParam(contextParams, "n_threads", configuredThreads);
             binding.setContextParam(contextParams, "n_threads_batch", configuredThreads);
-            binding.setContextParam(contextParams, "offload_kqv", configuredGpuLayers > 0);
+            binding.setContextParam(contextParams, "offload_kqv", activeGpuLayers != 0);
             binding.setContextParam(contextParams, "flash_attn_type", 0);
             binding.setContextParam(contextParams, "samplers", MemorySegment.NULL);
             binding.setContextParam(contextParams, "n_samplers", 0L);
+            try {
+                this.context = binding.createContext(model, contextParams);
+            } catch (RuntimeException gpuContextError) {
+                if (activeGpuLayers == 0) {
+                    throw gpuContextError;
+                }
 
-            this.context = binding.createContext(model, contextParams);
+                log.warnf("GPU context initialization failed (n_gpu_layers=%d). Retrying on CPU. Cause: %s",
+                        activeGpuLayers, gpuContextError.getMessage());
+                binding.freeModel(this.model);
+
+                MemorySegment cpuModelParams = binding.getDefaultModelParams();
+                activeGpuLayers = 0;
+                binding.setModelParam(cpuModelParams, "n_gpu_layers", activeGpuLayers);
+                binding.setModelParam(cpuModelParams, "main_gpu", providerConfig.gpuDeviceId());
+                binding.setModelParam(cpuModelParams, "use_mmap", useMmap);
+                binding.setModelParam(cpuModelParams, "use_direct_io", false);
+                binding.setModelParam(cpuModelParams, "use_mlock", useMlock);
+                binding.setModelParam(cpuModelParams, "check_tensors", false);
+                binding.setModelParam(cpuModelParams, "use_extra_bufts", false);
+                binding.setModelParam(cpuModelParams, "no_host", false);
+                binding.setModelParam(cpuModelParams, "no_alloc", false);
+
+                this.model = binding.loadModel(modelPath.toString(), cpuModelParams);
+                binding.setContextParam(contextParams, "offload_kqv", false);
+                this.context = binding.createContext(model, contextParams);
+            }
             this.contextSize = binding.getContextSize(context);
             this.vocabSize = binding.getVocabSize(model);
             this.eosToken = binding.getEosToken(model);
             this.bosToken = binding.getBosToken(model);
+            log.infof("GGUF runtime config: gpu_layers=%d, n_ctx=%d, n_batch=%d, threads=%d",
+                    activeGpuLayers, configuredCtx, this.runtimeBatchSize, configuredThreads);
 
             // Load metadata (chat template)
             this.chatTemplate = binding.getModelMetadata(model, "tokenizer.chat_template");
@@ -225,8 +274,27 @@ public class LlamaCppRunner {
         }
     }
 
+    private boolean hasGgufHeader(Path path) {
+        try (var in = java.nio.file.Files.newInputStream(path)) {
+            byte[] magic = in.readNBytes(4);
+            return magic.length == 4
+                    && magic[0] == 'G'
+                    && magic[1] == 'G'
+                    && magic[2] == 'U'
+                    && magic[3] == 'F';
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
     public InferenceResponse infer(
             InferenceRequest request) {
+        return inferInternal(request, null);
+    }
+
+    private InferenceResponse inferInternal(
+            InferenceRequest request,
+            Consumer<String> onTokenPiece) {
 
         if (!initialized) {
             throw new IllegalStateException("Runner not initialized");
@@ -305,12 +373,12 @@ public class LlamaCppRunner {
             int maxBatch = Math.max(1, runtimeBatchSize);
             long timeoutMs = Math.max(
                     1_000L,
-                    ((Number) request.getParameters().getOrDefault("inference_timeout_ms", 30_000)).longValue());
+                    ((Number) request.getParameters().getOrDefault("inference_timeout_ms", 120_000)).longValue());
             Instant inferenceDeadline = Instant.now().plusMillis(timeoutMs);
 
             // 3. Batch Init
-            // Decode is single-token per step; keep batch size at 1 for native stability.
-            MemorySegment batch = binding.batchInit(Math.min(1, maxBatch), 0, 1);
+            // Keep capacity aligned with runtime batch size so prompt evaluation can run in chunks.
+            MemorySegment batch = binding.batchInit(maxBatch, 0, 1);
 
             StringBuilder result = new StringBuilder();
             int tokensGenerated = 0;
@@ -323,29 +391,30 @@ public class LlamaCppRunner {
             try {
                 // 4. Prompt Evaluation in chunks to respect n_batch
                 int processed = 0;
+                int promptLogitsBatchIndex = 0;
                 while (processed < nTokens) {
                     if (Instant.now().isAfter(inferenceDeadline)) {
-                        throw new RuntimeException("GGUF prompt evaluation timed out");
+                        throw new RuntimeException(
+                                "GGUF prompt evaluation timed out after " + timeoutMs + " ms");
                     }
-                    // Decode prompt token-by-token for maximum compatibility across JVM/native
-                    // runtimes and stable logits indexing.
-                    int chunk = 1;
+                    int chunk = Math.min(maxBatch, nTokens - processed);
                     binding.setBatchSize(batch, chunk);
                     for (int i = 0; i < chunk; i++) {
                         int absoluteIndex = processed + i;
-                        // Single-token decode: logits are always at index 0.
+                        // Request logits only on the final token in this chunk.
                         binding.setBatchToken(batch, i, promptTokens[absoluteIndex], absoluteIndex, 0,
-                                true);
+                                i == chunk - 1);
                     }
                     if (binding.decode(this.context, batch) != 0) {
                         throw new RuntimeException("Prompt evaluation failed");
                     }
+                    promptLogitsBatchIndex = chunk - 1;
                     processed += chunk;
                 }
 
                 // 5. Generation Loop
                 int currentPos = nTokens;
-                int logitsBatchIndex = 0;
+                int logitsBatchIndex = promptLogitsBatchIndex;
                 if (effectiveRepeatLastN > 0) {
                     int start = Math.max(0, nTokens - effectiveRepeatLastN);
                     for (int i = start; i < nTokens; i++) {
@@ -355,7 +424,7 @@ public class LlamaCppRunner {
 
                 while (tokensGenerated < maxTokens) {
                     if (Instant.now().isAfter(inferenceDeadline)) {
-                        throw new RuntimeException("GGUF generation timed out");
+                        throw new RuntimeException("GGUF generation timed out after " + timeoutMs + " ms");
                     }
                     // Sample next token using the correct batch index for logits
                     int newTokenId = sampleNextToken(
@@ -379,6 +448,9 @@ public class LlamaCppRunner {
                     // Decode piece
                     String piece = binding.tokenToPiece(model, newTokenId);
                     result.append(piece);
+                    if (onTokenPiece != null && piece != null && !piece.isEmpty()) {
+                        onTokenPiece.accept(piece);
+                    }
                     tokensGenerated++;
 
                     // Respect textual stop sequences for chat-style templates.
@@ -413,8 +485,18 @@ public class LlamaCppRunner {
                 }
 
             } catch (Exception e) {
-                log.error("Inference failed", e);
-                throw new RuntimeException("Inference failed", e);
+                String message = e.getMessage();
+                if (message == null || message.isBlank()) {
+                    message = "Inference failed";
+                } else if (message.contains("timed out")) {
+                    message = message + " (increase --inference-timeout-ms for larger models)";
+                }
+                if (message.contains("timed out")) {
+                    log.warnf("Inference timeout: %s", message);
+                } else {
+                    log.errorf(e, "Inference failed: %s", message);
+                }
+                throw new RuntimeException(message, e);
             } finally {
                 // Cleanup request-specific resources
                 binding.batchFree(batch);
@@ -447,7 +529,12 @@ public class LlamaCppRunner {
                 try {
                     streamingInferenceLoop(request, emitter);
                 } catch (Exception e) {
-                    log.error("Streaming inference failed", e);
+                    String message = e.getMessage() == null ? "" : e.getMessage();
+                    if (message.contains("timed out")) {
+                        log.warnf("Streaming inference timeout: %s", message);
+                    } else {
+                        log.error("Streaming inference failed", e);
+                    }
                     emitter.fail(e);
                 }
             });
@@ -455,24 +542,16 @@ public class LlamaCppRunner {
     }
 
     private void streamingInferenceLoop(InferenceRequest request, MultiEmitter<? super StreamChunk> emitter) {
-        // Stable fallback: perform normal inference, then emit in small chunks.
-        InferenceResponse response = infer(request);
-        String content = response.getContent() == null ? "" : response.getContent();
-        int index = 0;
-        int chunkSize = 24;
-        int emitted = 0;
-
-        while (index < content.length()) {
-            if (emitter.isCancelled()) {
-                return;
+        final int[] emitted = { 0 };
+        inferInternal(request, piece -> {
+            if (!emitter.isCancelled()) {
+                emitter.emit(StreamChunk.of(request.getRequestId(), emitted[0]++, piece));
             }
-            int end = Math.min(content.length(), index + chunkSize);
-            emitter.emit(StreamChunk.of(request.getRequestId(), emitted++, content.substring(index, end)));
-            index = end;
+        });
+        if (!emitter.isCancelled()) {
+            emitter.emit(StreamChunk.finalChunk(request.getRequestId(), emitted[0], ""));
+            emitter.complete();
         }
-
-        emitter.emit(StreamChunk.finalChunk(request.getRequestId(), emitted, ""));
-        emitter.complete();
     }
 
     private MemorySegment createSamplerChainFromRequest(InferenceRequest request) {

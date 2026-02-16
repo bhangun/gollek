@@ -209,7 +209,12 @@ public class GGUFProvider implements StreamingProvider {
                 metrics.recordFailure();
                 recordMicrometerMetrics(request.getModel(), false, Duration.ZERO);
 
-                log.errorf(e, "Inference failed for model=%s", request.getModel());
+                String message = e.getMessage() == null ? "" : e.getMessage();
+                if (message.contains("timed out")) {
+                    log.warnf("Inference timeout for model=%s: %s", request.getModel(), message);
+                } else {
+                    log.errorf(e, "Inference failed for model=%s", request.getModel());
+                }
 
                 throw new ProviderException(
                         PROVIDER_ID,
