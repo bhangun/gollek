@@ -42,7 +42,7 @@ export PROVIDER_TYPE=onnx
 
 ```java
 ProviderRequest request = ProviderRequest.builder()
-  .tenantId("tenant-123")
+  .requestId("tenant-123")
   .userId("user-456")
   .modelId("bert-base-uncased")
   .prompt("Classify this text: ...")
@@ -81,7 +81,7 @@ response.getUsageMetrics()     // Resource usage
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `tenantId` | String | required | Multi-tenant isolation |
+| `requestId` | String | required | Multi-tenant isolation |
 | `userId` | String | required | User context for audit |
 | `modelId` | String | required | Model identifier |
 | `prompt` | String | required | Input to model |
@@ -136,7 +136,7 @@ Uni<ProviderResponse> result = openaiProvider.infer(request)
 Each request is isolated by tenant:
 
 ```java
-request.setTenantId("tenant-123");  // Separate resource quotas
+request.setRequestId("tenant-123");  // Separate resource quotas
 request.setUserId("user-456");      // Individual audit trail
 ```
 

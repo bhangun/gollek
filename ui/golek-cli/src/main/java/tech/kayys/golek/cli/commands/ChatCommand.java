@@ -9,11 +9,15 @@ import tech.kayys.golek.sdk.core.GolekSdk;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.Message;
+import tech.kayys.golek.spi.provider.ProviderInfo;
+import tech.kayys.golek.spi.provider.ProviderHealth;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.Scanner;
 import java.util.UUID;
 
 /**
@@ -32,7 +36,7 @@ public class ChatCommand implements Runnable {
     String modelId;
 
     @Option(names = {
-            "--provider" }, description = "Provider: litert, gguf, libtorch, ollama, gemini, openai, anthropic, cerebras")
+            "--provider" }, description = "Provider: litert, gguf, djl, libtorch(experimental), ollama, gemini, openai, anthropic, cerebras")
     String providerId;
 
     @Option(names = { "--system" }, description = "System prompt")
@@ -77,8 +81,17 @@ public class ChatCommand implements Runnable {
     @Option(names = { "--max-tokens" }, description = "Maximum tokens to generate per response", defaultValue = "64")
     int maxTokens;
 
+    @Option(names = { "--inference-timeout-ms" }, description = "Hard timeout for one inference call in milliseconds", defaultValue = "30000")
+    long inferenceTimeoutMs;
+
     @Option(names = { "-q", "--quiet" }, description = "Minimal output (no banner/spinner/stats)")
     boolean quiet;
+
+    @Option(names = { "--convert-mode" }, description = "Checkpoint conversion mode: ask, auto, off", defaultValue = "ask")
+    String convertMode;
+
+    @Option(names = { "--gguf-outtype" }, description = "GGUF converter outtype (e.g. q4_0, q8_0, f16, f32)")
+    String ggufOutType;
 
     private static final String RESET = "\u001B[0m";
     private static final String GREEN = "\u001B[32m";
@@ -117,6 +130,9 @@ public class ChatCommand implements Runnable {
                 return;
             }
             maybeAutoSelectProvider();
+            if (!ensureProviderReady()) {
+                return;
+            }
 
             // Add system prompt if provided
             if (systemPrompt != null && !systemPrompt.isEmpty()) {
@@ -279,6 +295,7 @@ public class ChatCommand implements Runnable {
                         .parameter("top_k", topK)
                         .parameter("repeat_penalty", repeatPenalty)
                         .parameter("json_mode", jsonMode)
+                        .parameter("inference_timeout_ms", inferenceTimeoutMs)
                         .maxTokens(maxTokens)
                         .preferredProvider(providerId)
                         .cacheBypass(noCache);
@@ -548,7 +565,9 @@ public class ChatCommand implements Runnable {
 
     private boolean ensureModelAvailable() {
         try {
-            if (sdk.getModelInfo(modelId).isPresent()) {
+            var localInfo = sdk.getModelInfo(modelId);
+            if (localInfo.isPresent()) {
+                maybeUpgradeDjlLayout(localInfo.get());
                 return true;
             }
 
@@ -562,6 +581,8 @@ public class ChatCommand implements Runnable {
                 System.err.println("Error: Model not found locally: " + modelId);
                 return false;
             }
+
+            configureCheckpointConversionPreference();
 
             boolean pulled = false;
             Exception lastPullError = null;
@@ -591,11 +612,14 @@ public class ChatCommand implements Runnable {
                     break;
                 } catch (Exception e) {
                     lastPullError = e;
+                    if (isFatalPullError(e)) {
+                        break;
+                    }
                 }
             }
 
             if (!pulled) {
-                String reason = lastPullError != null ? lastPullError.getMessage() : "unknown error";
+                String reason = lastPullError != null ? describeError(lastPullError) : "unknown error";
                 System.err.println("Failed to pull model from Hugging Face: " + reason);
                 return false;
             }
@@ -609,6 +633,7 @@ public class ChatCommand implements Runnable {
             for (String candidate : candidates) {
                 if (sdk.getModelInfo(candidate).isPresent()) {
                     modelId = candidate;
+                    sdk.getModelInfo(modelId).ifPresent(this::maybeUpgradeDjlLayout);
                     return true;
                 }
             }
@@ -623,6 +648,90 @@ public class ChatCommand implements Runnable {
 
     private boolean isHuggingFaceSpec(String id) {
         return id != null && (id.startsWith("hf:") || id.contains("/"));
+    }
+
+    private void configureCheckpointConversionPreference() {
+        String mode = convertMode == null ? "ask" : convertMode.trim().toLowerCase();
+        if (!mode.equals("ask") && !mode.equals("auto") && !mode.equals("off")) {
+            mode = "ask";
+        }
+
+        if (mode.equals("off")) {
+            System.setProperty("golek.gguf.converter.auto", "false");
+            return;
+        }
+
+        System.setProperty("golek.gguf.converter.auto", "true");
+        if (ggufOutType != null && !ggufOutType.isBlank()) {
+            System.setProperty("golek.gguf.converter.outtype", ggufOutType.trim().toLowerCase());
+            return;
+        }
+
+        if (!mode.equals("ask")) {
+            if (System.getProperty("golek.gguf.converter.outtype") == null) {
+                System.setProperty("golek.gguf.converter.outtype", defaultGgufOutType());
+            }
+            return;
+        }
+
+        if (!isHuggingFaceSpec(modelId)) {
+            return;
+        }
+        if (quiet || System.console() == null) {
+            return;
+        }
+        if (System.getProperty("golek.gguf.converter.prompted") != null) {
+            return;
+        }
+        System.setProperty("golek.gguf.converter.prompted", "true");
+
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("If this model has no GGUF artifact, convert checkpoints to GGUF? [Y/n]: ");
+        String answer = scanner.nextLine();
+        if (answer != null && answer.trim().equalsIgnoreCase("n")) {
+            System.setProperty("golek.gguf.converter.auto", "false");
+            return;
+        }
+
+        String current = System.getProperty("golek.gguf.converter.outtype", defaultGgufOutType());
+        System.out.print("Select GGUF outtype [q4_0/q8_0/f16/f32] (default " + current + "): ");
+        String outType = scanner.nextLine();
+        if (outType == null || outType.isBlank()) {
+            outType = current;
+        }
+        outType = outType.trim().toLowerCase();
+        if (!isSupportedGgufOutType(outType)) {
+            outType = defaultGgufOutType();
+        }
+        System.setProperty("golek.gguf.converter.outtype", outType);
+    }
+
+    private String defaultGgufOutType() {
+        if (isLikelyLargeModelId(modelId)) {
+            return "q4_0";
+        }
+        return "q8_0";
+    }
+
+    private boolean isSupportedGgufOutType(String outType) {
+        return outType != null && switch (outType) {
+            case "q4_0", "q4_1", "q5_0", "q5_1", "q8_0", "q8_1", "f16", "f32" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isLikelyLargeModelId(String id) {
+        if (id == null) {
+            return false;
+        }
+        String normalized = id.toUpperCase();
+        return normalized.contains("4B")
+                || normalized.contains("7B")
+                || normalized.contains("8B")
+                || normalized.contains("13B")
+                || normalized.contains("14B")
+                || normalized.contains("32B")
+                || normalized.contains("70B");
     }
 
     private java.util.List<String> buildPullSpecs(String id) {
@@ -653,6 +762,9 @@ public class ChatCommand implements Runnable {
             if (inferredProvider == null || inferredProvider.isBlank()) {
                 return;
             }
+            if (!isProviderHealthy(inferredProvider)) {
+                return;
+            }
             sdk.setPreferredProvider(inferredProvider);
             providerId = inferredProvider;
         } catch (Exception ignored) {
@@ -667,9 +779,228 @@ public class ChatCommand implements Runnable {
         String normalized = format.trim().toUpperCase();
         return switch (normalized) {
             case "GGUF" -> "gguf";
-            case "TORCHSCRIPT", "PYTORCH", "SAFETENSORS" -> "libtorch";
+            case "TORCHSCRIPT" -> "djl";
             case "ONNX" -> "onnx";
             default -> null;
         };
+    }
+
+    private void maybeUpgradeDjlLayout(tech.kayys.golek.sdk.core.model.ModelInfo info) {
+        if (info == null || info.getFormat() == null) {
+            return;
+        }
+        String format = info.getFormat().trim().toUpperCase();
+        if (!format.equals("TORCHSCRIPT")) {
+            return;
+        }
+        Object rawPath = info.getMetadata() != null ? info.getMetadata().get("path") : null;
+        String path = rawPath != null ? String.valueOf(rawPath).toLowerCase() : "";
+        if (!path.contains("/models/torchscript/")) {
+            return;
+        }
+        if (!isHuggingFaceSpec(modelId)) {
+            return;
+        }
+        try {
+            if (!quiet) {
+                System.out.println("Upgrading local model layout for DJL runtime: " + modelId);
+            }
+            for (String spec : buildPullSpecs(modelId)) {
+                try {
+                    sdk.pullModel(spec, null);
+                    break;
+                } catch (Exception ignored) {
+                    // try next variant
+                }
+            }
+        } catch (Exception ignored) {
+            // keep existing model when upgrade is unavailable
+        }
+    }
+
+    private boolean isProviderHealthy(String id) {
+        try {
+            return sdk.listAvailableProviders().stream()
+                    .filter(p -> id.equalsIgnoreCase(p.id()))
+                    .findFirst()
+                    .map(p -> p.healthStatus() != tech.kayys.golek.spi.provider.ProviderHealth.Status.UNHEALTHY)
+                    .orElse(false);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean ensureProviderReady() {
+        try {
+            if (providerId != null && !providerId.isBlank()) {
+                return ensureProviderHealthy(providerId);
+            }
+
+            var modelInfoOpt = sdk.getModelInfo(modelId);
+            if (modelInfoOpt.isEmpty()) {
+                return true;
+            }
+            var modelInfo = modelInfoOpt.get();
+            String format = modelInfo.getFormat();
+            if (isCheckpointOnlyFormat(format) && tryRefreshCompatibleModel()) {
+                modelInfoOpt = sdk.getModelInfo(modelId);
+                if (modelInfoOpt.isPresent()) {
+                    format = modelInfoOpt.get().getFormat();
+                }
+            }
+            if (isCheckpointOnlyFormat(format)) {
+                System.err.printf("Model '%s' uses unsupported runtime format '%s'.%n", modelId, format);
+                System.err.println("Use a GGUF or TorchScript model.");
+                return false;
+            }
+
+            String inferredProvider = providerForFormat(format);
+            if (inferredProvider == null || inferredProvider.isBlank()) {
+                return true;
+            }
+            return ensureProviderHealthy(inferredProvider);
+        } catch (Exception ignored) {
+            return true;
+        }
+    }
+
+    private boolean isCheckpointOnlyFormat(String format) {
+        if (format == null) {
+            return false;
+        }
+        String normalized = format.trim().toUpperCase();
+        return normalized.equals("PYTORCH") || normalized.equals("SAFETENSORS");
+    }
+
+    private boolean tryRefreshCompatibleModel() {
+        if (!isHuggingFaceSpec(modelId)) {
+            return false;
+        }
+        if (!quiet) {
+            System.out.println("Checkpoint-only model detected. Trying GGUF/TorchScript fallback...");
+        }
+        for (String spec : buildPullSpecs(modelId)) {
+            try {
+                sdk.pullModel(spec, null);
+            } catch (Exception ignored) {
+                // try next pull spec
+            }
+        }
+
+        String normalized = modelId.startsWith("hf:") ? modelId.substring(3) : modelId;
+        for (String candidate : java.util.List.of(modelId, normalized, modelId + "-GGUF", normalized + "-GGUF")) {
+            try {
+                var info = sdk.getModelInfo(candidate);
+                if (info.isPresent() && !isCheckpointOnlyFormat(info.get().getFormat())) {
+                    modelId = candidate;
+                    if (!quiet) {
+                        System.out.println("Using compatible model: " + modelId);
+                    }
+                    return true;
+                }
+            } catch (Exception ignored) {
+                // continue
+            }
+        }
+        return false;
+    }
+
+    private boolean ensureProviderHealthy(String provider) {
+        Optional<ProviderInfo> info = findProviderInfo(provider);
+        if (info.isEmpty()) {
+            System.err.printf("Required provider is not available: %s%n", provider);
+            return false;
+        }
+
+        if (info.get().healthStatus() != ProviderHealth.Status.UNHEALTHY) {
+            return true;
+        }
+
+        printProviderSetupHint(info.get());
+        return false;
+    }
+
+    private String describeError(Throwable throwable) {
+        if (throwable == null) {
+            return "unknown error";
+        }
+        StringBuilder sb = new StringBuilder();
+        Throwable current = throwable;
+        int guard = 0;
+        while (current != null && guard++ < 8) {
+            String msg = current.getMessage();
+            if (msg != null && !msg.isBlank()) {
+                if (sb.length() > 0) {
+                    sb.append(" | ");
+                }
+                sb.append(msg);
+            }
+            current = current.getCause();
+        }
+        if (sb.length() == 0) {
+            return throwable.getClass().getSimpleName();
+        }
+        return sb.toString();
+    }
+
+    private boolean isFatalPullError(Throwable throwable) {
+        String detail = describeError(throwable).toLowerCase();
+        return detail.contains("401")
+                || detail.contains("403")
+                || detail.contains("404")
+                || detail.contains("unauthorized")
+                || detail.contains("forbidden")
+                || detail.contains("gated")
+                || detail.contains("access denied")
+                || detail.contains("not found")
+                || detail.contains("model conversion service not available")
+                || detail.contains("conversion process failed")
+                || detail.contains("no gguf found")
+                || detail.contains("unsupported runtime format")
+                || detail.contains("checkpoint-only model");
+    }
+
+    private Optional<ProviderInfo> findProviderInfo(String id) {
+        try {
+            return sdk.listAvailableProviders().stream()
+                    .filter(p -> id.equalsIgnoreCase(p.id()))
+                    .findFirst();
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    private void printProviderSetupHint(ProviderInfo provider) {
+        String id = provider.id();
+        System.err.printf("Provider '%s' is installed but not healthy.%n", id);
+
+        String healthMessage = null;
+        if (provider.metadata() != null) {
+            Object value = provider.metadata().get("healthMessage");
+            if (value != null) {
+                healthMessage = String.valueOf(value);
+            }
+        }
+        if (healthMessage != null && !healthMessage.isBlank()) {
+            System.err.println("Reason: " + healthMessage);
+        }
+        if (provider.metadata() != null) {
+            Object details = provider.metadata().get("healthDetails");
+            if (details instanceof java.util.Map<?, ?> map) {
+                Object reason = map.get("reason");
+                if (reason != null) {
+                    System.err.println("Detail: " + reason);
+                }
+            }
+        }
+
+        if ("djl".equalsIgnoreCase(id)) {
+            System.err.println(
+                    "DJL PyTorch engine is unavailable. Ensure internet access for first-run native download or pre-install DJL native runtime.");
+        } else if ("libtorch".equalsIgnoreCase(id)) {
+            System.err.println("Set LIBTORCH_PATH to your libtorch native library directory.");
+        } else if ("gguf".equalsIgnoreCase(id)) {
+            System.err.println("Set GOLEK_LLAMA_LIB_DIR or GOLEK_LLAMA_LIB_PATH to llama.cpp native libraries.");
+        }
     }
 }

@@ -4,7 +4,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * Defines which models are available on which providers.
@@ -31,7 +30,7 @@ public record ModelProviderMapping(
         /** Image generation models */
         IMAGE,
         /** Multi-modal models */
-        MULTIMODAL, 
+        MULTIMODAL,
         /** Code generation models */
         CODE,
         /** Custom/Other models */
@@ -73,13 +72,12 @@ public record ModelProviderMapping(
      */
     public static ModelProviderMapping of(String modelId, String... providers) {
         return new ModelProviderMapping(
-            modelId,
-            modelId,
-            List.of(providers),
-            providers.length > 0 ? providers[0] : null,
-            ModelType.CHAT,
-            Collections.emptyMap()
-        );
+                modelId,
+                modelId,
+                List.of(providers),
+                providers.length > 0 ? providers[0] : null,
+                ModelType.CHAT,
+                Collections.emptyMap());
     }
 
     /**
@@ -138,8 +136,7 @@ public record ModelProviderMapping(
 
         public ModelProviderMapping build() {
             return new ModelProviderMapping(
-                modelId, displayName, providerIds, preferredProvider, type, metadata
-            );
+                    modelId, displayName, providerIds, preferredProvider, type, metadata);
         }
     }
 }

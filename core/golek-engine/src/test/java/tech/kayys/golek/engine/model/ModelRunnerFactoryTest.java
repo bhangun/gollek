@@ -66,15 +66,13 @@ public class ModelRunnerFactoryTest {
 
         @Override
         public tech.kayys.golek.spi.inference.InferenceResponse infer(
-                tech.kayys.golek.spi.inference.InferenceRequest request,
-                tech.kayys.golek.spi.context.RequestContext context) {
+                tech.kayys.golek.spi.inference.InferenceRequest request) {
             return null;
         }
 
         @Override
         public java.util.concurrent.CompletionStage<tech.kayys.golek.spi.inference.InferenceResponse> inferAsync(
-                tech.kayys.golek.spi.inference.InferenceRequest request,
-                tech.kayys.golek.spi.context.RequestContext context) {
+                tech.kayys.golek.spi.inference.InferenceRequest request) {
             return null;
         }
 
@@ -100,8 +98,8 @@ public class ModelRunnerFactoryTest {
 
     @Test
     void testGetOrCreateRunner_CachingBehavior() {
-        String tenantIdValue = "t1";
-        ModelManifest manifest = createManifest(tenantIdValue, "m1");
+        String requestIdValue = "t1";
+        ModelManifest manifest = createManifest(requestIdValue, "m1");
         String runnerName = "test-runner";
 
         TestModelRunner templateRunner = new TestModelRunner();
@@ -122,9 +120,9 @@ public class ModelRunnerFactoryTest {
     }
 
     // Helper
-    private ModelManifest createManifest(String tenantId, String modelId) {
+    private ModelManifest createManifest(String requestId, String modelId) {
         return new ModelManifest(
-                modelId, "model", "1.0", tenantId,
+                modelId, "model", "1.0", requestId,
                 Collections.emptyMap(), Collections.emptyList(),
                 null, Collections.emptyMap(), Instant.now(), Instant.now());
     }

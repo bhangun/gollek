@@ -27,13 +27,13 @@ import java.nio.file.Path;
 import java.util.List;
 
 public interface ModelRepository {
-    Uni<ModelManifest> findById(String modelId, String tenantId);
+    Uni<ModelManifest> findById(String modelId, String requestId);
 
-    Uni<List<ModelManifest>> list(String tenantId, Pageable pageable);
+    Uni<List<ModelManifest>> list(String requestId, Pageable pageable);
 
     Uni<ModelManifest> save(ModelManifest manifest);
 
-    Uni<Void> delete(String modelId, String tenantId);
+    Uni<Void> delete(String modelId, String requestId);
 
     ModelDescriptor resolve(ModelRef ref);
 

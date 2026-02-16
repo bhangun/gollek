@@ -23,9 +23,6 @@ import tech.kayys.golek.spi.tool.ToolCall;
 import tech.kayys.golek.tool.dto.ToolExecutionResult;
 import tech.kayys.golek.tool.util.ToolResultFormatter;
 import tech.kayys.golek.tool.validation.ToolArgumentValidator;
-import tech.kayys.golek.spi.tool.Tool;
-import tech.kayys.golek.spi.registry.ToolRegistry;
-import tech.kayys.wayang.tool.dto.ToolExecuteRequest;
 
 import java.util.*;
 
@@ -44,17 +41,11 @@ public class ToolExecutionPlugin implements InferencePhasePlugin {
     private boolean enabled = true;
     private Map<String, Object> config = new HashMap<>();
 
-    // Note: We'll need to update this once we have the DefaultToolExecutor in the
-    // new module
-    // For now, keeping the old import for the executor
-    @Inject
-    tech.kayys.wayang.tool.impl.DefaultToolExecutor toolExecutor;
-
     @Inject
     ObjectMapper objectMapper;
 
     @Inject
-    ToolRegistry toolRegistry;
+    tech.kayys.golek.spi.registry.ToolRegistry toolRegistry;
 
     private final ToolArgumentValidator validator = new ToolArgumentValidator();
     private final ToolResultFormatter resultFormatter = new ToolResultFormatter();
@@ -106,7 +97,8 @@ public class ToolExecutionPlugin implements InferencePhasePlugin {
         for (ToolCall call : toolCalls) {
             try {
                 // Get the tool from registry to validate arguments
-                Tool tool = toolRegistry.getTool(call.getFunction().getName()).await().indefinitely();
+                tech.kayys.golek.spi.tool.Tool tool = toolRegistry.getTool(call.getFunction().getName()).await()
+                        .indefinitely();
 
                 Map<String, Object> arguments = Collections.emptyMap();
                 try {
@@ -120,26 +112,22 @@ public class ToolExecutionPlugin implements InferencePhasePlugin {
                 }
 
                 // Validate arguments against the tool's schema
-                validator.validate(tool, arguments);
+                validator.validate((tech.kayys.golek.spi.tool.Tool) tool, arguments);
 
-                // Execute the tool using the DefaultToolExecutor
-                // We need to convert the SPI ToolCall to the format expected by the executor
-                tech.kayys.wayang.tool.dto.ToolExecutionResult wayangResult = toolExecutor.execute(
-                        call.getFunction().getName(),
-                        arguments,
-                        Collections.emptyMap() // context
-                ).await().indefinitely();
+                // Execute the tool directly
+                Map<String, Object> output = ((tech.kayys.golek.spi.tool.Tool) tool)
+                        .execute(arguments, Collections.emptyMap()).await().indefinitely();
 
-                // Map Wayang result to Golek result
+                // Map result to Golek result
                 tech.kayys.golek.tool.dto.ToolExecutionResult result = new tech.kayys.golek.tool.dto.ToolExecutionResult(
                         call.getId(),
                         call.getFunction().getName(),
-                        tech.kayys.golek.tool.dto.InvocationStatus.valueOf(wayangResult.status().name()),
-                        wayangResult.output(),
-                        wayangResult.errorMessage(),
-                        wayangResult.executionTimeMs(),
-                        wayangResult.metadata(),
-                        wayangResult.status().name().equals("SUCCESS"));
+                        tech.kayys.golek.tool.dto.InvocationStatus.SUCCESS,
+                        output,
+                        null,
+                        0L, // execution time
+                        null,
+                        true);
 
                 results.add(result);
 

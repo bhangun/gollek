@@ -1,8 +1,0 @@
-{
-        boolean allHealthy = providerRegistry.all().stream()
-            .allMatch(p -> p.health().isHealthy());
-
-        return HealthCheckResponse.named("inference-server-readiness")
-            .status(allHealthy)
-            .build();
-    }

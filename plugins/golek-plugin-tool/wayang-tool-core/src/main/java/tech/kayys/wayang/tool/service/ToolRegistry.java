@@ -7,7 +7,7 @@ import tech.kayys.wayang.tool.entity.McpTool;
 @ApplicationScoped
 public class ToolRegistry {
 
-    public Uni<McpTool> resolveTool(String toolId, String tenantId) {
+    public Uni<McpTool> resolveTool(String toolId, String requestId) {
         // Stub implementation
         return Uni.createFrom().nullItem();
     }

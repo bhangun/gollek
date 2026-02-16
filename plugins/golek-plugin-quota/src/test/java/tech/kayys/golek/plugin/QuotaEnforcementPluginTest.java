@@ -5,10 +5,10 @@ import org.junit.jupiter.api.BeforeEach;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import tech.kayys.wayang.tenant.TenantId;
+import tech.kayys.wayang.tenant.RequestId;
 import tech.kayys.golek.core.execution.ExecutionContext;
 import tech.kayys.golek.spi.context.EngineContext;
-import tech.kayys.wayang.tenant.TenantContext;
+import tech.kayys.golek.spi.context.RequestContext;
 import tech.kayys.golek.spi.inference.InferencePhase;
 
 class QuotaEnforcementPluginTest {
@@ -17,7 +17,7 @@ class QuotaEnforcementPluginTest {
     private TenantQuotaService mockQuotaService;
     private ExecutionContext mockContext;
     private EngineContext mockEngine;
-    private TenantContext mockTenantContext;
+    private RequestContext mockRequestContext;
 
     @BeforeEach
     void setUp() {
@@ -25,7 +25,7 @@ class QuotaEnforcementPluginTest {
         mockQuotaService = mock(TenantQuotaService.class);
         mockContext = mock(ExecutionContext.class);
         mockEngine = mock(EngineContext.class);
-        mockTenantContext = mock(TenantContext.class);
+        mockRequestContext = mock(RequestContext.class);
 
         // Inject the mock service (using reflection or setter if available)
         // Since we can't directly inject, we'll test the plugin with mocked

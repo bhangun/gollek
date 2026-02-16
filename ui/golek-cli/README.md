@@ -160,7 +160,9 @@ java -jar ui/golek-cli/target/golek-cli-1.0.0-SNAPSHOT-runner.jar chat --provide
 
 java -jar ui/golek-cli/target/golek-cli-1.0.0-SNAPSHOT-runner.jar chat --model google-t5/t5-small
 
-
+HuggingFaceTB/SmolLM2-135M
+meta-llama/Llama-3.2-1B
+google/gemma-2b-it
 
 # Run with different providers
 java -jar ui/golek-cli/target/quarkus-app/quarkus-run.jar run \

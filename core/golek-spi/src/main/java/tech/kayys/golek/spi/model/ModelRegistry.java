@@ -2,7 +2,6 @@ package tech.kayys.golek.spi.model;
 
 import io.smallrye.mutiny.Uni;
 import tech.kayys.golek.spi.auth.ApiKeyConstants;
-import tech.kayys.wayang.tenant.TenantId;
 import java.util.List;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -20,7 +19,7 @@ public interface ModelRegistry {
         /**
          * Get model manifest by ID and version.
          */
-        Uni<ModelManifest> getManifest(String tenantId, String modelId, String version);
+        Uni<ModelManifest> getManifest(String apiKey, String modelId, String version);
 
         /**
          * API-key-first alias for {@link #getManifest(String, String, String)}.
@@ -32,19 +31,19 @@ public interface ModelRegistry {
         /**
          * Find models by tenant.
          */
-        Uni<List<ModelManifest>> findByTenant(TenantId tenantId, Pageable pageable);
+        Uni<List<ModelManifest>> findByTenant(String apiKey, Pageable pageable);
 
         /**
-         * API-key-first alias for {@link #findByTenant(TenantId, Pageable)}.
+         * API-key-first alias for {@link #findByTenant(RequestId, Pageable)}.
          */
         default Uni<List<ModelManifest>> findByApiKey(String apiKey, Pageable pageable) {
-                return findByTenant(new TenantId(apiKey), pageable);
+                return findByTenant(apiKey, pageable);
         }
 
         /**
          * Delete a model and all its versions.
          */
-        Uni<Void> deleteModel(String tenantId, String modelId);
+        Uni<Void> deleteModel(String apiKey, String modelId);
 
         /**
          * API-key-first alias for {@link #deleteModel(String, String)}.
@@ -56,7 +55,7 @@ public interface ModelRegistry {
         /**
          * Get model statistics.
          */
-        Uni<ModelStats> getModelStats(String tenantId, String modelId);
+        Uni<ModelStats> getModelStats(String apiKey, String modelId);
 
         /**
          * API-key-first alias for {@link #getModelStats(String, String)}.
@@ -68,7 +67,7 @@ public interface ModelRegistry {
         // DTOs for SPI
 
         public record ModelUploadRequest(
-                        String tenantId,
+                        String apiKey,
                         String modelId,
                         String version,
                         String name,
@@ -81,10 +80,10 @@ public interface ModelRegistry {
                         Map<String, Object> outputSchema,
                         String createdBy) {
                 public String apiKey() {
-                        if (tenantId == null || tenantId.isBlank()) {
+                        if (apiKey == null || apiKey.isBlank()) {
                                 return ApiKeyConstants.COMMUNITY_API_KEY;
                         }
-                        return tenantId;
+                        return apiKey;
                 }
         }
 

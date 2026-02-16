@@ -17,12 +17,9 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import tech.kayys.wayang.tenant.Tenant;
 import tech.kayys.golek.spi.model.ModelManifest;
 
 @Entity
@@ -33,9 +30,11 @@ public class Model extends PanacheEntityBase {
     @GeneratedValue(strategy = GenerationType.UUID)
     public UUID id;
 
-    @ManyToOne
-    @JoinColumn(name = "tenant_id", nullable = false)
-    public Tenant tenant;
+    @Column(nullable = false)
+    public String apiKey;
+
+    @Column(nullable = false)
+    public String requestId;
 
     @Column(nullable = false)
     public String modelId;
@@ -67,11 +66,13 @@ public class Model extends PanacheEntityBase {
     public Model() {
     }
 
-    public Model(UUID id, Tenant tenant, String modelId, String name, String description, String framework,
+    public Model(UUID id, String apiKey, String requestId, String modelId, String name, String description,
+            String framework,
             ModelStage stage, String[] tags, Map<String, Object> metadata, String createdBy,
             LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
-        this.tenant = tenant;
+        this.apiKey = apiKey;
+        this.requestId = requestId;
         this.modelId = modelId;
         this.name = name;
         this.description = description;
@@ -89,8 +90,12 @@ public class Model extends PanacheEntityBase {
         return id;
     }
 
-    public Tenant getTenant() {
-        return tenant;
+    public String getApiKey() {
+        return apiKey;
+    }
+
+    public String getRequestId() {
+        return requestId;
     }
 
     public String getModelId() {
@@ -138,8 +143,12 @@ public class Model extends PanacheEntityBase {
         this.id = id;
     }
 
-    public void setTenant(Tenant tenant) {
-        this.tenant = tenant;
+    public void setApiKey(String apiKey) {
+        this.apiKey = apiKey;
+    }
+
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
     }
 
     public void setModelId(String modelId) {
@@ -190,7 +199,8 @@ public class Model extends PanacheEntityBase {
             return false;
         Model model = (Model) o;
         return Objects.equals(id, model.id) &&
-                Objects.equals(tenant, model.tenant) &&
+                Objects.equals(apiKey, model.apiKey) &&
+                Objects.equals(requestId, model.requestId) &&
                 Objects.equals(modelId, model.modelId) &&
                 Objects.equals(name, model.name) &&
                 Objects.equals(description, model.description) &&
@@ -205,7 +215,8 @@ public class Model extends PanacheEntityBase {
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(id, tenant, modelId, name, description, framework, stage, metadata, createdBy,
+        int result = Objects.hash(id, apiKey, requestId, modelId, name, description, framework, stage, metadata,
+                createdBy,
                 createdAt, updatedAt);
         result = 31 * result + java.util.Arrays.hashCode(tags);
         return result;
@@ -231,7 +242,9 @@ public class Model extends PanacheEntityBase {
                 .modelId(this.modelId)
                 .name(this.name)
                 .version("latest")
-                .tenantId(this.tenant != null ? this.tenant.tenantId : null)
+                .path(this.modelId)
+                .apiKey(this.apiKey)
+                .requestId(this.requestId)
                 .metadata(this.metadata)
                 .createdAt(this.createdAt != null ? this.createdAt.atZone(java.time.ZoneId.systemDefault()).toInstant()
                         : null)
@@ -241,12 +254,12 @@ public class Model extends PanacheEntityBase {
     }
 
     // Panache queries
-    public static Uni<Model> findByTenantAndModelId(String tenantId, String modelId) {
-        return find("tenant.tenantId = ?1 and modelId = ?2", tenantId, modelId).firstResult();
+    public static Uni<Model> findByTenantAndModelId(String requestId, String modelId) {
+        return find("requestId = ?1 and modelId = ?2", requestId, modelId).firstResult();
     }
 
-    public static Uni<List<Model>> findByTenant(String tenantId) {
-        return list("tenant.tenantId", tenantId);
+    public static Uni<List<Model>> findByTenant(String requestId) {
+        return list("requestId", requestId);
     }
 
     public static Uni<List<Model>> findByStage(ModelStage stage) {
@@ -259,7 +272,8 @@ public class Model extends PanacheEntityBase {
 
     public static class Builder {
         private UUID id;
-        private Tenant tenant;
+        private String apiKey;
+        private String requestId;
         private String modelId;
         private String name;
         private String description;
@@ -276,8 +290,13 @@ public class Model extends PanacheEntityBase {
             return this;
         }
 
-        public Builder tenant(Tenant tenant) {
-            this.tenant = tenant;
+        public Builder apiKey(String apiKey) {
+            this.apiKey = apiKey;
+            return this;
+        }
+
+        public Builder requestId(String requestId) {
+            this.requestId = requestId;
             return this;
         }
 
@@ -332,7 +351,8 @@ public class Model extends PanacheEntityBase {
         }
 
         public Model build() {
-            return new Model(id, tenant, modelId, name, description, framework, stage, tags, metadata, createdBy,
+            return new Model(id, apiKey, requestId, modelId, name, description, framework, stage, tags, metadata,
+                    createdBy,
                     createdAt, updatedAt);
         }
     }

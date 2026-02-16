@@ -27,11 +27,12 @@ public class GolekModelStorageService implements ModelStorageService {
     ExecutorService executorService; // Assuming an ExecutorService is available for async file ops
 
     @Override
-    public Uni<String> uploadModel(String tenantId, String modelId, String version, byte[] data) {
+    public Uni<String> uploadModel(String requestId, String modelId, String version, byte[] data) {
         if (!"local".equalsIgnoreCase(storageProvider)) {
-            return Uni.createFrom().failure(new UnsupportedOperationException("Only 'local' storage is supported by this provider."));
+            return Uni.createFrom()
+                    .failure(new UnsupportedOperationException("Only 'local' storage is supported by this provider."));
         }
-        if (tenantId == null || tenantId.isBlank()) {
+        if (requestId == null || requestId.isBlank()) {
             return Uni.createFrom().failure(new IllegalArgumentException("Tenant ID cannot be null or blank."));
         }
         if (modelId == null || modelId.isBlank()) {
@@ -46,7 +47,7 @@ public class GolekModelStorageService implements ModelStorageService {
 
         return Uni.createFrom().item(() -> {
             try {
-                Path modelDir = Paths.get(localBasePath, tenantId, modelId, version);
+                Path modelDir = Paths.get(localBasePath, requestId, modelId, version);
                 Files.createDirectories(modelDir); // Ensure directory exists
 
                 // Generate a unique filename for the model data within its version directory
@@ -93,7 +94,8 @@ public class GolekModelStorageService implements ModelStorageService {
                     // Delete the file itself
                     Files.delete(filePath);
 
-                    // Attempt to delete parent directories if they become empty (tenantId/modelId/version)
+                    // Attempt to delete parent directories if they become empty
+                    // (requestId/modelId/version)
                     Path parent = filePath.getParent();
                     while (parent != null && !parent.equals(Paths.get(localBasePath))) {
                         if (Files.isDirectory(parent) && isEmpty(parent)) {
@@ -105,7 +107,8 @@ public class GolekModelStorageService implements ModelStorageService {
                     }
 
                 } else {
-                    // Log a warning or just ignore if file doesn't exist, depending on desired behavior
+                    // Log a warning or just ignore if file doesn't exist, depending on desired
+                    // behavior
                     System.out.println("Warning: Attempted to delete non-existent file: " + filePath);
                 }
                 return null;
@@ -137,8 +140,9 @@ public class GolekModelStorageService implements ModelStorageService {
 
     // Helper to generate a consistent storage key/path within the local base path
     // Not part of the SPI, but useful for this implementation
-    private String generateStorageKey(String tenantId, String modelId, String version) {
-        // This is a simplified example. A real system might use hashing, unique IDs, etc.
-        return tenantId + "/" + modelId + "/" + version + "/" + UUID.randomUUID() + ".bin";
+    private String generateStorageKey(String requestId, String modelId, String version) {
+        // This is a simplified example. A real system might use hashing, unique IDs,
+        // etc.
+        return requestId + "/" + modelId + "/" + version + "/" + UUID.randomUUID() + ".bin";
     }
 }

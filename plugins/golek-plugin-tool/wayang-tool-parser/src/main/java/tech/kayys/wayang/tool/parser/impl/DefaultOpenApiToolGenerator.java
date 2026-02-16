@@ -70,43 +70,43 @@ public class DefaultOpenApiToolGenerator implements ToolGenerationService {
     @Override
     public Uni<ToolGenerationResult> generateTools(GenerateToolsRequest request) {
         LOG.info("Generating tools from OpenAPI source: {} (tenant: {})",
-                request.namespace(), request.tenantId());
+                request.namespace(), request.requestId());
 
         return Panache.withTransaction(() -> {
             // Parse OpenAPI spec using the actual Swagger parser
             OpenAPIV3Parser parser = new OpenAPIV3Parser();
             ParseOptions options = new ParseOptions();
             options.setResolve(true);
-            
+
             SwaggerParseResult parseResult = parser.readContents(request.source(), null, options);
-            
+
             if (parseResult.getMessages() != null && !parseResult.getMessages().isEmpty()) {
                 LOG.warn("OpenAPI parsing warnings: {}", parseResult.getMessages());
             }
-            
+
             OpenAPI openApi = parseResult.getOpenAPI();
             if (openApi == null) {
                 return Uni.createFrom().failure(
-                        new OpenApiParseException("Failed to parse OpenAPI spec: " + 
+                        new OpenApiParseException("Failed to parse OpenAPI spec: " +
                                 parseResult.getMessages()));
             }
 
             // Create source record
             return createOpenApiSource(request, openApi, parseResult.getMessages())
                     .flatMap(source ->
-                            // Generate tools from operations
-                            generateToolsFromSpec(source, openApi, request)
-                                    .flatMap(tools ->
-                                            // Persist tools
-                                            persistTools(tools)
-                                                    .map(persisted -> new ToolGenerationResult(
-                                                            source.getSourceId(),
-                                                            source.getNamespace(),
-                                                            persisted.size(),
-                                                            persisted.stream()
-                                                                    .map(McpTool::getToolId)
-                                                                    .collect(Collectors.toList()),
-                                                            List.of()))));
+            // Generate tools from operations
+            generateToolsFromSpec(source, openApi, request)
+                    .flatMap(tools ->
+            // Persist tools
+            persistTools(tools)
+                    .map(persisted -> new ToolGenerationResult(
+                            source.getSourceId(),
+                            source.getNamespace(),
+                            persisted.size(),
+                            persisted.stream()
+                                    .map(McpTool::getToolId)
+                                    .collect(Collectors.toList()),
+                            List.of()))));
         });
     }
 
@@ -118,7 +118,7 @@ public class DefaultOpenApiToolGenerator implements ToolGenerationService {
         return Uni.createFrom().item(() -> {
             OpenApiSource source = new OpenApiSource();
             source.setSourceId(UUID.randomUUID());
-            source.setTenantId(request.tenantId());
+            source.setRequestId(request.requestId());
             source.setNamespace(request.namespace());
             source.setDisplayName(openApi.getInfo().getTitle());
             source.setSourceType(request.sourceType());
@@ -208,7 +208,7 @@ public class DefaultOpenApiToolGenerator implements ToolGenerationService {
                 : generateOperationId(httpMethod, path);
 
         tool.setToolId(request.namespace() + "." + operationId);
-        tool.setTenantId(request.tenantId());
+        tool.setRequestId(request.requestId());
         tool.setNamespace(request.namespace());
         tool.setName(operationId);
         tool.setOperationId(operationId);
@@ -455,7 +455,7 @@ public class DefaultOpenApiToolGenerator implements ToolGenerationService {
         }
 
         Map<String, Object> result = new HashMap<>();
-        
+
         // Copy basic properties
         if (schema.getType() != null) {
             result.put("type", schema.getType());
@@ -498,7 +498,7 @@ public class DefaultOpenApiToolGenerator implements ToolGenerationService {
             Map<String, Object> props = (Map<String, Object>) schema.getProperties();
             for (String propName : props.keySet()) {
                 Object propValue = props.get(propName);
-                
+
                 // Convert the property schema if it's a Schema object
                 Object convertedValue;
                 if (propValue instanceof io.swagger.v3.oas.models.media.Schema) {
@@ -506,7 +506,7 @@ public class DefaultOpenApiToolGenerator implements ToolGenerationService {
                 } else {
                     convertedValue = propValue; // Keep as is if not a Schema
                 }
-                
+
                 properties.put(propName, convertedValue);
             }
             result.put("properties", properties);

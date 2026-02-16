@@ -1921,7 +1921,7 @@ public class PostgresVectorStore implements VectorMemoryStore {
             memory.getTimestamp(),
             memory.getExpiresAt(),
             memory.getImportance(),
-            extractTenantId(memory.getNamespace())
+            extractRequestId(memory.getNamespace())
         );
         
         return pgPool.preparedQuery(sql)
@@ -2310,7 +2310,7 @@ public class PostgresVectorStore implements VectorMemoryStore {
     /**
      * Extract tenant ID from namespace
      */
-    private String extractTenantId(String namespace) {
+    private String extractRequestId(String namespace) {
         // Namespace format: tenant:workflow:node
         String[] parts = namespace.split(":");
         return parts.length > 0 ? parts[0] : "default";

@@ -5,9 +5,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
+import tech.kayys.golek.spi.context.RequestContext;
 import tech.kayys.golek.spi.model.ModelManifest;
 import tech.kayys.golek.spi.model.Pageable;
-import tech.kayys.wayang.tenant.TenantContext;
 
 import java.util.List;
 
@@ -26,23 +26,23 @@ public class ModelManagementService {
         ModelRunnerFactory runnerFactory;
 
         public Uni<List<ModelManifest>> listModels(
-                        TenantContext tenantContext,
+                        RequestContext requestContext,
                         int page,
                         int size) {
-                return modelRepository.list(tenantContext.getTenantId().value(), Pageable.of(page, size));
+                return modelRepository.list(requestContext.getRequestId(), Pageable.of(page, size));
         }
 
         public Uni<ModelManifest> getModel(
                         String modelId,
-                        TenantContext tenantContext) {
-                return modelRepository.findById(modelId, tenantContext.getTenantId().value());
+                        RequestContext requestContext) {
+                return modelRepository.findById(modelId, requestContext.getRequestId());
         }
 
         public Uni<ModelManifest> registerModel(
                         ModelManifest manifest,
-                        TenantContext tenantContext) {
+                        RequestContext requestContext) {
                 LOG.infof("Registering model: %s for tenant: %s",
-                                manifest.modelId(), tenantContext.getTenantId().value());
+                                manifest.modelId(), requestContext.getRequestId());
 
                 return modelRepository.save(manifest);
         }
@@ -50,20 +50,20 @@ public class ModelManagementService {
         public Uni<ModelManifest> updateModel(
                         String modelId,
                         ModelManifest manifest,
-                        TenantContext tenantContext) {
+                        RequestContext requestContext) {
                 return modelRepository.save(manifest);
         }
 
         public Uni<Void> deleteModel(
                         String modelId,
-                        TenantContext tenantContext) {
-                return modelRepository.delete(modelId, tenantContext.getTenantId().value());
+                        RequestContext requestContext) {
+                return modelRepository.delete(modelId, requestContext.getRequestId());
         }
 
         public Uni<Void> warmup(
                         String modelId,
-                        TenantContext tenantContext) {
-                return modelRepository.findById(modelId, tenantContext.getTenantId().value())
+                        RequestContext requestContext) {
+                return modelRepository.findById(modelId, requestContext.getRequestId())
                                 .onItem().ifNotNull().invoke(manifest -> runnerFactory.prewarm(
                                                 List.of(manifest.modelId()),
                                                 List.of("default")))

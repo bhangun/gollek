@@ -7,9 +7,9 @@ import tech.kayys.golek.spi.provider.ProviderConfig;
 import tech.kayys.golek.spi.provider.ProviderHealth;
 import tech.kayys.golek.spi.provider.ProviderMetadata;
 import tech.kayys.golek.spi.provider.ProviderRequest;
-import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.spi.plugin.GolekPlugin;
 import tech.kayys.golek.spi.provider.LLMProvider;
+import tech.kayys.golek.spi.context.RequestContext;
 import tech.kayys.golek.spi.exception.ProviderException;
 
 /**
@@ -59,13 +59,13 @@ public class PluginProviderWrapper implements LLMProvider {
     }
 
     @Override
-    public boolean supports(String modelId, TenantContext tenantContext) {
-        return delegate.supports(modelId, tenantContext);
+    public boolean supports(String modelId, ProviderRequest request) {
+        return delegate.supports(modelId, request);
     }
 
     @Override
-    public Uni<InferenceResponse> infer(ProviderRequest request, TenantContext context) {
-        return delegate.infer(request, context);
+    public Uni<InferenceResponse> infer(ProviderRequest request) {
+        return delegate.infer(request);
     }
 
     @Override

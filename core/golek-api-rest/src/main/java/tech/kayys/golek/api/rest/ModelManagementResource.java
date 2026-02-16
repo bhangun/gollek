@@ -13,10 +13,11 @@ import jakarta.ws.rs.core.SecurityContext;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
-import tech.kayys.wayang.tenant.TenantContext;
+
+import tech.kayys.golek.spi.context.RequestContext;
+import tech.kayys.golek.spi.context.RequestContextResolver;
 import tech.kayys.golek.spi.model.ModelManifest;
 import tech.kayys.golek.engine.model.ModelManagementService;
-import tech.kayys.wayang.tenant.TenantContextResolver;
 
 import java.util.Map;
 
@@ -36,7 +37,7 @@ public class ModelManagementResource {
         ModelManagementService modelService;
 
         @Inject
-        TenantContextResolver tenantResolver;
+        RequestContextResolver tenantResolver;
 
         @GET
         @Operation(summary = "List all models")
@@ -44,10 +45,10 @@ public class ModelManagementResource {
                         @QueryParam("page") @DefaultValue("0") int page,
                         @QueryParam("size") @DefaultValue("20") int size,
                         @Context SecurityContext securityContext,
-                        @Context ContainerRequestContext requestContext) {
-                TenantContext tenantContext = resolveTenantContext(securityContext, requestContext);
+                        @Context ContainerRequestContext containerRequestContext) {
+                RequestContext effectiveContext = resolveRequestContext(securityContext, containerRequestContext);
 
-                return modelService.listModels(tenantContext, page, size)
+                return modelService.listModels(effectiveContext, page, size)
                                 .map(models -> Response.ok(models).build());
         }
 
@@ -57,10 +58,10 @@ public class ModelManagementResource {
         public Uni<Response> getModel(
                         @PathParam("modelId") String modelId,
                         @Context SecurityContext securityContext,
-                        @Context ContainerRequestContext requestContext) {
-                TenantContext tenantContext = resolveTenantContext(securityContext, requestContext);
+                        @Context ContainerRequestContext containerRequestContext) {
+                RequestContext effectiveContext = resolveRequestContext(securityContext, containerRequestContext);
 
-                return modelService.getModel(modelId, tenantContext)
+                return modelService.getModel(modelId, effectiveContext)
                                 .map(model -> Response.ok(model).build())
                                 .onFailure().recoverWithItem(
                                                 Response.status(Response.Status.NOT_FOUND).build());
@@ -71,12 +72,12 @@ public class ModelManagementResource {
         public Uni<Response> registerModel(
                         @Valid ModelManifest manifest,
                         @Context SecurityContext securityContext,
-                        @Context ContainerRequestContext requestContext) {
+                        @Context ContainerRequestContext containerRequestContext) {
                 LOG.infof("Registering model: %s", manifest.modelId());
 
-                TenantContext tenantContext = resolveTenantContext(securityContext, requestContext);
+                RequestContext effectiveContext = resolveRequestContext(securityContext, containerRequestContext);
 
-                return modelService.registerModel(manifest, tenantContext)
+                return modelService.registerModel(manifest, effectiveContext)
                                 .map(registered -> Response
                                                 .status(Response.Status.CREATED)
                                                 .entity(registered)
@@ -90,12 +91,12 @@ public class ModelManagementResource {
                         @PathParam("modelId") String modelId,
                         @Valid ModelManifest manifest,
                         @Context SecurityContext securityContext,
-                        @Context ContainerRequestContext requestContext) {
+                        @Context ContainerRequestContext containerRequestContext) {
                 LOG.infof("Updating model: %s", modelId);
 
-                TenantContext tenantContext = resolveTenantContext(securityContext, requestContext);
+                RequestContext effectiveContext = resolveRequestContext(securityContext, containerRequestContext);
 
-                return modelService.updateModel(modelId, manifest, tenantContext)
+                return modelService.updateModel(modelId, manifest, effectiveContext)
                                 .map(updated -> Response.ok(updated).build());
         }
 
@@ -105,12 +106,12 @@ public class ModelManagementResource {
         public Uni<Response> deleteModel(
                         @PathParam("modelId") String modelId,
                         @Context SecurityContext securityContext,
-                        @Context ContainerRequestContext requestContext) {
+                        @Context ContainerRequestContext containerRequestContext) {
                 LOG.infof("Deleting model: %s", modelId);
 
-                TenantContext tenantContext = resolveTenantContext(securityContext, requestContext);
+                RequestContext effectiveContext = resolveRequestContext(securityContext, containerRequestContext);
 
-                return modelService.deleteModel(modelId, tenantContext)
+                return modelService.deleteModel(modelId, effectiveContext)
                                 .map(deleted -> Response.noContent().build());
         }
 
@@ -120,23 +121,24 @@ public class ModelManagementResource {
         public Uni<Response> warmupModel(
                         @PathParam("modelId") String modelId,
                         @Context SecurityContext securityContext,
-                        @Context ContainerRequestContext requestContext) {
+                        @Context ContainerRequestContext containerRequestContext) {
                 LOG.infof("Warming up model: %s", modelId);
 
-                TenantContext tenantContext = resolveTenantContext(securityContext, requestContext);
+                RequestContext effectiveContext = resolveRequestContext(securityContext, containerRequestContext);
 
-                return modelService.warmup(modelId, tenantContext)
+                return modelService.warmup(modelId, effectiveContext)
                                 .map(result -> Response
                                                 .accepted()
                                                 .entity(Map.of("status", "WARMING_UP"))
                                                 .build());
         }
 
-        private TenantContext resolveTenantContext(SecurityContext securityContext,
-                        ContainerRequestContext requestContext) {
-                Object ctx = requestContext != null ? requestContext.getProperty("tenantContext") : null;
-                if (ctx instanceof TenantContext tenantContext) {
-                        return tenantContext;
+        private RequestContext resolveRequestContext(SecurityContext securityContext,
+                        ContainerRequestContext containerRequestContext) {
+                Object ctx = containerRequestContext != null ? containerRequestContext.getProperty("requestContext")
+                                : null;
+                if (ctx instanceof RequestContext effectiveContext) {
+                        return effectiveContext;
                 }
                 return tenantResolver.resolve(securityContext);
         }

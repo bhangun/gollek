@@ -27,7 +27,7 @@ public class ToolInvocationRecorder {
         return io.quarkus.hibernate.reactive.panache.Panache.withTransaction(() -> {
             ToolInvocation invocation = new ToolInvocation();
             invocation.setInvocationId(UUID.randomUUID());
-            invocation.setTenantId(request.tenantId());
+            invocation.setRequestId(request.requestId());
             invocation.setToolId(request.toolId());
             invocation.setWorkflowRunId(request.workflowRunId());
             invocation.setAgentId(request.agentId());

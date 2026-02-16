@@ -67,7 +67,7 @@ public Uni<ProviderResponse> inferenceWithTracing(
   
   // Parent span created automatically
   Span span = Tracer.getCurrentSpan();
-  span.setAttribute("tenant_id", request.getTenantId());
+  span.setAttribute("tenant_id", request.getRequestId());
   span.setAttribute("model", request.getModelId());
   span.setAttribute("user_id", request.getUserId());
   
@@ -122,7 +122,7 @@ Logger log = Logger.getLogger(MyService.class);
 // Structured logging with context
 log.infof("Inference request: model=%s, tenant=%s, user=%s",
   request.getModelId(),
-  request.getTenantId(),
+  request.getRequestId(),
   request.getUserId()
 );
 
@@ -165,7 +165,7 @@ public class InferenceEventPublisher {
                           ProviderResponse response) {
     InferenceEvent event = InferenceEvent.builder()
       .timestamp(Instant.now())
-      .tenantId(request.getTenantId())
+      .requestId(request.getRequestId())
       .userId(request.getUserId())
       .modelId(request.getModelId())
       .latencyMs(response.getLatencyMs())
@@ -256,7 +256,7 @@ public class MonitoredInferenceService {
     // Add attributes
     span.setAttributes(Attributes.of(
       AttributeKey.stringKey("tenant_id"), 
-        request.getTenantId(),
+        request.getRequestId(),
       AttributeKey.stringKey("model"), 
         request.getModelId(),
       AttributeKey.stringKey("user_id"), 
@@ -266,7 +266,7 @@ public class MonitoredInferenceService {
     // Log request
     log.infof("Inference request: model=%s, tenant=%s",
       request.getModelId(),
-      request.getTenantId()
+      request.getRequestId()
     );
     
     // Execute
@@ -283,7 +283,7 @@ public class MonitoredInferenceService {
         ).increment(response.getTokensUsed());
         
         meterRegistry.counter("inference.cost_usd",
-          "tenant", request.getTenantId()
+          "tenant", request.getRequestId()
         ).increment(response.getCostUsd());
         
         // Publish event

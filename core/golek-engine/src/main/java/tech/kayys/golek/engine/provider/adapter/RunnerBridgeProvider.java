@@ -2,6 +2,7 @@ package tech.kayys.golek.engine.provider.adapter;
 
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.Multi;
+
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.model.ModelManifest;
@@ -16,7 +17,6 @@ import tech.kayys.golek.engine.model.ModelRunnerFactory;
 import tech.kayys.golek.model.exception.ModelNotFoundException;
 import tech.kayys.golek.engine.model.CachedModelRepository;
 
-import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.spi.stream.StreamChunk;
 
 import java.time.Duration;
@@ -76,10 +76,10 @@ public class RunnerBridgeProvider implements StreamingProvider {
     }
 
     @Override
-    public boolean supports(String modelId, TenantContext tenantContext) {
-        TenantContext effectiveTenantContext = ensureTenantContext(tenantContext);
+    public boolean supports(String modelId, ProviderRequest request) {
+        String tenantId = resolveTenantId(request);
         try {
-            ModelManifest manifest = modelRepository.findById(modelId, effectiveTenantContext.getTenantId().value())
+            ModelManifest manifest = modelRepository.findById(modelId, tenantId)
                     .await().atMost(Duration.ofSeconds(5));
 
             if (manifest == null) {
@@ -96,14 +96,13 @@ public class RunnerBridgeProvider implements StreamingProvider {
     }
 
     @Override
-    public Uni<InferenceResponse> infer(ProviderRequest request, TenantContext context) {
-        TenantContext effectiveTenantContext = ensureTenantContext(context);
+    public Uni<InferenceResponse> infer(ProviderRequest request) {
+        String tenantId = resolveTenantId(request);
         // translate ProviderRequest to InferenceRequest (Engine's internal format)
         InferenceRequest inferenceRequest = InferenceRequest.builder()
                 .requestId(request.getRequestId())
                 .model(request.getModel())
                 .messages(request.getMessages())
-                .parameters(request.getMessages().isEmpty() ? request.getParameters() : request.getParameters()) // dummy
                 .parameters(request.getParameters())
                 .streaming(request.isStreaming())
                 .timeout(request.getTimeout())
@@ -111,12 +110,12 @@ public class RunnerBridgeProvider implements StreamingProvider {
                 .build();
 
         return modelRepository
-                .findById(request.getModel(), effectiveTenantContext.getTenantId().value())
+                .findById(request.getModel(), tenantId)
                 .onItem().ifNull().failWith(() -> new ModelNotFoundException(request.getModel()))
                 .chain(manifest -> {
                     ModelRunner runner = runnerFactory.getOrCreateRunner(runnerType, manifest);
                     try {
-                        return Uni.createFrom().item(runner.infer(inferenceRequest, null));
+                        return Uni.createFrom().item(runner.infer(inferenceRequest));
                     } catch (tech.kayys.golek.spi.exception.InferenceException e) {
                         return Uni.createFrom().failure(e);
                     }
@@ -124,7 +123,7 @@ public class RunnerBridgeProvider implements StreamingProvider {
     }
 
     @Override
-    public Multi<StreamChunk> inferStream(ProviderRequest request, TenantContext context) {
+    public Multi<StreamChunk> inferStream(ProviderRequest request) {
         return Multi.createFrom().failure(new UnsupportedOperationException(
                 "Streaming is not yet supported for local runners via RunnerBridgeProvider."));
     }
@@ -146,7 +145,20 @@ public class RunnerBridgeProvider implements StreamingProvider {
         return runnerName;
     }
 
-    private TenantContext ensureTenantContext(TenantContext tenantContext) {
-        return tenantContext != null ? tenantContext : TenantContext.of("community");
+    private String resolveTenantId(ProviderRequest request) {
+        // Try metadata "tenantId"
+        Object tenantId = request.getMetadata().get("tenantId");
+        if (tenantId instanceof String && !((String) tenantId).isBlank()) {
+            return (String) tenantId;
+        }
+        // Try userId
+        if (request.getUserId().isPresent()) {
+            return request.getUserId().get();
+        }
+        // Try apiKey
+        if (request.getApiKey().isPresent()) {
+            return request.getApiKey().get();
+        }
+        return "community";
     }
 }

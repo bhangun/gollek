@@ -54,8 +54,8 @@ inference.tenant.tenant-2.daily-quota=50000
 ### 2. Create Tenant Context
 
 ```java
-TenantContext context = TenantContext.builder()
-  .tenantId("tenant-1")
+RequestContext context = RequestContext.builder()
+  .requestId("tenant-1")
   .userId("user-456")
   .metadata(Map.of(
     "region", "us-east-1",
@@ -68,8 +68,8 @@ TenantContext context = TenantContext.builder()
 
 ```java
 ProviderRequest request = ProviderRequest.builder()
-  .tenantContext(context)
-  .tenantId("tenant-1")  // Also for convenience
+  .requestContext(context)
+  .requestId("tenant-1")  // Also for convenience
   .modelId("bert-base")
   .prompt("Analyze this: ...")
   .build();
@@ -175,7 +175,7 @@ provision.onItem().invoke(() -> {
 
 ```java
 // Tenant admins can only access their tenant data
-if (!request.getTenantContext().canAccess("tenant-2")) {
+if (!request.getRequestContext().canAccess("tenant-2")) {
   throw new UnauthorizedException(
     "Cannot access another tenant's data"
   );
@@ -183,7 +183,7 @@ if (!request.getTenantContext().canAccess("tenant-2")) {
 
 // Audit trail is also tenant-isolated
 AuditLog log = auditLogger.getLog(
-  request.getTenantContext().getTenantId()
+  request.getRequestContext().getRequestId()
 );
 ```
 
@@ -224,31 +224,31 @@ metrics.getMetric("model.cache_hits")        // Tenant-1 only
 
 ```java
 public Uni<InferenceResponse> multiTenantInference(
-    String tenantId,
+    String requestId,
     String userId,
     String modelId,
     String prompt) {
   
   // Create tenant context
-  TenantContext context = TenantContext.builder()
-    .tenantId(tenantId)
+  RequestContext context = RequestContext.builder()
+    .requestId(requestId)
     .userId(userId)
     .build();
   
   // Create request with tenant context
   ProviderRequest request = ProviderRequest.builder()
-    .tenantContext(context)
+    .requestContext(context)
     .modelId(modelId)
     .prompt(prompt)
     .build();
   
   // Check quota
-  return quotaManager.forTenant(tenantId)
+  return quotaManager.forTenant(requestId)
     .checkAvailable(request.getEstimatedTokens())
     .chain(() -> provider.infer(request))
     .onItem().invoke(response -> {
       // Log to tenant's audit trail
-      auditLogger.forTenant(tenantId).log(
+      auditLogger.forTenant(requestId).log(
         AuditEvent.builder()
           .action("INFERENCE_EXECUTED")
           .userId(userId)
@@ -258,7 +258,7 @@ public Uni<InferenceResponse> multiTenantInference(
       );
       
       // Track costs
-      costTracker.forTenant(tenantId)
+      costTracker.forTenant(requestId)
         .addCost(response.getTokensUsed() * PRICE_PER_TOKEN);
     });
 }
@@ -270,7 +270,7 @@ public Uni<InferenceResponse> multiTenantInference(
 // Always validate tenant context in requests
 TenantValidator validator = new TenantValidator();
 
-validator.validate(request.getTenantContext())
+validator.validate(request.getRequestContext())
   .onFailure().invoke(ex -> {
     log.error("Invalid tenant: " + ex.getMessage());
   });

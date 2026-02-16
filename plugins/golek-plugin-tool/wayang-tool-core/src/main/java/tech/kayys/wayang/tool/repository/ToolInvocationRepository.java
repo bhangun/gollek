@@ -10,11 +10,11 @@ public interface ToolInvocationRepository {
 
     Uni<List<ToolInvocation>> getAllInvocations();
 
-    Uni<List<ToolInvocation>> findByTenantId(String tenantId);
+    Uni<List<ToolInvocation>> findByRequestId(String requestId);
 
     Uni<List<ToolInvocation>> findByToolId(String toolId);
 
-    Uni<List<ToolInvocation>> findByTenantIdAndToolId(String tenantId, String toolId);
+    Uni<List<ToolInvocation>> findByRequestIdAndToolId(String requestId, String toolId);
 
     Uni<ToolInvocation> findById(UUID invocationId);
 
@@ -28,5 +28,5 @@ public interface ToolInvocationRepository {
 
     Uni<Long> count();
 
-    Uni<Long> countByTenantId(String tenantId);
+    Uni<Long> countByRequestId(String requestId);
 }

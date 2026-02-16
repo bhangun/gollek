@@ -10,42 +10,42 @@ import tech.kayys.golek.spi.auth.ApiKeyConstants;
  */
 public class QuotaExhaustedException extends ProviderException {
 
-    private final String tenantId;
+    private final String apiKey;
     private final long quotaLimit;
     private final long currentUsage;
 
-    public QuotaExhaustedException(String providerId, String tenantId) {
+    public QuotaExhaustedException(String providerId, String apiKey) {
         super(providerId, String.format("Quota exhausted for provider '%s' (tenant: %s)",
-                providerId, tenantId), null, ErrorCode.PROVIDER_QUOTA_EXCEEDED, false);
-        this.tenantId = tenantId;
+                providerId, apiKey), null, ErrorCode.PROVIDER_QUOTA_EXCEEDED, false);
+        this.apiKey = apiKey;
         this.quotaLimit = -1;
         this.currentUsage = -1;
     }
 
     public QuotaExhaustedException(
             String providerId,
-            String tenantId,
+            String apiKey,
             long quotaLimit,
             long currentUsage) {
         super(providerId, String.format(
                 "Quota exhausted for provider '%s' (tenant: %s): %d/%d used",
-                providerId, tenantId, currentUsage, quotaLimit), null, ErrorCode.PROVIDER_QUOTA_EXCEEDED, false);
-        this.tenantId = tenantId;
+                providerId, apiKey, currentUsage, quotaLimit), null, ErrorCode.PROVIDER_QUOTA_EXCEEDED, false);
+        this.apiKey = apiKey;
         this.quotaLimit = quotaLimit;
         this.currentUsage = currentUsage;
     }
 
     // getProviderId() is inherited from ProviderException
 
-    public String getTenantId() {
-        return tenantId;
+    public String getRequestId() {
+        return apiKey;
     }
 
     public String getApiKey() {
-        if (tenantId == null || tenantId.isBlank()) {
+        if (apiKey == null || apiKey.isBlank()) {
             return ApiKeyConstants.COMMUNITY_API_KEY;
         }
-        return tenantId;
+        return apiKey;
     }
 
     public long getQuotaLimit() {

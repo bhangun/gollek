@@ -10,11 +10,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.context.EngineContext;
+import tech.kayys.golek.spi.context.RequestContext;
 import tech.kayys.golek.core.engine.EngineMetadata;
 import tech.kayys.golek.spi.model.HealthStatus;
 import tech.kayys.golek.engine.execution.ExecutionStateMachine;
-import tech.kayys.wayang.tenant.TenantContext;
-import tech.kayys.wayang.tenant.TenantId;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -38,10 +38,10 @@ class DefaultInferenceEngineTest {
     private InferenceRequest request;
 
     @Mock
-    private TenantContext tenantContext;
+    private RequestContext requestContext;
 
     @Mock
-    private TenantId tenantIdMock;
+    private String requestIdMock;
 
     private DefaultInferenceEngine engine;
 
@@ -76,8 +76,8 @@ class DefaultInferenceEngineTest {
     void testInfer_SuccessfulExecution() {
         // Arrange
         lenient().when(request.getRequestId()).thenReturn("test-request-id");
-        lenient().when(tenantContext.getTenantId()).thenReturn(tenantIdMock);
-        lenient().when(tenantIdMock.value()).thenReturn("test-tenant");
+        lenient().when(requestContext.requestId()).thenReturn(requestIdMock);
+        lenient().when(requestIdMock).thenReturn("test-tenant");
         when(request.getModel()).thenReturn("test-model");
 
         doReturn(Uni.createFrom().item(InferenceResponse.builder()
@@ -87,7 +87,7 @@ class DefaultInferenceEngineTest {
                 .when(orchestrator).executeAsync(any(), any(), any());
 
         // Act
-        Uni<InferenceResponse> result = engine.infer(request, tenantContext);
+        Uni<InferenceResponse> result = engine.infer(request);
 
         // Assert
         assertNotNull(result);

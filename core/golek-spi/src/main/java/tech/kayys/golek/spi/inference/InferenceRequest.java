@@ -32,7 +32,7 @@ public final class InferenceRequest {
 
     @Nullable
     @Deprecated
-    private final String tenantId;
+    private final String apiKey;
 
     @NotBlank
     private final String model;
@@ -59,10 +59,22 @@ public final class InferenceRequest {
 
     private final boolean cacheBypass;
 
+    // Context fields (migrated from RequestContext)
+    @Nullable
+    private final String userId;
+
+    @Nullable
+    private final String sessionId;
+
+    @Nullable
+    private final String traceId;
+
+    private final Map<String, Object> metadata;
+
     @JsonCreator
     public InferenceRequest(
             @JsonProperty("requestId") String requestId,
-            @JsonProperty("apiKey") @JsonAlias("tenantId") String apiKey,
+            @JsonProperty("apiKey") @JsonAlias("apiKey") String apiKey,
             @JsonProperty("model") String model,
             @JsonProperty("messages") List<Message> messages,
             @JsonProperty("parameters") Map<String, Object> parameters,
@@ -72,9 +84,13 @@ public final class InferenceRequest {
             @JsonProperty("preferredProvider") String preferredProvider,
             @JsonProperty("timeout") Duration timeout,
             @JsonProperty("priority") int priority,
-            @JsonProperty("cacheBypass") boolean cacheBypass) {
+            @JsonProperty("cacheBypass") boolean cacheBypass,
+            @JsonProperty("userId") String userId,
+            @JsonProperty("sessionId") String sessionId,
+            @JsonProperty("traceId") String traceId,
+            @JsonProperty("metadata") Map<String, Object> metadata) {
         this.requestId = Objects.requireNonNull(requestId, "requestId");
-        this.tenantId = apiKey;
+        this.apiKey = apiKey;
         this.model = Objects.requireNonNull(model, "model");
         this.messages = Collections.unmodifiableList(new ArrayList<>(
                 Objects.requireNonNull(messages, "messages")));
@@ -88,6 +104,12 @@ public final class InferenceRequest {
         this.timeout = timeout;
         this.priority = priority;
         this.cacheBypass = cacheBypass;
+        this.userId = userId;
+        this.sessionId = sessionId;
+        this.traceId = traceId;
+        this.metadata = metadata != null
+                ? Collections.unmodifiableMap(new HashMap<>(metadata))
+                : Collections.emptyMap();
     }
 
     // Getters
@@ -95,24 +117,15 @@ public final class InferenceRequest {
         return requestId;
     }
 
-    /**
-     * @deprecated Tenant ID is resolved server-side from the API key.
-     * Client code should not set or rely on this value.
-     */
-    @Deprecated
-    public String getTenantId() {
-        return tenantId;
-    }
-
     public String getModel() {
         return model;
     }
 
     public String getApiKey() {
-        if (tenantId == null || tenantId.isBlank()) {
+        if (apiKey == null || apiKey.isBlank()) {
             return ApiKeyConstants.COMMUNITY_API_KEY;
         }
-        return tenantId;
+        return apiKey;
     }
 
     public List<Message> getMessages() {
@@ -151,14 +164,58 @@ public final class InferenceRequest {
         return cacheBypass;
     }
 
+    public Optional<String> getUserId() {
+        return Optional.ofNullable(userId);
+    }
+
+    public Optional<String> getSessionId() {
+        return Optional.ofNullable(sessionId);
+    }
+
+    public Optional<String> getTraceId() {
+        return Optional.ofNullable(traceId);
+    }
+
+    public Map<String, Object> getMetadata() {
+        return metadata;
+    }
+
     // Builder
+    public Builder toBuilder() {
+        Builder builder = new Builder()
+                .requestId(requestId)
+                .apiKey(apiKey)
+                .model(model)
+                .messages(messages)
+                .parameters(parameters)
+                .preferredProvider(preferredProvider)
+                .toolChoice(toolChoice)
+                .streaming(streaming)
+                .priority(priority)
+                .cacheBypass(cacheBypass)
+                .userId(userId)
+                .sessionId(sessionId)
+                .traceId(traceId)
+                .metadata(metadata);
+
+        if (tools != null) {
+            builder.tools(tools);
+        }
+
+        if (timeout != null) {
+            builder.timeout(timeout);
+        }
+
+        return builder;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
 
     public static class Builder {
         private String requestId = UUID.randomUUID().toString();
-        private String tenantId;
+        private String apiKey;
         private String model;
         private final List<Message> messages = new ArrayList<>();
         private final List<ToolDefinition> tools = new ArrayList<>();
@@ -169,24 +226,18 @@ public final class InferenceRequest {
         private Duration timeout;
         private int priority = 5;
         private boolean cacheBypass = false;
+        private String userId;
+        private String sessionId;
+        private String traceId;
+        private final Map<String, Object> metadata = new HashMap<>();
 
         public Builder requestId(String requestId) {
             this.requestId = requestId;
             return this;
         }
 
-        /**
-         * @deprecated Tenant ID is resolved server-side from the API key.
-         * Client code should not set or rely on this value.
-         */
-        @Deprecated
-        public Builder tenantId(String tenantId) {
-            this.tenantId = tenantId;
-            return this;
-        }
-
         public Builder apiKey(String apiKey) {
-            this.tenantId = apiKey;
+            this.apiKey = apiKey;
             return this;
         }
 
@@ -285,14 +336,39 @@ public final class InferenceRequest {
             return this;
         }
 
+        public Builder userId(String userId) {
+            this.userId = userId;
+            return this;
+        }
+
+        public Builder sessionId(String sessionId) {
+            this.sessionId = sessionId;
+            return this;
+        }
+
+        public Builder traceId(String traceId) {
+            this.traceId = traceId;
+            return this;
+        }
+
+        public Builder metadata(String key, Object value) {
+            this.metadata.put(key, value);
+            return this;
+        }
+
+        public Builder metadata(Map<String, Object> metadata) {
+            this.metadata.putAll(metadata);
+            return this;
+        }
+
         public InferenceRequest build() {
             Objects.requireNonNull(model, "model is required");
             if (messages.isEmpty()) {
                 throw new IllegalStateException("At least one message is required");
             }
             return new InferenceRequest(
-                    requestId, tenantId, model, messages, parameters, tools, toolChoice, streaming,
-                    preferredProvider, timeout, priority, cacheBypass);
+                    requestId, apiKey, model, messages, parameters, tools, toolChoice, streaming,
+                    preferredProvider, timeout, priority, cacheBypass, userId, sessionId, traceId, metadata);
         }
     }
 
@@ -308,12 +384,16 @@ public final class InferenceRequest {
                 model.equals(that.model) &&
                 messages.equals(that.messages) &&
                 Objects.equals(tools, that.tools) &&
-                Objects.equals(toolChoice, that.toolChoice);
+                Objects.equals(toolChoice, that.toolChoice) &&
+                Objects.equals(userId, that.userId) &&
+                Objects.equals(sessionId, that.sessionId) &&
+                Objects.equals(traceId, that.traceId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(requestId, model, messages, tools, toolChoice, streaming, priority);
+        return Objects.hash(requestId, model, messages, tools, toolChoice, streaming, priority, userId, sessionId,
+                traceId);
     }
 
     @Override
@@ -324,6 +404,7 @@ public final class InferenceRequest {
                 ", messageCount=" + messages.size() +
                 ", streaming=" + streaming +
                 ", priority=" + priority +
+                ", userId='" + userId + '\'' +
                 '}';
     }
 }

@@ -1,11 +1,11 @@
 package tech.kayys.golek.engine.provider.adapter;
 
 import io.smallrye.mutiny.Uni;
+
 import tech.kayys.golek.spi.provider.ProviderCapabilities;
 import tech.kayys.golek.spi.provider.ProviderHealth;
 import tech.kayys.golek.engine.loader.ModelLoader;
 import tech.kayys.golek.engine.session.SessionManager;
-import tech.kayys.wayang.tenant.TenantContext;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -23,7 +23,7 @@ public abstract class LocalProviderAdapter extends AbstractProvider {
     protected final Map<String, Path> loadedModels = new ConcurrentHashMap<>();
 
     @Override
-    protected Uni<Void> doInitialize(Map<String, Object> config, TenantContext tenant) {
+    protected Uni<Void> doInitialize(Map<String, Object> config) {
         return Uni.createFrom().item(() -> {
             this.modelLoader = createModelLoader(config);
             this.sessionManager = createSessionManager(config);

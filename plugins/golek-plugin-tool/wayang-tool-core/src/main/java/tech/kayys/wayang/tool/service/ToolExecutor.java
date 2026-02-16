@@ -118,11 +118,11 @@ public class ToolExecutor {
      */
     public Uni<ToolExecutionResult> execute(ToolExecutionRequest request) {
         LOG.info("Executing tool: {} for tenant: {}",
-                request.toolId(), request.tenantId());
+                request.toolId(), request.requestId());
 
         Instant startTime = Instant.now();
 
-        return toolRegistry.resolveTool(request.toolId(), request.tenantId())
+        return toolRegistry.resolveTool(request.toolId(), request.requestId())
                 .flatMap(tool ->
                 // Pre-execution validation
                 validateAndPrepare(tool, request)
@@ -161,7 +161,7 @@ public class ToolExecutor {
 
             // Check rate limits
             rateLimiter.checkLimit(
-                    request.tenantId(),
+                    request.requestId(),
                     tool.getToolId(),
                     tool.getGuardrails());
 
@@ -178,7 +178,7 @@ public class ToolExecutor {
 
             return new ValidatedToolRequest(
                     tool.getToolId(),
-                    request.tenantId(),
+                    request.requestId(),
                     request.userId(),
                     sanitizedArgs,
                     request.workflowRunId(),
@@ -574,7 +574,7 @@ public class ToolExecutor {
      */
     private record ValidatedToolRequest(
             String toolId,
-            String tenantId,
+            String requestId,
             String userId,
             Map<String, Object> arguments,
             String workflowRunId,

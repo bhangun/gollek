@@ -98,7 +98,7 @@ public class MemoryIntegrationPlugin implements InferencePhasePlugin {
             // VectorAgentMemory uses retrieve(agentId, query, limit) which returns
             // Uni<List<MemoryEntry>>
             // We need to extract agentId from request or context
-            String agentId = request.getTenantId(); // Assuming tenantId serves as agentId
+            String agentId = request.getRequestId(); // Assuming requestId serves as agentId
 
             // Call retrieve and block to get results (since we're in a synchronous plugin
             // context)

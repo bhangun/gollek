@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import org.jetbrains.annotations.Nullable;
 import tech.kayys.golek.spi.Message;
 import tech.kayys.golek.spi.tool.ToolDefinition;
-// import tech.kayys.wayang.tenant.TenantContext; // Temporarily commented out due to missing dependency
+// import tech.kayys.golek.spi.context.RequestContext; // Temporarily commented out due to missing dependency
 
 import java.time.Duration;
 import java.util.*;
@@ -33,7 +33,19 @@ public final class ProviderRequest {
     private final Map<String, Object> parameters;
     private final boolean streaming;
     private final Duration timeout;
-    private final Object tenantContext; // Using Object temporarily due to missing dependency
+
+    // Context fields
+    @Nullable
+    private final String userId;
+
+    @Nullable
+    private final String sessionId;
+
+    @Nullable
+    private final String traceId;
+
+    @Nullable
+    private final String apiKey;
 
     private final List<ToolDefinition> tools;
 
@@ -49,7 +61,10 @@ public final class ProviderRequest {
             @JsonProperty("toolChoice") Object toolChoice,
             @JsonProperty("streaming") boolean streaming,
             @JsonProperty("timeout") Duration timeout,
-            @JsonProperty("tenantContext") Object tenantContext,
+            @JsonProperty("userId") String userId,
+            @JsonProperty("sessionId") String sessionId,
+            @JsonProperty("traceId") String traceId,
+            @JsonProperty("apiKey") String apiKey,
             @JsonProperty("metadata") Map<String, Object> metadata) {
         this.requestId = Objects.requireNonNull(requestId, "requestId");
         this.model = Objects.requireNonNull(model, "model");
@@ -65,7 +80,10 @@ public final class ProviderRequest {
                 : Collections.emptyMap();
         this.streaming = streaming;
         this.timeout = timeout != null ? timeout : Duration.ofSeconds(30);
-        this.tenantContext = tenantContext;
+        this.userId = userId;
+        this.sessionId = sessionId;
+        this.traceId = traceId;
+        this.apiKey = apiKey;
         this.metadata = metadata != null
                 ? Collections.unmodifiableMap(new HashMap<>(metadata))
                 : Collections.emptyMap();
@@ -104,16 +122,20 @@ public final class ProviderRequest {
         return timeout;
     }
 
-    public Object getApiKeyContext() {
-        return tenantContext;
+    public Optional<String> getUserId() {
+        return Optional.ofNullable(userId);
     }
 
-    /**
-     * @deprecated Use {@link #getApiKeyContext()}.
-     */
-    @Deprecated
-    public Object getTenantContext() {
-        return tenantContext;
+    public Optional<String> getSessionId() {
+        return Optional.ofNullable(sessionId);
+    }
+
+    public Optional<String> getTraceId() {
+        return Optional.ofNullable(traceId);
+    }
+
+    public Optional<String> getApiKey() {
+        return Optional.ofNullable(apiKey);
     }
 
     public Map<String, Object> getMetadata() {
@@ -160,7 +182,10 @@ public final class ProviderRequest {
         private final Map<String, Object> parameters = new HashMap<>();
         private boolean streaming = false;
         private Duration timeout = Duration.ofSeconds(30);
-        private Object tenantContext; // Using Object temporarily due to missing dependency
+        private String userId;
+        private String sessionId;
+        private String traceId;
+        private String apiKey;
         private Map<String, Object> metadata = new HashMap<>();
 
         public Builder requestId(String requestId) {
@@ -218,17 +243,23 @@ public final class ProviderRequest {
             return this;
         }
 
-        public Builder apiKeyContext(Object apiKeyContext) {
-            this.tenantContext = apiKeyContext;
+        public Builder userId(String userId) {
+            this.userId = userId;
             return this;
         }
 
-        /**
-         * @deprecated Use {@link #apiKeyContext(Object)}.
-         */
-        @Deprecated
-        public Builder tenantContext(Object tenantContext) {
-            this.tenantContext = tenantContext;
+        public Builder sessionId(String sessionId) {
+            this.sessionId = sessionId;
+            return this;
+        }
+
+        public Builder traceId(String traceId) {
+            this.traceId = traceId;
+            return this;
+        }
+
+        public Builder apiKey(String apiKey) {
+            this.apiKey = apiKey;
             return this;
         }
 
@@ -250,8 +281,8 @@ public final class ProviderRequest {
                 throw new IllegalStateException("At least one message is required");
             }
             return new ProviderRequest(
-                    requestId, model, messages, parameters, tools, toolChoice, streaming, timeout, tenantContext,
-                    metadata);
+                    requestId, model, messages, parameters, tools, toolChoice, streaming, timeout,
+                    userId, sessionId, traceId, apiKey, metadata);
         }
     }
 
@@ -263,6 +294,7 @@ public final class ProviderRequest {
                 ", messageCount=" + messages.size() +
                 ", toolCount=" + (tools != null ? tools.size() : 0) +
                 ", streaming=" + streaming +
+                ", userId='" + userId + '\'' +
                 '}';
     }
 }

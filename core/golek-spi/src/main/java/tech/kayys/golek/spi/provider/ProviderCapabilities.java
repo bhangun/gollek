@@ -137,6 +137,10 @@ public final class ProviderCapabilities {
         return features.contains(feature);
     }
 
+    public Set<String> getFeatures() {
+        return features;
+    }
+
     public static Builder builder() {
         return new Builder();
     }

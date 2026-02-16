@@ -17,12 +17,12 @@ public interface ModelRouterService {
     /**
      * Select the best provider for a given model and tenant
      */
-    String selectProvider(String modelId, String tenantId);
+    String selectProvider(String modelId, String requestId);
 
     /**
      * Select the best provider for a given model, tenant, and request context
      */
-    String selectProvider(String modelId, String tenantId, Map<String, Object> requestContext);
+    String selectProvider(String modelId, String requestId, Map<String, Object> requestContext);
 
     /**
      * Get available providers for a model
@@ -32,10 +32,10 @@ public interface ModelRouterService {
     /**
      * Get routing score for a provider for a specific model
      */
-    double getProviderScore(String modelId, String providerId, String tenantId);
+    double getProviderScore(String modelId, String providerId, String requestId);
 
     /**
      * Get routing decision details
      */
-    RoutingDecision getRoutingDecision(String modelId, String tenantId, Map<String, Object> context);
+    RoutingDecision getRoutingDecision(String modelId, String requestId, Map<String, Object> context);
 }

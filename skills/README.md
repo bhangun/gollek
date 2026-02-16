@@ -159,14 +159,14 @@ ModelRepository repo = ModelRepositoryRegistry
 Model model = repo.load("bert-base-uncased");
 
 // 2. Create tenant context (Handle Multi-Tenancy skill)
-TenantContext tenant = TenantContext.builder()
-  .tenantId("customer-1")
+RequestContext tenant = RequestContext.builder()
+  .requestId("customer-1")
   .userId("user-456")
   .build();
 
 // 3. Run inference (Run Inference skill)
 ProviderRequest request = ProviderRequest.builder()
-  .tenantContext(tenant)
+  .requestContext(tenant)
   .modelId("bert-base-uncased")
   .prompt("Analyze this text: ...")
   .build();
@@ -176,7 +176,7 @@ Uni<ProviderResponse> result = provider.infer(request);
 // 4. Monitor execution (Monitor Inference skill)
 result.onItem().invoke(response -> {
   metricsRegistry.timer("inference.latency",
-    "tenant", tenant.getTenantId()
+    "tenant", tenant.getRequestId()
   ).record(response.getLatencyMs(), TimeUnit.MILLISECONDS);
 });
 ```

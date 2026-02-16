@@ -39,7 +39,7 @@ public class ModelConversionService {
      * Submit model conversion job.
      */
     public Uni<ConversionJob> submitConversion(
-            String tenantId,
+            String requestId,
             String modelId,
             String targetFormat) {
 

@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import tech.kayys.golek.core.execution.ExecutionContext;
 import tech.kayys.golek.core.execution.ExecutionToken;
 import tech.kayys.golek.spi.execution.ExecutionStatus;
-import tech.kayys.wayang.tenant.TenantContext;
+import tech.kayys.golek.spi.context.RequestContext;
 import tech.kayys.golek.spi.context.EngineContext;
 import tech.kayys.golek.spi.inference.InferencePhase;
 
@@ -16,16 +16,16 @@ import tech.kayys.golek.spi.inference.InferencePhase;
 public class DefaultExecutionContext implements ExecutionContext {
 
     private final EngineContext engineContext;
-    private final TenantContext tenantContext;
+    private final RequestContext requestContext;
     private final AtomicReference<ExecutionToken> tokenRef;
     private final AtomicReference<Throwable> errorRef;
 
     public DefaultExecutionContext(
             EngineContext engineContext,
-            TenantContext tenantContext,
+            RequestContext requestContext,
             ExecutionToken initialToken) {
         this.engineContext = engineContext;
-        this.tenantContext = tenantContext != null ? tenantContext : TenantContext.of("community");
+        this.requestContext = requestContext != null ? requestContext : RequestContext.of("community");
         this.tokenRef = new AtomicReference<>(initialToken);
         this.errorRef = new AtomicReference<>();
     }
@@ -41,8 +41,8 @@ public class DefaultExecutionContext implements ExecutionContext {
     }
 
     @Override
-    public TenantContext tenantContext() {
-        return tenantContext;
+    public RequestContext requestContext() {
+        return requestContext;
     }
 
     @Override
@@ -128,7 +128,7 @@ public class DefaultExecutionContext implements ExecutionContext {
     public String toString() {
         return "DefaultExecutionContext{" +
                 "token=" + token() +
-                ", tenant=" + tenantContext.getTenantId() +
+                ", tenant=" + requestContext.getRequestId() +
                 ", hasError=" + hasError() +
                 '}';
     }

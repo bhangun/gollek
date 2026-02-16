@@ -2,6 +2,8 @@ package tech.kayys.golek.engine.provider.adapter;
 
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
+import java.util.Map;
+
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.provider.ProviderRequest;
 import tech.kayys.golek.spi.provider.StreamingProvider;
@@ -9,7 +11,6 @@ import tech.kayys.golek.spi.stream.StreamChunk;
 
 import tech.kayys.golek.provider.core.streaming.ChunkProcessor;
 import tech.kayys.golek.provider.core.streaming.StreamHandler;
-import tech.kayys.wayang.tenant.TenantContext;
 
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicLong;
@@ -24,15 +25,15 @@ public abstract class StreamingAdapter extends AbstractProvider implements Strea
     protected volatile ChunkProcessor chunkProcessor;
 
     @Override
-    public Multi<StreamChunk> inferStream(ProviderRequest request, TenantContext context) {
+    public Multi<StreamChunk> inferStream(ProviderRequest request) {
         if (!isInitialized()) {
             return Multi.createFrom().failure(
                     new IllegalStateException("Provider not initialized"));
         }
 
-        String tenantId = context != null ? context.getTenantId().value() : "community";
+        String tenantId = resolveTenantId(request);
 
-        return checkQuota(context)
+        return checkQuota(tenantId)
                 .chain(() -> checkRateLimit(tenantId))
                 .onItem().transformToMulti(v -> doStream(request))
                 .onFailure().transform(this::handleFailure);
@@ -99,7 +100,7 @@ public abstract class StreamingAdapter extends AbstractProvider implements Strea
     protected abstract ChunkProcessor createChunkProcessor();
 
     @Override
-    protected Uni<Void> doInitialize(java.util.Map<String, Object> config, TenantContext tenant) {
+    protected Uni<Void> doInitialize(Map<String, Object> config) {
         this.streamHandler = createStreamHandler();
         this.chunkProcessor = createChunkProcessor();
         return Uni.createFrom().voidItem();

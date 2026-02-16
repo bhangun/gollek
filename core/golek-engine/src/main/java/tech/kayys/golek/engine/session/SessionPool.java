@@ -18,16 +18,16 @@ public class SessionPool {
     private static final Logger LOG = Logger.getLogger(SessionPool.class);
 
     private final String modelId;
-    private final String tenantId;
+    private final String requestId;
     private final SessionConfig config;
     private final BlockingQueue<Session> availableSessions;
     private final List<Session> allSessions;
     private final AtomicInteger activeCount;
     private volatile boolean shutdown;
 
-    public SessionPool(String modelId, String tenantId, SessionConfig config) {
+    public SessionPool(String modelId, String requestId, SessionConfig config) {
         this.modelId = modelId;
-        this.tenantId = tenantId;
+        this.requestId = requestId;
         this.config = config;
         this.availableSessions = new LinkedBlockingQueue<>();
         this.allSessions = new ArrayList<>();
@@ -152,7 +152,7 @@ public class SessionPool {
                 activeCount.get(),
                 availableSessions.size(),
                 modelId,
-                tenantId);
+                requestId);
     }
 
     /**
@@ -180,7 +180,7 @@ public class SessionPool {
 
     private Session createSession() {
         try {
-            return new Session(modelId, tenantId, config);
+            return new Session(modelId, requestId, config);
         } catch (Exception e) {
             LOG.errorf(e, "Failed to create session for model %s", modelId);
             return null;
@@ -204,7 +204,7 @@ public class SessionPool {
             int activeSessions,
             int availableSessions,
             String modelId,
-            String tenantId) {
+            String requestId) {
         @Override
         public String toString() {
             return String.format(

@@ -1,7 +1,5 @@
 package tech.kayys.golek.spi.model;
 
-import tech.kayys.golek.spi.auth.ApiKeyConstants;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +14,9 @@ public record ModelManifest(
         String modelId,
         String name,
         String version,
-        String tenantId,
+        String path,
+        String apiKey,
+        String requestId,
         Map<ModelFormat, ArtifactLocation> artifacts,
         List<SupportedDevice> supportedDevices,
         ResourceRequirements resourceRequirements,
@@ -28,7 +28,9 @@ public record ModelManifest(
         Objects.requireNonNull(modelId, "modelId cannot be null");
         Objects.requireNonNull(name, "name cannot be null");
         Objects.requireNonNull(version, "version cannot be null");
-        Objects.requireNonNull(tenantId, "tenantId cannot be null");
+        Objects.requireNonNull(path, "path cannot be null");
+        Objects.requireNonNull(apiKey, "apiKey cannot be null");
+        Objects.requireNonNull(requestId, "requestId cannot be null");
         artifacts = Optional.ofNullable(artifacts).orElse(Map.of());
         supportedDevices = Optional.ofNullable(supportedDevices).orElse(List.of());
         metadata = Optional.ofNullable(metadata).orElse(Map.of());
@@ -49,18 +51,20 @@ public record ModelManifest(
                 .anyMatch(d -> d.type() == deviceType);
     }
 
-    public String apiKey() {
-        if (tenantId == null || tenantId.isBlank()) {
-            return ApiKeyConstants.COMMUNITY_API_KEY;
+    public String path() {
+        if (path == null || path.isBlank()) {
+            return "community";
         }
-        return tenantId;
+        return path;
     }
 
     public static class Builder {
         private String modelId;
         private String name;
         private String version;
-        private String tenantId;
+        private String path;
+        private String requestId;
+        private String apiKey;
         private Map<ModelFormat, ArtifactLocation> artifacts;
         private List<SupportedDevice> supportedDevices;
         private ResourceRequirements resourceRequirements;
@@ -86,13 +90,18 @@ public record ModelManifest(
             return this;
         }
 
-        public Builder tenantId(String tenantId) {
-            this.tenantId = tenantId;
+        public Builder path(String path) {
+            this.path = path;
             return this;
         }
 
         public Builder apiKey(String apiKey) {
-            this.tenantId = apiKey;
+            this.apiKey = apiKey;
+            return this;
+        }
+
+        public Builder requestId(String requestId) {
+            this.requestId = requestId;
             return this;
         }
 
@@ -127,14 +136,16 @@ public record ModelManifest(
         }
 
         public ModelManifest build() {
-            return new ModelManifest(modelId, name, version, tenantId, artifacts, supportedDevices, resourceRequirements,
+            return new ModelManifest(modelId, name, version, path, apiKey, requestId, artifacts, supportedDevices,
+                    resourceRequirements,
                     metadata, createdAt, updatedAt);
         }
 
         @Override
         public String toString() {
             return "ModelManifest.Builder(modelId=" + this.modelId + ", name=" + this.name + ", version=" + this.version
-                    + ", tenantId=" + this.tenantId + ", artifacts=" + this.artifacts + ", supportedDevices="
+                    + ", requestId=" + this.requestId + ", path=" + this.path + ", artifacts=" + this.artifacts
+                    + ", supportedDevices="
                     + this.supportedDevices + ", resourceRequirements=" + this.resourceRequirements + ", metadata="
                     + this.metadata + ", createdAt=" + this.createdAt + ", updatedAt=" + this.updatedAt + ")";
         }

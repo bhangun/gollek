@@ -1,6 +1,6 @@
 package tech.kayys.golek.plugin;
 
-import tech.kayys.wayang.tenant.TenantId;
+import tech.kayys.wayang.tenant.RequestId;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import java.time.Instant;
@@ -24,8 +24,8 @@ public class DefaultTenantQuotaService implements TenantQuotaService {
     private final ConcurrentHashMap<String, Long> lastResetMap = new ConcurrentHashMap<>();
 
     @Override
-    public QuotaInfo checkQuota(TenantId tenantId) {
-        String tenantStr = tenantId.value();
+    public QuotaInfo checkQuota(RequestId requestId) {
+        String tenantStr = requestId.value();
 
         // Get or create default config
         QuotaConfig config = configMap.computeIfAbsent(tenantStr, this::getDefaultConfig);
@@ -59,8 +59,8 @@ public class DefaultTenantQuotaService implements TenantQuotaService {
     }
 
     @Override
-    public void reserve(TenantId tenantId, int amount) {
-        String tenantStr = tenantId.value();
+    public void reserve(RequestId requestId, int amount) {
+        String tenantStr = requestId.value();
 
         QuotaConfig config = configMap.computeIfAbsent(tenantStr, this::getDefaultConfig);
 
@@ -74,8 +74,8 @@ public class DefaultTenantQuotaService implements TenantQuotaService {
     }
 
     @Override
-    public void release(TenantId tenantId, int amount) {
-        String tenantStr = tenantId.value();
+    public void release(RequestId requestId, int amount) {
+        String tenantStr = requestId.value();
 
         QuotaConfig config = configMap.computeIfAbsent(tenantStr, this::getDefaultConfig);
 
@@ -95,21 +95,21 @@ public class DefaultTenantQuotaService implements TenantQuotaService {
     }
 
     @Override
-    public QuotaConfig getConfig(TenantId tenantId) {
-        return configMap.computeIfAbsent(tenantId.value(), this::getDefaultConfig);
+    public QuotaConfig getConfig(RequestId requestId) {
+        return configMap.computeIfAbsent(requestId.value(), this::getDefaultConfig);
     }
 
     /**
      * Set quota configuration for a tenant
      */
-    public void setConfig(TenantId tenantId, QuotaConfig config) {
-        configMap.put(tenantId.value(), config);
+    public void setConfig(RequestId requestId, QuotaConfig config) {
+        configMap.put(requestId.value(), config);
     }
 
     /**
      * Get default configuration for a tenant
      */
-    private QuotaConfig getDefaultConfig(String tenantId) {
+    private QuotaConfig getDefaultConfig(String requestId) {
         return QuotaConfig.builder()
                 .limit(1000) // Default 1000 requests per hour
                 .periodMs(3600000) // 1 hour

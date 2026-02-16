@@ -13,7 +13,7 @@ public final class ModelInfo {
     private final String name;
     private final String version;
     @Deprecated
-    private final String tenantId;
+    private final String requestId;
     private final String format;
     private final Long sizeBytes;
     private final String quantization;
@@ -25,7 +25,7 @@ public final class ModelInfo {
             String modelId,
             String name,
             String version,
-            String tenantId,
+            String requestId,
             String format,
             Long sizeBytes,
             String quantization,
@@ -35,7 +35,7 @@ public final class ModelInfo {
         this.modelId = Objects.requireNonNull(modelId, "modelId is required");
         this.name = name;
         this.version = version;
-        this.tenantId = tenantId;
+        this.requestId = requestId;
         this.format = format;
         this.sizeBytes = sizeBytes;
         this.quantization = quantization;
@@ -57,19 +57,19 @@ public final class ModelInfo {
     }
 
     public String getApiKey() {
-        if (tenantId == null || tenantId.isBlank()) {
+        if (requestId == null || requestId.isBlank()) {
             return "community";
         }
-        return tenantId;
+        return requestId;
     }
 
     /**
      * @deprecated Tenant ID is resolved server-side from the API key.
-     * Client code should not rely on this field.
+     *             Client code should not rely on this field.
      */
     @Deprecated
-    public String getTenantId() {
-        return tenantId;
+    public String getRequestId() {
+        return requestId;
     }
 
     public String getFormat() {
@@ -123,7 +123,7 @@ public final class ModelInfo {
         private String name;
         private String version;
         @Deprecated
-        private String tenantId;
+        private String requestId;
         private String format;
         private Long sizeBytes;
         private String quantization;
@@ -148,16 +148,16 @@ public final class ModelInfo {
 
         /**
          * @deprecated Tenant ID is resolved server-side from the API key.
-         * Client code should not set or rely on this value.
+         *             Client code should not set or rely on this value.
          */
         @Deprecated
-        public Builder tenantId(String tenantId) {
-            this.tenantId = tenantId;
+        public Builder requestId(String requestId) {
+            this.requestId = requestId;
             return this;
         }
 
         public Builder apiKey(String apiKey) {
-            this.tenantId = apiKey;
+            this.requestId = apiKey;
             return this;
         }
 
@@ -192,7 +192,7 @@ public final class ModelInfo {
         }
 
         public ModelInfo build() {
-            return new ModelInfo(modelId, name, version, tenantId, format,
+            return new ModelInfo(modelId, name, version, requestId, format,
                     sizeBytes, quantization, createdAt, updatedAt, metadata);
         }
     }

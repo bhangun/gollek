@@ -30,9 +30,9 @@ public interface RemoteModelRepository {
 
     String type();
 
-    Uni<ModelManifest> fetchMetadata(String modelId, String tenantId);
+    Uni<ModelManifest> fetchMetadata(String modelId, String requestId);
 
-    Uni<List<ModelManifest>> search(String query, String tenantId);
+    Uni<List<ModelManifest>> search(String query, String requestId);
 
     Uni<Path> downloadArtifact(ModelManifest manifest, String artifactId, Path targetDir,
             DownloadProgressListener listener);

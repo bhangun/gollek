@@ -1,7 +1,6 @@
 package tech.kayys.golek.spi.registry;
 
 import io.smallrye.mutiny.Uni;
-import tech.kayys.golek.spi.tool.Tool;
 
 import java.util.List;
 
@@ -15,7 +14,7 @@ public interface ToolRegistry {
      *
      * @param tool the tool to register
      */
-    void register(Tool tool);
+    void register(tech.kayys.golek.spi.tool.Tool tool);
 
     /**
      * Get tool by ID.
@@ -23,12 +22,12 @@ public interface ToolRegistry {
      * @param id tool ID
      * @return Uni Tool or failure if not found
      */
-    Uni<Tool> getTool(String id);
+    Uni<tech.kayys.golek.spi.tool.Tool> getTool(String id);
 
     /**
      * List all available tools.
      *
      * @return Uni List of tools
      */
-    Uni<List<Tool>> listTools();
+    Uni<List<tech.kayys.golek.spi.tool.Tool>> listTools();
 }

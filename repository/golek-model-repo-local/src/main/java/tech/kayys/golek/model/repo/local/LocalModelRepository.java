@@ -6,6 +6,7 @@ import io.smallrye.mutiny.Uni;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.List;
 import java.util.Collections;
@@ -47,26 +48,14 @@ public final class LocalModelRepository implements ModelRepository {
         if (modelId == null)
             return Uni.createFrom().nullItem();
 
-        // Normalize modelId (replace / with _)
-        String normalizedId = modelId.replace("/", "_");
+        Path modelPath = resolveLocalPath(modelId);
+        Path artifactPath = resolveArtifactFile(modelPath);
 
-        Path modelDir = Path.of(System.getProperty("user.home"), ".golek", "models", "gguf");
-        Path modelPath = modelDir.resolve(normalizedId);
-
-        // Check local variations (e.g. if the file has -GGUF suffix)
-        if (!Files.exists(modelPath)) {
-            if (Files.exists(modelDir.resolve(normalizedId + "-GGUF"))) {
-                modelPath = modelDir.resolve(normalizedId + "-GGUF");
-            } else if (normalizedId.endsWith("_GGUF")
-                    && Files.exists(modelDir.resolve(normalizedId.substring(0, normalizedId.length() - 5)))) {
-                modelPath = modelDir.resolve(normalizedId.substring(0, normalizedId.length() - 5));
-            }
-        }
-
-        if (Files.exists(modelPath)) {
+        if (artifactPath != null && Files.exists(artifactPath)) {
             try {
-                long size = Files.size(modelPath);
-                String uri = modelPath.toUri().toString();
+                long size = Files.size(artifactPath);
+                String uri = artifactPath.toUri().toString();
+                ModelFormat format = detectFormat(artifactPath);
 
                 tech.kayys.golek.spi.model.ArtifactLocation artifact = new tech.kayys.golek.spi.model.ArtifactLocation(
                         uri, null, size, "application/octet-stream");
@@ -75,9 +64,11 @@ public final class LocalModelRepository implements ModelRepository {
                         .modelId(modelId)
                         .name(modelId)
                         .version("1.0.0")
-                        .tenantId(tenantId)
-                        .artifacts(Map.of(ModelFormat.GGUF, artifact))
-                        .metadata(Map.of("path", uri, "source", "local"))
+                        .requestId("local-" + modelId.replace("/", "_"))
+                        .path(uri)
+                        .apiKey(tenantId != null && !tenantId.isBlank() ? tenantId : "community")
+                        .artifacts(Map.of(format, artifact))
+                        .metadata(Map.of("path", uri, "source", "local", "format", format.name()))
                         .build());
             } catch (Exception e) {
                 // Fallback if file read fails
@@ -85,11 +76,116 @@ public final class LocalModelRepository implements ModelRepository {
                         .modelId(modelId)
                         .name(modelId)
                         .version("1.0.0")
-                        .tenantId(tenantId)
+                        .requestId("local-" + modelId.replace("/", "_"))
+                        .path(artifactPath.toString())
+                        .apiKey(tenantId != null && !tenantId.isBlank() ? tenantId : "community")
                         .build());
             }
         }
         return Uni.createFrom().nullItem();
+    }
+
+    private Path resolveLocalPath(String modelId) {
+        Path direct = Path.of(modelId);
+        if (direct.isAbsolute() && Files.exists(direct)) {
+            return direct;
+        }
+
+        String normalizedId = modelId.replace("/", "_");
+        Path ggufDir = Path.of(System.getProperty("user.home"), ".golek", "models", "gguf");
+        Path torchDir = Path.of(System.getProperty("user.home"), ".golek", "models", "torchscript");
+
+        List<Path> candidates = new ArrayList<>();
+
+        // GGUF variants (historical naming)
+        candidates.add(ggufDir.resolve(normalizedId));
+        candidates.add(ggufDir.resolve(normalizedId + ".gguf"));
+        candidates.add(ggufDir.resolve(normalizedId + "-GGUF"));
+        candidates.add(ggufDir.resolve(modelId + ".gguf"));
+
+        // LibTorch / PyTorch variants (both nested repo path and normalized file naming)
+        candidates.add(torchDir.resolve(modelId));
+        candidates.add(torchDir.resolve(normalizedId));
+        for (String ext : List.of(".pt", ".pts", ".pth", ".bin", ".safetensors")) {
+            candidates.add(torchDir.resolve(modelId + ext));
+            candidates.add(torchDir.resolve(normalizedId + ext));
+        }
+
+        for (Path candidate : candidates) {
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+        }
+        // Return primary GGUF candidate for consistent "not found" behavior.
+        return ggufDir.resolve(normalizedId);
+    }
+
+    private Path resolveArtifactFile(Path modelPath) {
+        if (modelPath == null || !Files.exists(modelPath)) {
+            return null;
+        }
+        if (Files.isRegularFile(modelPath)) {
+            return modelPath;
+        }
+        if (!Files.isDirectory(modelPath)) {
+            return null;
+        }
+        try (var stream = Files.list(modelPath)) {
+            return stream
+                    .filter(Files::isRegularFile)
+                    .filter(this::isLikelyModelFile)
+                    .findFirst()
+                    .orElse(null);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private boolean isLikelyModelFile(Path p) {
+        String name = p.getFileName().toString().toLowerCase();
+        return name.endsWith(".gguf")
+                || name.endsWith(".pt")
+                || name.endsWith(".pts")
+                || name.endsWith(".pth")
+                || name.endsWith(".bin")
+                || name.endsWith(".safetensors")
+                || isGgufFile(p);
+    }
+
+    private ModelFormat detectFormat(Path modelPath) {
+        String name = modelPath.getFileName().toString().toLowerCase();
+        if (name.endsWith(".gguf")) {
+            return ModelFormat.GGUF;
+        }
+        // Handle extensionless GGUF files by checking magic header.
+        if (isGgufFile(modelPath)) {
+            return ModelFormat.GGUF;
+        }
+        if (name.endsWith(".pt") || name.endsWith(".pts")) {
+            return ModelFormat.TORCHSCRIPT;
+        }
+        if (name.endsWith(".pth") || name.endsWith(".bin") || name.endsWith(".safetensors")) {
+            return ModelFormat.PYTORCH;
+        }
+        return ModelFormat.UNKNOWN;
+    }
+
+    private boolean isGgufFile(Path modelPath) {
+        try {
+            if (!Files.isRegularFile(modelPath) || Files.size(modelPath) < 4) {
+                return false;
+            }
+            byte[] header = new byte[4];
+            try (var in = Files.newInputStream(modelPath)) {
+                int read = in.read(header);
+                if (read < 4) {
+                    return false;
+                }
+            }
+            return header[0] == 'G' && header[1] == 'G' && header[2] == 'U' && header[3] == 'F';
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     @Override

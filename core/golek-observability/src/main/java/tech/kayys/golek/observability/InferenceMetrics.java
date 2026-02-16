@@ -23,47 +23,47 @@ public class InferenceMetrics {
 
         public void recordSuccess(
                         String model,
-                        String tenantId,
+                        String requestId,
                         long durationNanos,
                         int tokensUsed) {
                 Timer.builder("inference.duration")
                                 .tag("model", model)
-                                .tag("tenant", tenantId)
+                                .tag("tenant", requestId)
                                 .tag("status", "success")
                                 .register(registry)
                                 .record(Duration.ofNanos(durationNanos));
 
                 Counter.builder("inference.requests")
                                 .tag("model", model)
-                                .tag("tenant", tenantId)
+                                .tag("tenant", requestId)
                                 .tag("status", "success")
                                 .register(registry)
                                 .increment();
 
                 Counter.builder("inference.tokens")
                                 .tag("model", model)
-                                .tag("tenant", tenantId)
+                                .tag("tenant", requestId)
                                 .register(registry)
                                 .increment(tokensUsed);
         }
 
         public void recordFailure(
                         String model,
-                        String tenantId,
+                        String requestId,
                         String errorType) {
                 Counter.builder("inference.requests")
                                 .tag("model", model)
-                                .tag("tenant", tenantId)
+                                .tag("tenant", requestId)
                                 .tag("status", "failed")
                                 .tag("error", errorType)
                                 .register(registry)
                                 .increment();
         }
 
-        public void recordStreamChunk(String model, String tenantId) {
+        public void recordStreamChunk(String model, String requestId) {
                 Counter.builder("inference.stream.chunks")
                                 .tag("model", model)
-                                .tag("tenant", tenantId)
+                                .tag("tenant", requestId)
                                 .register(registry)
                                 .increment();
         }

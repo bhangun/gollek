@@ -3,6 +3,7 @@ package tech.kayys.golek.sdk.local;
 import io.smallrye.mutiny.Multi;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
+import jakarta.enterprise.inject.spi.CDI;
 import jakarta.inject.Inject;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
@@ -18,8 +19,6 @@ import tech.kayys.golek.spi.model.Pageable;
 import tech.kayys.golek.model.download.DownloadProgressListener;
 import java.time.Instant;
 
-import tech.kayys.golek.provider.ollama.OllamaClient;
-import tech.kayys.golek.provider.ollama.OllamaPullRequest;
 import tech.kayys.golek.sdk.core.GolekSdk;
 import tech.kayys.golek.sdk.core.exception.SdkException;
 import tech.kayys.golek.sdk.core.exception.NonRetryableException;
@@ -69,9 +68,6 @@ public class LocalGolekSdk implements GolekSdk {
     LocalModelRepository modelRepository;
 
     @Inject
-    Instance<OllamaClient> ollamaClientInstance;
-
-    @Inject
     Instance<HuggingFaceClient> hfClientInstance;
 
     @Inject
@@ -85,7 +81,7 @@ public class LocalGolekSdk implements GolekSdk {
      */
     protected String resolveTenantId() {
         try {
-            return tenantResolver.resolveTenantId();
+            return tenantResolver.resolveApiKey();
         } catch (Exception e) {
             log.warn("Failed to resolve tenant ID, using 'default': {}", e.getMessage());
             return "default";
@@ -160,7 +156,7 @@ public class LocalGolekSdk implements GolekSdk {
             return AsyncJobStatus.builder()
                     .jobId(status.jobId())
                     .requestId(status.requestId())
-                    .tenantId(status.tenantId())
+                    .apiKey(status.apiKey())
                     .status(status.status())
                     .result(status.result())
                     .error(status.error())
@@ -352,43 +348,70 @@ public class LocalGolekSdk implements GolekSdk {
     // ==================== Private Helpers ====================
 
     private void pullFromOllama(String model, Consumer<PullProgress> progressCallback) throws SdkException {
-        if (!ollamaClientInstance.isResolvable()) {
+        Optional<Object> maybeClient = resolveBeanByClassName("tech.kayys.golek.provider.ollama.OllamaClient");
+        if (maybeClient.isEmpty()) {
             throw new SdkException("SDK_ERR_PROVIDER_UNAVAILABLE", "Ollama client not available");
         }
 
-        OllamaClient ollamaClient = ollamaClientInstance.get();
-        OllamaPullRequest request = new OllamaPullRequest();
-        request.setName(model);
-        request.setStream(true);
+        try {
+            Object ollamaClient = maybeClient.get();
+            Class<?> requestClass = Class.forName("tech.kayys.golek.provider.ollama.OllamaPullRequest");
+            Object request = requestClass.getDeclaredConstructor().newInstance();
 
-        ollamaClient.pullModel(request)
-                .subscribe().with(
-                        progress -> {
-                            if (progressCallback != null) {
-                                PullProgress pp = PullProgress.of(
-                                        progress.getStatus(),
-                                        progress.getDigest(),
-                                        progress.getTotal() != null ? progress.getTotal() : 0,
-                                        progress.getCompleted() != null ? progress.getCompleted() : 0);
-                                progressCallback.accept(pp);
-                            }
-                        },
-                        error -> log.error("Error pulling model: {}", error.getMessage()),
-                        () -> log.info("Model pull complete: {}", model));
+            requestClass.getMethod("setName", String.class).invoke(request, model);
+            requestClass.getMethod("setStream", boolean.class).invoke(request, true);
+
+            Object pullResult = ollamaClient.getClass().getMethod("pullModel", requestClass).invoke(ollamaClient,
+                    request);
+            if (!(pullResult instanceof Multi<?> stream)) {
+                throw new SdkException("SDK_ERR_PROVIDER_UNAVAILABLE", "Ollama pull stream is unavailable");
+            }
+
+            stream.subscribe().with(
+                    progress -> {
+                        if (progressCallback != null) {
+                            PullProgress pp = PullProgress.of(
+                                    stringGetter(progress, "getStatus").orElse("downloading"),
+                                    stringGetter(progress, "getDigest").orElse(model),
+                                    longGetter(progress, "getTotal").orElse(0L),
+                                    longGetter(progress, "getCompleted").orElse(0L));
+                            progressCallback.accept(pp);
+                        }
+                    },
+                    error -> log.error("Error pulling model: {}", error.getMessage()),
+                    () -> log.info("Model pull complete: {}", model));
+        } catch (SdkException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_MODEL_PULL", "Failed to pull model from Ollama", e);
+        }
     }
 
     private void pullFromHuggingFace(String modelId, Consumer<PullProgress> progressCallback) throws SdkException {
         if (!hfClientInstance.isResolvable()) {
             throw new SdkException("SDK_ERR_PROVIDER_UNAVAILABLE", "HuggingFace client not available");
         }
+        if (isLikelyMetaLlama(modelId) && !hasHuggingFaceToken()) {
+            throw new SdkException(
+                    "SDK_ERR_MODEL_PULL",
+                    "Model '" + modelId
+                            + "' is likely gated. Set wayang.inference.repository.huggingface.token (or env WAYANG_INFERENCE_REPOSITORY_HUGGINGFACE_TOKEN) and accept model access on Hugging Face.");
+        }
 
         try {
             HuggingFaceClient client = hfClientInstance.get();
             List<String> files = client.listFiles(modelId);
 
-            // Check for GGUF files
+            // Prefer GGUF when available (default runtime), otherwise select a compatible
+            // runtime.
             List<String> ggufFiles = files.stream()
                     .filter(f -> f.endsWith(".gguf"))
+                    .toList();
+            List<String> torchScriptFiles = files.stream()
+                    .filter(this::isTorchScriptCandidateFile)
+                    .toList();
+            List<String> djlCheckpointFiles = files.stream()
+                    .filter(this::isDjlCheckpointFile)
                     .toList();
 
             DownloadProgressListener listener = (bytesRead, totalBytes,
@@ -417,7 +440,7 @@ public class LocalGolekSdk implements GolekSdk {
                 Files.createDirectories(outputDir);
 
                 // Use modelId as filename (replacing / with _)
-                Path outputPath = outputDir.resolve(modelId.replace("/", "_"));
+                Path outputPath = outputDir.resolve(modelId.replace("/", "_") + ".gguf");
 
                 client.downloadFile(modelId, targetFile, outputPath, listener);
 
@@ -428,8 +451,74 @@ public class LocalGolekSdk implements GolekSdk {
                 // Register model in repository so it persists
                 registerDownloadedModel(modelId, outputPath);
 
+            } else if (!torchScriptFiles.isEmpty()) {
+                String targetFile = pickBestTorchScriptFile(torchScriptFiles);
+                log.info("Found LibTorch candidate file: {}, downloading...", targetFile);
+
+                Path outputBase = Paths.get(System.getProperty("user.home"), ".golek", "models", "torchscript");
+                Path outputPath = outputBase.resolve(modelId + fileExtension(targetFile));
+                if (outputPath.getParent() != null) {
+                    Files.createDirectories(outputPath.getParent());
+                }
+
+                client.downloadFile(modelId, targetFile, outputPath, listener);
+
+                System.out.println("\n✓ Model saved to: " + outputPath);
+                log.info("Model downloaded to: {}", outputPath);
+
+                registerDownloadedModel(modelId, outputPath, inferFormatFromFileName(targetFile));
+
+            } else if (!djlCheckpointFiles.isEmpty()) {
+                // Raw HF checkpoints (.bin/.safetensors/.pth) are not directly executable
+                // in our Java-only runtime path. Try GGUF fallback or conversion instead.
+                log.info("Found checkpoint files for {} but no GGUF/TorchScript artifacts", modelId);
+                if (preferPrebuiltGGUFFallback()) {
+                    boolean usedFallback = tryLikelyGGUFFallback(modelId, progressCallback);
+                    if (usedFallback) {
+                        return;
+                    }
+                }
+                if (!isGgufAutoConversionEnabled()) {
+                    throw new SdkException(
+                            "SDK_ERR_UNSUPPORTED_FORMAT",
+                            "Repository has checkpoint files only and auto-conversion is disabled. "
+                                    + "Enable conversion or use a GGUF/TorchScript model.");
+                }
+                if (!converterServiceInstance.isResolvable() || !converterServiceInstance.get().isAvailable()) {
+                    if (!modelId.toUpperCase().endsWith("-GGUF")) {
+                        attemptGGUFFallback(modelId, progressCallback);
+                        return;
+                    }
+                    throw new SdkException(
+                            "SDK_ERR_UNSUPPORTED_FORMAT",
+                            "Repository has PyTorch checkpoints only (.bin/.safetensors/.pth). "
+                                    + "Use a GGUF or TorchScript model for Java runtime.");
+                }
+
+                log.info("No GGUF/TorchScript file found for {}, downloading for conversion...", modelId);
+
+                Path tempDir = Paths.get(System.getProperty("java.io.tmpdir"), "golek-conversion",
+                        modelId.replace("/", "_"));
+                client.downloadRepository(modelId, tempDir, listener);
+
+                Path outputDir = Paths.get(System.getProperty("user.home"), ".golek", "models", "gguf");
+                Files.createDirectories(outputDir);
+                Path outputFile = outputDir.resolve(modelId.replace("/", "_") + ".gguf");
+
+                log.info("Converting model to {}", outputFile);
+                converterServiceInstance.get().convert(tempDir, outputFile, configuredConverterOutType());
+
+                System.out.println("\n✓ Model saved to: " + outputFile);
+                log.info("Model converted and saved to: {}", outputFile);
+
+                registerDownloadedModel(modelId, outputFile);
             } else {
                 // Scenario B: No GGUF, download and convert
+                if (!isGgufAutoConversionEnabled()) {
+                    throw new SdkException(
+                            "SDK_ERR_UNSUPPORTED_FORMAT",
+                            "No GGUF artifact found and auto-conversion is disabled for this model.");
+                }
                 if (!converterServiceInstance.isResolvable() || !converterServiceInstance.get().isAvailable()) {
                     // Try fallback if not already a GGUF variant
                     if (!modelId.toUpperCase().endsWith("-GGUF")) {
@@ -448,10 +537,10 @@ public class LocalGolekSdk implements GolekSdk {
 
                 Path outputDir = Paths.get(System.getProperty("user.home"), ".golek", "models", "gguf");
                 Files.createDirectories(outputDir);
-                Path outputFile = outputDir.resolve(modelId.replace("/", "_"));
+                Path outputFile = outputDir.resolve(modelId.replace("/", "_") + ".gguf");
 
                 log.info("Converting model to {}", outputFile);
-                converterServiceInstance.get().convert(tempDir, outputFile);
+                converterServiceInstance.get().convert(tempDir, outputFile, configuredConverterOutType());
 
                 System.out.println("\n✓ Model saved to: " + outputFile);
                 log.info("Model converted and saved to: {}", outputFile);
@@ -461,7 +550,23 @@ public class LocalGolekSdk implements GolekSdk {
             }
 
         } catch (Exception e) {
-            throw new SdkException("SDK_ERR_MODEL_PULL", "Failed to pull/convert model from HuggingFace", e);
+            String reason = rootCauseMessage(e);
+            String message = "Failed to pull/convert model from HuggingFace";
+            if (reason != null && !reason.isBlank()) {
+                message = message + ": " + reason;
+            }
+            if (isLikelyGatedHuggingFaceModel(reason)) {
+                if (hasHuggingFaceToken()) {
+                    message = message
+                            + " (Hugging Face token detected, but access is denied. "
+                            + "Accept access for this model with the same HF account as the token, "
+                            + "and ensure token scope includes Read permission.)";
+                } else {
+                    message = message
+                            + " (this repository is likely gated/private; set a valid HF token and ensure access is accepted)";
+                }
+            }
+            throw new SdkException("SDK_ERR_MODEL_PULL", message, e);
         }
     }
 
@@ -496,21 +601,32 @@ public class LocalGolekSdk implements GolekSdk {
     }
 
     private ProviderInfo toProviderInfo(LLMProvider provider) {
-        var healthStatus = provider.health()
+        var health = provider.health()
                 .await()
-                .atMost(Duration.ofSeconds(5))
-                .status();
+                .atMost(Duration.ofSeconds(5));
+        var healthStatus = health.status();
+        var metadata = provider.metadata();
+        String description = metadata != null ? metadata.getDescription() : null;
+        String vendor = metadata != null ? metadata.getVendor() : null;
+        var capabilities = provider.capabilities();
+        java.util.Map<String, Object> providerMetadata = new java.util.HashMap<>();
+        if (health.message() != null && !health.message().isBlank()) {
+            providerMetadata.put("healthMessage", health.message());
+        }
+        if (health.details() != null && !health.details().isEmpty()) {
+            providerMetadata.put("healthDetails", health.details());
+        }
 
         return ProviderInfo.builder()
                 .id(provider.id())
                 .name(provider.name())
                 .version(provider.version())
-                .description(provider.metadata().getDescription())
-                .vendor(provider.metadata().getVendor())
+                .description(description)
+                .vendor(vendor)
                 .healthStatus(healthStatus)
-                .capabilities(provider.capabilities())
+                .capabilities(capabilities)
                 .supportedModels(java.util.Set.of())
-                .metadata(java.util.Map.of())
+                .metadata(providerMetadata)
                 .build();
     }
 
@@ -544,7 +660,7 @@ public class LocalGolekSdk implements GolekSdk {
                 .modelId(manifest.modelId())
                 .name(manifest.name())
                 .version(manifest.version())
-                .tenantId(manifest.tenantId())
+                .apiKey(manifest.apiKey())
                 .format(format)
                 .sizeBytes(sizeBytes)
                 .createdAt(manifest.createdAt())
@@ -557,24 +673,31 @@ public class LocalGolekSdk implements GolekSdk {
      * Register a downloaded model in the repository so it persists across sessions
      */
     private void registerDownloadedModel(String modelId, Path filePath) {
+        registerDownloadedModel(modelId, filePath, tech.kayys.golek.spi.model.ModelFormat.GGUF);
+    }
+
+    private void registerDownloadedModel(String modelId, Path filePath, tech.kayys.golek.spi.model.ModelFormat format) {
         try {
-            long fileSize = Files.size(filePath);
+            long fileSize = Files.isDirectory(filePath) ? directorySize(filePath) : Files.size(filePath);
+            String mimeType = Files.isDirectory(filePath) ? "inode/directory" : "application/octet-stream";
 
             // Create artifact location
             ArtifactLocation artifactLocation = new ArtifactLocation(
                     filePath.toUri().toString(),
                     null, // checksum - optional for now
                     fileSize,
-                    "application/octet-stream");
+                    mimeType);
 
             // Create manifest with artifact
             ModelManifest manifest = ModelManifest.builder()
                     .modelId(modelId)
                     .name(modelId)
                     .version("1.0.0")
-                    .tenantId(DEFAULT_TENANT_ID)
-                    .artifacts(java.util.Map.of(tech.kayys.golek.spi.model.ModelFormat.GGUF, artifactLocation))
-                    .metadata(java.util.Map.of("source", "huggingface"))
+                    .requestId("local-" + modelId.replace("/", "_"))
+                    .path(filePath.toUri().toString())
+                    .apiKey(DEFAULT_TENANT_ID)
+                    .artifacts(java.util.Map.of(format, artifactLocation))
+                    .metadata(java.util.Map.of("source", "huggingface", "path", filePath.toString()))
                     .build();
 
             // Save to repository
@@ -584,6 +707,204 @@ public class LocalGolekSdk implements GolekSdk {
         } catch (Exception e) {
             log.warn("Failed to register model {} in repository: {}", modelId, e.getMessage());
             // Don't fail the download if registration fails
+        }
+    }
+
+    private boolean isTorchScriptCandidateFile(String fileName) {
+        String f = fileName.toLowerCase();
+        return f.endsWith(".pt") || f.endsWith(".pts") || f.endsWith(".jit") || f.endsWith(".ts");
+    }
+
+    private boolean isDjlCheckpointFile(String fileName) {
+        String f = fileName.toLowerCase();
+        return f.endsWith(".bin") || f.endsWith(".safetensors") || f.endsWith(".pth");
+    }
+
+    private String pickBestTorchScriptFile(List<String> candidates) {
+        return candidates.stream()
+                .filter(f -> f.endsWith(".pt") || f.endsWith(".jit") || f.endsWith(".ts") || f.endsWith(".pts"))
+                .findFirst()
+                .orElse(candidates.get(0));
+    }
+
+    private String pickBestDjlCheckpointFile(List<String> candidates) {
+        return candidates.stream()
+                .filter(f -> f.endsWith(".safetensors"))
+                .findFirst()
+                .orElseGet(() -> candidates.stream()
+                        .filter(f -> f.endsWith(".bin"))
+                        .findFirst()
+                        .orElse(candidates.get(0)));
+    }
+
+    private String fileExtension(String fileName) {
+        int idx = fileName.lastIndexOf('.');
+        return idx >= 0 ? fileName.substring(idx) : "";
+    }
+
+    private tech.kayys.golek.spi.model.ModelFormat inferFormatFromFileName(String fileName) {
+        String f = fileName.toLowerCase();
+        if (f.endsWith(".pt") || f.endsWith(".pts") || f.endsWith(".jit") || f.endsWith(".ts")) {
+            return tech.kayys.golek.spi.model.ModelFormat.TORCHSCRIPT;
+        }
+        if (f.endsWith(".safetensors")) {
+            return tech.kayys.golek.spi.model.ModelFormat.SAFETENSORS;
+        }
+        if (f.endsWith(".pth") || f.endsWith(".bin")) {
+            return tech.kayys.golek.spi.model.ModelFormat.PYTORCH;
+        }
+        return tech.kayys.golek.spi.model.ModelFormat.UNKNOWN;
+    }
+
+    private long directorySize(Path directory) {
+        try (var stream = Files.walk(directory)) {
+            return stream
+                    .filter(Files::isRegularFile)
+                    .mapToLong(p -> {
+                        try {
+                            return Files.size(p);
+                        } catch (Exception ignored) {
+                            return 0L;
+                        }
+                    })
+                    .sum();
+        } catch (Exception e) {
+            return 0L;
+        }
+    }
+
+    private Optional<Object> resolveBeanByClassName(String className) {
+        try {
+            Class<?> clazz = Class.forName(className);
+            var instance = CDI.current().select(clazz);
+            if (instance.isResolvable()) {
+                return Optional.ofNullable(instance.get());
+            }
+        } catch (ClassNotFoundException ignored) {
+            // Optional extension is not on classpath.
+        } catch (Exception e) {
+            log.warn("Failed to resolve optional bean {}", className, e);
+        }
+        return Optional.empty();
+    }
+
+    private Optional<String> stringGetter(Object target, String getterName) {
+        try {
+            Object value = target.getClass().getMethod(getterName).invoke(target);
+            return Optional.ofNullable(value != null ? String.valueOf(value) : null);
+        } catch (Exception ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<Long> longGetter(Object target, String getterName) {
+        try {
+            Object value = target.getClass().getMethod(getterName).invoke(target);
+            if (value instanceof Number n) {
+                return Optional.of(n.longValue());
+            }
+        } catch (Exception ignored) {
+            return Optional.empty();
+        }
+        return Optional.empty();
+    }
+
+    private String rootCauseMessage(Throwable throwable) {
+        Throwable current = throwable;
+        String message = null;
+        String type = null;
+        int guard = 0;
+        while (current != null && guard++ < 16) {
+            type = current.getClass().getSimpleName();
+            if (current.getMessage() != null && !current.getMessage().isBlank()) {
+                message = current.getMessage();
+            }
+            current = current.getCause();
+        }
+        if (message != null && !message.isBlank()) {
+            return message;
+        }
+        return type != null ? type : null;
+    }
+
+    private boolean isLikelyGatedHuggingFaceModel(String message) {
+        if (message == null) {
+            return false;
+        }
+        String lower = message.toLowerCase();
+        return lower.contains("401")
+                || lower.contains("403")
+                || lower.contains("unauthorized")
+                || lower.contains("forbidden")
+                || lower.contains("gated")
+                || lower.contains("access to model")
+                || lower.contains("access denied");
+    }
+
+    private boolean isLikelyMetaLlama(String modelId) {
+        return modelId != null && modelId.toLowerCase().startsWith("meta-llama/");
+    }
+
+    private boolean hasHuggingFaceToken() {
+        String propertyToken = System.getProperty("wayang.inference.repository.huggingface.token");
+        if (propertyToken != null && !propertyToken.isBlank()) {
+            return true;
+        }
+
+        String[] keys = {
+                "WAYANG_INFERENCE_REPOSITORY_HUGGINGFACE_TOKEN",
+                "HF_TOKEN",
+                "HUGGING_FACE_HUB_TOKEN"
+        };
+        for (String key : keys) {
+            String value = System.getenv(key);
+            if (value != null && !value.isBlank()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isGgufAutoConversionEnabled() {
+        String value = System.getProperty("golek.gguf.converter.auto");
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+        return Boolean.parseBoolean(value);
+    }
+
+    private String configuredConverterOutType() {
+        String outType = System.getProperty("golek.gguf.converter.outtype");
+        if (outType == null || outType.isBlank()) {
+            return null;
+        }
+        return outType.trim();
+    }
+
+    private boolean preferPrebuiltGGUFFallback() {
+        String value = System.getProperty("golek.gguf.prefer-prebuilt", "true");
+        return Boolean.parseBoolean(value);
+    }
+
+    private boolean tryLikelyGGUFFallback(String modelId, Consumer<PullProgress> progressCallback) {
+        String fallbackId = modelId + "-GGUF";
+        log.info("Checking likely prebuilt GGUF fallback: {}", fallbackId);
+        if (!hfClientInstance.isResolvable()) {
+            return false;
+        }
+        try {
+            HuggingFaceClient client = hfClientInstance.get();
+            List<String> files = client.listFiles(fallbackId);
+            boolean hasGGUF = files.stream().anyMatch(f -> f.endsWith(".gguf"));
+            if (!hasGGUF) {
+                return false;
+            }
+            log.info("Found GGUF fallback repository: {}", fallbackId);
+            pullFromHuggingFace(fallbackId, progressCallback);
+            return true;
+        } catch (Exception e) {
+            log.debug("GGUF fallback check failed for {}: {}", fallbackId, e.getMessage());
+            return false;
         }
     }
 }

@@ -12,7 +12,6 @@ import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.spi.inference.AsyncJobStatus;
 import tech.kayys.golek.engine.inference.InferenceOrchestrator;
-import tech.kayys.wayang.tenant.TenantContext;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -117,12 +116,12 @@ public class AsyncJobManager {
         enqueue(jobId, request, null);
     }
 
-    public void enqueue(String jobId, InferenceRequest request, String tenantId) {
-        String effectiveTenantId = resolveTenantId(tenantId);
+    public void enqueue(String jobId, InferenceRequest request, String requestId) {
+        String effectiveRequestId = resolveRequestId(requestId);
         AsyncJob job = new AsyncJob(
                 jobId,
                 request,
-                effectiveTenantId,
+                effectiveRequestId,
                 request.getPriority(),
                 Instant.now());
 
@@ -132,7 +131,7 @@ public class AsyncJobManager {
         AsyncJobStatus status = new AsyncJobStatus(
                 jobId,
                 request.getRequestId(),
-                effectiveTenantId,
+                effectiveRequestId,
                 "PENDING",
                 null,
                 null,
@@ -182,7 +181,7 @@ public class AsyncJobManager {
         AsyncJobStatus cancelledStatus = new AsyncJobStatus(
                 jobId,
                 status.requestId(),
-                status.tenantId(),
+                status.apiKey(),
                 "CANCELLED",
                 null,
                 "Job cancelled by user",
@@ -217,8 +216,7 @@ public class AsyncJobManager {
                 try {
                     // Execute inference via orchestrator directly
                     InferenceResponse response = orchestrator
-                            .execute(job.request.getModel(), job.request,
-                                    TenantContext.of(job.tenantId));
+                            .execute(job.request.getModel(), job.request);
 
                     // Store result
                     updateStatus(job.jobId, "COMPLETED", response, null);
@@ -240,8 +238,8 @@ public class AsyncJobManager {
         }
     }
 
-    private String resolveTenantId(String tenantId) {
-        return tenantId != null && !tenantId.trim().isEmpty() ? tenantId : "community";
+    private String resolveRequestId(String requestId) {
+        return requestId != null && !requestId.trim().isEmpty() ? requestId : "community";
     }
 
     /**
@@ -255,7 +253,7 @@ public class AsyncJobManager {
                 Map<String, String> jobData = new HashMap<>();
                 jobData.put("jobId", status.jobId());
                 jobData.put("requestId", status.requestId());
-                jobData.put("tenantId", status.tenantId());
+                jobData.put("apiKey", status.apiKey());
                 jobData.put("status", status.status());
                 jobData.put("submittedAt", status.submittedAt().toString());
 
@@ -300,7 +298,7 @@ public class AsyncJobManager {
         AsyncJobStatus newStatus = new AsyncJobStatus(
                 jobId,
                 currentStatus.requestId(),
-                currentStatus.tenantId(),
+                currentStatus.apiKey(),
                 status,
                 result,
                 error,
@@ -319,7 +317,7 @@ public class AsyncJobManager {
         return new AsyncJobStatus(
                 jobData.get("jobId"),
                 jobData.get("requestId"),
-                jobData.get("tenantId"),
+                jobData.get("requestId"),
                 jobData.get("status"),
                 null, // Result not stored in hash (too large)
                 jobData.get("error"),
@@ -375,7 +373,7 @@ public class AsyncJobManager {
     private record AsyncJob(
             String jobId,
             InferenceRequest request,
-            String tenantId,
+            String requestId,
             int priority,
             Instant submittedAt) {
     }

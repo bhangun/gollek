@@ -61,9 +61,9 @@ public class LocalModelRepository implements ModelRepository {
     }
 
     @Override
-    public Uni<ModelManifest> findById(String modelId, String tenantId) {
+    public Uni<ModelManifest> findById(String modelId, String path) {
         return Uni.createFrom().item(() -> {
-            Path manifestPath = getManifestPath(modelId, tenantId);
+            Path manifestPath = getManifestPath(modelId, path);
             if (!Files.exists(manifestPath)) {
                 return null;
             }
@@ -74,16 +74,16 @@ public class LocalModelRepository implements ModelRepository {
                 throw new InferenceException(ErrorCode.STORAGE_READ_FAILED,
                         "Failed to read manifest for model " + modelId, e)
                         .addContext("modelId", modelId)
-                        .addContext("tenantId", tenantId)
+                        .addContext("path", path)
                         .addContext("path", manifestPath.toString());
             }
         });
     }
 
     @Override
-    public Uni<List<ModelManifest>> list(String tenantId, Pageable pageable) {
+    public Uni<List<ModelManifest>> list(String path, Pageable pageable) {
         return Uni.createFrom().item(() -> {
-            Path tenantPath = rootPath.resolve(tenantId);
+            Path tenantPath = rootPath.resolve(path);
             if (!Files.exists(tenantPath)) {
                 return List.of();
             }
@@ -102,10 +102,10 @@ public class LocalModelRepository implements ModelRepository {
                             }
                         });
             } catch (IOException e) {
-                LOG.errorf(e, "Failed to list models for tenant %s", tenantId);
+                LOG.errorf(e, "Failed to list models for tenant %s", path);
                 throw new InferenceException(ErrorCode.STORAGE_READ_FAILED,
-                        "Failed to list models for tenant " + tenantId, e)
-                        .addContext("tenantId", tenantId)
+                        "Failed to list models for tenant " + path, e)
+                        .addContext("path", path)
                         .addContext("path", tenantPath.toString());
             }
 
@@ -119,7 +119,7 @@ public class LocalModelRepository implements ModelRepository {
     @Override
     public Uni<ModelManifest> save(ModelManifest manifest) {
         return Uni.createFrom().item(() -> {
-            Path modelDir = rootPath.resolve(manifest.tenantId()).resolve(manifest.modelId());
+            Path modelDir = rootPath.resolve(manifest.path()).resolve(manifest.modelId());
             ensureDirectory(modelDir);
 
             Path manifestPath = modelDir.resolve(MANIFEST_FILE);
@@ -132,7 +132,7 @@ public class LocalModelRepository implements ModelRepository {
                     throw new InferenceException(ErrorCode.STORAGE_WRITE_FAILED,
                             "Could not acquire lock for model " + manifest.modelId())
                             .addContext("modelId", manifest.modelId())
-                            .addContext("tenantId", manifest.tenantId())
+                            .addContext("path", manifest.path())
                             .addContext("path", lockPath.toString());
                 }
 
@@ -151,7 +151,7 @@ public class LocalModelRepository implements ModelRepository {
                 throw new InferenceException(ErrorCode.STORAGE_WRITE_FAILED,
                         "Failed to save model manifest", e)
                         .addContext("modelId", manifest.modelId())
-                        .addContext("tenantId", manifest.tenantId())
+                        .addContext("path", manifest.path())
                         .addContext("path", manifestPath.toString());
             }
         });
@@ -185,9 +185,9 @@ public class LocalModelRepository implements ModelRepository {
     }
 
     @Override
-    public Uni<Void> delete(String modelId, String tenantId) {
+    public Uni<Void> delete(String modelId, String path) {
         return Uni.createFrom().item(() -> {
-            Path modelDir = rootPath.resolve(tenantId).resolve(modelId);
+            Path modelDir = rootPath.resolve(path).resolve(modelId);
             if (Files.exists(modelDir)) {
                 try (Stream<Path> files = Files.walk(modelDir)) {
                     files.sorted((a, b) -> b.compareTo(a)) // Delete files before directories
@@ -203,7 +203,7 @@ public class LocalModelRepository implements ModelRepository {
                     throw new InferenceException(ErrorCode.STORAGE_WRITE_FAILED,
                             "Failed to delete model", e)
                             .addContext("modelId", modelId)
-                            .addContext("tenantId", tenantId)
+                            .addContext("path", path)
                             .addContext("path", modelDir.toString());
                 }
             }
@@ -233,7 +233,7 @@ public class LocalModelRepository implements ModelRepository {
 
     @Override
     public Path downloadArtifact(ModelManifest manifest, ModelFormat format) {
-        Path modelDir = rootPath.resolve(manifest.tenantId()).resolve(manifest.modelId());
+        Path modelDir = rootPath.resolve(manifest.path()).resolve(manifest.modelId());
         Path artifactPath = modelDir.resolve(format.toString().toLowerCase());
         if (Files.exists(artifactPath)) {
             return artifactPath;
@@ -274,8 +274,8 @@ public class LocalModelRepository implements ModelRepository {
         }
     }
 
-    private Path getManifestPath(String modelId, String tenantId) {
-        return rootPath.resolve(tenantId).resolve(modelId).resolve(MANIFEST_FILE);
+    private Path getManifestPath(String modelId, String path) {
+        return rootPath.resolve(path).resolve(modelId).resolve(MANIFEST_FILE);
     }
 
     private void ensureDirectory(Path path) {

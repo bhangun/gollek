@@ -8,7 +8,7 @@ import java.util.Set;
 import tech.kayys.golek.spi.auth.ApiKeyConstants;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.routing.SelectionStrategy;
-import tech.kayys.wayang.tenant.TenantContext;
+import tech.kayys.golek.spi.context.RequestContext;
 
 /**
  * Context for routing decisions.
@@ -16,7 +16,7 @@ import tech.kayys.wayang.tenant.TenantContext;
  */
 public record RoutingContext(
         InferenceRequest request,
-        TenantContext tenantContext,
+        RequestContext requestContext,
         Optional<String> preferredProvider,
         Optional<String> deviceHint,
         Duration timeout,
@@ -40,7 +40,7 @@ public record RoutingContext(
      */
     public static RoutingContext simple(
             InferenceRequest request,
-            TenantContext tenant) {
+            RequestContext tenant) {
         return new RoutingContext(
                 request,
                 tenant,
@@ -59,7 +59,7 @@ public record RoutingContext(
      */
     public static RoutingContext withProvider(
             InferenceRequest request,
-            TenantContext tenant,
+            RequestContext tenant,
             String providerId) {
         return new RoutingContext(
                 request,
@@ -81,7 +81,7 @@ public record RoutingContext(
         Set<String> newExcluded = new java.util.HashSet<>(excludedProviders);
         newExcluded.add(providerId);
         return new RoutingContext(
-                request, tenantContext, preferredProvider, deviceHint,
+                request, requestContext, preferredProvider, deviceHint,
                 timeout, costSensitive, priority, strategyOverride,
                 poolId, newExcluded);
     }
@@ -101,10 +101,10 @@ public record RoutingContext(
     }
 
     public String apiKey() {
-        if (tenantContext == null || tenantContext.getTenantId() == null) {
+        if (requestContext == null || requestContext.apiKey() == null) {
             return ApiKeyConstants.COMMUNITY_API_KEY;
         }
-        return tenantContext.getTenantId().value();
+        return requestContext.apiKey();
     }
 
     /**
@@ -116,7 +116,7 @@ public record RoutingContext(
 
     public static class Builder {
         private InferenceRequest request;
-        private TenantContext tenantContext;
+        private RequestContext requestContext;
         private Optional<String> preferredProvider = Optional.empty();
         private Optional<String> deviceHint = Optional.empty();
         private Duration timeout = Duration.ofSeconds(30);
@@ -131,8 +131,8 @@ public record RoutingContext(
             return this;
         }
 
-        public Builder tenantContext(TenantContext ctx) {
-            this.tenantContext = ctx;
+        public Builder requestContext(RequestContext ctx) {
+            this.requestContext = ctx;
             return this;
         }
 
@@ -178,7 +178,7 @@ public record RoutingContext(
 
         public RoutingContext build() {
             return new RoutingContext(
-                    request, tenantContext, preferredProvider, deviceHint,
+                    request, requestContext, preferredProvider, deviceHint,
                     timeout, costSensitive, priority, strategyOverride,
                     poolId, excludedProviders);
         }

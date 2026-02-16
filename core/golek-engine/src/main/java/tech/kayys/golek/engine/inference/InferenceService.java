@@ -18,12 +18,10 @@ import tech.kayys.golek.spi.inference.StreamingSession;
 import tech.kayys.golek.spi.inference.ValidationContext;
 import tech.kayys.golek.engine.model.Model;
 import tech.kayys.golek.engine.model.ModelRegistryService;
-
-import tech.kayys.wayang.tenant.TenantContext;
+import tech.kayys.golek.spi.context.RequestContext;
 import tech.kayys.golek.spi.error.ErrorCode;
 import tech.kayys.golek.engine.service.AsyncJobManager;
-import tech.kayys.wayang.tenant.QuotaEnforcer;
-import tech.kayys.wayang.tenant.Tenant;
+import tech.kayys.golek.engine.security.EngineQuotaEnforcer;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.faulttolerance.Bulkhead;
@@ -48,7 +46,7 @@ public class InferenceService {
     InferenceOrchestrator orchestrator;
 
     @Inject
-    QuotaEnforcer quotaEnforcer;
+    EngineQuotaEnforcer quotaEnforcer;
 
     @Inject
     InferenceMetrics metrics;
@@ -75,49 +73,49 @@ public class InferenceService {
         return inferAsync(request, null);
     }
 
-    public Uni<InferenceResponse> inferAsync(InferenceRequest request, TenantContext tenantContext) {
-        String requestId = request.getRequestId();
-        String tenantId = resolveTenantId(tenantContext);
+    public Uni<InferenceResponse> inferAsync(InferenceRequest request, RequestContext requestContext) {
+        RequestContext effectiveContext = resolveContext(requestContext, request.getRequestId());
+        String tenantId = effectiveContext.getRequestId();
 
-        log.info("Processing inference request: requestId={}, tenantId={}, model={}",
-                requestId, tenantId, request.getModel());
+        log.info("Processing inference request: tenantId={}, model={}",
+                tenantId, request.getModel());
 
         if (!multitenancyEnabled) {
             return orchestrator
-                    .executeAsync(request.getModel(), request, TenantContext.of(tenantId))
+                    .executeAsync(request.getModel(), request)
                     .onItem().invoke(response -> {
                         metrics.recordSuccess(tenantId, request.getModel(), "unified",
                                 response.getDurationMs());
-                        log.info("Inference completed: requestId={}, durationMs={}, model={}",
-                                requestId, response.getDurationMs(), response.getModel());
+                        log.info("Inference completed: tenantId={}, durationMs={}, model={}",
+                                tenantId, response.getDurationMs(), response.getModel());
                     })
                     .onFailure().invoke(failure -> {
                         metrics.recordFailure(tenantId, request.getModel(),
                                 failure.getClass().getSimpleName());
-                        log.error("Inference failed: requestId={}", requestId, failure);
+                        log.error("Inference failed: tenantId={}", tenantId, failure);
                     });
         }
 
-        return validateTenant(tenantId)
-                .chain(tenant -> validateModel(tenantId, request.getModel())
+        return validateTenant(tenantId, request.getRequestId())
+                .chain(tenant -> validateModel(tenant.tenantId, request.getModel())
                         .map(model -> new ValidationContext(tenant.tenantId, model.modelId)))
                 .chain((ValidationContext ctx) -> enforceQuota(tenantId, request)
-                        .chain(() -> createAuditRecord(request, null, null,
+                        .chain(() -> createAuditRecord(request, null,
                                 InferenceRequestEntity.RequestStatus.PROCESSING))
                         .chain(auditRecord -> orchestrator
-                                .executeAsync(request.getModel(), request, TenantContext.of(tenantId))
+                                .executeAsync(request.getModel(), request)
                                 .onItem().call(response -> updateAuditRecord(auditRecord, response, null))
                                 .onItem().invoke(response -> {
                                     metrics.recordSuccess(tenantId, request.getModel(), "unified",
                                             response.getDurationMs());
-                                    log.info("Inference completed: requestId={}, durationMs={}, model={}",
-                                            requestId, response.getDurationMs(), response.getModel());
+                                    log.info("Inference completed: tenantId={}, durationMs={}, model={}",
+                                            tenantId, response.getDurationMs(), response.getModel());
                                 })
                                 .onFailure().call(failure -> updateAuditRecord(auditRecord, null, failure))
                                 .onFailure().invoke(failure -> {
                                     metrics.recordFailure(tenantId, request.getModel(),
                                             failure.getClass().getSimpleName());
-                                    log.error("Inference failed: requestId={}", requestId, failure);
+                                    log.error("Inference failed: tenantId={}", tenantId, failure);
                                 })));
     }
 
@@ -128,9 +126,10 @@ public class InferenceService {
         return submitAsyncJob(request, null);
     }
 
-    public Uni<String> submitAsyncJob(InferenceRequest request, TenantContext tenantContext) {
+    public Uni<String> submitAsyncJob(InferenceRequest request, RequestContext requestContext) {
         String jobId = UUID.randomUUID().toString();
-        String tId = resolveTenantId(tenantContext);
+        RequestContext effectiveContext = resolveContext(requestContext, request.getRequestId());
+        String tId = effectiveContext.getRequestId();
 
         log.info("Submitting async job: jobId={}, requestId={}, model={}",
                 jobId, request.getRequestId(), request.getModel());
@@ -140,7 +139,7 @@ public class InferenceService {
             return Uni.createFrom().item(jobId);
         }
 
-        return validateTenant(tId)
+        return validateTenant(tId, request.getRequestId())
                 .chain(tenant -> enforceQuota(tId, request).replaceWith(tenant))
                 .map(tenant -> {
                     asyncJobManager.enqueue(jobId, request, tId);
@@ -151,7 +150,7 @@ public class InferenceService {
     /**
      * Get status of async inference job.
      */
-    public Uni<AsyncJobStatus> getJobStatus(String jobId, String tenantId) {
+    public Uni<AsyncJobStatus> getJobStatus(String jobId, String requestId) {
         AsyncJobStatus status = asyncJobManager.getStatus(jobId);
         if (status == null) {
             return Uni.createFrom().failure(new InferenceException(ErrorCode.INTERNAL_ERROR, "Job not found: " + jobId)
@@ -162,7 +161,7 @@ public class InferenceService {
             return Uni.createFrom().item(status);
         }
 
-        if (!status.tenantId().equals(tenantId)) {
+        if (!status.requestId().equals(requestId)) {
             return Uni.createFrom().failure(
                     new InferenceException(ErrorCode.AUTH_PERMISSION_DENIED, "Access denied to job: " + jobId));
         }
@@ -177,101 +176,33 @@ public class InferenceService {
         return inferStream(request, null);
     }
 
-    public Multi<StreamingInferenceChunk> inferStream(InferenceRequest request, TenantContext tenantContext) {
-        String requestId = request.getRequestId();
-        String tId = resolveTenantId(tenantContext);
+    public Multi<StreamingInferenceChunk> inferStream(InferenceRequest request, RequestContext requestContext) {
+        RequestContext effectiveContext = resolveContext(requestContext, request.getRequestId());
+        String tenantId = effectiveContext.getRequestId();
 
         return Multi.createFrom().emitter(emitter -> {
-            if (!multitenancyEnabled) {
+            if (multitenancyEnabled) {
+                validateTenant(tenantId, request.getRequestId())
+                        .chain(tenant -> enforceQuota(tenantId, request).replaceWith(tenant))
+                        .subscribe().with(
+                                tenant -> startStream(request, tenantId, effectiveContext, emitter),
+                                failure -> emitter.fail(mapToInferenceException(failure)));
+            } else {
                 try {
-                    StreamingSession session = new StreamingSession(requestId, request.getModel(), "community",
-                            Multi.createFrom().empty());
-                    streamingSessions.put(requestId, session);
-
-                    java.util.concurrent.atomic.AtomicInteger sequenceNumber = new java.util.concurrent.atomic.AtomicInteger(
-                            0);
-                    long startTime = System.currentTimeMillis();
-
-                    orchestrator
-                            .streamExecute(request.getModel(), request, TenantContext.of(tId))
-                            .subscribe().with(
-                                    chunk -> {
-                                        sequenceNumber.getAndIncrement();
-                                        emitter.emit(new StreamingInferenceChunk(
-                                                requestId,
-                                                sequenceNumber.get(),
-                                                chunk.getDelta(),
-                                                chunk.isFinal(),
-                                                System.currentTimeMillis() - startTime));
-                                    },
-                                    failure -> {
-                                        log.error("Streaming inference failed: requestId={}", requestId,
-                                                failure);
-                                        emitter.fail(mapToInferenceException(failure));
-                                        streamingSessions.remove(requestId);
-                                    },
-                                    () -> {
-                                        emitter.complete();
-                                        streamingSessions.remove(requestId);
-                                    });
+                    startStream(request, tenantId, effectiveContext, emitter);
                 } catch (Exception e) {
                     emitter.fail(mapToInferenceException(e));
                 }
-                return;
             }
-
-            validateTenant(tId)
-                    .chain(tenant -> validateModel(tId, request.getModel())
-                            .map(model -> new ValidationContext(tenant.tenantId, model.modelId)))
-                    .chain(ctx -> enforceQuota(tId, request).replaceWith(ctx))
-                    .subscribe().with(
-                            (ValidationContext ctx) -> {
-                                try {
-                                    StreamingSession session = new StreamingSession(requestId, request.getModel(), tId,
-                                            Multi.createFrom().empty());
-                                    streamingSessions.put(requestId, session);
-
-                                    java.util.concurrent.atomic.AtomicInteger sequenceNumber = new java.util.concurrent.atomic.AtomicInteger(
-                                            0);
-                                    long startTime = System.currentTimeMillis();
-
-                                    orchestrator
-                                            .streamExecute(request.getModel(), request,
-                                                    tech.kayys.wayang.tenant.TenantContext.of(tId))
-                                            .subscribe().with(
-                                                    chunk -> {
-                                                        sequenceNumber.getAndIncrement();
-                                                        emitter.emit(new StreamingInferenceChunk(
-                                                                requestId,
-                                                                sequenceNumber.get(),
-                                                                chunk.getDelta(),
-                                                                chunk.isFinal(),
-                                                                System.currentTimeMillis() - startTime));
-                                                    },
-                                                    failure -> {
-                                                        log.error("Streaming inference failed: requestId={}", requestId,
-                                                                failure);
-                                                        emitter.fail(mapToInferenceException(failure));
-                                                        streamingSessions.remove(requestId);
-                                                    },
-                                                    () -> {
-                                                        emitter.complete();
-                                                        streamingSessions.remove(requestId);
-                                                    });
-                                } catch (Exception e) {
-                                    emitter.fail(mapToInferenceException(e));
-                                }
-                            },
-                            failure -> emitter.fail(mapToInferenceException(failure)));
         });
     }
 
     /**
      * Batch inference - process multiple requests.
      */
-    public Uni<List<InferenceResponse>> batchInfer(BatchInferenceRequest batchRequest, String tenantId) {
-        String tId = resolveTenantId(tenantId);
-        log.info("Processing batch inference: size={}, tenantId={}", batchRequest.getRequests().size(), tId);
+    public Uni<List<InferenceResponse>> batchInfer(BatchInferenceRequest batchRequest) {
+
+        log.info("Processing batch inference: size={}, requestId={}", batchRequest.getRequests().size());
 
         return Multi.createFrom().items(batchRequest.getRequests().stream())
                 .onItem().transformToUniAndConcatenate(request -> inferAsync(request)
@@ -285,56 +216,19 @@ public class InferenceService {
 
     // ===== Helper Methods =====
 
-    private Uni<Tenant> validateTenant(String tenantId) {
-        return Tenant.findByTenantId(tenantId)
-                .onItem().ifNull()
-                .failWith(
-                        () -> new InferenceException(ErrorCode.AUTH_TENANT_NOT_FOUND, "Tenant not found: " + tenantId))
-                .invoke(tenant -> {
-                    if (tenant.status != Tenant.TenantStatus.ACTIVE) {
-                        throw new InferenceException("Tenant is not active: " + tenantId);
-                    }
-                });
-    }
-
-    private Uni<Void> enforceQuota(String tenantId, InferenceRequest request) {
-        // Resolve UUID from tenantId if possible, or just use a fixed one for now if
-        // tenantId is "community"
-        UUID tenantUuid = UUID.nameUUIDFromBytes(tenantId.getBytes());
-        return quotaEnforcer.checkAndIncrementQuota(tenantUuid, "inference", 1L)
-                .onItem().invoke(allowed -> {
-                    if (!allowed) {
-                        throw new InferenceException("Quota exceeded for tenant: " + tenantId);
-                    }
-                })
-                .replaceWithVoid();
-    }
-
-    private Uni<Model> validateModel(String tenantId, String modelId) {
+    private Uni<Model> validateModel(String requestId, String modelId) {
         String modelName = modelId.split(":")[0];
-        return Model.findByTenantAndModelId(tenantId, modelName)
+        return Model.findByTenantAndModelId(requestId, modelName)
                 .onItem().ifNull()
                 .failWith(() -> new InferenceException(ErrorCode.MODEL_NOT_FOUND, "Model not found: " + modelId));
     }
 
-    private String resolveTenantId(TenantContext tenantContext) {
-        if (tenantContext == null || tenantContext.getTenantId() == null) {
-            return "community";
-        }
-        String tenantId = tenantContext.getTenantId().value();
-        return (tenantId == null || tenantId.trim().isEmpty()) ? "community" : tenantId;
-    }
-
-    private String resolveTenantId(String tenantId) {
-        return (tenantId == null || tenantId.trim().isEmpty()) ? "community" : tenantId;
-    }
-
     @Transactional
-    public Uni<InferenceRequestEntity> createAuditRecord(InferenceRequest request, Tenant tenant, Model model,
+    public Uni<InferenceRequestEntity> createAuditRecord(InferenceRequest request, Model model,
             InferenceRequestEntity.RequestStatus status) {
         InferenceRequestEntity entity = InferenceRequestEntity.builder()
                 .requestId(request.getRequestId())
-                .tenant(tenant)
+
                 .model(model)
                 .status(status)
                 .inputSizeBytes(calculateInputSize(request))
@@ -367,10 +261,132 @@ public class InferenceService {
                 .sum();
     }
 
+    private void startStream(
+            InferenceRequest request,
+            String requestId,
+            RequestContext effectiveContext,
+            io.smallrye.mutiny.subscription.MultiEmitter<? super StreamingInferenceChunk> emitter) {
+        StreamingSession session = new StreamingSession(
+                requestId,
+                request.getModel(),
+                effectiveContext.getRequestId(),
+                Multi.createFrom().empty());
+        streamingSessions.put(requestId, session);
+
+        java.util.concurrent.atomic.AtomicInteger sequenceNumber = new java.util.concurrent.atomic.AtomicInteger(0);
+        long startTime = System.currentTimeMillis();
+
+        orchestrator
+                .streamExecute(request.getModel(), request)
+                .subscribe().with(
+                        chunk -> {
+                            sequenceNumber.getAndIncrement();
+                            emitter.emit(new StreamingInferenceChunk(
+                                    requestId,
+                                    sequenceNumber.get(),
+                                    chunk.getDelta(),
+                                    chunk.isFinal(),
+                                    System.currentTimeMillis() - startTime));
+                        },
+                        failure -> {
+                            if (isStreamingUnsupported(failure)) {
+                                log.info(
+                                        "Provider does not support streaming, falling back to single-response mode: requestId={}",
+                                        requestId);
+                                orchestrator.executeAsync(request.getModel(), request)
+                                        .subscribe().with(
+                                                response -> {
+                                                    int sequence = sequenceNumber.incrementAndGet();
+                                                    emitter.emit(new StreamingInferenceChunk(
+                                                            requestId,
+                                                            sequence,
+                                                            response.getContent(),
+                                                            true,
+                                                            System.currentTimeMillis() - startTime));
+                                                    emitter.complete();
+                                                    streamingSessions.remove(requestId);
+                                                },
+                                                fallbackFailure -> {
+                                                    log.error("Fallback inference failed: requestId={}", requestId,
+                                                            fallbackFailure);
+                                                    emitter.fail(mapToInferenceException(fallbackFailure));
+                                                    streamingSessions.remove(requestId);
+                                                });
+                                return;
+                            }
+
+                            log.error("Streaming inference failed: requestId={}", requestId, failure);
+                            emitter.fail(mapToInferenceException(failure));
+                            streamingSessions.remove(requestId);
+                        },
+                        () -> {
+                            emitter.complete();
+                            streamingSessions.remove(requestId);
+                        });
+    }
+
+    private RequestContext resolveContext(RequestContext requestContext, String requestId) {
+        if (requestContext != null) {
+            return requestContext;
+        }
+        return RequestContext.of(requestId);
+    }
+
+    private Uni<TenantValidation> validateTenant(String tenantId, String requestId) {
+        String effectiveTenant = (tenantId == null || tenantId.isBlank())
+                ? RequestContext.COMMUNITY_TENANT_ID
+                : tenantId.trim();
+        String effectiveRequestId = (requestId == null || requestId.isBlank())
+                ? UUID.randomUUID().toString()
+                : requestId;
+        return Uni.createFrom().item(new TenantValidation(effectiveTenant, effectiveRequestId));
+    }
+
+    private Uni<Void> enforceQuota(String requestId, InferenceRequest request) {
+        return quotaEnforcer
+                .checkAndIncrementQuota(parseTenantUuid(requestId), "requests", 1)
+                .onItem().transformToUni(allowed -> {
+                    if (Boolean.TRUE.equals(allowed)) {
+                        return Uni.createFrom().voidItem();
+                    }
+                    return Uni.createFrom().failure(new InferenceException(
+                            ErrorCode.AUTH_PERMISSION_DENIED,
+                            "Tenant quota exceeded: " + requestId));
+                });
+    }
+
+    private UUID parseTenantUuid(String requestId) {
+        if (requestId == null || requestId.isBlank()) {
+            return UUID.nameUUIDFromBytes(RequestContext.COMMUNITY_TENANT_ID.getBytes());
+        }
+        try {
+            return UUID.fromString(requestId);
+        } catch (IllegalArgumentException e) {
+            return UUID.nameUUIDFromBytes(requestId.getBytes());
+        }
+    }
+
+    private record TenantValidation(String tenantId, String requestId) {
+    }
+
     private InferenceException mapToInferenceException(Throwable t) {
         if (t instanceof InferenceException ie)
             return ie;
         return new InferenceException("Internal error: " + t.getMessage(), t);
+    }
+
+    private boolean isStreamingUnsupported(Throwable t) {
+        if (t == null) {
+            return false;
+        }
+        if (t instanceof UnsupportedOperationException) {
+            return true;
+        }
+        String message = t.getMessage();
+        if (message != null && message.toLowerCase().contains("does not support streaming")) {
+            return true;
+        }
+        return isStreamingUnsupported(t.getCause());
     }
 
 }

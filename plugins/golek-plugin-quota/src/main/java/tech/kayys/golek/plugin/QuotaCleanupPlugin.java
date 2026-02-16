@@ -6,7 +6,7 @@ import tech.kayys.golek.spi.plugin.PluginContext;
 import tech.kayys.golek.spi.context.EngineContext;
 import tech.kayys.golek.core.execution.ExecutionContext;
 import tech.kayys.golek.spi.inference.InferencePhase;
-import tech.kayys.wayang.tenant.TenantId;
+import tech.kayys.wayang.tenant.RequestId;
 import tech.kayys.golek.core.plugin.GolekConfigurablePlugin;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -58,20 +58,20 @@ public class QuotaCleanupPlugin implements InferencePhasePlugin {
 
         if (Boolean.TRUE.equals(quotaReserved)) {
             // Retrieve the tenant ID and quota ID that were stored during reservation
-            Optional<String> tenantIdOpt = context.getVariable("reservedTenantId", String.class);
+            Optional<String> requestIdOpt = context.getVariable("reservedRequestId", String.class);
 
-            if (tenantIdOpt.isPresent()) {
+            if (requestIdOpt.isPresent()) {
                 try {
-                    TenantId tenantId = TenantId.of(tenantIdOpt.get());
+                    RequestId requestId = RequestId.of(requestIdOpt.get());
 
                     // Release the quota that was reserved for this request
-                    quotaService.release(tenantId, 1);
+                    quotaService.release(requestId, 1);
 
                     // Clean up the variables we stored
                     // Using null to effectively remove if removeVariable is not available
                     context.putVariable("quotaReserved", null);
                     context.putVariable("reservedQuotaId", null);
-                    context.putVariable("reservedTenantId", null);
+                    context.putVariable("reservedRequestId", null);
                 } catch (Exception e) {
                     // Log the error but don't fail the request
                     // Releasing quota is important but shouldn't break the pipeline

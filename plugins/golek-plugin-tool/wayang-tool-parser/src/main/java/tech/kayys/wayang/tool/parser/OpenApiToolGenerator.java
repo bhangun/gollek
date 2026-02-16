@@ -83,7 +83,7 @@ public class OpenApiToolGenerator {
      */
     public Uni<ToolGenerationResult> generateTools(GenerateToolsRequest request) {
         LOG.info("Generating tools from OpenAPI source: {} (tenant: {})",
-                request.namespace(), request.tenantId());
+                request.namespace(), request.requestId());
 
         return Panache.withTransaction(() ->
         // Parse OpenAPI spec
@@ -124,7 +124,7 @@ public class OpenApiToolGenerator {
         return Uni.createFrom().item(() -> {
             OpenApiSource source = new OpenApiSource();
             source.setSourceId(UUID.randomUUID());
-            source.setTenantId(request.tenantId());
+            source.setRequestId(request.requestId());
             source.setNamespace(request.namespace());
             source.setDisplayName(parseResult.openApi().getInfo().getTitle());
             source.setSourceType(request.sourceType());
@@ -227,7 +227,7 @@ public class OpenApiToolGenerator {
                 : generateOperationId(httpMethod, path);
 
         tool.setToolId(request.namespace() + "." + operationId);
-        tool.setTenantId(request.tenantId());
+        tool.setRequestId(request.requestId());
         tool.setNamespace(request.namespace());
         tool.setName(operationId);
         tool.setOperationId(operationId);

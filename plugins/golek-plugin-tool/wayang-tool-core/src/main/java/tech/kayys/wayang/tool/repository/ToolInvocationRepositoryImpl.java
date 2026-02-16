@@ -17,8 +17,8 @@ public class ToolInvocationRepositoryImpl implements PanacheRepository<ToolInvoc
     }
 
     @Override
-    public Uni<List<ToolInvocation>> findByTenantId(String tenantId) {
-        return list("tenantId", tenantId);
+    public Uni<List<ToolInvocation>> findByRequestId(String requestId) {
+        return list("requestId", requestId);
     }
 
     @Override
@@ -27,8 +27,8 @@ public class ToolInvocationRepositoryImpl implements PanacheRepository<ToolInvoc
     }
 
     @Override
-    public Uni<List<ToolInvocation>> findByTenantIdAndToolId(String tenantId, String toolId) {
-        return list("tenantId = ?1 AND toolId = ?2", tenantId, toolId);
+    public Uni<List<ToolInvocation>> findByRequestIdAndToolId(String requestId, String toolId) {
+        return list("requestId = ?1 AND toolId = ?2", requestId, toolId);
     }
 
     @Override
@@ -62,7 +62,7 @@ public class ToolInvocationRepositoryImpl implements PanacheRepository<ToolInvoc
     }
 
     @Override
-    public Uni<Long> countByTenantId(String tenantId) {
-        return count("tenantId", tenantId);
+    public Uni<Long> countByRequestId(String requestId) {
+        return count("requestId", requestId);
     }
 }

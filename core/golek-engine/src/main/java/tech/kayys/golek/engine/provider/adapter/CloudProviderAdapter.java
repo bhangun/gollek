@@ -2,9 +2,9 @@ package tech.kayys.golek.engine.provider.adapter;
 
 import io.smallrye.mutiny.Uni;
 import tech.kayys.golek.spi.provider.ProviderHealth;
+import tech.kayys.golek.spi.context.RequestContext;
 import tech.kayys.golek.spi.provider.ProviderCapabilities;
 import tech.kayys.golek.provider.core.ratelimit.RateLimiter;
-import tech.kayys.wayang.tenant.TenantContext;
 import tech.kayys.golek.engine.ratelimit.SlidingWindowRateLimiter;
 
 import java.time.Duration;
@@ -49,9 +49,9 @@ public abstract class CloudProviderAdapter extends AbstractProvider {
     }
 
     @Override
-    protected Uni<Void> doInitialize(Map<String, Object> config, TenantContext tenant) {
+    protected Uni<Void> doInitialize(Map<String, Object> config) {
         return Uni.createFrom().item(() -> {
-            TenantContext effectiveTenant = tenant != null ? tenant : TenantContext.of("community");
+            RequestContext effectiveTenant = RequestContext.of("init");
             this.apiKey = extractApiKey(config, effectiveTenant);
             this.baseUrl = getConfigValue("base-url", getDefaultBaseUrl());
             this.requestTimeout = Duration.parse(
@@ -101,12 +101,12 @@ public abstract class CloudProviderAdapter extends AbstractProvider {
     }
 
     @Override
-    protected RateLimiter createRateLimiter(String tenantId) {
+    protected RateLimiter createRateLimiter(String requestId) {
         // Cloud providers typically have stricter rate limits
         int requestsPerMinute = getConfigValue("rate-limit.requests-per-minute", 60);
 
         log.debugf("Creating sliding window rate limiter for tenant %s: %d req/min",
-                tenantId, requestsPerMinute);
+                requestId, requestsPerMinute);
 
         return new SlidingWindowRateLimiter(requestsPerMinute, Duration.ofMinutes(1));
     }
@@ -114,7 +114,7 @@ public abstract class CloudProviderAdapter extends AbstractProvider {
     /**
      * Extract API key from config or tenant context
      */
-    protected String extractApiKey(Map<String, Object> config, TenantContext tenant) {
+    protected String extractApiKey(Map<String, Object> config, RequestContext context) {
         // Try config first
         String key = (String) config.get("api-key");
 
@@ -126,7 +126,7 @@ public abstract class CloudProviderAdapter extends AbstractProvider {
 
         // Try tenant-specific key
         if (key == null || key.isBlank()) {
-            key = tenant.getAttribute("api-key-" + id()).orElse(null);
+            key = context.getApiKey();
         }
 
         return key;

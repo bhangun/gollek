@@ -57,14 +57,14 @@ public class ModelRouterPlugin implements InferencePhasePlugin {
                 throw new PluginException("Model ID is required for routing");
             }
 
-            // Get tenant context - TenantId is a record with value()
-            String tenantId = context.tenantContext().getTenantId().value();
+            // Get tenant context - RequestId is a record with value()
+            String requestId = context.requestContext().getRequestId().value();
 
             // Extract additional context for routing decisions
             Map<String, Object> requestContext = extractRequestContext(context);
 
             // Select best provider for this model and tenant
-            String selectedProviderId = routerService.selectProvider(modelId, tenantId, requestContext);
+            String selectedProviderId = routerService.selectProvider(modelId, requestId, requestContext);
 
             if (selectedProviderId == null) {
                 throw new PluginException("No suitable provider found for model: " + modelId);
@@ -74,7 +74,7 @@ public class ModelRouterPlugin implements InferencePhasePlugin {
             context.putVariable("selectedProviderId", selectedProviderId);
 
             // Create detailed routing decision object
-            RoutingDecision routingDecision = routerService.getRoutingDecision(modelId, tenantId, requestContext);
+            RoutingDecision routingDecision = routerService.getRoutingDecision(modelId, requestId, requestContext);
             context.putVariable("routingDecision", routingDecision);
 
             // Add audit information

@@ -12,7 +12,7 @@ public interface ModelStorageService {
      * 
      * @return URI of the stored model
      */
-    Uni<String> uploadModel(String tenantId, String modelId, String version, byte[] data);
+    Uni<String> uploadModel(String apiKey, String modelId, String version, byte[] data);
 
     /**
      * API-key-first alias for {@link #uploadModel(String, String, String, byte[])}.

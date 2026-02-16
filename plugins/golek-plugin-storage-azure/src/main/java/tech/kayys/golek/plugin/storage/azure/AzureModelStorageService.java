@@ -30,13 +30,13 @@ public class AzureModelStorageService implements ModelStorageService {
     }
 
     @Override
-    public Uni<String> uploadModel(String tenantId, String modelId, String version, byte[] data) {
+    public Uni<String> uploadModel(String requestId, String modelId, String version, byte[] data) {
         return Uni.createFrom().item(() -> {
             try {
-                String blobName = String.format("%s%s/%s/%s", pathPrefix, tenantId, modelId, version);
-                
+                String blobName = String.format("%s%s/%s/%s", pathPrefix, requestId, modelId, version);
+
                 BlobClient blobClient = containerClient.getBlobClient(blobName);
-                
+
                 blobClient.upload(BinaryData.fromBytes(data), true);
 
                 return String.format("azure://%s/%s", containerName, blobName);
@@ -52,9 +52,9 @@ public class AzureModelStorageService implements ModelStorageService {
             try {
                 // Extract blob name from Azure URI (format: azure://container/blob-name)
                 String blobName = storageUri.substring(("azure://" + containerName + "/").length());
-                
+
                 BlobClient blobClient = containerClient.getBlobClient(blobName);
-                
+
                 return blobClient.downloadContent().toBytes();
             } catch (Exception e) {
                 throw new RuntimeException("Failed to download model from Azure", e);
@@ -68,9 +68,9 @@ public class AzureModelStorageService implements ModelStorageService {
             try {
                 // Extract blob name from Azure URI (format: azure://container/blob-name)
                 String blobName = storageUri.substring(("azure://" + containerName + "/").length());
-                
+
                 BlobClient blobClient = containerClient.getBlobClient(blobName);
-                
+
                 blobClient.delete();
                 return null;
             } catch (Exception e) {

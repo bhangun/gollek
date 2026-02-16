@@ -18,7 +18,7 @@ import tech.kayys.wayang.tool.dto.GenerateToolsRequest;
 import tech.kayys.wayang.tool.dto.SourceType;
 import tech.kayys.wayang.tool.dto.OpenApiToolRequest;
 import tech.kayys.wayang.tool.dto.HttpRequestContext;
-import tech.kayys.wayang.tool.dto.TenantContext;
+import tech.kayys.wayang.tool.dto.RequestContext;
 import tech.kayys.wayang.tool.dto.ToolDetailResponse; // Wait, check if this exists
 import tech.kayys.wayang.tool.dto.ToolExecuteRequest; // Wait, check if this exists
 import tech.kayys.wayang.tool.dto.ToolExecutionResponse; // Wait, check if this exists
@@ -64,7 +64,7 @@ public class ToolResource {
     ToolExecutor toolExecutor;
 
     @Inject
-    TenantContext tenantContext;
+    RequestContext requestContext;
 
     @Inject
     SpecFormatRegistry specFormatRegistry;
@@ -91,10 +91,10 @@ public class ToolResource {
     public Uni<RestResponse<ToolGenerationResponse>> generateFromOpenApi(
             @Valid OpenApiToolRequest request) {
 
-        String tenantId = tenantContext.getCurrentTenantId();
+        String requestId = requestContext.getCurrentRequestId();
 
         GenerateToolsRequest genRequest = new GenerateToolsRequest(
-                tenantId,
+                requestId,
                 request.namespace(),
                 SourceType.valueOf(request.sourceType()),
                 request.source(),
@@ -110,8 +110,8 @@ public class ToolResource {
                                 result.toolsGenerated(),
                                 result.toolIds(),
                                 result.warnings())))
-                .onFailure().transform(error ->
-                        new WayangException(ErrorCode.VALIDATION_FAILED, error.getMessage(), error));
+                .onFailure()
+                .transform(error -> new WayangException(ErrorCode.VALIDATION_FAILED, error.getMessage(), error));
     }
 
     /**
@@ -126,11 +126,11 @@ public class ToolResource {
             @QueryParam("enabled") Boolean enabled,
             @QueryParam("readOnly") Boolean readOnly) {
 
-        String tenantId = tenantContext.getCurrentTenantId();
+        String requestId = requestContext.getCurrentRequestId();
 
-        String query = "tenantId = ?1";
+        String query = "requestId = ?1";
         List<Object> params = new ArrayList<>();
-        params.add(tenantId);
+        params.add(requestId);
 
         if (namespace != null) {
             query += " and namespace = ?" + (params.size() + 1);
@@ -167,9 +167,9 @@ public class ToolResource {
     public Uni<RestResponse<ToolDetailResponse>> getTool(
             @PathParam("toolId") String toolId) {
 
-        String tenantId = tenantContext.getCurrentTenantId();
+        String requestId = requestContext.getCurrentRequestId();
 
-        return mcpToolRepository.findByTenantIdAndToolId(tenantId, toolId)
+        return mcpToolRepository.findByRequestIdAndToolId(requestId, toolId)
                 .map(tool -> {
                     if (tool == null) {
                         return RestResponse.notFound();
@@ -199,10 +199,10 @@ public class ToolResource {
             @PathParam("toolId") String toolId,
             @Valid ToolExecuteRequest request) {
 
-        String tenantId = tenantContext.getCurrentTenantId();
+        String requestId = requestContext.getCurrentRequestId();
 
         ToolExecutionRequest execRequest = new ToolExecutionRequest(
-                tenantId,
+                requestId,
                 "current-user", // userId
                 toolId,
                 request.arguments(),
@@ -256,9 +256,9 @@ public class ToolResource {
             @PathParam("toolId") String toolId,
             @Valid ToolUpdateRequest request) {
 
-        String tenantId = tenantContext.getCurrentTenantId();
+        String requestId = requestContext.getCurrentRequestId();
 
-        return mcpToolRepository.findByTenantIdAndToolId(tenantId, toolId)
+        return mcpToolRepository.findByRequestIdAndToolId(requestId, toolId)
                 .flatMap(tool -> {
                     if (tool == null) {
                         return Uni.createFrom().item(RestResponse.notFound());
@@ -288,9 +288,9 @@ public class ToolResource {
     public Uni<RestResponse<Void>> deleteTool(
             @PathParam("toolId") String toolId) {
 
-        String tenantId = tenantContext.getCurrentTenantId();
+        String requestId = requestContext.getCurrentRequestId();
 
-        return mcpToolRepository.findByTenantIdAndToolId(tenantId, toolId)
+        return mcpToolRepository.findByRequestIdAndToolId(requestId, toolId)
                 .flatMap(tool -> {
                     if (tool == null) {
                         return Uni.createFrom().item(RestResponse.notFound());

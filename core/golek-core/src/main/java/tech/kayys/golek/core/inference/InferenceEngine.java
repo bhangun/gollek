@@ -21,7 +21,7 @@ import io.smallrye.mutiny.Uni;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
 import tech.kayys.golek.core.engine.EngineMetadata;
-import tech.kayys.wayang.tenant.TenantContext;
+
 import tech.kayys.golek.spi.model.HealthStatus;
 import tech.kayys.golek.spi.inference.StreamingInferenceChunk;
 
@@ -35,8 +35,7 @@ public interface InferenceEngine {
          * Execute synchronous inference
          */
         Uni<InferenceResponse> infer(
-                        InferenceRequest request,
-                        TenantContext tenantContext);
+                        InferenceRequest request);
 
         /**
          * Get engine metadata
@@ -56,7 +55,7 @@ public interface InferenceEngine {
         /**
          * Execute streaming inference
          */
-        Multi<StreamingInferenceChunk> stream(InferenceRequest request, TenantContext tenantContext);
+        Multi<StreamingInferenceChunk> stream(InferenceRequest request);
 
         /**
          * Submit asynchronous inference job

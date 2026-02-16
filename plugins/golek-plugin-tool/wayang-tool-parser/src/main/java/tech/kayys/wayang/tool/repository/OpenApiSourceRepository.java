@@ -10,15 +10,15 @@ public interface OpenApiSourceRepository {
 
     Uni<List<OpenApiSource>> listAllSources();
 
-    Uni<List<OpenApiSource>> findByTenantId(String tenantId);
+    Uni<List<OpenApiSource>> findByRequestId(String requestId);
 
     Uni<List<OpenApiSource>> findByNamespace(String namespace);
 
-    Uni<List<OpenApiSource>> findByTenantIdAndNamespace(String tenantId, String namespace);
+    Uni<List<OpenApiSource>> findByRequestIdAndNamespace(String requestId, String namespace);
 
     Uni<OpenApiSource> findById(UUID sourceId);
 
-    Uni<OpenApiSource> findByTenantIdAndSourceId(String tenantId, UUID sourceId);
+    Uni<OpenApiSource> findByRequestIdAndSourceId(String requestId, UUID sourceId);
 
     Uni<OpenApiSource> save(OpenApiSource source);
 
@@ -30,5 +30,5 @@ public interface OpenApiSourceRepository {
 
     Uni<Long> count();
 
-    Uni<Long> countByTenantId(String tenantId);
+    Uni<Long> countByRequestId(String requestId);
 }

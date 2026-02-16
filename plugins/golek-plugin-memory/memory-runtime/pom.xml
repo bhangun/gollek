@@ -9,9 +9,7 @@
         <artifactId>wayang-memory-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-    <artifactId>wayang-mcp-runtime</artifactId>
-    <version>1.0-SNAPSHOT</version>
-    <packaging>jar</packaging>
+    <artifactId>wayang-memory-runtime</artifactId>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -135,7 +133,7 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-resteasy-reactive-jackson</artifactId>
+            <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>

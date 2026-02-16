@@ -3,9 +3,9 @@ package tech.kayys.golek.observability;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import tech.kayys.golek.spi.AuditPayload;
+import tech.kayys.golek.spi.context.RequestContext;
 import tech.kayys.golek.spi.inference.InferenceRequest;
 import tech.kayys.golek.spi.inference.InferenceResponse;
-import tech.kayys.wayang.tenant.TenantContext;
 
 import org.jboss.logging.Logger;
 
@@ -22,14 +22,14 @@ public class AuditService {
 
         public void logInferenceStart(
                         InferenceRequest request,
-                        TenantContext tenantContext) {
+                        RequestContext requestContext) {
                 AuditPayload audit = AuditPayload.builder()
                                 .runId(request.getRequestId())
                                 .event("INFERENCE_STARTED")
                                 .level("INFO")
                                 .actor(AuditPayload.Actor.system("inference-platform"))
                                 .metadata("model", request.getModel())
-                                .metadata("tenantId", tenantContext.getTenantId())
+                                .metadata("requestId", requestContext.requestId())
                                 .metadata("streaming", request.isStreaming())
                                 .build();
 
@@ -40,7 +40,7 @@ public class AuditService {
         public void logInferenceComplete(
                         InferenceRequest request,
                         InferenceResponse response,
-                        TenantContext tenantContext) {
+                        RequestContext requestContext) {
                 AuditPayload audit = AuditPayload.builder()
                                 .runId(request.getRequestId())
                                 .event("INFERENCE_COMPLETED")
@@ -49,7 +49,7 @@ public class AuditService {
                                 .metadata("model", response.getModel())
                                 .metadata("tokensUsed", response.getTokensUsed())
                                 .metadata("durationMs", response.getDurationMs())
-                                .metadata("tenantId", tenantContext.getTenantId())
+                                .metadata("requestId", requestContext.requestId())
                                 .build();
 
                 eventPublisher.publish(audit);
@@ -59,7 +59,7 @@ public class AuditService {
         public void logInferenceFailure(
                         InferenceRequest request,
                         Throwable error,
-                        TenantContext tenantContext) {
+                        RequestContext requestContext) {
                 AuditPayload audit = AuditPayload.builder()
                                 .runId(request.getRequestId())
                                 .event("INFERENCE_FAILED")
@@ -68,7 +68,7 @@ public class AuditService {
                                 .metadata("model", request.getModel())
                                 .metadata("error", error.getClass().getSimpleName())
                                 .metadata("message", error.getMessage())
-                                .metadata("tenantId", tenantContext.getTenantId())
+                                .metadata("requestId", requestContext.requestId())
                                 .build();
 
                 eventPublisher.publish(audit);
@@ -77,14 +77,14 @@ public class AuditService {
 
         public void logStreamStart(
                         InferenceRequest request,
-                        TenantContext tenantContext) {
+                        RequestContext requestContext) {
                 AuditPayload audit = AuditPayload.builder()
                                 .runId(request.getRequestId())
                                 .event("STREAM_STARTED")
                                 .level("INFO")
                                 .actor(AuditPayload.Actor.system("inference-platform"))
                                 .metadata("model", request.getModel())
-                                .metadata("tenantId", tenantContext.getTenantId())
+                                .metadata("requestId", requestContext.requestId())
                                 .build();
 
                 eventPublisher.publish(audit);
@@ -92,13 +92,13 @@ public class AuditService {
 
         public void logStreamComplete(
                         InferenceRequest request,
-                        TenantContext tenantContext) {
+                        RequestContext requestContext) {
                 AuditPayload audit = AuditPayload.builder()
                                 .runId(request.getRequestId())
                                 .event("STREAM_COMPLETED")
                                 .level("INFO")
                                 .actor(AuditPayload.Actor.system("inference-platform"))
-                                .metadata("tenantId", tenantContext.getTenantId())
+                                .metadata("requestId", requestContext.requestId())
                                 .build();
 
                 eventPublisher.publish(audit);
@@ -107,14 +107,14 @@ public class AuditService {
         public void logStreamFailure(
                         InferenceRequest request,
                         Throwable error,
-                        TenantContext tenantContext) {
+                        RequestContext requestContext) {
                 AuditPayload audit = AuditPayload.builder()
                                 .runId(request.getRequestId())
                                 .event("STREAM_FAILED")
                                 .level("ERROR")
                                 .actor(AuditPayload.Actor.system("inference-platform"))
                                 .metadata("error", error.getClass().getSimpleName())
-                                .metadata("tenantId", tenantContext.getTenantId())
+                                .metadata("requestId", requestContext.requestId())
                                 .build();
 
                 eventPublisher.publish(audit);
@@ -122,13 +122,13 @@ public class AuditService {
 
         public void logCancellation(
                         String requestId,
-                        TenantContext tenantContext) {
+                        RequestContext requestContext) {
                 AuditPayload audit = AuditPayload.builder()
                                 .runId(requestId)
                                 .event("INFERENCE_CANCELLED")
                                 .level("WARN")
                                 .actor(AuditPayload.Actor.system("inference-platform"))
-                                .metadata("tenantId", tenantContext.getTenantId())
+                                .metadata("requestId", requestContext.requestId())
                                 .build();
 
                 eventPublisher.publish(audit);
