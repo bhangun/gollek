@@ -21,7 +21,7 @@ public interface DjlProviderConfig {
         @WithDefault("${user.home}/.golek/models/djl")
         String basePath();
 
-        @WithDefault(".pt,.pts,.jit,.ts")
+        @WithDefault(".pt,.pts,.jit,.ts,.safetensors,.safetensor,.bin,.pth")
         String extensions();
     }
 }

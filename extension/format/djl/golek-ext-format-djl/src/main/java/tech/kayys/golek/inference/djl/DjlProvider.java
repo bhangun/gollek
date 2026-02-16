@@ -102,7 +102,7 @@ public class DjlProvider implements LLMProvider {
                 .functionCalling(false)
                 .toolCalling(false)
                 .structuredOutputs(false)
-                .supportedFormats(Set.of(ModelFormat.TORCHSCRIPT))
+                .supportedFormats(Set.of(ModelFormat.TORCHSCRIPT, ModelFormat.SAFETENSORS, ModelFormat.PYTORCH))
                 .supportedDevices(Set.of(DeviceType.CPU))
                 .features(Set.of("djl", "pytorch-engine"))
                 .build();
@@ -132,7 +132,17 @@ public class DjlProvider implements LLMProvider {
             return false;
         }
         if (Files.isDirectory(modelPath)) {
-            return Files.exists(modelPath.resolve("config.json"));
+            if (!Files.exists(modelPath.resolve("config.json"))) {
+                return false;
+            }
+            try (var files = Files.walk(modelPath, 3)) {
+                return files
+                        .filter(Files::isRegularFile)
+                        .map(path -> path.getFileName().toString().toLowerCase())
+                        .anyMatch(name -> configuredExtensions().stream().anyMatch(name::endsWith));
+            } catch (Exception ignored) {
+                return false;
+            }
         }
         String name = modelPath.getFileName().toString().toLowerCase();
         return configuredExtensions().stream().anyMatch(name::endsWith);
