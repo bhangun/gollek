@@ -37,8 +37,7 @@
         <module>runtime/gollek-runtime-cloud</module>
         <module>runtime/gollek-runtime-standalone</module>
         <module>runtime/gollek-runtime-unified</module>
-        <!--  <module>ui/gollek-cli</module> -->
-
+        <module>ui/gollek-cli</module>
     </modules>
 
 
