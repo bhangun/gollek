@@ -1,24 +1,24 @@
-# Golek Core — Module Guide
+# Gollek Core — Module Guide
 
-This directory contains the core building blocks for Golek. Each module has a focused scope and clear dependency direction.
+This directory contains the core building blocks for Gollek. Each module has a focused scope and clear dependency direction.
 
 ## Module Structure
 
-### **golek-spi** (Interfaces & Contracts)
+### **gollek-spi** (Interfaces & Contracts)
 **Purpose**: Public APIs, interfaces, and value objects that other modules depend on
 
 **Key Principle**: Only interfaces, DTOs, and exceptions. No implementations.
 
 ---
 
-### **golek-core** (Core Domain Logic)
+### **gollek-core** (Core Domain Logic)
 **Purpose**: Core business logic, domain models, and base implementations
 
 **Key Principle**: Domain logic, no framework-specific code (Jakarta, Quarkus, etc.)
 
 ---
 
-### **golek-model-repo-core** (Model Repository Layer)
+### **gollek-model-repo-core** (Model Repository Layer)
 **Purpose**: Model discovery, loading, and repository management
 
 
@@ -26,21 +26,21 @@ This directory contains the core building blocks for Golek. Each module has a fo
 
 ---
 
-### **golek-provider-core** (Provider SPI)
+### **gollek-provider-core** (Provider SPI)
 **Purpose**: Service Provider Interface for pluggable model runners
 
 **Key Principle**: Clean separation between model repository (metadata) and provider (execution)
 
 ---
 
-### **golek-engine** (Inference Engine Implementation)
+### **gollek-engine** (Inference Engine Implementation)
 **Purpose**: Concrete implementations of inference pipeline and orchestration
 
 **Key Principle**: Framework-specific implementations (Jakarta CDI, Quarkus), orchestration logic
 
 ---
 
-### **golek-infrastructure** (Infrastructure & Integration)
+### **gollek-infrastructure** (Infrastructure & Integration)
 **Purpose**: Framework integration, REST resources, persistence
 
 **Key Principle**: All infrastructure concerns - HTTP, persistence, monitoring, plugin loading
@@ -49,13 +49,13 @@ This directory contains the core building blocks for Golek. Each module has a fo
 
 ## Capability Map (Quick)
 
-* **API Contracts**: `inference-golek/core/golek-spi/`
-* **Domain + Policy**: `inference-golek/core/golek-core/`
-* **Engine Orchestration**: `inference-golek/core/golek-engine/`
-* **Model Registry & Artifacts**: `inference-golek/core/golek-model-repo-core/`
-* **Provider SPI**: `inference-golek/core/golek-provider-core/`
-* **Infrastructure**: `inference-golek/core/golek-infrastructure/`
-* **Plugin API**: `inference-golek/core/golek-spi/`
+* **API Contracts**: `inference-gollek/core/gollek-spi/`
+* **Domain + Policy**: `inference-gollek/core/gollek-core/`
+* **Engine Orchestration**: `inference-gollek/core/gollek-engine/`
+* **Model Registry & Artifacts**: `inference-gollek/core/gollek-model-repo-core/`
+* **Provider SPI**: `inference-gollek/core/gollek-provider-core/`
+* **Infrastructure**: `inference-gollek/core/gollek-infrastructure/`
+* **Plugin API**: `inference-gollek/core/gollek-spi/`
 
 ## Error Codes
 
@@ -71,12 +71,12 @@ The modules should depend on each other in this order (no circular dependencies)
 
 ```mermaid
 graph TD
-    A[golek-spi] 
-    C[golek-core]
-    D[golek-model-repo-core]
-    E[golek-provider-core]
-    F[golek-engine]
-    G[golek-infrastructure]
+    A[gollek-spi] 
+    C[gollek-core]
+    D[gollek-model-repo-core]
+    E[gollek-provider-core]
+    F[gollek-engine]
+    G[gollek-infrastructure]
 
     %% Tier 1: Base Contracts
     C --> A
@@ -106,10 +106,10 @@ graph TD
 ```
 
 **Legend**:
-- **Blue** (golek-spi): **Contracts & APIs** - Stable interfaces, minimal dependencies
-- **Yellow** (golek-core, model-repo, provider-core): **Domain Layer** - Business logic & SPI definitions
-- **Red** (golek-engine): **Application Layer** - Orchestration, reliability patterns, implementation
-- **Purple** (golek-infrastructure): **Infrastructure Layer** - Framework integration (Quarkus/REST), adapters
+- **Blue** (gollek-spi): **Contracts & APIs** - Stable interfaces, minimal dependencies
+- **Yellow** (gollek-core, model-repo, provider-core): **Domain Layer** - Business logic & SPI definitions
+- **Red** (gollek-engine): **Application Layer** - Orchestration, reliability patterns, implementation
+- **Purple** (gollek-infrastructure): **Infrastructure Layer** - Framework integration (Quarkus/REST), adapters
 
 ---
 
@@ -127,8 +127,8 @@ graph TD
 
 ### 3. **Stable Dependencies Principle**
 - Depend on modules that change less frequently
-- `golek-spi` should be the most stable (rarely changes)
-- `golek-infrastructure` can change frequently
+- `gollek-spi` should be the most stable (rarely changes)
+- `gollek-infrastructure` can change frequently
 
 ### 4. **Interface Segregation**
 - Put interfaces in the module that defines the abstraction

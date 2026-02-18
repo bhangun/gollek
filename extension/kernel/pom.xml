@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>tech.kayys.gollek</groupId>
+        <artifactId>gollek-ext-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>gollek-kernel-parent</artifactId>
+    <packaging>pom</packaging>
+
+    <name>Gollek Format parent</name>
+    <description>Gollek Extension based on Model Format</description>
+
+
+    <properties>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+    </properties>
+    <modules>
+        <module>djl</module>
+        <module>gguf</module>
+        <module>libtorch</module>
+        <module>paged-attention</module>
+        <!-- <module>tflite/gollek-ext-format-tflite</module>
+        <module>transformers/gollek-ext-format-transformers</module>
+         -->
+    </modules>
+</project>

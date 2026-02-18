@@ -1,0 +1,4 @@
+tech.kayys.gollek.inference.libtorch.plugin.builtin.CoreOpsPlugin
+tech.kayys.gollek.inference.libtorch.plugin.builtin.NNOpsPlugin
+tech.kayys.gollek.inference.libtorch.plugin.builtin.SerializationPlugin
+tech.kayys.gollek.inference.libtorch.plugin.builtin.CudaPlugin

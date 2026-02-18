@@ -1,7 +1,7 @@
 
 ### ARCHITECTURE GOLEK INFERENCE SERVER
 
-![Error Codes Doc Check](https://github.com/bhangun/golek/actions/workflows/error-codes.yml/badge.svg)
+![Error Codes Doc Check](https://github.com/bhangun/gollek/actions/workflows/error-codes.yml/badge.svg)
 
 ```mermaid
 flowchart 
@@ -53,20 +53,20 @@ flowchart
 7. **Error Handling Integration**
    - Standardized `ErrorPayload` schema
    - Audit events for all failures
-   - golek error-as-input compatibility
+   - gollek error-as-input compatibility
    - Human-in-the-loop escalation support
 
 ### Multi-Tenancy Defaults
 
-Golek runs in **single-tenant mode by default**. In this mode, tenant is resolved from API key and the runtime uses API key `community` when no key is provided.
+Gollek runs in **single-tenant mode by default**. In this mode, tenant is resolved from API key and the runtime uses API key `community` when no key is provided.
 
-To enable multi-tenancy (enterprise mode), add the `tenant-golek-ext` module or explicitly set the config flag.
+To enable multi-tenancy (enterprise mode), add the `tenant-gollek-ext` module or explicitly set the config flag.
 
 **Enable via dependency**
 ```xml
 <dependency>
   <groupId>tech.kayys.wayang</groupId>
-  <artifactId>tenant-golek-ext</artifactId>
+  <artifactId>tenant-gollek-ext</artifactId>
   <version>${project.version}</version>
 </dependency>
 ```
@@ -94,7 +94,7 @@ make error-codes
 
 ### CI Notes
 
-In CI, the `golek-spi` module runs doc generation during `generate-resources`.
+In CI, the `gollek-spi` module runs doc generation during `generate-resources`.
 The Maven profile `ci-error-codes` is activated when `CI=true`.
 
 ```bash

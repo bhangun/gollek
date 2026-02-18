@@ -2,9 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SPI_SRC="$ROOT_DIR/core/golek-spi/src/main/java"
+SPI_SRC="$ROOT_DIR/core/gollek-spi/src/main/java"
 OUTPUT_FILE="$ROOT_DIR/docs/error-codes.md"
-BUILD_DIR="${TMPDIR:-/tmp}/golek-error-codes"
+BUILD_DIR="${TMPDIR:-/tmp}/gollek-error-codes"
 
 mkdir -p "$BUILD_DIR"
 
@@ -27,10 +27,10 @@ fi
 # Compile only what we need
 "$JAVAC_BIN" \
   -d "$BUILD_DIR" \
-  "$SPI_SRC/tech/kayys/golek/spi/error/ErrorCode.java" \
-  "$SPI_SRC/tech/kayys/golek/spi/error/ErrorCodeDoc.java"
+  "$SPI_SRC/tech/kayys/gollek/spi/error/ErrorCode.java" \
+  "$SPI_SRC/tech/kayys/gollek/spi/error/ErrorCodeDoc.java"
 
 # Generate markdown from ErrorCodeDoc
-"$JAVA_BIN" -cp "$BUILD_DIR" tech.kayys.golek.spi.error.ErrorCodeDoc > "$OUTPUT_FILE"
+"$JAVA_BIN" -cp "$BUILD_DIR" tech.kayys.gollek.spi.error.ErrorCodeDoc > "$OUTPUT_FILE"
 
 echo "Wrote $OUTPUT_FILE"
