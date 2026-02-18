@@ -4,16 +4,16 @@
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>tech.kayys.golek</groupId>
-        <artifactId>golek-parent</artifactId>
+        <groupId>tech.kayys.gollek</groupId>
+        <artifactId>gollek-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>golek-core-parent</artifactId>
+    <artifactId>gollek-core-parent</artifactId>
     <packaging>pom</packaging>
 
-    <name>golek-core-parent</name>
-    <description>golek Core</description>
+    <name>gollek-core-parent</name>
+    <description>gollek Core</description>
 
 
     <properties>
@@ -21,14 +21,15 @@
         <maven.compiler.target>25</maven.compiler.target>
     </properties>
     <modules>
-        <module>golek-spi</module>
-        <module>golek-core</module>
-        <module>golek-model-repo-core</module>
-        <module>golek-provider-core</module>
-        <module>golek-api</module>
-        <module>golek-api-rest</module>
-        <module>golek-observability</module>
-        <module>golek-engine</module>
-        <module>golek-tool-core</module>
+        <module>gollek-spi</module>
+        <module>gollek-kv-cache</module>
+        <module>gollek-cluster</module>
+        <module>gollek-core</module>
+        <module>gollek-model-repo-core</module>
+        <module>gollek-provider-core</module>
+        <module>gollek-api-rest</module>
+        <module>gollek-observability</module>
+        <module>gollek-engine</module>
+        <module>gollek-tool-core</module>
     </modules>
 </project>

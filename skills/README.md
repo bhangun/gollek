@@ -1,8 +1,8 @@
-# Inference-Golek Skills
+# Inference-Gollek Skills
 
-Executable capability packages for inference-golek, built on the [agent skills standard](https://agentskills.io).
+Executable capability packages for inference-gollek, built on the [agent skills standard](https://agentskills.io).
 
-Skills capture step-by-step instructions for AI agents to accomplish inference tasks using inference-golek.
+Skills capture step-by-step instructions for AI agents to accomplish inference tasks using inference-gollek.
 
 ## Quick Start Skills
 
@@ -26,7 +26,7 @@ Load models from HuggingFace, local filesystem, or cloud storage with intelligen
 **Key features**: HuggingFace integration, local caching, hardware detection, model versioning
 
 #### 3. [Configure Plugin](./configure-plugin/)
-Build and deploy custom plugins to extend inference-golek (model router, quota, content safety, etc.).
+Build and deploy custom plugins to extend inference-gollek (model router, quota, content safety, etc.).
 
 **When to use**: Custom inference logic or constraints
 **Key features**: Model routing, quota enforcement, content filtering, plugin lifecycle management
@@ -46,7 +46,7 @@ Observe inference execution with OpenTelemetry tracing, Prometheus metrics, stru
 ## Skill Structure
 
 ```
-inference-golek/skills/
+inference-gollek/skills/
 ├── run-inference/
 │   ├── SKILL.md                 # Instructions
 │   ├── scripts/                 # Code examples
@@ -128,7 +128,7 @@ The agent will automatically select `$run-inference` skill.
 
 ## Core Capabilities
 
-All skills leverage these inference-golek capabilities:
+All skills leverage these inference-gollek capabilities:
 
 - **Multi-Format Models**: GGUF (llama.cpp), ONNX, Triton, Cloud APIs
 - **Production Ready**: Circuit breakers, rate limiting, warm model pools
@@ -197,7 +197,7 @@ If a skill isn't working:
 1. Check the SKILL.md for prerequisites
 2. Review error handling section
 3. Look at references/ documentation
-4. Check inference-golek logs
+4. Check inference-gollek logs
 5. Use `monitor-inference` skill to debug
 
 ## Contributing
@@ -212,6 +212,6 @@ To add new skills:
 
 ## Links
 
-- [Inference-Golek Documentation](../README.md)
+- [Inference-Gollek Documentation](../README.md)
 - [Agent Skills Standard](https://agentskills.io)
 - [OpenAI Codex Skills](https://developers.openai.com/codex/skills/)

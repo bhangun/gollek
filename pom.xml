@@ -3,13 +3,13 @@
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>tech.kayys.golek</groupId>
-    <artifactId>golek-parent</artifactId>
+    <groupId>tech.kayys.gollek</groupId>
+    <artifactId>gollek-parent</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
-    <name>golek-parent</name>
-    <description>golek Parent</description>
+    <name>gollek-parent</name>
+    <description>gollek Parent</description>
 
 
     <properties>
@@ -28,17 +28,17 @@
     </properties>
 
     <modules>
-        <module>extension</module>
-        <module>repository/golek-model-repo-hf</module>
-        <module>repository/golek-model-repo-local</module>
-        <module>plugins</module>
         <module>core</module>
-
-        <module>runtime/golek-runtime-cloud</module>
-        <module>runtime/golek-runtime-standalone</module>
-        <module>runtime/golek-runtime-unified</module>
-        <!--  <module>ui/golek-cli</module> -->
+        <module>plugins</module>
+        <module>extension</module>
         <module>sdk</module>
+        <module>repository/gollek-model-repo-hf</module>
+        <module>repository/gollek-model-repo-local</module>
+        <module>runtime/gollek-runtime-cloud</module>
+        <module>runtime/gollek-runtime-standalone</module>
+        <module>runtime/gollek-runtime-unified</module>
+        <!--  <module>ui/gollek-cli</module> -->
+
     </modules>
 
 

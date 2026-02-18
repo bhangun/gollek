@@ -4,4 +4,4 @@ error-codes:
 	./scripts/generate-error-codes.sh
 
 ci:
-	CI=true mvn -pl core/golek-spi -am -DskipTests generate-resources
+	CI=true mvn -pl core/gollek-spi -am -DskipTests generate-resources

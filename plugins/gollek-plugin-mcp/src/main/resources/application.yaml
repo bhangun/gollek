@@ -1,0 +1,63 @@
+wayang:
+  inference:
+    mcp:
+      enabled: true
+      # Optional: provide standard MCP JSON directly (for CLI -D use)
+      # mcp-servers-json: '{"mcpServers":{"image-downloader":{"command":"node","args":["/path/to/mcp-image-downloader/build/index.js"]}}}'
+      # Optional: path to a JSON file that contains `mcpServers`
+      # mcp-servers-json-file: "/absolute/path/to/mcp-servers.json"
+      # Optional: centralized registry mode via system/env (defaults to local file mode)
+      # Community mode (default): local file registry only (~/.gollek/mcp/servers.json)
+      # Enterprise mode required for remote DB-backed registry:
+      # -Dgollek.enterprise.enabled=true   or   -Dgollek.edition=enterprise
+      # -Dgollek.mcp.registry.mode=remote
+      # -Dgollek.mcp.registry.api.base-url=http://localhost:8080
+      # -Dgollek.mcp.registry.api-token=<jwt-or-bearer-token>
+      # Optional enterprise tenant header forwarding (enabled by default in enterprise):
+      # -Dgollek.mcp.registry.tenant-header.enabled=true|false
+      # -Dgollek.mcp.registry.tenant-header.name=X-Tenant-Id
+      # -Dgollek.tenant.id=<tenant-id>
+      default-timeout: 30s
+      tools-enabled: true
+      resources-enabled: true
+      prompts-enabled: true
+      
+      cache:
+        enabled: true
+        max-size: 1000
+        ttl: 15m
+      
+      servers:
+        # File system MCP server
+        filesystem:
+          name: "Filesystem Server"
+          transport: stdio
+          command: "npx"
+          args:
+            - "-y"
+            - "@modelcontextprotocol/server-filesystem"
+            - "/Users/workspace"
+          env:
+            NODE_ENV: "production"
+          auto-reconnect: true
+          max-reconnect-attempts: 3
+        
+        # GitHub MCP server
+        github:
+          name: "GitHub Server"
+          transport: stdio
+          command: "npx"
+          args:
+            - "-y"
+            - "@modelcontextprotocol/server-github"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
+          auto-reconnect: true
+          max-reconnect-attempts: 3
+        
+        # Custom MCP server via HTTP
+        custom:
+          name: "Custom Server"
+          transport: http
+          url: "http://localhost:8080/mcp"
+          auto-reconnect: false

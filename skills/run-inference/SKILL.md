@@ -1,6 +1,6 @@
 ---
 name: run-inference
-description: Execute inference using inference-golek with support for multiple model formats (GGUF, ONNX, Triton, Cloud APIs)
+description: Execute inference using inference-gollek with support for multiple model formats (GGUF, ONNX, Triton, Cloud APIs)
 metadata:
   short-description: Run ML model inference
   category: inference
@@ -9,7 +9,7 @@ metadata:
 
 # Run Inference Skill
 
-Execute ML model inference using inference-golek. Supports GGUF (llama.cpp), ONNX Runtime, Triton Inference Server, and cloud APIs.
+Execute ML model inference using inference-gollek. Supports GGUF (llama.cpp), ONNX Runtime, Triton Inference Server, and cloud APIs.
 
 ## When to Use
 
@@ -20,7 +20,7 @@ Execute ML model inference using inference-golek. Supports GGUF (llama.cpp), ONN
 
 ## Prerequisites
 
-1. inference-golek runtime configured
+1. inference-gollek runtime configured
 2. Model available in one of the supported formats
 3. Provider initialized (OpenAI, Anthropic, local ONNX, etc.)
 

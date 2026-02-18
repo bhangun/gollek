@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package tech.kayys.gollek.cluster.proto;
+
+option java_multiple_files = true;
+option java_package = "tech.kayys.gollek.cluster.proto";
+option java_outer_classname = "GollekInternalProto";
+
+service GollekInternal {
+  // Handoff KV-cache metadata and data from prefill node to decode node
+  rpc HandoffCache(CacheHandoffRequest) returns (CacheHandoffResponse);
+
+  // Check node health and capability
+  rpc Ping(PingRequest) returns (PingResponse);
+}
+
+message CacheHandoffRequest {
+  string request_id = 1;
+  string model_id = 2;
+  int32 prompt_token_count = 3;
+
+  // List of logical block IDs assigned to this request
+  repeated int32 block_ids = 4;
+
+  // Optional: Serialized block data if not using shared storage/RDMA
+  // For Phase 4 MVP, we might assume shared storage or send data here
+  bytes block_data = 5;
+
+  map<string, string> metadata = 6;
+}
+
+message CacheHandoffResponse {
+  bool success = 1;
+  string error_message = 2;
+  string decode_node_id = 3;
+}
+
+message PingRequest { string source_node_id = 1; }
+
+message PingResponse {
+  string node_id = 1;
+  string role = 2; // PREFILL, DECODE, BOTH
+  bool ready = 3;
+}

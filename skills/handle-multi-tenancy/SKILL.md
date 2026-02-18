@@ -9,7 +9,7 @@ metadata:
 
 # Handle Multi-Tenancy Skill
 
-Configure and manage multiple isolated tenants in inference-golek with resource quotas, separate model pools, and audit trails.
+Configure and manage multiple isolated tenants in inference-gollek with resource quotas, separate model pools, and audit trails.
 
 ## When to Use
 
@@ -22,7 +22,7 @@ Configure and manage multiple isolated tenants in inference-golek with resource 
 
 ```
 ┌─────────────────────────────────────┐
-│     inference-golek Platform        │
+│     inference-gollek Platform        │
 ├─────────────────────────────────────┤
 │  Tenant 1    │  Tenant 2  │ Tenant 3│
 │ (isolated)   │ (isolated) │(isolated)

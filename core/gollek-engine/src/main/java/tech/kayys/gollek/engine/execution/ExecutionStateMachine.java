@@ -1,0 +1,20 @@
+package tech.kayys.gollek.engine.execution;
+
+import tech.kayys.gollek.spi.execution.ExecutionStatus;
+
+/**
+ * Deterministic state machine for execution lifecycle.
+ * Pure function: (current state, signal) -> next state
+ */
+public interface ExecutionStateMachine {
+
+    /**
+     * Compute next state based on current state and signal
+     */
+    ExecutionStatus next(ExecutionStatus current, ExecutionSignal signal);
+
+    /**
+     * Validate if transition is allowed
+     */
+    boolean isTransitionAllowed(ExecutionStatus from, ExecutionStatus to);
+}
