@@ -34,11 +34,11 @@ class InferenceOrchestratorTest {
 
         private final String requestId = "test-tenant";
 
-        private InferenceOrchestrator orchestrator;
+        private DefaultInferenceOrchestrator orchestrator;
 
         @BeforeEach
         void setUp() {
-                orchestrator = new InferenceOrchestrator(router, metrics);
+                orchestrator = new DefaultInferenceOrchestrator(router, metrics);
 
                 when(requestContext.requestId()).thenReturn(requestId);
         }
