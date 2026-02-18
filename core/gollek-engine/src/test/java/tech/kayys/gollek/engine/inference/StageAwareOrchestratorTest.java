@@ -28,11 +28,11 @@ class StageAwareOrchestratorTest {
     @Mock
     private MetricsPublisher metrics;
 
-    private InferenceOrchestrator orchestrator;
+    private DefaultInferenceOrchestrator orchestrator;
 
     @BeforeEach
     void setUp() {
-        orchestrator = new InferenceOrchestrator(router, metrics);
+        orchestrator = new DefaultInferenceOrchestrator(router, metrics);
         // Default: disaggregated mode disabled
         orchestrator.setDisaggregatedMode(false);
     }
