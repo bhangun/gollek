@@ -141,3 +141,87 @@ graph TD
 - **DTOs**: Suffix based on purpose (`Request`, `Response`, `Metadata`)
 
 ---
+
+
+
+# Walkthrough: Multimodal/Omni Inference Support for Golek Core
+
+## Summary
+
+Added comprehensive multimodal and omni-model inference support to `pkg/core/` in the golek Go workflow engine. This introduces first-class content types for text, image, audio, video, file, and embedding modalities, plus a provider SPI for inference engine integration.
+
+## Changes Made
+
+### New Files
+
+| File | Purpose |
+|------|---------|
+| [inference.go](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/inference.go) | Core inference types: `ContentPart`, `Message`, `InferenceRequest`, `InferenceResponse`, `StreamChunk`, `InferenceEngine` interface |
+| [provider.go](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/provider.go) | Provider SPI: `InferenceProvider`, `ProviderCapabilities`, `ProviderHealth`, `InferenceProviderRegistry` |
+| [inference_test.go](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/inference_test.go) | 21 tests for inference domain types |
+| [provider_test.go](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/provider_test.go) | 12 tests for provider SPI types |
+
+### Modified Files
+
+| File | Change |
+|------|--------|
+| [domain.go](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/domain.go) | Added `NodeTypeInference` and `PluginTypeInference` constants |
+
+## Architecture
+
+## Changes Made
+
+### New Files
+
+| File | Purpose |
+|------|---------|
+| [inference.go](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/inference.go) | Core inference types: [ContentPart](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/inference.go#71-79), [Message](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/inference.go#192-198), [InferenceRequest](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/inference.go#269-282), [InferenceResponse](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/inference.go#383-394), [StreamChunk](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/inference.go#430-437), [InferenceEngine](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/inference.go#449-465) interface |
+| [provider.go](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/provider.go) | Provider SPI: [InferenceProvider](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/provider.go#19-49), [ProviderCapabilities](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/provider.go#58-91), [ProviderHealth](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/provider.go#162-168), [InferenceProviderRegistry](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/provider.go#238-264) |
+| [inference_test.go](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/inference_test.go) | 21 tests for inference domain types |
+| [provider_test.go](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/provider_test.go) | 12 tests for provider SPI types |
+| [batching.go](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/batching.go) | Batching Domain: [BatchStrategy](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/batching.go#18-19), [InferenceStage](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/batching.go#43-44), [BatchConfig](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/batching.go#76-100), [BatchRequest](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/batching.go#149-156), [BatchScheduler](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/batching.go#246-273) |
+| [batching_test.go](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/batching_test.go) | 15 tests for batching configurations and stage routing |
+
+### Modified Files
+
+| File | Change |
+|------|--------|
+| [domain.go](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/domain.go) | Added `NodeTypeInference` and `PluginTypeInference` constants |
+| [inference.go](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/inference.go) | Added [Stage](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/batching.go#43-44)/`PromptTokenCount` to [InferenceRequest](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/inference.go#269-282), added [InferBatch()](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/inference.go#453-455) method |
+| [provider.go](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/provider.go) | Added [Batching](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/batching_test.go#264-276) flag and `MaxBatchSize` to [ProviderCapabilities](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/golek/pkg/core/provider.go#58-91) |
+
+## Architecture
+
+### Multimodal Pipeline
+
+```mermaid
+graph TD
+    A["InferenceEngine"] --> B["InferenceProviderRegistry"]
+    B --> C["InferenceProvider (Cloud)"]
+    B --> D["InferenceProvider (Local)"]
+    
+    F["InferenceRequest"] --> A
+    F --> G["Message[]"]
+    G --> H["ContentPart[]"]
+    H --> H1["Text"]
+    H --> H2["Image/Audio/Video/File"]
+    
+    A --> I["InferenceResponse"]
+    I --> J["ContentPart[]"]
+    I --> K["ToolCall[]"]
+```
+
+### Batching & Disaggregation Scheduler
+
+```mermaid
+graph TD
+    R1["Request A (1600 tokens)"] --> S["BatchScheduler"]
+    R2["Request B (32 tokens)"] --> S
+    R3["Request C (1024 tokens)"] --> S
+
+    S -- "Stage: PREFILL (Compute-Bound)" --> B1["BatchRequest (A, C)"]
+    S -- "Stage: COMBINED (Fast Path)" --> B2["BatchRequest (B)"]
+
+    B1 --> E["InferenceEngine.InferBatch()"]
+    B2 --> E
+```

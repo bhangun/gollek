@@ -57,7 +57,7 @@ mvn archetype:generate \
 ### 3. Implement Plugin Interface
 
 ```java
-package com.example.inference.plugin;
+packagetech.kayys.inference.plugin;
 
 import tech.kayys.wayang.inference.plugin.spi.InferencePlugin;
 import tech.kayys.wayang.inference.api.ProviderRequest;

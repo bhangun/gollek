@@ -19,10 +19,13 @@ import java.lang.invoke.MethodHandle;
 public final class GGUFNative {
 
     private static final String LIBRARY_NAME = "gguf_bridge";
+    private static final System.Logger LOG = System.getLogger(GGUFNative.class.getName());
 
     // Linker and symbol lookup
     private static final Linker LINKER = Linker.nativeLinker();
-    private static final SymbolLookup LOOKUP;
+    private static SymbolLookup LOOKUP;
+    private static volatile boolean AVAILABLE;
+    private static volatile Throwable LOAD_ERROR;
 
     // Method handles (lazily initialized and cached)
     private static volatile MethodHandle gguf_version_handle;
@@ -41,16 +44,38 @@ public final class GGUFNative {
     private static volatile MethodHandle gguf_verify_file_handle;
 
     static {
-        // Load native library
-        System.loadLibrary(LIBRARY_NAME);
-
-        // Initialize symbol lookup
-        LOOKUP = SymbolLookup.loaderLookup();
+        try {
+            System.loadLibrary(LIBRARY_NAME);
+            LOOKUP = SymbolLookup.loaderLookup();
+            AVAILABLE = true;
+        } catch (Throwable t) {
+            AVAILABLE = false;
+            LOAD_ERROR = t;
+            LOG.log(System.Logger.Level.WARNING,
+                    "GGUF native library '" + LIBRARY_NAME
+                            + "' is unavailable; GGUF conversion endpoints will run in degraded mode.",
+                    t);
+        }
     }
 
     // Prevent instantiation
     private GGUFNative() {
         throw new UnsupportedOperationException("Utility class");
+    }
+
+    public static boolean isAvailable() {
+        return AVAILABLE;
+    }
+
+    public static String getUnavailableReason() {
+        Throwable t = LOAD_ERROR;
+        return t == null ? "" : t.getClass().getSimpleName() + ": " + t.getMessage();
+    }
+
+    private static void ensureAvailable() {
+        if (!AVAILABLE) {
+            throw new IllegalStateException("Native GGUF bridge is unavailable: " + getUnavailableReason(), LOAD_ERROR);
+        }
     }
 
     // ========================================================================
@@ -362,6 +387,7 @@ public final class GGUFNative {
      */
     public static String getVersion() {
         try {
+            ensureAvailable();
             MemorySegment result = (MemorySegment) getVersionHandle().invoke();
             return result.reinterpret(Long.MAX_VALUE).getString(0);
         } catch (Throwable t) {
@@ -375,6 +401,9 @@ public final class GGUFNative {
      * @return error message or empty string if no error
      */
     public static String getLastError() {
+        if (!AVAILABLE) {
+            return "GGUF native bridge unavailable: " + getUnavailableReason();
+        }
         try {
             MemorySegment result = (MemorySegment) getLastErrorHandle().invoke();
             if (result.address() == 0) {
@@ -390,6 +419,9 @@ public final class GGUFNative {
      * Clear last error.
      */
     public static void clearError() {
+        if (!AVAILABLE) {
+            return;
+        }
         try {
             getClearErrorHandle().invoke();
         } catch (Throwable t) {
@@ -405,6 +437,7 @@ public final class GGUFNative {
      */
     public static MemorySegment defaultParams(Arena arena) {
         try {
+            ensureAvailable();
             MemorySegment params = arena.allocate(PARAMS_LAYOUT);
             getDefaultParamsHandle().invoke(params);
             return params;
@@ -422,6 +455,7 @@ public final class GGUFNative {
      */
     public static MemorySegment createContext(MemorySegment params) {
         try {
+            ensureAvailable();
             MemorySegment ctx = (MemorySegment) getCreateContextHandle().invoke(params);
             if (ctx.address() == 0) {
                 throw new RuntimeException("Failed to create context: " + getLastError());
@@ -441,6 +475,7 @@ public final class GGUFNative {
      */
     public static int validateInput(MemorySegment ctx, MemorySegment info) {
         try {
+            ensureAvailable();
             return (int) getValidateInputHandle().invoke(ctx, info);
         } catch (Throwable t) {
             throw new RuntimeException("Failed to validate input", t);
@@ -455,6 +490,7 @@ public final class GGUFNative {
      */
     public static int convert(MemorySegment ctx) {
         try {
+            ensureAvailable();
             return (int) getConvertHandle().invoke(ctx);
         } catch (Throwable t) {
             throw new RuntimeException("Failed to execute conversion", t);
@@ -467,6 +503,9 @@ public final class GGUFNative {
      * @param ctx context handle
      */
     public static void cancel(MemorySegment ctx) {
+        if (!AVAILABLE) {
+            return;
+        }
         try {
             getCancelHandle().invoke(ctx);
         } catch (Throwable t) {
@@ -481,6 +520,9 @@ public final class GGUFNative {
      * @return 1 if cancelled, 0 otherwise
      */
     public static int isCancelled(MemorySegment ctx) {
+        if (!AVAILABLE) {
+            return 0;
+        }
         try {
             return (int) getIsCancelledHandle().invoke(ctx);
         } catch (Throwable t) {
@@ -495,6 +537,9 @@ public final class GGUFNative {
      * @return progress (0.0 - 1.0) or -1.0 on error
      */
     public static float getProgress(MemorySegment ctx) {
+        if (!AVAILABLE) {
+            return -1.0f;
+        }
         try {
             return (float) getProgressHandle().invoke(ctx);
         } catch (Throwable t) {
@@ -508,6 +553,9 @@ public final class GGUFNative {
      * @param ctx context handle
      */
     public static void freeContext(MemorySegment ctx) {
+        if (!AVAILABLE) {
+            return;
+        }
         try {
             getFreeContextHandle().invoke(ctx);
         } catch (Throwable t) {
@@ -523,6 +571,9 @@ public final class GGUFNative {
      * @return format string or null if not detected
      */
     public static String detectFormat(Arena arena, String path) {
+        if (!AVAILABLE) {
+            return null;
+        }
         try {
             MemorySegment pathSeg = arena.allocateFrom(path);
             MemorySegment result = (MemorySegment) getDetectFormatHandle().invoke(pathSeg);
@@ -541,6 +592,9 @@ public final class GGUFNative {
      * @return array of quantization type strings
      */
     public static String[] getAvailableQuantizations() {
+        if (!AVAILABLE) {
+            return new String[0];
+        }
         try {
             MemorySegment array = (MemorySegment) getAvailableQuantizationsHandle().invoke();
 
@@ -575,6 +629,9 @@ public final class GGUFNative {
      * @return error code (0 = success)
      */
     public static int verifyFile(Arena arena, String path, MemorySegment info) {
+        if (!AVAILABLE) {
+            return -99;
+        }
         try {
             MemorySegment pathSeg = arena.allocateFrom(path);
             return (int) getVerifyFileHandle().invoke(pathSeg, info);
