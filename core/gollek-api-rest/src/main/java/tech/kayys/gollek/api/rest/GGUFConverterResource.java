@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import tech.kayys.gollek.converter.ConversionStorageService;
 import tech.kayys.gollek.converter.GGUFConverter;
 import tech.kayys.gollek.converter.GGUFException;
+import tech.kayys.gollek.converter.GGUFNative;
 import tech.kayys.gollek.converter.dto.ConversionRequest;
 import tech.kayys.gollek.converter.dto.ConversionResponse;
 import tech.kayys.gollek.converter.dto.ModelInfoResponse;
@@ -64,6 +65,23 @@ public class GGUFConverterResource {
 
     @Inject
     ConversionStorageService storageService;
+
+    /**
+     * Native bridge health for GGUF converter.
+     */
+    @GET
+    @Path("/health")
+    @Operation(summary = "GGUF converter health", description = "Reports whether the native gguf_bridge library is available")
+    public Response health() {
+        boolean nativeAvailable = GGUFNative.isAvailable();
+
+        return Response.ok(Map.of(
+                "converter", "gguf",
+                "nativeAvailable", nativeAvailable,
+                "mode", nativeAvailable ? "native" : "degraded",
+                "reason", nativeAvailable ? "" : GGUFNative.getUnavailableReason()))
+                .build();
+    }
 
     /**
      * Convert model to GGUF format (async).

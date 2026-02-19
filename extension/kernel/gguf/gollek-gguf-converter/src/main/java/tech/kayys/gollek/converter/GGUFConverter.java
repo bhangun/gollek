@@ -58,6 +58,20 @@ public class GGUFConverter {
     }
 
     /**
+     * Returns true when GGUF native bridge is available in current runtime.
+     */
+    public boolean isNativeAvailable() {
+        return GGUFNative.isAvailable();
+    }
+
+    /**
+     * Returns the reason when native bridge is unavailable.
+     */
+    public String getNativeUnavailableReason() {
+        return GGUFNative.getUnavailableReason();
+    }
+
+    /**
      * Detect model format from path.
      *
      * @param modelPath path to model file or directory
