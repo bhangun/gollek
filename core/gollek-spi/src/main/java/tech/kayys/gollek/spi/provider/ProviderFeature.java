@@ -4,5 +4,6 @@ public enum ProviderFeature {
     STREAMING,
     TOOL_CALLING,
     MULTIMODAL,
-    STRUCTURED_OUTPUTS
+    STRUCTURED_OUTPUTS,
+    BATCHING
 }
