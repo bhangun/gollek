@@ -25,6 +25,7 @@
         <module>gguf</module>
         <module>libtorch</module>
         <module>paged-attention</module>
+        <module>flash-attention</module>
         <module>tflite</module>
         <!-- <module>transformers/gollek-ext-format-transformers</module>
          -->

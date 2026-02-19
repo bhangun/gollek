@@ -225,3 +225,41 @@ graph TD
     B1 --> E["InferenceEngine.InferBatch()"]
     B2 --> E
 ```
+
+
+
+## Architecture
+
+### Multimodal Pipeline
+
+```mermaid
+graph TD
+    A["InferenceEngine"] --> B["InferenceProviderRegistry"]
+    B --> C["InferenceProvider (Cloud)"]
+    B --> D["InferenceProvider (Local)"]
+    
+    F["InferenceRequest"] --> A
+    F --> G["Message[]"]
+    G --> H["ContentPart[]"]
+    H --> H1["Text"]
+    H --> H2["Image/Audio/Video/File"]
+    
+    A --> I["InferenceResponse"]
+    I --> J["ContentPart[]"]
+    I --> K["ToolCall[]"]
+```
+
+### Batching & Disaggregation Scheduler
+
+```mermaid
+graph TD
+    R1["Request A (1600 tokens)"] --> S["BatchScheduler"]
+    R2["Request B (32 tokens)"] --> S
+    R3["Request C (1024 tokens)"] --> S
+
+    S -- "Stage: PREFILL (Compute-Bound)" --> B1["BatchRequest (A, C)"]
+    S -- "Stage: COMBINED (Fast Path)" --> B2["BatchRequest (B)"]
+
+    B1 --> E["InferenceEngine.InferBatch()"]
+    B2 --> E
+```

@@ -208,6 +208,16 @@ Due to local environment constraints (missing parent POMs for reactor build), au
   - `ServiceLevelIndicator`: SLO tracking (Availability, TTFT, TPOT) with burn rate alerting.
   - `PerformanceAnalyzer`: Multi-dimensional analysis (time of day, input length buckets).
 
+### Phase 6: FlashAttention-3 & Java Batching Abstractions (Completed)
+- **`gollek-ext-flash-attention`**: New kernel extension module specifically targeting H100 (Hopper, SM_90) GPUs to leverage the Tensor Memory Accelerator (TMA) and FP8 precision for massive throughput improvements (up to 1.2 PFLOPs).
+  - **`gollek_fa3_kernels.cu`**: C++/CUDA wrapper exporting the FA3 routines over an `extern "C"` ABI for Java FFM. 
+  - **`FlashAttention3Binding`**: Java 22+ FFM API handling downcalls from the orchestrator directly to the GPU context.
+  - **`FlashAttention3CpuFallback`**: Standard attention implementation used if Hopper native kernels are unavailable.
+- **`Batching Abstractions` (Java SPI Pivot)**: Shifted batching domain models from Go to Java `gollek-spi`.
+  - Added `BatchStrategy` (STATIC, DYNAMIC, CONTINUOUS) and `BatchConfig` representing BentoML's batching tier philosophies.
+  - Implemented `BatchScheduler`, `BatchRequest`, `BatchResponse`, and `BatchMetrics` to form the contract for the engine's batching loops.
+  - Extended `ProviderCapabilities` and `ProviderFeature` to broadcast `BATCHING` support.
+
 ## Next Steps
 1.  **Metric Verification**: Verify metrics are correctly emitted to Prometheus/Micrometer registry.
 2.  **Multi-LoRA Serving**: Begin implementation of `LoRAAdapterManager`.

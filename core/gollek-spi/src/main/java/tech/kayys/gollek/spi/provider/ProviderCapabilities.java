@@ -20,6 +20,8 @@ public final class ProviderCapabilities {
     private final boolean functionCalling;
     private final boolean multimodal;
     private final boolean embeddings;
+    private final boolean batching;
+    private final int maxBatchSize;
     private final int maxContextTokens;
     private final int maxOutputTokens;
     private final Set<String> supportedModels;
@@ -44,11 +46,15 @@ public final class ProviderCapabilities {
             @JsonProperty("toolCalling") boolean toolCalling,
             @JsonProperty("structuredOutputs") boolean structuredOutputs,
             @JsonProperty("supportedFormats") Set<ModelFormat> supportedFormats,
-            @JsonProperty("supportedDevices") Set<DeviceType> supportedDevices) {
+            @JsonProperty("supportedDevices") Set<DeviceType> supportedDevices,
+            @JsonProperty("batching") boolean batching,
+            @JsonProperty("maxBatchSize") int maxBatchSize) {
         this.streaming = streaming;
         this.functionCalling = functionCalling;
         this.multimodal = multimodal;
         this.embeddings = embeddings;
+        this.batching = batching;
+        this.maxBatchSize = maxBatchSize;
         this.maxContextTokens = maxContextTokens;
         this.maxOutputTokens = maxOutputTokens;
         this.supportedModels = supportedModels != null
@@ -77,6 +83,7 @@ public final class ProviderCapabilities {
             case TOOL_CALLING -> toolCalling;
             case MULTIMODAL -> multimodal;
             case STRUCTURED_OUTPUTS -> structuredOutputs;
+            case BATCHING -> batching;
         };
     }
 
@@ -95,6 +102,14 @@ public final class ProviderCapabilities {
 
     public boolean isEmbeddings() {
         return embeddings;
+    }
+
+    public boolean isBatching() {
+        return batching;
+    }
+
+    public int getMaxBatchSize() {
+        return maxBatchSize;
     }
 
     public int getMaxContextTokens() {
@@ -150,6 +165,8 @@ public final class ProviderCapabilities {
         private boolean functionCalling = false;
         private boolean multimodal = false;
         private boolean embeddings = false;
+        private boolean batching = false;
+        private int maxBatchSize = 0;
         private int maxContextTokens = 4096;
         private int maxOutputTokens = 2048;
         private Set<String> supportedModels = Collections.emptySet();
@@ -177,6 +194,16 @@ public final class ProviderCapabilities {
 
         public Builder embeddings(boolean embeddings) {
             this.embeddings = embeddings;
+            return this;
+        }
+
+        public Builder batching(boolean batching) {
+            this.batching = batching;
+            return this;
+        }
+
+        public Builder maxBatchSize(int maxBatchSize) {
+            this.maxBatchSize = maxBatchSize;
             return this;
         }
 
@@ -230,7 +257,7 @@ public final class ProviderCapabilities {
                     streaming, functionCalling, multimodal, embeddings,
                     maxContextTokens, maxOutputTokens, supportedModels,
                     supportedLanguages, features, toolCalling, structuredOutputs,
-                    supportedFormats, supportedDevices);
+                    supportedFormats, supportedDevices, batching, maxBatchSize);
         }
     }
 
@@ -243,12 +270,13 @@ public final class ProviderCapabilities {
         return streaming == that.streaming &&
                 functionCalling == that.functionCalling &&
                 multimodal == that.multimodal &&
+                batching == that.batching &&
                 maxContextTokens == that.maxContextTokens;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(streaming, functionCalling, multimodal, maxContextTokens);
+        return Objects.hash(streaming, functionCalling, multimodal, batching, maxContextTokens);
     }
 
     @Override
