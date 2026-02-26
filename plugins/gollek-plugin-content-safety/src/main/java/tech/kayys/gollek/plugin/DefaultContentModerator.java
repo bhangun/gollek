@@ -9,9 +9,6 @@ import tech.kayys.gollek.spi.inference.InferencePhase;
 import tech.kayys.gollek.spi.plugin.PluginContext;
 import tech.kayys.gollek.spi.plugin.PluginException;
 
-import tech.kayys.gollek.plugin.SafetyPlugin.SafetyValidationResult;
-import tech.kayys.gollek.plugin.SafetyPlugin.SafetyViolation;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

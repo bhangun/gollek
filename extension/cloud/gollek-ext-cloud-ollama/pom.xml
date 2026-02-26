@@ -18,7 +18,7 @@
     <dependencies>
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-core</artifactId>
+            <artifactId>gollek-engine-core</artifactId>
             <version>${project.version}</version>
         </dependency>
 

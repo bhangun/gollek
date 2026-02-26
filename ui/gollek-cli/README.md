@@ -223,6 +223,18 @@ java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar run \
   --provider cerebras --model llama-3.1-8b --prompt "Hello"
 ```
 
+```bash
+java -jar ui/gollek-cli/target/gollek-cli-1.0.0-SNAPSHOT-runner.jar providers
+ID              NAME                 VERSION    STATUS    
+------------------------------------------------------------
+cerebras        Cerebras             1.0.0      UNHEALTHY 
+djl             DJL Runtime          1.0.0      DEGRADED  
+gemini          Google Gemini        1.0.0      UNHEALTHY 
+gguf            GGUF Provider (ll... 1.1.0      HEALTHY   
+libtorch        LibTorch/TorchScript 1.1.0      HEALTHY   
+mistral         Mistral AI           1.0.0      UNHEALTHY 
+ollama          Ollama               1.0.0      UNHEALTHY 
+```
 
 ### Run native
 ```bash

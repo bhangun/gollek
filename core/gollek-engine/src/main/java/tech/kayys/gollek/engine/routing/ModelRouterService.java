@@ -28,7 +28,7 @@ import tech.kayys.gollek.spi.provider.ProviderCapabilities;
 import tech.kayys.gollek.spi.provider.ProviderRequest;
 // Core engine imports
 
-import tech.kayys.gollek.core.exception.NoCompatibleProviderException;
+import tech.kayys.gollek.spi.exception.NoCompatibleProviderException;
 
 // Additional imports for model classes
 import tech.kayys.gollek.spi.model.DeviceType;
@@ -91,6 +91,8 @@ public class ModelRouterService {
                 return modelRepository.findById(modelId, getTenantId(request))
                                 .onItem().transform(manifest -> manifest != null ? manifest
                                                 : createDirectPathManifest(modelId, request))
+                                .onItem().transform(manifest -> manifest != null ? manifest
+                                                : createVirtualProviderManifest(modelId, request))
                                 .onItem().ifNull().failWith(() -> new ModelException(
                                                 tech.kayys.gollek.spi.error.ErrorCode.MODEL_NOT_FOUND,
                                                 "Model not found: " + modelId, modelId))
@@ -127,6 +129,8 @@ public class ModelRouterService {
                 return modelRepository.findById(modelId, getTenantId(request))
                                 .onItem().transform(manifest -> manifest != null ? manifest
                                                 : createDirectPathManifest(modelId, request))
+                                .onItem().transform(manifest -> manifest != null ? manifest
+                                                : createVirtualProviderManifest(modelId, request))
                                 .onItem().ifNull().failWith(() -> new ModelException(
                                                 tech.kayys.gollek.spi.error.ErrorCode.MODEL_NOT_FOUND,
                                                 "Model not found: " + modelId, modelId))
@@ -139,6 +143,27 @@ public class ModelRouterService {
 
         private String getTenantId(InferenceRequest request) {
                 return request.getMetadata().getOrDefault("tenantId", "community").toString();
+        }
+
+        private ModelManifest createVirtualProviderManifest(String modelId, InferenceRequest request) {
+                if (request.getPreferredProvider().isPresent()) {
+                        String preferred = request.getPreferredProvider().get();
+                        if (providerRegistry.hasProvider(preferred)) {
+                                return ModelManifest.builder()
+                                                .modelId(modelId)
+                                                .name(modelId)
+                                                .version("latest")
+                                                .path("virtual")
+                                                .apiKey(request.getApiKey())
+                                                .requestId(request.getRequestId())
+                                                .metadata(Map.of("source", "virtual-provider", "provider", preferred))
+                                                .artifacts(Map.of())
+                                                .createdAt(Instant.now())
+                                                .updatedAt(Instant.now())
+                                                .build();
+                        }
+                }
+                return null;
         }
 
         private ModelManifest createDirectPathManifest(String modelId, InferenceRequest request) {
@@ -264,7 +289,8 @@ public class ModelRouterService {
                                                 .score(selected.score())
                                                 .fallbackProviders(candidates.stream()
                                                                 .filter(c -> !c.providerId()
-                                                                                .equalsIgnoreCase(selected.providerId()))
+                                                                                .equalsIgnoreCase(
+                                                                                                selected.providerId()))
                                                                 .limit(2)
                                                                 .map(ProviderCandidate::providerId)
                                                                 .collect(Collectors.toList()))

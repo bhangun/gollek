@@ -7,6 +7,7 @@
         <groupId>tech.kayys.gollek</groupId>
         <artifactId>gollek-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
     </parent>
 
     <artifactId>gollek-inference-runtime-cloud</artifactId>
@@ -17,40 +18,48 @@
         <maven.compiler.target>25</maven.compiler.target>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <!-- Import Gollek BOM for internal module versions -->
+            <dependency>
+                <groupId>tech.kayys.gollek</groupId>
+                <artifactId>gollek-bom</artifactId>
+                <version>${project.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <!-- Core kernel (minimal) -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-core</artifactId>
-            <version>${project.version}</version>
+            <artifactId>gollek-engine-core</artifactId>
         </dependency>
 
         <!-- Core API -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-spi</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Provider SPI -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-provider-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Engine Implementation -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-engine</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Infrastructure -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-observability</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Quarkus Core -->

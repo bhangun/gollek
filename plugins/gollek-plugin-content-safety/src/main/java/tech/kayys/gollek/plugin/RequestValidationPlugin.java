@@ -1,8 +1,8 @@
 package tech.kayys.gollek.plugin;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.Message;
+import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.core.plugin.InferencePhasePlugin;
 import tech.kayys.gollek.core.execution.ExecutionContext;
 import tech.kayys.gollek.spi.context.EngineContext;

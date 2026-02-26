@@ -1,7 +1,7 @@
 package tech.kayys.gollek.cli.commands;
 
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.sdk.core.model.ModelInfo;
+import tech.kayys.gollek.sdk.model.ModelInfo;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -142,7 +142,8 @@ final class LocalModelResolver {
             }
             Path normalizedCandidate = base.resolve(normalized + ext);
             if (Files.isRegularFile(normalizedCandidate)) {
-                return Optional.of(toModelInfo(id, normalizedCandidate, detectFormat(normalizedCandidate, fallbackFormat)));
+                return Optional
+                        .of(toModelInfo(id, normalizedCandidate, detectFormat(normalizedCandidate, fallbackFormat)));
             }
         }
         return Optional.empty();

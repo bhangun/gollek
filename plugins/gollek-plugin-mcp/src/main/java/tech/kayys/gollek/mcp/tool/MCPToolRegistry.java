@@ -3,7 +3,6 @@ package tech.kayys.gollek.mcp.tool;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
-import tech.kayys.gollek.mcp.client.MCPClient;
 import tech.kayys.gollek.mcp.dto.MCPConnection;
 import tech.kayys.gollek.mcp.dto.MCPTool;
 

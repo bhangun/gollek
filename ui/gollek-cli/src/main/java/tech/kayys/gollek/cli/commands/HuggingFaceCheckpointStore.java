@@ -2,7 +2,7 @@ package tech.kayys.gollek.cli.commands;
 
 import jakarta.enterprise.inject.Instance;
 import tech.kayys.gollek.model.repo.hf.HuggingFaceClient;
-import tech.kayys.gollek.sdk.core.model.PullProgress;
+import tech.kayys.gollek.sdk.model.PullProgress;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -69,7 +69,8 @@ final class HuggingFaceCheckpointStore {
                 }
                 client.downloadFile(repo, file, target, (completed, total, progress) -> {
                     if (progressCallback != null) {
-                        progressCallback.accept(PullProgress.of("Downloading checkpoint artifacts", null, total, completed));
+                        progressCallback
+                                .accept(PullProgress.of("Downloading checkpoint artifacts", null, total, completed));
                     }
                 });
                 downloaded++;

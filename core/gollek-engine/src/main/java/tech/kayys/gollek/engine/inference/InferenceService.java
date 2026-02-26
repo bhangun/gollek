@@ -10,6 +10,8 @@ import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.core.exception.RetryableException;
 import tech.kayys.gollek.spi.inference.AsyncJobStatus;
 import tech.kayys.gollek.spi.inference.BatchInferenceRequest;
+import tech.kayys.gollek.spi.inference.BatchResponse;
+import tech.kayys.gollek.spi.inference.BatchScheduler;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.exception.InferenceException;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
@@ -44,6 +46,9 @@ public class InferenceService {
 
     @Inject
     InferenceOrchestrator orchestrator;
+
+    @Inject
+    BatchScheduler batchScheduler;
 
     @Inject
     EngineQuotaEnforcer quotaEnforcer;
@@ -198,20 +203,19 @@ public class InferenceService {
     }
 
     /**
-     * Batch inference - process multiple requests.
+     * Batch inference — delegates to the configured {@link BatchScheduler}.
+     * <p>
+     * The scheduler applies the active batching strategy (STATIC / DYNAMIC /
+     * CONTINUOUS)
+     * and returns a {@link BatchResponse} with per-request results and aggregate
+     * metrics.
      */
-    public Uni<List<InferenceResponse>> batchInfer(BatchInferenceRequest batchRequest) {
+    public Uni<BatchResponse> batchInfer(BatchInferenceRequest batchRequest) {
+        log.info("Processing batch inference via scheduler: size={}, requestId={}",
+                batchRequest.getRequests().size(), batchRequest.modelId());
 
-        log.info("Processing batch inference: size={}, requestId={}", batchRequest.getRequests().size());
-
-        return Multi.createFrom().items(batchRequest.getRequests().stream())
-                .onItem().transformToUniAndConcatenate(request -> inferAsync(request)
-                        .onFailure().recoverWithItem(failure -> InferenceResponse.builder()
-                                .requestId(request.getRequestId())
-                                .model(request.getModel())
-                                .content("Error: " + failure.getMessage())
-                                .build()))
-                .collect().asList();
+        return Uni.createFrom().completionStage(
+                batchScheduler.submitBatch(batchRequest));
     }
 
     // ===== Helper Methods =====

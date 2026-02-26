@@ -55,13 +55,23 @@ public class GollekCommand implements Runnable {
     @Option(names = { "--log" }, description = "Enable verbose logging", scope = CommandLine.ScopeType.INHERIT)
     boolean verbose;
 
-    @Option(names = { "--mcp-servers-json" }, description = "Inline MCP config JSON with `mcpServers` object", scope = CommandLine.ScopeType.INHERIT)
+    @Option(names = {
+            "--mcp-servers-json" }, description = "Inline MCP config JSON with `mcpServers` object", scope = CommandLine.ScopeType.INHERIT)
     String mcpServersJson;
 
-    @Option(names = { "--mcp-servers-file" }, description = "Path to MCP config JSON file containing `mcpServers`", scope = CommandLine.ScopeType.INHERIT)
+    @Option(names = {
+            "--mcp-servers-file" }, description = "Path to MCP config JSON file containing `mcpServers`", scope = CommandLine.ScopeType.INHERIT)
     String mcpServersFile;
 
     public GollekCommand() {
+        // Enforce silent logging by default as early as possible
+        System.setProperty("quarkus.log.level", "WARN");
+        System.setProperty("quarkus.log.console.level", "WARN");
+        System.setProperty("quarkus.log.console.json.enabled", "false");
+        System.setProperty("quarkus.log.category.\"tech.kayys.gollek\".level", "WARN");
+        System.setProperty("quarkus.log.category.\"tech.kayys.gollek.sdk\".level", "WARN");
+        System.setProperty("quarkus.log.category.\"io.quarkus\".level", "WARN");
+
         configureHuggingFaceTokenFromDotEnv();
         configureGgufNativeLibraryDir();
         configureMcpServersFromEnvironmentAndArgs();
@@ -72,7 +82,9 @@ public class GollekCommand implements Runnable {
         applyRuntimeOverrides();
         if (verbose) {
             System.setProperty("quarkus.log.level", "DEBUG");
+            System.setProperty("quarkus.log.console.level", "DEBUG");
             System.setProperty("quarkus.log.category.\"tech.kayys.gollek\".level", "DEBUG");
+            System.setProperty("quarkus.log.category.\"tech.kayys.gollek.inference.libtorch\".level", "DEBUG");
             System.setProperty("gguf.provider.verbose-logging", "true");
             // Workaround for programmatic change during runtime if possible,
             // but Picocli runs before Quarkus finishes all init in some modes.

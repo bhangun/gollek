@@ -39,19 +39,24 @@ class InferenceOrchestratorTest {
         @BeforeEach
         void setUp() {
                 orchestrator = new DefaultInferenceOrchestrator(router, metrics);
-
-                when(requestContext.requestId()).thenReturn(requestId);
         }
 
         @Test
         void testExecuteAsync_SuccessfulExecution() {
                 // Arrange
                 InferenceResponse expectedResponse = mock(InferenceResponse.class);
+                InferenceRequest realRequest = InferenceRequest.builder()
+                                .model("test-model")
+                                .message(new tech.kayys.gollek.spi.Message(tech.kayys.gollek.spi.Message.Role.USER,
+                                                "test prompt"))
+                                .requestId(requestId)
+                                .build();
+
                 when(router.route(anyString(), any(InferenceRequest.class)))
                                 .thenReturn(Uni.createFrom().item(expectedResponse));
 
                 // Act
-                var result = orchestrator.executeAsync("test-model", request);
+                var result = orchestrator.executeAsync("test-model", realRequest);
 
                 // Assert
                 InferenceResponse actualResponse = result.await().indefinitely();
@@ -63,12 +68,19 @@ class InferenceOrchestratorTest {
         @Test
         void testExecuteAsync_Failure() {
                 // Arrange
+                InferenceRequest realRequest = InferenceRequest.builder()
+                                .model("test-model")
+                                .message(new tech.kayys.gollek.spi.Message(tech.kayys.gollek.spi.Message.Role.USER,
+                                                "test prompt"))
+                                .requestId(requestId)
+                                .build();
+
                 when(router.route(anyString(), any(InferenceRequest.class)))
                                 .thenReturn(Uni.createFrom().failure(new RuntimeException("Test failure")));
 
                 // Act & Assert
                 assertThrows(RuntimeException.class, () -> {
-                        orchestrator.executeAsync("test-model", request).await().indefinitely();
+                        orchestrator.executeAsync("test-model", realRequest).await().indefinitely();
                 });
 
                 verify(metrics).recordFailure(eq("unified"), eq("test-model"), anyString());

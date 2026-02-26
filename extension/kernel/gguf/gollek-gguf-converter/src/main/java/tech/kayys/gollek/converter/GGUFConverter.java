@@ -6,7 +6,7 @@ import io.smallrye.mutiny.infrastructure.Infrastructure;
 import tech.kayys.gollek.converter.model.ConversionProgress;
 import tech.kayys.gollek.converter.model.ConversionResult;
 import tech.kayys.gollek.converter.model.GGUFConversionParams;
-import tech.kayys.gollek.converter.model.ModelInfo;
+import tech.kayys.gollek.converter.model.ModelMetadata;
 import tech.kayys.gollek.converter.model.QuantizationType;
 import tech.kayys.gollek.spi.model.ModelFormat;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -54,7 +54,15 @@ public class GGUFConverter {
      * @return version string
      */
     public String getVersion() {
-        return GGUFNative.getVersion();
+        if (!isNativeAvailable()) {
+            return "1.0.0-fallback";
+        }
+        try {
+            return GGUFNative.getVersion();
+        } catch (Exception e) {
+            log.warn("Failed to get native version, using fallback: {}", e.getMessage());
+            return "1.0.0-fallback";
+        }
     }
 
     /**
@@ -83,6 +91,10 @@ public class GGUFConverter {
             return ModelFormat.UNKNOWN;
         }
 
+        if (!isNativeAvailable()) {
+            return detectFormatFallback(modelPath);
+        }
+
         try (Arena arena = Arena.ofConfined()) {
             String format = GGUFNative.detectFormat(arena, modelPath.toString());
             if (format != null) {
@@ -90,13 +102,30 @@ public class GGUFConverter {
                 log.debug("Detected format for {}: {}", modelPath, modelFormat);
                 return modelFormat;
             } else {
-                log.warn("Could not detect format for: {}", modelPath);
-                return ModelFormat.UNKNOWN;
+                return detectFormatFallback(modelPath);
             }
         } catch (Exception e) {
             log.warn("Failed to detect format for {}: {}", modelPath, e.getMessage(), e);
-            return ModelFormat.UNKNOWN;
+            return detectFormatFallback(modelPath);
         }
+    }
+
+    private ModelFormat detectFormatFallback(Path modelPath) {
+        if (Files.isRegularFile(modelPath)) {
+            String name = modelPath.getFileName().toString().toLowerCase();
+            return ModelFormat.fromExtension(name.substring(name.lastIndexOf(".")));
+        } else if (Files.isDirectory(modelPath)) {
+            for (ModelFormat format : ModelFormat.values()) {
+                if (format.getMarkerFiles() != null) {
+                    for (String mf : format.getMarkerFiles()) {
+                        if (Files.exists(modelPath.resolve(mf))) {
+                            return format;
+                        }
+                    }
+                }
+            }
+        }
+        return ModelFormat.UNKNOWN;
     }
 
     /**
@@ -106,7 +135,7 @@ public class GGUFConverter {
      * @return model information
      * @throws GGUFException if validation fails
      */
-    public ModelInfo getModelInfo(Path modelPath) {
+    public ModelMetadata getModelInfo(Path modelPath) {
         if (modelPath == null) {
             log.warn("Cannot get model info: modelPath is null");
             throw new GGUFException("Model path cannot be null");
@@ -136,7 +165,7 @@ public class GGUFConverter {
                     throw new GGUFException("Validation failed: " + errorMsg);
                 }
 
-                ModelInfo modelInfo = extractModelInfo(infoSegment, modelPath);
+                ModelMetadata modelInfo = extractModelInfo(infoSegment, modelPath);
                 log.debug("Extracted model info for {}: {}", modelPath, modelInfo);
                 return modelInfo;
 
@@ -197,7 +226,7 @@ public class GGUFConverter {
                                 GGUFNative.getLastError());
                     }
 
-                    ModelInfo inputInfo = extractModelInfo(infoSegment, params.getInputPath());
+                    ModelMetadata inputInfo = extractModelInfo(infoSegment, params.getInputPath());
                     log.info("Input model info: {}", inputInfo);
 
                     // Execute conversion with periodic progress checks
@@ -372,8 +401,14 @@ public class GGUFConverter {
      * @return array of available quantization types
      */
     public QuantizationType[] getAvailableQuantizations() {
+        if (!isNativeAvailable()) {
+            return QuantizationType.values();
+        }
         try (Arena arena = Arena.ofConfined()) {
             String[] nativeQuantizations = GGUFNative.getAvailableQuantizations();
+            if (nativeQuantizations == null || nativeQuantizations.length == 0) {
+                return QuantizationType.values();
+            }
             return Arrays.stream(nativeQuantizations)
                     .map(QuantizationType::fromNativeName)
                     .filter(Objects::nonNull)
@@ -402,7 +437,7 @@ public class GGUFConverter {
      * @return model info if valid
      * @throws GGUFException if file is invalid
      */
-    public ModelInfo verifyGGUF(Path ggufPath) {
+    public ModelMetadata verifyGGUF(Path ggufPath) {
         if (ggufPath == null) {
             log.warn("Cannot verify GGUF: ggufPath is null");
             throw new GGUFException("GGUF path cannot be null");
@@ -428,7 +463,7 @@ public class GGUFConverter {
                 throw new GGUFException("GGUF verification failed: " + errorMsg);
             }
 
-            ModelInfo modelInfo = extractModelInfo(infoSegment, ggufPath);
+            ModelMetadata modelInfo = extractModelInfo(infoSegment, ggufPath);
             log.debug("Verified GGUF file {}: {}", ggufPath, modelInfo);
             return modelInfo;
 
@@ -566,7 +601,7 @@ public class GGUFConverter {
         void run(int level, MemorySegment messagePtr, MemorySegment userDataPtr);
     }
 
-    private ModelInfo extractModelInfo(MemorySegment infoSegment, Path sourcePath) {
+    private ModelMetadata extractModelInfo(MemorySegment infoSegment, Path sourcePath) {
         // Extract string fields
         String modelType = extractString(infoSegment, 0, 64);
         String architecture = extractString(infoSegment, 64, 64);
@@ -582,7 +617,7 @@ public class GGUFConverter {
 
         ModelFormat format = detectFormat(sourcePath);
 
-        return ModelInfo.builder()
+        return ModelMetadata.builder()
                 .modelType(modelType.isEmpty() ? null : modelType)
                 .architecture(architecture.isEmpty() ? null : architecture)
                 .parameterCount(paramCount)

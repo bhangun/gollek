@@ -1,6 +1,6 @@
 package tech.kayys.gollek.plugin;
 
-import tech.kayys.wayang.tenant.RequestId;
+// No RequestId import needed, using String
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Default;
@@ -15,20 +15,20 @@ public interface TenantQuotaService {
     /**
      * Check current quota status for a tenant
      */
-    QuotaInfo checkQuota(RequestId requestId);
+    QuotaInfo checkQuota(String requestId);
 
     /**
      * Reserve quota for a specific request
      */
-    void reserve(RequestId requestId, int amount);
+    void reserve(String requestId, int amount);
 
     /**
      * Release previously reserved quota
      */
-    void release(RequestId requestId, int amount);
+    void release(String requestId, int amount);
 
     /**
      * Get quota configuration for a tenant
      */
-    QuotaConfig getConfig(RequestId requestId);
+    QuotaConfig getConfig(String requestId);
 }

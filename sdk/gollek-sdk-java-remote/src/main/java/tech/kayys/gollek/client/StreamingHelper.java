@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.smallrye.mutiny.Multi;
 import tech.kayys.gollek.spi.stream.StreamChunk;
 import tech.kayys.gollek.client.exception.GollekClientException;
+import tech.kayys.gollek.sdk.model.PullProgress;
 import tech.kayys.gollek.spi.auth.ApiKeyConstants;
 
 import java.io.BufferedReader;
@@ -54,9 +55,9 @@ public class StreamingHelper {
      * @param progressCallback Callback to receive progress updates
      * @return A Multi that emits PullProgress objects
      */
-    public Multi<tech.kayys.gollek.sdk.core.model.PullProgress> createModelPullStreamPublisher(
+    public Multi<PullProgress> createModelPullStreamPublisher(
             String modelSpec,
-            Consumer<tech.kayys.gollek.sdk.core.model.PullProgress> progressCallback) {
+            Consumer<PullProgress> progressCallback) {
 
         return Multi.createFrom().emitter(emitter -> {
             try {
@@ -95,8 +96,8 @@ public class StreamingHelper {
                             }
 
                             try {
-                                tech.kayys.gollek.sdk.core.model.PullProgress progress = objectMapper.readValue(data,
-                                        tech.kayys.gollek.sdk.core.model.PullProgress.class);
+                                PullProgress progress = objectMapper.readValue(data,
+                                        PullProgress.class);
 
                                 if (progressCallback != null) {
                                     progressCallback.accept(progress);
@@ -149,7 +150,8 @@ public class StreamingHelper {
 
                 if (response.statusCode() != 200) {
                     emitter.fail(
-                            new GollekClientException("Streaming request failed with status: " + response.statusCode()));
+                            new GollekClientException(
+                                    "Streaming request failed with status: " + response.statusCode()));
                     return;
                 }
 

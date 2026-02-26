@@ -22,7 +22,7 @@ public interface CerebrasConfig {
      * Default model
      */
     @WithName("default-model")
-    @WithDefault("llama3.1-70b")
+    @WithDefault("llama3.1-8b")
     String defaultModel();
 
     /**

@@ -1,4 +1,7 @@
-package tech.kayys.gollek.sdk.core.model;
+package tech.kayys.gollek.sdk.model;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Progress information for model pull operations.
@@ -11,7 +14,12 @@ public final class PullProgress {
     private final long completed;
     private final int percentComplete;
 
-    public PullProgress(String status, String digest, long total, long completed) {
+    @JsonCreator
+    public PullProgress(
+            @JsonProperty("status") String status,
+            @JsonProperty("digest") String digest,
+            @JsonProperty("total") long total,
+            @JsonProperty("completed") long completed) {
         this.status = status;
         this.digest = digest;
         this.total = total;

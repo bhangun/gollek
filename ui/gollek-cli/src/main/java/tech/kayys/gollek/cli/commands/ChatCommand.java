@@ -9,6 +9,7 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 import tech.kayys.gollek.cli.GollekCommand;
 import tech.kayys.gollek.sdk.core.GollekSdk;
+import tech.kayys.gollek.sdk.model.ModelInfo;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.Message;
@@ -48,21 +49,22 @@ public class ChatCommand implements Runnable {
     @Inject
     ProviderRegistry providerRegistry;
 
-    @Option(names = { "-m", "--model" }, description = "Model ID or path", required = true)
-    String modelId;
+    @Option(names = { "-m", "--model" }, description = "Model ID or path (optional if provider has default)")
+    public String modelId;
 
     @Option(names = {
             "--provider" }, description = "Provider: litert, gguf, djl, libtorch(experimental), ollama, gemini, openai, anthropic, cerebras")
-    String providerId;
+    public String providerId;
 
     @Option(names = { "--system" }, description = "System prompt")
     String systemPrompt;
 
-    @Option(names = { "--concise" }, description = "Prefer concise answers for lower latency", defaultValue = "true", negatable = true)
-    boolean concise;
+    @Option(names = {
+            "--concise" }, description = "Prefer concise answers for lower latency", defaultValue = "true", negatable = true)
+    public boolean concise;
 
     @Option(names = { "--temperature" }, description = "Sampling temperature", defaultValue = "0.2")
-    double temperature;
+    public double temperature;
 
     @Option(names = { "--top-p" }, description = "Top-p sampling", defaultValue = "0.9")
     double topP;
@@ -100,13 +102,15 @@ public class ChatCommand implements Runnable {
     @Option(names = { "--max-tokens" }, description = "Maximum tokens to generate per response", defaultValue = "48")
     int maxTokens;
 
-    @Option(names = { "--inference-timeout-ms" }, description = "Hard timeout for one inference call in milliseconds", defaultValue = "180000")
+    @Option(names = {
+            "--inference-timeout-ms" }, description = "Hard timeout for one inference call in milliseconds", defaultValue = "180000")
     long inferenceTimeoutMs;
 
     @Option(names = { "-q", "--quiet" }, description = "Minimal output (no banner/spinner/stats)")
     boolean quiet;
 
-    @Option(names = { "--convert-mode" }, description = "Checkpoint conversion mode: ask, auto, off", defaultValue = "ask")
+    @Option(names = {
+            "--convert-mode" }, description = "Checkpoint conversion mode: ask, auto, off", defaultValue = "ask")
     String convertMode;
 
     @Option(names = { "--gguf-outtype" }, description = "GGUF converter outtype (e.g. q4_0, q8_0, f16, f32)")
@@ -118,9 +122,8 @@ public class ChatCommand implements Runnable {
     private static final String YELLOW = "\u001B[33m";
     private static final String DIM = "\u001B[2m";
     private static final String BOLD = "\u001B[1m";
-    private static final String DEFAULT_CONCISE_SYSTEM_PROMPT =
-            "Answer briefly and directly. Keep responses relevant to the question. "
-                    + "Prefer 1-4 short sentences unless the user asks for detail.";
+    private static final String DEFAULT_CONCISE_SYSTEM_PROMPT = "Answer briefly and directly. Keep responses relevant to the question. "
+            + "Prefer 1-4 short sentences unless the user asks for detail.";
 
     private String sessionId;
     private String modelPathOverride;
@@ -138,6 +141,10 @@ public class ChatCommand implements Runnable {
             }
             // Configure logging: show GGUF debug logs only if --verbose/--logs is on
             if (verbose) {
+                System.setProperty("quarkus.log.console.level", "DEBUG");
+                System.setProperty("quarkus.log.category.\"tech.kayys.gollek\".level", "DEBUG");
+                System.setProperty("quarkus.log.category.\"tech.kayys.gollek.inference.libtorch\".level", "DEBUG");
+
                 java.util.logging.Logger ggufLogger = java.util.logging.Logger
                         .getLogger("tech.kayys.gollek.inference.gguf");
                 ggufLogger.setLevel(java.util.logging.Level.FINE);
@@ -152,7 +159,21 @@ public class ChatCommand implements Runnable {
                 sdk.setPreferredProvider(providerId);
             }
 
-            if (!isMcpProvider()) {
+            // Resolve default model from provider if omitted
+            if (modelId == null || modelId.isBlank()) {
+                if (providerId != null && !providerId.isBlank()) {
+                    providerRegistry.getProvider(providerId).ifPresent(p -> {
+                        modelId = p.metadata().getDefaultModel();
+                    });
+                }
+                if (modelId == null || modelId.isBlank()) {
+                    System.err.println(
+                            "Error: Missing required option: '--model=<modelId>' (or specify a provider with a default model)");
+                    return;
+                }
+            }
+
+            if (!isMcpProvider() && !isCloudProvider(providerId)) {
                 if (!ensureModelAvailable()) {
                     return;
                 }
@@ -625,6 +646,15 @@ public class ChatCommand implements Runnable {
         return providerId != null && "mcp".equalsIgnoreCase(providerId.trim());
     }
 
+    private boolean isCloudProvider(String providerId) {
+        if (providerId == null || providerId.isBlank()) {
+            return false;
+        }
+        String p = providerId.trim().toLowerCase();
+        return p.equals("cerebras") || p.equals("ollama") || p.equals("mistral") || p.equals("gemini")
+                || p.equals("openai") || p.equals("anthropic");
+    }
+
     private boolean isHuggingFaceSpec(String id) {
         return id != null && (id.startsWith("hf:") || id.contains("/"));
     }
@@ -633,6 +663,12 @@ public class ChatCommand implements Runnable {
         String mode = convertMode == null ? "ask" : convertMode.trim().toLowerCase();
         if (!mode.equals("ask") && !mode.equals("auto") && !mode.equals("off")) {
             mode = "ask";
+        }
+
+        // If a specific provider is requested and it's not GGUF, skip GGUF conversion
+        // prompt
+        if (providerId != null && !providerId.isEmpty() && !"gguf".equalsIgnoreCase(providerId)) {
+            return;
         }
 
         if (mode.equals("off")) {
@@ -771,7 +807,7 @@ public class ChatCommand implements Runnable {
         };
     }
 
-    private void maybeUpgradeDjlLayout(tech.kayys.gollek.sdk.core.model.ModelInfo info) {
+    private void maybeUpgradeDjlLayout(ModelInfo info) {
         if (info == null || info.getFormat() == null) {
             return;
         }
@@ -900,7 +936,8 @@ public class ChatCommand implements Runnable {
                 var resolved = LocalModelResolver.resolve(sdk, candidate);
                 if (resolved.isPresent() && !isCheckpointOnlyFormat(resolved.get().info().getFormat())) {
                     modelId = resolved.get().modelId();
-                    modelPathOverride = resolved.get().localPath() != null ? resolved.get().localPath().toString() : null;
+                    modelPathOverride = resolved.get().localPath() != null ? resolved.get().localPath().toString()
+                            : null;
                     if (!quiet) {
                         System.out.println("Using compatible model: " + modelId);
                     }
@@ -914,6 +951,12 @@ public class ChatCommand implements Runnable {
     }
 
     private boolean ensureProviderHealthy(String provider) {
+        if (isCloudProvider(provider)) {
+            // Cloud providers might report UNHEALTHY if API keys are missing,
+            // but we want to let the request go through to show the actual API error
+            return true;
+        }
+
         Optional<ProviderInfo> info = findProviderInfo(provider);
         if (info.isEmpty()) {
             System.err.printf("Required provider is not available: %s%n", provider);
@@ -934,9 +977,11 @@ public class ChatCommand implements Runnable {
             System.err.println(
                     "DJL runtime is not loaded. Ensure gollek-ext-format-djl is on classpath and DJL native runtime can initialize.");
         } else if ("libtorch".equalsIgnoreCase(providerId)) {
-            System.err.println("LibTorch runtime is not loaded. Set LIBTORCH_PATH and include gollek-ext-format-libtorch.");
+            System.err.println(
+                    "LibTorch runtime is not loaded. Set LIBTORCH_PATH and include gollek-ext-format-libtorch.");
         } else if ("gguf".equalsIgnoreCase(providerId)) {
-            System.err.println("GGUF runtime is not loaded. Set GOLEK_LLAMA_LIB_DIR/GOLEK_LLAMA_LIB_PATH and include gollek-ext-format-gguf.");
+            System.err.println(
+                    "GGUF runtime is not loaded. Set GOLEK_LLAMA_LIB_DIR/GOLEK_LLAMA_LIB_PATH and include gollek-ext-format-gguf.");
         }
     }
 

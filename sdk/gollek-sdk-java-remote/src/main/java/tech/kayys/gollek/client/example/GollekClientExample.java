@@ -1,14 +1,15 @@
 package tech.kayys.gollek.client.example;
 
 import io.smallrye.mutiny.Multi;
+
 import tech.kayys.gollek.spi.Message;
-import tech.kayys.gollek.sdk.core.model.AsyncJobStatus;
-import tech.kayys.gollek.sdk.core.model.BatchInferenceRequest;
+import tech.kayys.gollek.spi.inference.AsyncJobStatus;
+import tech.kayys.gollek.spi.inference.BatchInferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.stream.StreamChunk;
 import tech.kayys.gollek.client.GollekClient;
-import tech.kayys.gollek.sdk.core.exception.SdkException;
+import tech.kayys.gollek.sdk.exception.SdkException;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -123,11 +124,11 @@ public class GollekClientExample {
                     Duration.ofSeconds(2) // Poll interval
             );
 
-            if (status.getResult() != null) {
+            if (status.result() != null) {
                 System.out.println("Job completed successfully:");
-                System.out.println("Response: " + status.getResult().getContent());
+                System.out.println("Response: " + status.result().getContent());
             } else {
-                System.out.println("Job failed: " + status.getError());
+                System.out.println("Job failed: " + status.error());
             }
         } catch (SdkException e) {
             System.err.println("Async job error [" + e.getErrorCode() + "]: " + e.getMessage());

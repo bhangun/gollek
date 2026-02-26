@@ -9,7 +9,6 @@ import tech.kayys.gollek.spi.provider.ProviderMetadata;
 import tech.kayys.gollek.spi.provider.ProviderRequest;
 import tech.kayys.gollek.spi.plugin.GollekPlugin;
 import tech.kayys.gollek.spi.provider.LLMProvider;
-import tech.kayys.gollek.spi.context.RequestContext;
 import tech.kayys.gollek.spi.exception.ProviderException;
 
 /**

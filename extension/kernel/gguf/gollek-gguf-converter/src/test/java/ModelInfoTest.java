@@ -1,6 +1,6 @@
 import org.junit.jupiter.api.Test;
 
-import tech.kayys.gollek.converter.model.ModelInfo;
+import tech.kayys.gollek.converter.model.ModelMetadata;
 import tech.kayys.gollek.converter.model.QuantizationType;
 import tech.kayys.gollek.spi.model.ModelFormat;
 
@@ -18,7 +18,7 @@ class ModelInfoTest {
         @Test
         @DisplayName("Should create ModelInfo with all parameters")
         void testModelInfoCreation() {
-                ModelInfo info = ModelInfo.builder()
+                ModelMetadata info = ModelMetadata.builder()
                                 .modelType("llama")
                                 .architecture("LlamaForCausalLM")
                                 .parameterCount(7_241_748_480L)
@@ -46,22 +46,22 @@ class ModelInfoTest {
         @Test
         @DisplayName("Should format parameter count correctly")
         void testParameterCountFormatting() {
-                ModelInfo small = ModelInfo.builder()
+                ModelMetadata small = ModelMetadata.builder()
                                 .parameterCount(500_000L) // 0.5M
                                 .build();
-                assertEquals("500.0M", small.getParameterCountFormatted());
+                assertEquals("0.5M", small.getParameterCountFormatted());
 
-                ModelInfo medium = ModelInfo.builder()
+                ModelMetadata medium = ModelMetadata.builder()
                                 .parameterCount(2_500_000_000L) // 2.5B
                                 .build();
                 assertEquals("2.5B", medium.getParameterCountFormatted());
 
-                ModelInfo large = ModelInfo.builder()
+                ModelMetadata large = ModelMetadata.builder()
                                 .parameterCount(13_000_000_000L) // 13B
                                 .build();
                 assertEquals("13.0B", large.getParameterCountFormatted());
 
-                ModelInfo zero = ModelInfo.builder()
+                ModelMetadata zero = ModelMetadata.builder()
                                 .parameterCount(0L)
                                 .build();
                 assertEquals("Unknown", zero.getParameterCountFormatted());
@@ -70,22 +70,22 @@ class ModelInfoTest {
         @Test
         @DisplayName("Should format file size correctly")
         void testFileSizeFormatting() {
-                ModelInfo small = ModelInfo.builder()
+                ModelMetadata small = ModelMetadata.builder()
                                 .fileSize(512 * 1024) // 512KB
                                 .build();
                 assertEquals("0.50 MB", small.getFileSizeFormatted());
 
-                ModelInfo medium = ModelInfo.builder()
+                ModelMetadata medium = ModelMetadata.builder()
                                 .fileSize(2L * 1024 * 1024 * 1024) // 2GB
                                 .build();
                 assertEquals("2.00 GB", medium.getFileSizeFormatted());
 
-                ModelInfo large = ModelInfo.builder()
+                ModelMetadata large = ModelMetadata.builder()
                                 .fileSize(15L * 1024 * 1024 * 1024) // 15GB
                                 .build();
                 assertEquals("15.00 GB", large.getFileSizeFormatted());
 
-                ModelInfo zero = ModelInfo.builder()
+                ModelMetadata zero = ModelMetadata.builder()
                                 .fileSize(0L)
                                 .build();
                 assertEquals("Unknown", zero.getFileSizeFormatted());
@@ -94,7 +94,7 @@ class ModelInfoTest {
         @Test
         @DisplayName("Should calculate file size in GB correctly")
         void testFileSizeInGb() {
-                ModelInfo info = ModelInfo.builder()
+                ModelMetadata info = ModelMetadata.builder()
                                 .fileSize(4_294_967_296L) // Exactly 4GB
                                 .build();
 
@@ -104,17 +104,17 @@ class ModelInfoTest {
         @Test
         @DisplayName("Should identify large models correctly")
         void testIsLargeModel() {
-                ModelInfo small = ModelInfo.builder()
+                ModelMetadata small = ModelMetadata.builder()
                                 .parameterCount(5_000_000_000L) // 5B
                                 .build();
                 assertFalse(small.isLargeModel());
 
-                ModelInfo large = ModelInfo.builder()
+                ModelMetadata large = ModelMetadata.builder()
                                 .parameterCount(12_000_000_000L) // 12B
                                 .build();
                 assertTrue(large.isLargeModel());
 
-                ModelInfo huge = ModelInfo.builder()
+                ModelMetadata huge = ModelMetadata.builder()
                                 .parameterCount(70_000_000_000L) // 70B
                                 .build();
                 assertTrue(huge.isLargeModel());
@@ -123,7 +123,7 @@ class ModelInfoTest {
         @Test
         @DisplayName("Should estimate memory requirements correctly")
         void testMemoryEstimation() {
-                ModelInfo info = ModelInfo.builder()
+                ModelMetadata info = ModelMetadata.builder()
                                 .parameterCount(7_000_000_000L) // 7B parameters
                                 .build();
 
@@ -137,13 +137,13 @@ class ModelInfoTest {
 
                 // Estimate for Q8_0 (4/4 bytes per parameter)
                 double q8Memory = info.estimateMemoryGb(QuantizationType.Q8_0);
-                assertTrue(q8Memory > 25.0); // Should be close to original size with overhead
+                assertTrue(q8Memory > 8.0 && q8Memory < 10.0); // ~6.5GB model + 2GB overhead
         }
 
         @Test
         @DisplayName("Should handle null values gracefully")
         void testNullValueHandling() {
-                ModelInfo info = ModelInfo.builder().build(); // All fields null/default
+                ModelMetadata info = ModelMetadata.builder().build(); // All fields null/default
 
                 assertNull(info.getModelType());
                 assertNull(info.getArchitecture());
@@ -160,7 +160,7 @@ class ModelInfoTest {
         @Test
         @DisplayName("Should generate meaningful toString representation")
         void testToString() {
-                ModelInfo info = ModelInfo.builder()
+                ModelMetadata info = ModelMetadata.builder()
                                 .modelType("llama")
                                 .architecture("LlamaForCausalLM")
                                 .parameterCount(7_241_748_480L)
@@ -173,14 +173,14 @@ class ModelInfoTest {
                 assertTrue(str.contains("type=llama"));
                 assertTrue(str.contains("arch=LlamaForCausalLM"));
                 assertTrue(str.contains("params=7.2B"));
-                assertTrue(str.contains("size=3.83"));
+                assertTrue(str.contains("size=3.57 GB"));
                 assertTrue(str.contains("format=PyTorch"));
         }
 
         @Test
         @DisplayName("Should handle unknown format gracefully")
         void testUnknownFormat() {
-                ModelInfo info = ModelInfo.builder()
+                ModelMetadata info = ModelMetadata.builder()
                                 .format(ModelFormat.UNKNOWN)
                                 .build();
 

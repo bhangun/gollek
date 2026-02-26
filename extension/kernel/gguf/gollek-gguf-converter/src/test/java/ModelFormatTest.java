@@ -134,7 +134,7 @@ class ModelFormatTest {
     void testAllFormatConstants() {
         ModelFormat[] allFormats = ModelFormat.values();
 
-        assertEquals(6, allFormats.length); // PYTORCH, SAFETENSORS, TENSORFLOW, FLAX, ONNX, GGUF, UNKNOWN
+        assertEquals(11, allFormats.length); // PYTORCH, SAFETENSORS, TENSORFLOW, FLAX, ONNX, GGUF, UNKNOWN, etc
 
         // Verify each format has unique ID
         for (int i = 0; i < allFormats.length; i++) {

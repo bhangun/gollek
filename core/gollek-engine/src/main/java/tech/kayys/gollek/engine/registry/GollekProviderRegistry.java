@@ -43,8 +43,12 @@ public class GollekProviderRegistry implements ProviderRegistry {
         providerInstances.stream().forEach(provider -> {
             try {
 
-                register(provider);
-                LOG.infof("Registered provider: %s v%s", provider.id(), provider.version());
+                if (provider.isEnabled()) {
+                    register(provider);
+                    LOG.infof("Registered provider: %s v%s", provider.id(), provider.version());
+                } else {
+                    LOG.debugf("Skipping disabled provider: %s", provider.id());
+                }
 
             } catch (Exception e) {
 

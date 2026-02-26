@@ -4,7 +4,7 @@ import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.sdk.core.model.SystemInfo;
+import tech.kayys.gollek.sdk.model.SystemInfo;
 import tech.kayys.gollek.spi.provider.ProviderInfo;
 import io.quarkus.arc.Unremovable;
 

@@ -346,6 +346,13 @@ public class LlamaCppBinding {
                 FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     }
 
+    private boolean verbose = false;
+
+    private LlamaCppBinding(SymbolLookup symbolLookup, boolean verbose) {
+        this(symbolLookup);
+        this.verbose = verbose;
+    }
+
     private MethodHandle linkFunction(Linker linker, String name, FunctionDescriptor descriptor) {
         return linkFunction(linker, name, descriptor, true);
     }
@@ -373,19 +380,19 @@ public class LlamaCppBinding {
                     });
         } catch (Throwable t) {
             if (required) {
-                log.warnf("Failed to link native function '%s' (%s). Function will be treated as unavailable.",
-                        name, t.getMessage());
+                if (verbose) {
+                    log.warnf("Failed to link native function '%s' (%s). Function will be treated as unavailable.",
+                            name, t.getMessage());
+                } else {
+                    log.debugf("Failed to link native function '%s' (%s).", name, t.getMessage());
+                }
             } else {
                 log.debugf("Failed to link optional native function '%s' (%s).", name, t.getMessage());
             }
-            return null;
         }
+        return null;
     }
 
-    /**
-     * Load the native library and create binding instance with default (quiet)
-     * logging.
-     */
     public static LlamaCppBinding load() {
         return load(false);
     }
@@ -420,7 +427,7 @@ public class LlamaCppBinding {
                 suppressNativeLogsStatic(symbolLookup);
             }
 
-            LlamaCppBinding binding = new LlamaCppBinding(symbolLookup);
+            LlamaCppBinding binding = new LlamaCppBinding(symbolLookup, verbose);
 
             // Initialize backend
             binding.backendInit();

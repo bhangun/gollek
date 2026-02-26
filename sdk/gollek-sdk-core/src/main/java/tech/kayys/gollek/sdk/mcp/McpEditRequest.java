@@ -1,14 +1,13 @@
-package tech.kayys.gollek.sdk.core.mcp;
+package tech.kayys.gollek.sdk.mcp;
 
 public record McpEditRequest(
-        String name,
-        String transport,
-        String command,
-        String url,
-        String argsJson,
-        boolean clearArgs,
-        String envJson,
-        boolean clearEnv,
-        Boolean enabled) {
+                String name,
+                String transport,
+                String command,
+                String url,
+                String argsJson,
+                boolean clearArgs,
+                String envJson,
+                boolean clearEnv,
+                Boolean enabled) {
 }
-

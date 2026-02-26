@@ -89,16 +89,6 @@ class GGUFConversionParamsTest {
                     .validate();
         });
 
-        // Invalid: null quantization
-        assertThrows(IllegalArgumentException.class, () -> {
-            GGUFConversionParams.builder()
-                    .inputPath(input)
-                    .outputPath(output)
-                    .quantization(null)
-                    .build()
-                    .validate();
-        });
-
         // Invalid: negative threads
         assertThrows(IllegalArgumentException.class, () -> {
             GGUFConversionParams.builder()

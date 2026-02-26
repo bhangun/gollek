@@ -25,9 +25,11 @@
         <grpc.version>1.60.0</grpc.version>
         <protobuf.version>3.25.5</protobuf.version>
         <testcontainers.version>1.19.3</testcontainers.version>
+        <hypersistence-utils.version>3.15.2</hypersistence-utils.version>
     </properties>
 
     <modules>
+        <module>bom</module>
         <module>core</module>
         <module>plugins</module>
         <module>extension</module>
@@ -60,6 +62,24 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+
+            <!-- Jakarta EE APIs -->
+            <dependency>
+                <groupId>jakarta.enterprise</groupId>
+                <artifactId>jakarta.enterprise.cdi-api</artifactId>
+                <version>4.0.1</version>
+            </dependency>
+            <dependency>
+                <groupId>jakarta.inject</groupId>
+                <artifactId>jakarta.inject-api</artifactId>
+                <version>2.0.1</version>
+            </dependency>
+            <dependency>
+                <groupId>jakarta.validation</groupId>
+                <artifactId>jakarta.validation-api</artifactId>
+                <version>3.0.2</version>
+            </dependency>
+
 
             <!-- Apache Commons -->
             <dependency>
@@ -126,12 +146,6 @@
                 <version>4.5.24</version>
             </dependency>
 
-            <!-- SmallRye -->
-            <dependency>
-                <groupId>io.smallrye.reactive</groupId>
-                <artifactId>mutiny</artifactId>
-                <version>3.1.0</version>
-            </dependency>
 
             <!-- Caffeine -->
             <dependency>
@@ -140,12 +154,6 @@
                 <version>3.1.8</version>
             </dependency>
 
-            <!-- Jakarta -->
-            <dependency>
-                <groupId>jakarta.validation</groupId>
-                <artifactId>jakarta.validation-api</artifactId>
-                <version>3.0.2</version>
-            </dependency>
 
             <dependency>
                 <groupId>org.projectlombok</groupId>
@@ -154,6 +162,11 @@
                 <scope>provided</scope>
             </dependency>
 
+            <dependency>
+                <groupId>io.hypersistence</groupId>
+                <artifactId>hypersistence-utils-hibernate-71</artifactId>
+                <version>${hypersistence-utils.version}</version>
+            </dependency>
 
         </dependencies>
     </dependencyManagement>

@@ -24,7 +24,7 @@
         <!-- Core API -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-core</artifactId>
+            <artifactId>gollek-engine-core</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -38,9 +38,16 @@
             <artifactId>gollek-observability</artifactId>
             <version>${project.version}</version>
         </dependency>
-
-
-        <!-- Jackson for JSON -->
+        <dependency>
+            <groupId>tech.kayys.gollek</groupId>
+            <artifactId>gollek-flash-attention</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys.gollek</groupId>
+            <artifactId>gollek-paged-attention</artifactId>
+            <version>${project.version}</version>
+        </dependency>        <!-- Jackson for JSON -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -99,6 +106,11 @@
 
         <dependency>
             <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-opentelemetry</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.quarkus</groupId>
             <artifactId>quarkus-smallrye-fault-tolerance</artifactId>
         </dependency>
 
@@ -146,6 +158,16 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                        <java.util.logging.config.file>${project.basedir}/src/test/resources/jboss-logging.properties</java.util.logging.config.file>
+                    </systemPropertyVariables>
+                </configuration>
             </plugin>
         </plugins>
     </build>

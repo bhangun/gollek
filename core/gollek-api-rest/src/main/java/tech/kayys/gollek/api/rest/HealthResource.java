@@ -1,5 +1,6 @@
 package tech.kayys.gollek.api.rest;
 
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -10,13 +11,16 @@ import org.eclipse.microprofile.health.HealthCheck;
 import org.eclipse.microprofile.health.HealthCheckResponse;
 import org.eclipse.microprofile.health.Liveness;
 import org.eclipse.microprofile.health.Readiness;
-import tech.kayys.gollek.observability.InferenceEngineHealthCheck;
 
 import java.time.Instant;
 import java.util.Map;
 
 /**
  * Custom health and diagnostics endpoints
+ * Note: Quarkus provides built-in health endpoints at:
+ * - /q/health/live (liveness)
+ * - /q/health/ready (readiness)
+ * - /q/health (combined)
  */
 @Path("/health")
 @Produces(MediaType.APPLICATION_JSON)
@@ -24,33 +28,49 @@ public class HealthResource {
 
         @Inject
         @Liveness
-        HealthCheck livenessCheck;
+        Instance<HealthCheck> livenessChecks;
 
         @Inject
         @Readiness
-        HealthCheck readinessCheck;
+        Instance<HealthCheck> readinessChecks;
 
-        @Inject
-        InferenceEngineHealthCheck engineHealth; // This may need to be replaced with actual health check class
+        @GET
+        public Response health() {
+                return Response.ok(Map.of(
+                                "status", "UP",
+                                "timestamp", Instant.now(),
+                                "info", "Use /q/health/live, /q/health/ready, or /q/health for detailed health checks"))
+                                .build();
+        }
 
         @GET
         @Path("/detailed")
         public Response detailedHealth() {
-                HealthCheckResponse liveness = livenessCheck.call();
-                HealthCheckResponse readiness = readinessCheck.call();
-                HealthCheckResponse engine = engineHealth.call();
+                // Aggregate all liveness checks
+                boolean livenessUp = true;
+                for (HealthCheck check : livenessChecks) {
+                        if (check.call().getStatus() != HealthCheckResponse.Status.UP) {
+                                livenessUp = false;
+                                break;
+                        }
+                }
 
-                boolean overall = liveness.getStatus() == HealthCheckResponse.Status.UP &&
-                                readiness.getStatus() == HealthCheckResponse.Status.UP &&
-                                engine.getStatus() == HealthCheckResponse.Status.UP;
+                // Aggregate all readiness checks
+                boolean readinessUp = true;
+                for (HealthCheck check : readinessChecks) {
+                        if (check.call().getStatus() != HealthCheckResponse.Status.UP) {
+                                readinessUp = false;
+                                break;
+                        }
+                }
+
+                boolean overall = livenessUp && readinessUp;
 
                 return Response.ok(Map.of(
                                 "status", overall ? "UP" : "DOWN",
                                 "timestamp", Instant.now(),
-                                "checks", Map.of(
-                                                "liveness", liveness,
-                                                "readiness", readiness,
-                                                "engine", engine)))
+                                "liveness", livenessUp ? "UP" : "DOWN",
+                                "readiness", readinessUp ? "UP" : "DOWN"))
                                 .build();
         }
 }

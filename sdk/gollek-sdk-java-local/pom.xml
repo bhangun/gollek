@@ -9,9 +9,7 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <groupId>tech.kayys.gollek</groupId>
     <artifactId>gollek-sdk-java-local</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -25,54 +23,46 @@
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-sdk-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Gollek Core API -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-spi</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Gollek Engine (for direct access to services) -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-engine</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Gollek Model Repository -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-model-repo-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- HuggingFace Repo (for direct access) -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-model-repo-hf</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Local Model Repo (for direct access) -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-model-repo-local</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- GGUF Inference (for conversion service) -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-ext-format-gguf</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-plugin-mcp</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Reactive Programming -->

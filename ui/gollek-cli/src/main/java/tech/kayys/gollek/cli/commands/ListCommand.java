@@ -6,7 +6,7 @@ import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.sdk.core.model.ModelInfo;
+import tech.kayys.gollek.sdk.model.ModelInfo;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,12 +31,13 @@ public class ListCommand implements Runnable {
     GollekSdk sdk;
 
     @Option(names = { "-f", "--format" }, description = "Output format: table, json", defaultValue = "table")
-    String format;
+    public String format;
 
     @Option(names = { "-l", "--limit" }, description = "Maximum models to list", defaultValue = "50")
-    int limit;
+    public int limit;
 
-    @Option(names = { "--runnable-only" }, description = "Show only models runnable in local Java runtime", defaultValue = "false")
+    @Option(names = {
+            "--runnable-only" }, description = "Show only models runnable in local Java runtime", defaultValue = "false")
     boolean runnableOnly;
 
     @Override
