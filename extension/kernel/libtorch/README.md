@@ -54,6 +54,23 @@ graph LR
 
 ```
 
+# LibTorch Extension Enhancements
+## Phase A — Foundation
+- [x] 2.1 Tensor Cleaner safety net (memory leak protection)
+- [x] 2.4 Session Pool limits (max pool size + backpressure)
+- [x] 4.4 Model warmup / preloading at startup
+- [ ] 4.1 Test coverage expansion
+## Phase B — Inference Pipeline
+- [x] 1.1 Streaming / token-by-token generation
+- [x] 1.2 Sampling strategies (Temperature, Top-K, Top-P)
+- [ ] 1.3 KV-Cache integration with TorchScriptRunner
+## Phase C — Performance
+- [ ] 3.1 Mixed precision (FP16/BF16)
+- [ ] 3.3 Dynamic batching with priority queue
+## Phase D — Observability
+- [ ] 5.1 Per-inference telemetry
+- [ ] 5.2 GPU memory tracking
+
 ## File Inventory (38 source files + 2 SPI registrations)
 
 ### Provider Integration (root package)
