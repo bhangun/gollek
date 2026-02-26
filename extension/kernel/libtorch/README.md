@@ -32,6 +32,28 @@ graph TD
     I --> E
 ```
 
+
+
+```mermaid
+graph LR
+    A["Phase A\nFoundation"] --> B["Phase B\nInference"]
+    B --> C["Phase C\nPerformance"]
+    C --> D["Phase D\nObservability"]
+    A1["2.1 Cleaner safety net"] --> A
+    A2["2.4 Pool limits"] --> A
+    A3["4.1 Test expansion"] --> A
+    A4["4.4 Warmup"] --> A
+    B1["1.1 Streaming"] --> B
+    B2["1.2 Sampling"] --> B
+    B3["1.3 KV-Cache integration"] --> B
+    C1["3.1 Mixed precision"] --> C
+    C2["3.3 Priority batching"] --> C
+    C3["1.4 Multi-LoRA"] --> C
+    D1["5.1 Per-inference telemetry"] --> D
+    D2["5.2 GPU memory tracking"] --> D
+
+```
+
 ## File Inventory (38 source files + 2 SPI registrations)
 
 ### Provider Integration (root package)
