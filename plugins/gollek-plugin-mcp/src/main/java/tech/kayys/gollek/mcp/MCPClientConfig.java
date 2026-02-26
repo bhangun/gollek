@@ -1,4 +1,4 @@
-package tech.kayys.gollek.provider.core.mcp;
+package tech.kayys.gollek.mcp;
 
 import java.time.Duration;
 import java.util.HashMap;

@@ -64,9 +64,9 @@ New core module at `inference-gollek/core/gollek-cluster/`:
 
 | File | Fix |
 |---|---|
-| [DefaultInferenceEngineTest.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/core/gollek-engine/src/test/java/tech/kayys/golek/engine/inference/DefaultInferenceEngineTest.java) | `@Mock String` → plain `String` literal |
-| [InferenceOrchestratorTest.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/core/gollek-engine/src/test/java/tech/kayys/golek/engine/inference/InferenceOrchestratorTest.java) | `@Mock String` → plain `String` literal |
-| [ModelStorageServiceTest.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/core/gollek-engine/src/test/java/tech/kayys/golek/engine/model/ModelStorageServiceTest.java) | Path assertion: `/tmp/test-models/` → `/tmp/test-models-gollek/` |
+| [DefaultInferenceEngineTest.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/core/gollek-engine/src/test/java/tech/kayys/gollek/engine/inference/DefaultInferenceEngineTest.java) | `@Mock String` → plain `String` literal |
+| [InferenceOrchestratorTest.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/core/gollek-engine/src/test/java/tech/kayys/gollek/engine/inference/InferenceOrchestratorTest.java) | `@Mock String` → plain `String` literal |
+| [ModelStorageServiceTest.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/core/gollek-engine/src/test/java/tech/kayys/gollek/engine/model/ModelStorageServiceTest.java) | Path assertion: `/tmp/test-models/` → `/tmp/test-models-gollek/` |
 
 ---
 
@@ -163,9 +163,9 @@ New core module at `inference-gollek/core/gollek-cluster/`:
 
 | File | Fix |
 |---|---|
-| [DefaultInferenceEngineTest.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/core/gollek-engine/src/test/java/tech/kayys/golek/engine/inference/DefaultInferenceEngineTest.java) | `@Mock String` → plain `String` literal |
-| [InferenceOrchestratorTest.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/core/gollek-engine/src/test/java/tech/kayys/golek/engine/inference/InferenceOrchestratorTest.java) | `@Mock String` → plain `String` literal |
-| [ModelStorageServiceTest.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/core/gollek-engine/src/test/java/tech/kayys/golek/engine/model/ModelStorageServiceTest.java) | Path assertion: `/tmp/test-models/` → `/tmp/test-models-gollek/` |
+| [DefaultInferenceEngineTest.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/core/gollek-engine/src/test/java/tech/kayys/gollek/engine/inference/DefaultInferenceEngineTest.java) | `@Mock String` → plain `String` literal |
+| [InferenceOrchestratorTest.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/core/gollek-engine/src/test/java/tech/kayys/gollek/engine/inference/InferenceOrchestratorTest.java) | `@Mock String` → plain `String` literal |
+| [ModelStorageServiceTest.java](file:///Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/core/gollek-engine/src/test/java/tech/kayys/gollek/engine/model/ModelStorageServiceTest.java) | Path assertion: `/tmp/test-models/` → `/tmp/test-models-gollek/` |
 
 ---
 

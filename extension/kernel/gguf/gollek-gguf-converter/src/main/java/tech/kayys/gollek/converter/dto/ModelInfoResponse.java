@@ -2,7 +2,7 @@ package tech.kayys.gollek.converter.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-import tech.kayys.gollek.converter.model.ModelInfo;
+import tech.kayys.gollek.converter.model.ModelMetadata;
 
 /**
  * Model information response DTO.
@@ -149,7 +149,7 @@ public class ModelInfoResponse {
         this.estimatedMemoryGb = estimatedMemoryGb;
     }
 
-    public static ModelInfoResponse fromModelInfo(ModelInfo info) {
+    public static ModelInfoResponse fromModelInfo(ModelMetadata info) {
         if (info == null) {
             return null;
         }

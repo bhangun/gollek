@@ -1,7 +1,5 @@
 package tech.kayys.gollek.plugin;
 
-import tech.kayys.wayang.tenant.RequestId;
-
 import jakarta.enterprise.context.ApplicationScoped;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,8 +22,8 @@ public class DefaultTenantQuotaService implements TenantQuotaService {
     private final ConcurrentHashMap<String, Long> lastResetMap = new ConcurrentHashMap<>();
 
     @Override
-    public QuotaInfo checkQuota(RequestId requestId) {
-        String tenantStr = requestId.value();
+    public QuotaInfo checkQuota(String requestId) {
+        String tenantStr = requestId;
 
         // Get or create default config
         QuotaConfig config = configMap.computeIfAbsent(tenantStr, this::getDefaultConfig);
@@ -59,8 +57,8 @@ public class DefaultTenantQuotaService implements TenantQuotaService {
     }
 
     @Override
-    public void reserve(RequestId requestId, int amount) {
-        String tenantStr = requestId.value();
+    public void reserve(String requestId, int amount) {
+        String tenantStr = requestId;
 
         QuotaConfig config = configMap.computeIfAbsent(tenantStr, this::getDefaultConfig);
 
@@ -74,8 +72,8 @@ public class DefaultTenantQuotaService implements TenantQuotaService {
     }
 
     @Override
-    public void release(RequestId requestId, int amount) {
-        String tenantStr = requestId.value();
+    public void release(String requestId, int amount) {
+        String tenantStr = requestId;
 
         QuotaConfig config = configMap.computeIfAbsent(tenantStr, this::getDefaultConfig);
 
@@ -95,15 +93,15 @@ public class DefaultTenantQuotaService implements TenantQuotaService {
     }
 
     @Override
-    public QuotaConfig getConfig(RequestId requestId) {
-        return configMap.computeIfAbsent(requestId.value(), this::getDefaultConfig);
+    public QuotaConfig getConfig(String requestId) {
+        return configMap.computeIfAbsent(requestId, this::getDefaultConfig);
     }
 
     /**
      * Set quota configuration for a tenant
      */
-    public void setConfig(RequestId requestId, QuotaConfig config) {
-        configMap.put(requestId.value(), config);
+    public void setConfig(String requestId, QuotaConfig config) {
+        configMap.put(requestId, config);
     }
 
     /**

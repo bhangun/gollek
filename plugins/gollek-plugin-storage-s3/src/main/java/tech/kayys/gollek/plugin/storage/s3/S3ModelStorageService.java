@@ -18,14 +18,12 @@ public class S3ModelStorageService implements ModelStorageService {
 
     private S3Client s3Client;
     private String bucketName;
-    private String region;
     private String pathPrefix;
 
     // Initialize with configuration
     public void initialize(String accessKeyId, String secretAccessKey, String bucketName,
             String region, String endpoint, String pathPrefix) {
         this.bucketName = bucketName;
-        this.region = region;
         this.pathPrefix = pathPrefix != null ? pathPrefix : "models/";
 
         AwsBasicCredentials awsCreds = AwsBasicCredentials.create(accessKeyId, secretAccessKey);
@@ -41,10 +39,10 @@ public class S3ModelStorageService implements ModelStorageService {
     }
 
     @Override
-    public Uni<String> uploadModel(String requestId, String modelId, String version, byte[] data) {
+    public Uni<String> uploadModel(String apiKey, String modelId, String version, byte[] data) {
         return Uni.createFrom().item(() -> {
             try {
-                String key = String.format("%s%s/%s/%s", pathPrefix, requestId, modelId, version);
+                String key = String.format("%s%s/%s/%s", pathPrefix, apiKey, modelId, version);
 
                 PutObjectRequest request = PutObjectRequest.builder()
                         .bucket(bucketName)

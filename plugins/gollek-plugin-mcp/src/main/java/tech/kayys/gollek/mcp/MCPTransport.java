@@ -1,4 +1,4 @@
-package tech.kayys.gollek.provider.core.mcp;
+package tech.kayys.gollek.mcp;
 
 import io.smallrye.mutiny.Uni;
 import tech.kayys.gollek.mcp.dto.JsonRpcMessage;

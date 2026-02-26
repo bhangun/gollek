@@ -1,4 +1,4 @@
-package tech.kayys.gollek.provider.core.mcp;
+package tech.kayys.gollek.mcp;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.smallrye.mutiny.Uni;

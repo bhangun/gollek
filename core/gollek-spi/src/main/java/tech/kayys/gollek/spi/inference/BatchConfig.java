@@ -14,6 +14,17 @@ public record BatchConfig(
         int smallPromptThreshold,
         boolean enableDisaggregation) {
 
+    public static BatchConfig defaultStatic() {
+        return new BatchConfig(
+                BatchStrategy.STATIC,
+                8,
+                Duration.ZERO,
+                2,
+                4,
+                128,
+                false);
+    }
+
     public static BatchConfig defaultDynamic() {
         return new BatchConfig(
                 BatchStrategy.DYNAMIC,

@@ -67,6 +67,11 @@ public class DjlProvider implements LLMProvider {
     }
 
     @Override
+    public boolean isEnabled() {
+        return config.enabled();
+    }
+
+    @Override
     public String id() {
         return PROVIDER_ID;
     }

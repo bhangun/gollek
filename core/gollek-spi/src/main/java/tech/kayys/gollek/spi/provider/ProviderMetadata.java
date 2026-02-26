@@ -16,6 +16,7 @@ public final class ProviderMetadata {
     private final String description;
     private final String vendor;
     private final String homepage;
+    private final String defaultModel;
 
     @JsonCreator
     public ProviderMetadata(
@@ -24,13 +25,15 @@ public final class ProviderMetadata {
             @JsonProperty("version") String version,
             @JsonProperty("description") String description,
             @JsonProperty("vendor") String vendor,
-            @JsonProperty("homepage") String homepage) {
+            @JsonProperty("homepage") String homepage,
+            @JsonProperty("defaultModel") String defaultModel) {
         this.providerId = Objects.requireNonNull(providerId, "providerId");
         this.name = Objects.requireNonNull(name, "name");
         this.version = Objects.requireNonNull(version, "version");
         this.description = description;
         this.vendor = vendor;
         this.homepage = homepage;
+        this.defaultModel = defaultModel;
     }
 
     // Getters
@@ -54,6 +57,10 @@ public final class ProviderMetadata {
         return vendor;
     }
 
+    public String getDefaultModel() {
+        return defaultModel;
+    }
+
     public String getHomepage() {
         return homepage;
     }
@@ -69,6 +76,7 @@ public final class ProviderMetadata {
         private String description;
         private String vendor;
         private String homepage;
+        private String defaultModel;
 
         public Builder providerId(String providerId) {
             this.providerId = providerId;
@@ -100,9 +108,14 @@ public final class ProviderMetadata {
             return this;
         }
 
+        public Builder defaultModel(String defaultModel) {
+            this.defaultModel = defaultModel;
+            return this;
+        }
+
         public ProviderMetadata build() {
             return new ProviderMetadata(
-                    providerId, name, version, description, vendor, homepage);
+                    providerId, name, version, description, vendor, homepage, defaultModel);
         }
     }
 

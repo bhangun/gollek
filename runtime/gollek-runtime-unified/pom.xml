@@ -7,6 +7,7 @@
         <groupId>tech.kayys.gollek</groupId>
         <artifactId>gollek-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
     </parent>
 
     <artifactId>gollek-runtime-unified</artifactId>
@@ -18,19 +19,30 @@
         <maven.compiler.target>25</maven.compiler.target>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <!-- Import Gollek BOM for internal module versions -->
+            <dependency>
+                <groupId>tech.kayys.gollek</groupId>
+                <artifactId>gollek-bom</artifactId>
+                <version>${project.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <!-- Core kernel (minimal) -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-core</artifactId>
-            <version>${project.version}</version>
+            <artifactId>gollek-engine-core</artifactId>
         </dependency>
 
         <!-- Core API -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-spi</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Tenant Core -->
@@ -44,54 +56,46 @@
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-provider-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Inference Engine -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-engine</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Local Providers -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-ext-cloud-ollama</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-ext-format-tflite</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- SDK for programmatic access -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-sdk-java-local</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- CLI Interface -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-cli</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- REST API -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-api-rest</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Infrastructure -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-observability</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Quarkus Core -->
@@ -180,6 +184,21 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-config-yaml</artifactId>
+        </dependency>
+
+        <!-- Database - Reactive PostgreSQL -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-reactive-pg-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-hibernate-reactive-panache</artifactId>
+        </dependency>
+        <!-- H2 for dev services / standalone mode -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-h2</artifactId>
         </dependency>
 
         <!-- Testing -->

@@ -92,6 +92,33 @@ Or via Make:
 make error-codes
 ```
 
+### BOM Usage
+
+`inference-gollek` now publishes `tech.kayys.gollek:gollek-bom` for centralized dependency version management.
+
+```xml
+<dependencyManagement>
+  <dependencies>
+    <dependency>
+      <groupId>tech.kayys.gollek</groupId>
+      <artifactId>gollek-bom</artifactId>
+      <version>1.0.0-SNAPSHOT</version>
+      <type>pom</type>
+      <scope>import</scope>
+    </dependency>
+  </dependencies>
+</dependencyManagement>
+```
+
+Then consume Gollek modules without specifying versions:
+
+```xml
+<dependency>
+  <groupId>tech.kayys.gollek</groupId>
+  <artifactId>gollek-sdk-java-remote</artifactId>
+</dependency>
+```
+
 ### CI Notes
 
 In CI, the `gollek-spi` module runs doc generation during `generate-resources`.

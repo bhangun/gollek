@@ -14,26 +14,23 @@ public class GCSModelStorageService implements ModelStorageService {
 
     private Storage storage;
     private String bucketName;
-    private String projectId;
     private String pathPrefix;
 
     // Initialize with configuration
-    public void initialize(String bucketName, String projectId, String pathPrefix) {
+    public void initialize(String bucketName, String pathPrefix) {
         this.bucketName = bucketName;
-        this.projectId = projectId;
         this.pathPrefix = pathPrefix != null ? pathPrefix : "models/";
 
-        this.storage = StorageOptions.newBuilder()
-                .setProjectId(projectId)
-                .build()
-                .getService();
+        // Use default storage options; project ID is typically handled by environment
+        // or ADC
+        this.storage = StorageOptions.getDefaultInstance().getService();
     }
 
     @Override
-    public Uni<String> uploadModel(String requestId, String modelId, String version, byte[] data) {
+    public Uni<String> uploadModel(String apiKey, String modelId, String version, byte[] data) {
         return Uni.createFrom().item(() -> {
             try {
-                String blobName = String.format("%s%s/%s/%s", pathPrefix, requestId, modelId, version);
+                String blobName = String.format("%s%s/%s/%s", pathPrefix, apiKey, modelId, version);
 
                 BlobId blobId = BlobId.of(bucketName, blobName);
                 BlobInfo blobInfo = BlobInfo.newBuilder(blobId).build();

@@ -7,7 +7,7 @@ import tech.kayys.gollek.spi.plugin.PluginException;
 import tech.kayys.gollek.spi.context.EngineContext;
 import tech.kayys.gollek.core.execution.ExecutionContext;
 import tech.kayys.gollek.spi.inference.InferencePhase;
-import tech.kayys.wayang.tenant.RequestId;
+// No RequestId import needed, using String
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -50,7 +50,7 @@ public class QuotaEnforcementPlugin implements InferencePhasePlugin {
 
     @Override
     public void execute(ExecutionContext context, EngineContext engine) throws PluginException {
-        RequestId requestId = context.requestContext().getRequestId();
+        String requestId = context.requestContext().getRequestId();
         if (requestId == null) {
             throw new PluginException("Tenant ID is required for quota enforcement");
         }
@@ -59,7 +59,7 @@ public class QuotaEnforcementPlugin implements InferencePhasePlugin {
         QuotaInfo quota = quotaService.checkQuota(requestId);
         if (!quota.hasCapacity()) {
             throw new PluginException(
-                    "Tenant " + requestId.value() + " has exceeded quota: " + quota.getLimit());
+                    "Tenant " + requestId + " has exceeded quota: " + quota.getLimit());
         }
 
         // Reserve quota for this request
@@ -68,7 +68,7 @@ public class QuotaEnforcementPlugin implements InferencePhasePlugin {
         // Store reservation info for cleanup in later phases
         context.putVariable("quotaReserved", true);
         context.putVariable("reservedQuotaId", quota.getId());
-        context.putVariable("reservedRequestId", requestId.value());
+        context.putVariable("reservedRequestId", requestId);
     }
 
     @Override

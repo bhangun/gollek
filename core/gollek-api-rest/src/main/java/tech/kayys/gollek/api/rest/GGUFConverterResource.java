@@ -20,7 +20,7 @@ import tech.kayys.gollek.converter.dto.ProgressUpdate;
 import tech.kayys.gollek.converter.model.ConversionProgress;
 import tech.kayys.gollek.converter.model.ConversionResult;
 import tech.kayys.gollek.converter.model.GGUFConversionParams;
-import tech.kayys.gollek.converter.model.ModelInfo;
+import tech.kayys.gollek.converter.model.ModelMetadata;
 import tech.kayys.gollek.converter.model.QuantizationType;
 import tech.kayys.gollek.spi.auth.ApiKeyConstants;
 import tech.kayys.gollek.spi.context.RequestContext;
@@ -199,7 +199,7 @@ public class GGUFConverterResource {
         java.nio.file.Path fullPath = getTenantPath(requestId, path);
 
         try {
-            ModelInfo info = converter.getModelInfo(fullPath);
+            ModelMetadata info = converter.getModelInfo(fullPath);
             return Response.ok(ModelInfoResponse.fromModelInfo(info)).build();
         } catch (GGUFException e) {
             log.error("Failed to get model info for tenant {}, path {}", requestId, path, e);
@@ -220,7 +220,7 @@ public class GGUFConverterResource {
         java.nio.file.Path fullPath = getTenantPath(requestId, path);
 
         try {
-            ModelInfo info = converter.verifyGGUF(fullPath);
+            ModelMetadata info = converter.verifyGGUF(fullPath);
             return Response.ok(Map.of(
                     "valid", true,
                     "info", ModelInfoResponse.fromModelInfo(info))).build();

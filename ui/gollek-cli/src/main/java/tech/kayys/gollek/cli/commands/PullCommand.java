@@ -28,13 +28,14 @@ public class PullCommand implements Runnable {
     @Inject
     Instance<HuggingFaceClient> hfClientInstance;
 
-    @Parameters(index = "0", description = "Model specification (e.g., ollama:llama2, llama2)")
-    String modelSpec;
+    @Parameters(index = "0", description = "Model name to pull (e.g. llama3, hf:user/repo)")
+    public String modelSpec;
 
-    @Option(names = { "--insecure" }, description = "Allow insecure connections")
-    boolean insecure;
+    @Option(names = { "--insecure" }, description = "Allow insecure connections", defaultValue = "false")
+    public boolean insecure;
 
-    @Option(names = { "--convert-mode" }, description = "Checkpoint conversion mode: auto or off", defaultValue = "auto")
+    @Option(names = {
+            "--convert-mode" }, description = "Checkpoint conversion mode: auto or off", defaultValue = "auto")
     String convertMode;
 
     @Option(names = { "--gguf-outtype" }, description = "GGUF converter outtype (e.g. f16, q8_0, f32)")

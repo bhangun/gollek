@@ -51,16 +51,16 @@ public class InferenceEngineBootstrap {
     @Inject
     EngineContext engineContext;
 
-    @ConfigProperty(name = "wayang.inference.engine.startup.timeout", defaultValue = "30s")
+    @ConfigProperty(name = "gollek.inference.engine.startup.timeout", defaultValue = "30s")
     Duration startupTimeout;
 
-    @ConfigProperty(name = "wayang.inference.engine.enabled", defaultValue = "true")
+    @ConfigProperty(name = "gollek.inference.engine.enabled", defaultValue = "true")
     boolean engineEnabled;
 
-    @ConfigProperty(name = "wayang.inference.engine.startup.fail-on-plugin-error", defaultValue = "false")
+    @ConfigProperty(name = "gollek.inference.engine.startup.fail-on-plugin-error", defaultValue = "false")
     boolean failOnPluginError;
 
-    @ConfigProperty(name = "wayang.inference.engine.startup.min-plugins", defaultValue = "0")
+    @ConfigProperty(name = "gollek.inference.engine.startup.min-plugins", defaultValue = "0")
     int minPluginsRequired;
 
     private volatile boolean initialized = false;
@@ -81,7 +81,7 @@ public class InferenceEngineBootstrap {
         }
 
         LOG.info("========================================");
-        LOG.info("Starting Wayang Inference Engine...");
+        LOG.info("Starting Gollek Inference Engine...");
         LOG.info("========================================");
 
         Instant start = Instant.now();

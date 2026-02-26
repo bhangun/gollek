@@ -45,11 +45,9 @@ public class MistralProvider implements StreamingProvider {
     @Override
     public Uni<ProviderHealth> health() {
         String apiKey = getApiKey();
-        if (apiKey == null || apiKey.isEmpty()) {
-            return Uni.createFrom().item(ProviderHealth.unhealthy("API key is missing"));
-        }
-        // Simplified health check for Mistral
-        return Uni.createFrom().item(ProviderHealth.healthy("Mistral provider initialized"));
+        return Uni.createFrom().item(ProviderHealth.healthy(
+                apiKey != null && !apiKey.isEmpty() ? "Mistral API available"
+                        : "Mistral initialized (API key missing)"));
     }
 
     private String getApiKey(ProviderRequest request) {
@@ -64,6 +62,10 @@ public class MistralProvider implements StreamingProvider {
     private String getApiKey() {
         if (providerConfig == null)
             return null;
+        String key = System.getenv("MISTRAL_API_KEY");
+        if (key != null && !key.isBlank()) {
+            return key;
+        }
         return providerConfig.getSecret("api.key")
                 .orElseGet(() -> providerConfig.getString("api_key"));
     }
@@ -113,6 +115,7 @@ public class MistralProvider implements StreamingProvider {
                 .version(VERSION)
                 .vendor("Mistral AI")
                 .homepage("https://mistral.ai")
+                .defaultModel("mistral-large-latest")
                 .build();
     }
 

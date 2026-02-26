@@ -9,7 +9,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.sdk.core.model.ModelInfo;
+import tech.kayys.gollek.sdk.model.ModelInfo;
 
 import java.nio.file.Path;
 import java.util.Locale;
@@ -28,8 +28,8 @@ public class ShowCommand implements Runnable {
     @Inject
     GollekSdk sdk;
 
-    @Parameters(index = "0", description = "Model ID to show")
-    String modelId;
+    @Parameters(index = "0", description = "Model ID or path")
+    public String modelId;
 
     @Option(names = { "--json" }, description = "Print model details as JSON")
     boolean json;

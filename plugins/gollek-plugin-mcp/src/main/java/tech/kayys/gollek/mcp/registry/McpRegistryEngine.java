@@ -9,16 +9,16 @@ import jakarta.json.JsonReader;
 import jakarta.json.JsonString;
 import jakarta.json.JsonValue;
 import jakarta.json.stream.JsonGenerator;
-import tech.kayys.gollek.sdk.core.exception.SdkException;
-import tech.kayys.gollek.sdk.core.mcp.McpAddRequest;
-import tech.kayys.gollek.sdk.core.mcp.McpDoctorEntry;
-import tech.kayys.gollek.sdk.core.mcp.McpDoctorReport;
-import tech.kayys.gollek.sdk.core.mcp.McpEditRequest;
-import tech.kayys.gollek.sdk.core.mcp.McpRegistryManager;
-import tech.kayys.gollek.sdk.core.mcp.McpServerSummary;
-import tech.kayys.gollek.sdk.core.mcp.McpServerView;
-import tech.kayys.gollek.sdk.core.mcp.McpTestEntry;
-import tech.kayys.gollek.sdk.core.mcp.McpTestReport;
+import tech.kayys.gollek.sdk.exception.SdkException;
+import tech.kayys.gollek.sdk.mcp.McpAddRequest;
+import tech.kayys.gollek.sdk.mcp.McpDoctorEntry;
+import tech.kayys.gollek.sdk.mcp.McpDoctorReport;
+import tech.kayys.gollek.sdk.mcp.McpEditRequest;
+import tech.kayys.gollek.sdk.mcp.McpRegistryManager;
+import tech.kayys.gollek.sdk.mcp.McpServerSummary;
+import tech.kayys.gollek.sdk.mcp.McpServerView;
+import tech.kayys.gollek.sdk.mcp.McpTestEntry;
+import tech.kayys.gollek.sdk.mcp.McpTestReport;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -373,7 +373,8 @@ public class McpRegistryEngine implements McpRegistryManager {
                     .build();
             List<String> validationErrors = validateServers(validationProbe);
             if (!validationErrors.isEmpty()) {
-                throw new SdkException("SDK_ERR_MCP_EDIT", "Invalid MCP config: " + String.join("; ", validationErrors));
+                throw new SdkException("SDK_ERR_MCP_EDIT",
+                        "Invalid MCP config: " + String.join("; ", validationErrors));
             }
 
             if (useRemoteRegistry()) {
@@ -448,7 +449,8 @@ public class McpRegistryEngine implements McpRegistryManager {
                 }
                 JsonObject response = postJson(remoteEndpoint("/import"), Json.createObjectBuilder()
                         .add("sourceType", "RAW")
-                        .add("source", Json.createObjectBuilder().add(MCP_SERVERS_KEY, importedServers).build().toString())
+                        .add("source",
+                                Json.createObjectBuilder().add(MCP_SERVERS_KEY, importedServers).build().toString())
                         .build());
                 return response.getInt("importedCount", importedServers.size());
             }
@@ -459,7 +461,8 @@ public class McpRegistryEngine implements McpRegistryManager {
             }
             List<String> validationErrors = validateServers(importedServers);
             if (!validationErrors.isEmpty()) {
-                throw new SdkException("SDK_ERR_MCP_IMPORT", "Invalid MCP config: " + String.join("; ", validationErrors));
+                throw new SdkException("SDK_ERR_MCP_IMPORT",
+                        "Invalid MCP config: " + String.join("; ", validationErrors));
             }
 
             JsonObject finalServers;
@@ -661,9 +664,12 @@ public class McpRegistryEngine implements McpRegistryManager {
             }
 
             process = pb.start();
-            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8));
-                 BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
-                 BufferedReader errReader = new BufferedReader(new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
+            try (BufferedWriter writer = new BufferedWriter(
+                    new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8));
+                    BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
+                    BufferedReader errReader = new BufferedReader(
+                            new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
 
                 long requestId = 1L;
                 JsonObject initParams = Json.createObjectBuilder()
@@ -802,10 +808,12 @@ public class McpRegistryEngine implements McpRegistryManager {
         boolean hasFromUrl = request.fromUrl() != null && !request.fromUrl().isBlank();
         boolean hasFromRegistry = request.fromRegistry() != null && !request.fromRegistry().isBlank();
         boolean hasStructured = isStructuredAdd(request);
-        int sourceCount = (hasInlineOrFile ? 1 : 0) + (hasFromUrl ? 1 : 0) + (hasFromRegistry ? 1 : 0) + (hasStructured ? 1 : 0);
+        int sourceCount = (hasInlineOrFile ? 1 : 0) + (hasFromUrl ? 1 : 0) + (hasFromRegistry ? 1 : 0)
+                + (hasStructured ? 1 : 0);
 
         if (sourceCount > 1) {
-            throw new IllegalArgumentException("Use one add source only: <json>/--file, --from-url, --from-registry, or --name.");
+            throw new IllegalArgumentException(
+                    "Use one add source only: <json>/--file, --from-url, --from-registry, or --name.");
         }
         if (hasFromUrl) {
             return fetchUrl(request.fromUrl());
@@ -815,7 +823,8 @@ public class McpRegistryEngine implements McpRegistryManager {
         }
         if (hasInlineOrFile) {
             if (request.name() != null && !request.name().isBlank()) {
-                throw new IllegalArgumentException("Do not combine JSON input (--file/<json>) with structured flags (--name ...).");
+                throw new IllegalArgumentException(
+                        "Do not combine JSON input (--file/<json>) with structured flags (--name ...).");
             }
             if (request.inlineJson() != null && !request.inlineJson().isBlank()) {
                 return request.inlineJson();
@@ -986,7 +995,8 @@ public class McpRegistryEngine implements McpRegistryManager {
                     .header("Accept", "application/json")
                     .GET()
                     .build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            HttpResponse<String> response = client.send(request,
+                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             int status = response.statusCode();
             if (status < 200 || status >= 300) {
                 throw new IllegalArgumentException("HTTP " + status);
@@ -1014,8 +1024,10 @@ public class McpRegistryEngine implements McpRegistryManager {
     }
 
     private String remoteEndpoint(String suffix) {
-        String configuredBase = readConfigValue(REGISTRY_API_BASE_URL_PROP, REGISTRY_API_BASE_URL_ENV, "http://localhost:8080");
-        String base = configuredBase.endsWith("/") ? configuredBase.substring(0, configuredBase.length() - 1) : configuredBase;
+        String configuredBase = readConfigValue(REGISTRY_API_BASE_URL_PROP, REGISTRY_API_BASE_URL_ENV,
+                "http://localhost:8080");
+        String base = configuredBase.endsWith("/") ? configuredBase.substring(0, configuredBase.length() - 1)
+                : configuredBase;
         String path = suffix.startsWith("/") ? suffix : "/" + suffix;
         return base + REGISTRY_API_PREFIX + path;
     }
@@ -1091,10 +1103,12 @@ public class McpRegistryEngine implements McpRegistryManager {
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(payload.toString(), StandardCharsets.UTF_8))
                 .build();
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        HttpResponse<String> response = client.send(request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         int status = response.statusCode();
         if (status < 200 || status >= 300) {
-            throw new IllegalArgumentException("Registry API POST " + url + " returned HTTP " + status + ": " + response.body());
+            throw new IllegalArgumentException(
+                    "Registry API POST " + url + " returned HTTP " + status + ": " + response.body());
         }
         String body = response.body();
         if (body == null || body.isBlank()) {
@@ -1108,10 +1122,12 @@ public class McpRegistryEngine implements McpRegistryManager {
         HttpRequest request = apiRequestBuilder(URI.create(url))
                 .GET()
                 .build();
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        HttpResponse<String> response = client.send(request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         int status = response.statusCode();
         if (status < 200 || status >= 300) {
-            throw new IllegalArgumentException("Registry API GET " + url + " returned HTTP " + status + ": " + response.body());
+            throw new IllegalArgumentException(
+                    "Registry API GET " + url + " returned HTTP " + status + ": " + response.body());
         }
         String body = response.body();
         if (body == null || body.isBlank()) {
@@ -1127,7 +1143,8 @@ public class McpRegistryEngine implements McpRegistryManager {
         HttpRequest request = apiRequestBuilder(URI.create(url))
                 .DELETE()
                 .build();
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        HttpResponse<String> response = client.send(request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         return response.statusCode();
     }
 

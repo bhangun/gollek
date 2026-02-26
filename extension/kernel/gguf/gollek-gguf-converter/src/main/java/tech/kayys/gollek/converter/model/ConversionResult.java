@@ -23,7 +23,7 @@ public class ConversionResult {
     /**
      * Input model information.
      */
-    private final ModelInfo inputInfo;
+    private final ModelMetadata inputInfo;
 
     /**
      * Output file path.
@@ -50,7 +50,8 @@ public class ConversionResult {
      */
     private final String errorMessage;
 
-    public ConversionResult(long conversionId, boolean success, ModelInfo inputInfo, Path outputPath, long outputSize,
+    public ConversionResult(long conversionId, boolean success, ModelMetadata inputInfo, Path outputPath,
+            long outputSize,
             long durationMs, double compressionRatio, String errorMessage) {
         this.conversionId = conversionId;
         this.success = success;
@@ -70,7 +71,7 @@ public class ConversionResult {
         return success;
     }
 
-    public ModelInfo getInputInfo() {
+    public ModelMetadata getInputInfo() {
         return inputInfo;
     }
 
@@ -138,7 +139,7 @@ public class ConversionResult {
     public static class Builder {
         private long conversionId;
         private boolean success;
-        private ModelInfo inputInfo;
+        private ModelMetadata inputInfo;
         private Path outputPath;
         private long outputSize;
         private long durationMs;
@@ -155,7 +156,7 @@ public class ConversionResult {
             return this;
         }
 
-        public Builder inputInfo(ModelInfo inputInfo) {
+        public Builder inputInfo(ModelMetadata inputInfo) {
             this.inputInfo = inputInfo;
             return this;
         }
@@ -186,7 +187,8 @@ public class ConversionResult {
         }
 
         public ConversionResult build() {
-            return new ConversionResult(conversionId, success, inputInfo, outputPath, outputSize, durationMs, compressionRatio, errorMessage);
+            return new ConversionResult(conversionId, success, inputInfo, outputPath, outputSize, durationMs,
+                    compressionRatio, errorMessage);
         }
     }
 

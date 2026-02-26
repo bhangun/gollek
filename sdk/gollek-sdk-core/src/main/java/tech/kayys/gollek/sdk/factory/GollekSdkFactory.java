@@ -3,9 +3,9 @@ package tech.kayys.gollek.sdk.factory;
 import jakarta.enterprise.inject.se.SeContainer;
 import jakarta.enterprise.inject.se.SeContainerInitializer;
 import jakarta.enterprise.inject.spi.CDI;
+import tech.kayys.gollek.sdk.config.SdkConfig;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.sdk.core.config.SdkConfig;
-import tech.kayys.gollek.sdk.core.exception.SdkException;
+import tech.kayys.gollek.sdk.exception.SdkException;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -102,10 +102,10 @@ public class GollekSdkFactory {
      * @return A remote SDK instance
      */
     public static GollekSdk createRemoteSdk(String baseUrl, String apiKey) throws SdkException {
-         return builder()
-         .baseUrl(baseUrl)
-         .apiKey(apiKey)
-         .buildRemote();
+        return builder()
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
+                .buildRemote();
     }
 
     /**
@@ -118,10 +118,10 @@ public class GollekSdkFactory {
         Objects.requireNonNull(config, "config cannot be null");
 
         Builder builder = builder()
-        .apiKey(config.getApiKey())
-        .requestTimeout(config.getRequestTimeout())
-        .connectTimeout(config.getConnectTimeout())
-        .maxRetries(config.getRetryConfig().getMaxAttempts());
+                .apiKey(config.getApiKey())
+                .requestTimeout(config.getRequestTimeout())
+                .connectTimeout(config.getConnectTimeout())
+                .maxRetries(config.getRetryConfig().getMaxAttempts());
 
         config.getPreferredProvider().ifPresent(builder::preferredProvider);
 
@@ -165,7 +165,8 @@ public class GollekSdkFactory {
                 return selection.get();
             }
         } catch (IllegalStateException ignored) {
-            // No active CDI context in this runtime; fallback to SeContainer initialization.
+            // No active CDI context in this runtime; fallback to SeContainer
+            // initialization.
         } catch (Exception ignored) {
             // CDI API unavailable or bean resolution failed; fallback path below.
         }
@@ -273,7 +274,8 @@ public class GollekSdkFactory {
             if (apiKey == null || apiKey.isBlank()) {
                 apiKey = "community";
             }
-            // TODO: Implement proper remote SDK instantiation when gollek-sdk-java-remote is
+            // TODO: Implement proper remote SDK instantiation when gollek-sdk-java-remote
+            // is
             // available
             throw new UnsupportedOperationException("Remote SDK not yet implemented.");
         }

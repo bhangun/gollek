@@ -7,10 +7,10 @@ import tech.kayys.gollek.core.plugin.InferencePhasePlugin;
 import tech.kayys.gollek.core.execution.ExecutionContext;
 import tech.kayys.gollek.spi.inference.InferencePhase;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
-import tech.kayys.gollek.spi.Message;
-import tech.kayys.gollek.spi.context.EngineContext;
 import tech.kayys.gollek.spi.plugin.PluginContext;
 import tech.kayys.gollek.spi.plugin.PluginException;
+import tech.kayys.gollek.spi.context.EngineContext;
+import tech.kayys.gollek.spi.Message; // Re-adding this as it's used and not explicitly removed by the instruction's intent to "ensure correct imports"
 
 import java.util.*;
 import java.util.regex.Pattern;

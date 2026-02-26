@@ -20,16 +20,32 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
     </properties>
+    
+    <dependencyManagement>
+        <dependencies>
+            <!-- Import Gollek BOM for internal module versions -->
+            <dependency>
+                <groupId>tech.kayys.gollek</groupId>
+                <artifactId>gollek-bom</artifactId>
+                <version>${project.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    
     <modules>
         <module>gollek-spi</module>
         <module>gollek-kv-cache</module>
         <module>gollek-cluster</module>
-        <module>gollek-core</module>
+        <module>gollek-engine-core</module>
         <module>gollek-model-repo-core</module>
         <module>gollek-provider-core</module>
         <module>gollek-api-rest</module>
         <module>gollek-observability</module>
         <module>gollek-engine</module>
         <module>gollek-tool-core</module>
+        <module>gollek-ext-flash-attention</module>
+        <module>gollek-ext-paged-attention</module>
     </modules>
 </project>

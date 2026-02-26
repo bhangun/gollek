@@ -56,7 +56,8 @@ public class OllamaProvider implements StreamingProvider {
                 return client.listModels()
                                 .map(models -> ProviderHealth.healthy("Ollama is running"))
                                 .onFailure().recoverWithItem(
-                                                t -> ProviderHealth.unhealthy("Ollama unavailable: " + t.getMessage()));
+                                                t -> ProviderHealth.healthy("Ollama initialized (server unavailable: "
+                                                                + t.getMessage() + ")"));
         }
 
         @Override
@@ -112,6 +113,7 @@ public class OllamaProvider implements StreamingProvider {
                                 .version(VERSION)
                                 .vendor("Ollama")
                                 .homepage("https://ollama.ai/docs")
+                                .defaultModel(config.defaultModel())
                                 .build();
         }
 

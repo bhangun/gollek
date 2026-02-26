@@ -9,6 +9,7 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 import tech.kayys.gollek.cli.GollekCommand;
 import tech.kayys.gollek.sdk.core.GollekSdk;
+import tech.kayys.gollek.sdk.model.ModelInfo;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.Message;
@@ -48,10 +49,10 @@ public class RunCommand implements Runnable {
     ProviderRegistry providerRegistry;
 
     @Option(names = { "-m", "--model" }, description = "Model ID or path", required = true)
-    String modelId;
+    public String modelId;
 
     @Option(names = { "-p", "--prompt" }, description = "Input prompt", required = true)
-    String prompt;
+    public String prompt;
 
     @Option(names = {
             "--provider" }, description = "Provider: litert, gguf, djl, libtorch(experimental), ollama, gemini, openai, anthropic, cerebras")
@@ -97,7 +98,8 @@ public class RunCommand implements Runnable {
     @Option(names = { "--model-path" }, description = "Path to a custom model file (bypasses repository lookup)")
     String modelPath;
 
-    @Option(names = { "--convert-mode" }, description = "Checkpoint conversion mode: auto or off", defaultValue = "auto")
+    @Option(names = {
+            "--convert-mode" }, description = "Checkpoint conversion mode: auto or off", defaultValue = "auto")
     String convertMode;
 
     @Option(names = { "--gguf-outtype" }, description = "GGUF converter outtype (e.g. f16, q8_0, f32)")
@@ -191,7 +193,8 @@ public class RunCommand implements Runnable {
                                 if (stored.isPresent() && stored.get().hasWeights()) {
                                     System.out.println();
                                     System.out.println(
-                                            "Checkpoint artifacts saved to: " + stored.get().rootDir().toAbsolutePath());
+                                            "Checkpoint artifacts saved to: "
+                                                    + stored.get().rootDir().toAbsolutePath());
                                     System.err.println(
                                             "Model was downloaded in origin checkpoint format (.safetensors/.bin) and is not runnable yet in local Java runtime.");
                                     System.err.println(
@@ -479,7 +482,7 @@ public class RunCommand implements Runnable {
         };
     }
 
-    private void maybeUpgradeDjlLayout(tech.kayys.gollek.sdk.core.model.ModelInfo info) {
+    private void maybeUpgradeDjlLayout(ModelInfo info) {
         if (info == null || info.getFormat() == null) {
             return;
         }
@@ -541,9 +544,11 @@ public class RunCommand implements Runnable {
                     return true;
                 }
                 if (offline) {
-                    System.err.printf("Model '%s' uses checkpoint format '%s' and cannot run in offline Java runtime.%n",
+                    System.err.printf(
+                            "Model '%s' uses checkpoint format '%s' and cannot run in offline Java runtime.%n",
                             modelId, format);
-                    System.err.println("Use a GGUF or TorchScript model, or rerun without --offline for fallback pull.");
+                    System.err
+                            .println("Use a GGUF or TorchScript model, or rerun without --offline for fallback pull.");
                     return false;
                 }
                 if (tryRefreshCompatibleModel()) {
@@ -654,9 +659,11 @@ public class RunCommand implements Runnable {
             System.err.println(
                     "DJL runtime is not loaded. Ensure gollek-ext-format-djl is on classpath and DJL native runtime can initialize.");
         } else if ("libtorch".equalsIgnoreCase(providerId)) {
-            System.err.println("LibTorch runtime is not loaded. Set LIBTORCH_PATH and include gollek-ext-format-libtorch.");
+            System.err.println(
+                    "LibTorch runtime is not loaded. Set LIBTORCH_PATH and include gollek-ext-format-libtorch.");
         } else if ("gguf".equalsIgnoreCase(providerId)) {
-            System.err.println("GGUF runtime is not loaded. Set GOLEK_LLAMA_LIB_DIR/GOLEK_LLAMA_LIB_PATH and include gollek-ext-format-gguf.");
+            System.err.println(
+                    "GGUF runtime is not loaded. Set GOLEK_LLAMA_LIB_DIR/GOLEK_LLAMA_LIB_PATH and include gollek-ext-format-gguf.");
         }
     }
 

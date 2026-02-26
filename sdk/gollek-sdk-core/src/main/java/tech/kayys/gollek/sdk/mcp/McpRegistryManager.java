@@ -1,6 +1,6 @@
-package tech.kayys.gollek.sdk.core.mcp;
+package tech.kayys.gollek.sdk.mcp;
 
-import tech.kayys.gollek.sdk.core.exception.SdkException;
+import tech.kayys.gollek.sdk.exception.SdkException;
 
 import java.util.List;
 
@@ -30,4 +30,3 @@ public interface McpRegistryManager {
 
     McpTestReport test(String name, boolean all, long timeoutMs) throws SdkException;
 }
-

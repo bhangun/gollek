@@ -1,11 +1,10 @@
-package tech.kayys.gollek.sdk.core.mcp;
+package tech.kayys.gollek.sdk.mcp;
 
 public record McpTestEntry(
-        String name,
-        boolean success,
-        int tools,
-        int resources,
-        int prompts,
-        String error) {
+                String name,
+                boolean success,
+                int tools,
+                int resources,
+                int prompts,
+                String error) {
 }
-

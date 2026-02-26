@@ -20,6 +20,20 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
     </properties>
+    
+    <dependencyManagement>
+        <dependencies>
+            <!-- Import Gollek BOM for internal module versions -->
+            <dependency>
+                <groupId>tech.kayys.gollek</groupId>
+                <artifactId>gollek-bom</artifactId>
+                <version>${project.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    
     <modules>
         <module>gollek-plugin-content-safety</module>
         <module>gollek-plugin-model-router</module>

@@ -1,5 +1,7 @@
-package tech.kayys.gollek.sdk.core.model;
+package tech.kayys.gollek.sdk.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
@@ -21,17 +23,18 @@ public final class ModelInfo {
     private final Instant updatedAt;
     private final Map<String, Object> metadata;
 
+    @JsonCreator
     public ModelInfo(
-            String modelId,
-            String name,
-            String version,
-            String requestId,
-            String format,
-            Long sizeBytes,
-            String quantization,
-            Instant createdAt,
-            Instant updatedAt,
-            Map<String, Object> metadata) {
+            @JsonProperty("modelId") String modelId,
+            @JsonProperty("name") String name,
+            @JsonProperty("version") String version,
+            @JsonProperty("requestId") String requestId,
+            @JsonProperty("format") String format,
+            @JsonProperty("sizeBytes") Long sizeBytes,
+            @JsonProperty("quantization") String quantization,
+            @JsonProperty("createdAt") Instant createdAt,
+            @JsonProperty("updatedAt") Instant updatedAt,
+            @JsonProperty("metadata") Map<String, Object> metadata) {
         this.modelId = Objects.requireNonNull(modelId, "modelId is required");
         this.name = name;
         this.version = version;

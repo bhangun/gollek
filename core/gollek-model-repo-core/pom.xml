@@ -13,7 +13,7 @@
 
 
     <properties>
-        <hypersistence-utils.version>3.8.2</hypersistence-utils.version>
+        <hypersistence-utils.version>3.15.2</hypersistence-utils.version>
     </properties>
 
     <name>Wayang Inference :: Model Repository Core</name>
@@ -28,7 +28,7 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-core</artifactId>
+            <artifactId>gollek-engine-core</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -101,7 +101,7 @@
         <!-- JSON Support (Hypersistence for JSONB) -->
         <dependency>
             <groupId>io.hypersistence</groupId>
-            <artifactId>hypersistence-utils-hibernate-63</artifactId>
+            <artifactId>hypersistence-utils-hibernate-71</artifactId>
             <version>${hypersistence-utils.version}</version>
         </dependency>
 

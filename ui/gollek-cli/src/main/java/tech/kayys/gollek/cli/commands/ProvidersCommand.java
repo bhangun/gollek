@@ -22,8 +22,8 @@ public class ProvidersCommand implements Runnable {
     @Inject
     GollekSdk sdk;
 
-    @Option(names = { "-v", "--verbose" }, description = "Show detailed capabilities")
-    boolean verbose;
+    @Option(names = { "-v", "--verbose" }, description = "Show detailed health checks", defaultValue = "false")
+    public boolean verbose;
 
     @Override
     public void run() {

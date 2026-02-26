@@ -3,15 +3,17 @@ package tech.kayys.gollek.client;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.smallrye.mutiny.Multi;
+import tech.kayys.gollek.spi.inference.AsyncJobStatus;
+import tech.kayys.gollek.spi.inference.BatchInferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.provider.ProviderInfo;
 import tech.kayys.gollek.spi.stream.StreamChunk;
 import tech.kayys.gollek.client.exception.*;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.sdk.core.exception.SdkException;
-import tech.kayys.gollek.sdk.core.model.AsyncJobStatus;
-import tech.kayys.gollek.sdk.core.model.BatchInferenceRequest;
+import tech.kayys.gollek.sdk.exception.SdkException;
+import tech.kayys.gollek.sdk.model.ModelInfo;
+import tech.kayys.gollek.sdk.model.PullProgress;
 import tech.kayys.gollek.spi.auth.ApiKeyConstants;
 import javax.net.ssl.SSLContext;
 import java.net.URI;
@@ -295,7 +297,8 @@ public class GollekClient implements GollekSdk {
             case 503:
                 throw new GollekClientException("Service unavailable: " + responseBody);
             default:
-                throw new GollekClientException("Request failed with status: " + statusCode + ", body: " + responseBody);
+                throw new GollekClientException(
+                        "Request failed with status: " + statusCode + ", body: " + responseBody);
         }
     }
 
@@ -425,7 +428,7 @@ public class GollekClient implements GollekSdk {
     // ==================== Model Operations ====================
 
     @Override
-    public List<tech.kayys.gollek.sdk.core.model.ModelInfo> listModels() throws SdkException {
+    public List<ModelInfo> listModels() throws SdkException {
         try {
             String url = String.format("%s/v1/models", baseUrl);
 
@@ -442,7 +445,7 @@ public class GollekClient implements GollekSdk {
 
             return handleResponse(response,
                     objectMapper.getTypeFactory().constructCollectionType(java.util.List.class,
-                            tech.kayys.gollek.sdk.core.model.ModelInfo.class));
+                            ModelInfo.class));
         } catch (GollekClientException e) {
             throw new SdkException(e.getErrorCode(), e.getMessage(), e);
         } catch (Exception e) {
@@ -451,7 +454,7 @@ public class GollekClient implements GollekSdk {
     }
 
     @Override
-    public List<tech.kayys.gollek.sdk.core.model.ModelInfo> listModels(int offset, int limit) throws SdkException {
+    public List<ModelInfo> listModels(int offset, int limit) throws SdkException {
         try {
             String url = String.format("%s/v1/models?offset=%d&limit=%d", baseUrl, offset, limit);
 
@@ -468,7 +471,7 @@ public class GollekClient implements GollekSdk {
 
             return handleResponse(response,
                     objectMapper.getTypeFactory().constructCollectionType(java.util.List.class,
-                            tech.kayys.gollek.sdk.core.model.ModelInfo.class));
+                            ModelInfo.class));
         } catch (GollekClientException e) {
             throw new SdkException(e.getErrorCode(), e.getMessage(), e);
         } catch (Exception e) {
@@ -477,7 +480,7 @@ public class GollekClient implements GollekSdk {
     }
 
     @Override
-    public java.util.Optional<tech.kayys.gollek.sdk.core.model.ModelInfo> getModelInfo(String modelId)
+    public java.util.Optional<ModelInfo> getModelInfo(String modelId)
             throws SdkException {
         try {
             String encodedModelId = URLEncoder.encode(modelId, StandardCharsets.UTF_8);
@@ -498,8 +501,8 @@ public class GollekClient implements GollekSdk {
                 return java.util.Optional.empty(); // Model not found
             }
 
-            tech.kayys.gollek.sdk.core.model.ModelInfo modelInfo = handleResponse(response,
-                    tech.kayys.gollek.sdk.core.model.ModelInfo.class);
+            ModelInfo modelInfo = handleResponse(response,
+                    ModelInfo.class);
             return java.util.Optional.of(modelInfo);
         } catch (GollekClientException e) {
             if (e.getErrorCode().equals("CLIENT_ERROR") && e.getMessage().contains("404")) {
@@ -513,7 +516,7 @@ public class GollekClient implements GollekSdk {
 
     @Override
     public void pullModel(String modelSpec,
-            java.util.function.Consumer<tech.kayys.gollek.sdk.core.model.PullProgress> progressCallback)
+            java.util.function.Consumer<PullProgress> progressCallback)
             throws SdkException {
         try {
             // First, try to initiate the model pull
@@ -536,7 +539,7 @@ public class GollekClient implements GollekSdk {
             // If the server immediately returns success, call the callback
             if (response.statusCode() == 200) {
                 if (progressCallback != null) {
-                    tech.kayys.gollek.sdk.core.model.PullProgress progress = new tech.kayys.gollek.sdk.core.model.PullProgress(
+                    PullProgress progress = new PullProgress(
                             "Model pulled successfully", null, 100L, 100L);
                     progressCallback.accept(progress);
                 }
@@ -546,7 +549,7 @@ public class GollekClient implements GollekSdk {
                 StreamingHelper helper = new StreamingHelper(httpClient, objectMapper, baseUrl, apiKey);
 
                 // Create a Multi for the streaming progress
-                Multi<tech.kayys.gollek.sdk.core.model.PullProgress> progressMulti = helper
+                Multi<PullProgress> progressMulti = helper
                         .createModelPullStreamPublisher(modelSpec, progressCallback);
 
                 // Use blocking subscribe for model pull

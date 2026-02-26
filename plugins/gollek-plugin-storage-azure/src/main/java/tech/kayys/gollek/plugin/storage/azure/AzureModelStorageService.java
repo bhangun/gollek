@@ -30,10 +30,10 @@ public class AzureModelStorageService implements ModelStorageService {
     }
 
     @Override
-    public Uni<String> uploadModel(String requestId, String modelId, String version, byte[] data) {
+    public Uni<String> uploadModel(String apiKey, String modelId, String version, byte[] data) {
         return Uni.createFrom().item(() -> {
             try {
-                String blobName = String.format("%s%s/%s/%s", pathPrefix, requestId, modelId, version);
+                String blobName = String.format("%s%s/%s/%s", pathPrefix, apiKey, modelId, version);
 
                 BlobClient blobClient = containerClient.getBlobClient(blobName);
 

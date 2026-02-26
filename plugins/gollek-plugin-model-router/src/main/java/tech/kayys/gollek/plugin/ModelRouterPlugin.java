@@ -4,9 +4,9 @@ import tech.kayys.gollek.core.plugin.InferencePhasePlugin;
 import tech.kayys.gollek.core.plugin.GollekConfigurablePlugin;
 import tech.kayys.gollek.spi.plugin.PluginContext;
 import tech.kayys.gollek.spi.plugin.PluginException;
+import tech.kayys.gollek.spi.inference.InferencePhase;
 import tech.kayys.gollek.spi.context.EngineContext;
 import tech.kayys.gollek.core.execution.ExecutionContext;
-import tech.kayys.gollek.spi.inference.InferencePhase;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

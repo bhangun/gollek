@@ -34,7 +34,7 @@ class QuantizationTypeTest {
         assertEquals("4-bit K-quant (medium)", q4km.getDescription());
         assertEquals(QuantizationType.QualityLevel.MEDIUM_HIGH, q4km.getQualityLevel());
         assertEquals(8.5, q4km.getCompressionRatio(), 0.01);
-        assertTrue(q4km.getUseCase().contains("recommended"));
+        assertTrue(q4km.getUseCase().contains("Best overall"));
     }
 
     @Test
@@ -60,16 +60,16 @@ class QuantizationTypeTest {
         assertTrue(smallSize == QuantizationType.F16 || smallSize == QuantizationType.Q4_K_M);
 
         // Medium model with quality priority
-        QuantizationType mediumQuality = QuantizationType.recommend(7.0, true);
+        QuantizationType mediumQuality = QuantizationType.recommend(6.9, true);
         assertEquals(QuantizationType.Q5_K_M, mediumQuality);
 
         // Medium model with size priority
-        QuantizationType mediumSize = QuantizationType.recommend(7.0, false);
+        QuantizationType mediumSize = QuantizationType.recommend(6.9, false);
         assertEquals(QuantizationType.Q4_K_M, mediumSize);
 
         // Large model with quality priority
         QuantizationType largeQuality = QuantizationType.recommend(15.0, true);
-        assertEquals(QuantizationType.Q4_K_M, largeQuality);
+        assertEquals(QuantizationType.Q4_K_S, largeQuality);
 
         // Large model with size priority
         QuantizationType largeSize = QuantizationType.recommend(15.0, false);

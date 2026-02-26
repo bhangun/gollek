@@ -1,13 +1,14 @@
 package tech.kayys.gollek.mcp.registry;
 
 import com.sun.net.httpserver.HttpServer;
+
+import tech.kayys.gollek.sdk.exception.SdkException;
+
 import org.junit.jupiter.api.Test;
 
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
-
-import tech.kayys.gollek.sdk.core.exception.SdkException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

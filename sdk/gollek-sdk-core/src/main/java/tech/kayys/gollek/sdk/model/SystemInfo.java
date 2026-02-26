@@ -1,5 +1,7 @@
-package tech.kayys.gollek.sdk.core.model;
+package tech.kayys.gollek.sdk.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 import java.util.Objects;
 
@@ -21,19 +23,20 @@ public final class SystemInfo {
     private final int availableProcessors;
     private final Map<String, Object> metadata;
 
+    @JsonCreator
     public SystemInfo(
-            String cliVersion,
-            String javaVersion,
-            String osName,
-            String osVersion,
-            String osArch,
-            String userName,
-            String userHome,
-            long totalMemory,
-            long freeMemory,
-            long maxMemory,
-            int availableProcessors,
-            Map<String, Object> metadata) {
+            @JsonProperty("cliVersion") String cliVersion,
+            @JsonProperty("javaVersion") String javaVersion,
+            @JsonProperty("osName") String osName,
+            @JsonProperty("osVersion") String osVersion,
+            @JsonProperty("osArch") String osArch,
+            @JsonProperty("userName") String userName,
+            @JsonProperty("userHome") String userHome,
+            @JsonProperty("totalMemory") long totalMemory,
+            @JsonProperty("freeMemory") long freeMemory,
+            @JsonProperty("maxMemory") long maxMemory,
+            @JsonProperty("availableProcessors") int availableProcessors,
+            @JsonProperty("metadata") Map<String, Object> metadata) {
         this.cliVersion = Objects.requireNonNull(cliVersion, "cliVersion is required");
         this.javaVersion = javaVersion;
         this.osName = osName;

@@ -6,7 +6,7 @@ import tech.kayys.gollek.spi.plugin.PluginContext;
 import tech.kayys.gollek.spi.context.EngineContext;
 import tech.kayys.gollek.core.execution.ExecutionContext;
 import tech.kayys.gollek.spi.inference.InferencePhase;
-import tech.kayys.wayang.tenant.RequestId;
+// No RequestId import needed, using String
 import tech.kayys.gollek.core.plugin.GollekConfigurablePlugin;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -62,7 +62,7 @@ public class QuotaCleanupPlugin implements InferencePhasePlugin {
 
             if (requestIdOpt.isPresent()) {
                 try {
-                    RequestId requestId = RequestId.of(requestIdOpt.get());
+                    String requestId = requestIdOpt.get();
 
                     // Release the quota that was reserved for this request
                     quotaService.release(requestId, 1);

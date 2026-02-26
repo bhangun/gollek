@@ -14,6 +14,15 @@ import java.util.Optional;
 public interface LLMProvider {
 
     /**
+     * Determine if the provider is explicitly enabled by configuration.
+     * 
+     * @return true if enabled (default), false otherwise.
+     */
+    default boolean isEnabled() {
+        return true;
+    }
+
+    /**
      * Unique provider identifier.
      */
     String id();

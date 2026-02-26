@@ -1,7 +1,6 @@
 
 import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.io.TempDir;
 import jakarta.inject.Inject;
@@ -9,7 +8,7 @@ import tech.kayys.gollek.converter.GGUFConverter;
 import tech.kayys.gollek.converter.GGUFException;
 import tech.kayys.gollek.converter.model.ConversionProgress;
 import tech.kayys.gollek.converter.model.GGUFConversionParams;
-import tech.kayys.gollek.converter.model.ModelInfo;
+import tech.kayys.gollek.converter.model.ModelMetadata;
 import tech.kayys.gollek.converter.model.QuantizationType;
 import tech.kayys.gollek.spi.model.ModelFormat;
 
@@ -72,12 +71,10 @@ class GGUFConverterTest {
     @Test
     @DisplayName("Should detect SafeTensors format")
     void testDetectSafeTensorsFormat() throws IOException {
-        Path modelDir = tempDir.resolve("test-model-st");
-        Files.createDirectories(modelDir);
-        Files.createFile(modelDir.resolve("model.safetensors"));
-        Files.createFile(modelDir.resolve("config.json"));
+        Path stFile = tempDir.resolve("model.safetensors");
+        Files.createFile(stFile);
 
-        ModelFormat format = converter.detectFormat(modelDir);
+        ModelFormat format = converter.detectFormat(stFile);
         assertThat(format).isEqualTo(ModelFormat.SAFETENSORS);
     }
 
@@ -224,7 +221,7 @@ class GGUFConverterTest {
     @Test
     @DisplayName("Should calculate model info correctly")
     void testModelInfo() {
-        ModelInfo info = ModelInfo.builder()
+        ModelMetadata info = ModelMetadata.builder()
                 .modelType("llama")
                 .architecture("LlamaForCausalLM")
                 .parameterCount(7_241_748_480L)

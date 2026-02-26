@@ -9,16 +9,37 @@ case $0 in
   *) SCRIPT_DIR=$(pwd)/$(dirname "$0");;
 esac
 
+# Find project root (walk up from BASE_DIR until Inference-gollek-vendor is found)
+PROJECT_ROOT="$BASE_DIR"
+while [ "$PROJECT_ROOT" != "/" ] && [ ! -d "$PROJECT_ROOT/Inference-gollek-vendor" ]; do
+    PROJECT_ROOT=$(dirname "$PROJECT_ROOT")
+done
+
 # Normalize potential relative paths
-VENDOR_DIR="$BASE_DIR/../../../../../vendor/llama-cpp"
+VENDOR_DIR="$PROJECT_ROOT/Inference-gollek-vendor/llama-cpp"
 ROOT_VENDOR_DIR="$VENDOR_DIR"
 BUILD_DIR="$BASE_DIR/target/llama-cpp-build"
 OUTPUT_DIR="$BASE_DIR/target/llama-cpp/lib"
 
 echo "Running build-llama-cpp.sh..."
 echo "Base Dir: $BASE_DIR"
+echo "Project Root: $PROJECT_ROOT"
 echo "Vendor Dir: $VENDOR_DIR"
 echo "Output Dir: $OUTPUT_DIR"
+
+# Check for vendor directory and find the actual llama.cpp source root
+if [ ! -d "$VENDOR_DIR" ]; then
+    echo "Warning: llama.cpp vendor directory not found at $VENDOR_DIR"
+else
+    # Check for CMakeLists.txt to find the real source root
+    if [ ! -f "$VENDOR_DIR/CMakeLists.txt" ]; then
+        if [ -f "$VENDOR_DIR/llama.cpp/CMakeLists.txt" ]; then
+            VENDOR_DIR="$VENDOR_DIR/llama.cpp"
+        elif [ -f "$VENDOR_DIR/llama-cpp/llama.cpp/CMakeLists.txt" ]; then
+            VENDOR_DIR="$VENDOR_DIR/llama-cpp/llama.cpp"
+        fi
+    fi
+fi
 
 mkdir -p "$OUTPUT_DIR"
 
@@ -41,7 +62,7 @@ normalize_macos_rpaths() {
 
 # Check if artifacts already exist to skip build (speed optimization).
 # If shim source exists, ensure shim artifact exists too before skipping.
-SHIM_SRC="$BASE_DIR/src/main/native/gollek_llama_shim.c"
+SHIM_SRC="$BASE_DIR/src/main/native/golek_llama_shim.c"
 SHIM_OK=1
 if [ -f "$SHIM_SRC" ]; then
     if [ -f "$OUTPUT_DIR/libgollek_llama_shim.dylib" ] || [ -f "$OUTPUT_DIR/libgollek_llama_shim.so" ]; then
@@ -63,8 +84,7 @@ if { [ -f "$OUTPUT_DIR/libllama.dylib" ] || [ -f "$OUTPUT_DIR/libllama.so" ]; } 
         if [ "$(uname -s)" = "Darwin" ]; then
             SHIM_OUT="$OUTPUT_DIR/libgollek_llama_shim.dylib"
             cc -shared -fPIC \
-                -I"$VENDOR_DIR/llama.cpp/include" \
-                -I"$ROOT_VENDOR_DIR/llama.cpp/ggml/include" \
+                -I"$VENDOR_DIR/include" \
                 -I"$VENDOR_DIR/ggml/include" \
                 "$SHIM_SRC" \
                 -L"$OUTPUT_DIR" -lllama \
@@ -73,8 +93,7 @@ if { [ -f "$OUTPUT_DIR/libllama.dylib" ] || [ -f "$OUTPUT_DIR/libllama.so" ]; } 
         else
             SHIM_OUT="$OUTPUT_DIR/libgollek_llama_shim.so"
             cc -shared -fPIC \
-                -I"$VENDOR_DIR/llama.cpp/include" \
-                -I"$ROOT_VENDOR_DIR/llama.cpp/ggml/include" \
+                -I"$VENDOR_DIR/include" \
                 -I"$VENDOR_DIR/ggml/include" \
                 "$SHIM_SRC" \
                 -L"$OUTPUT_DIR" -lllama \
@@ -86,24 +105,11 @@ if { [ -f "$OUTPUT_DIR/libllama.dylib" ] || [ -f "$OUTPUT_DIR/libllama.so" ]; } 
     exit 0
 fi
 
-if [ ! -d "$VENDOR_DIR" ]; then
-    echo "Warning: llama.cpp vendor directory not found at $VENDOR_DIR"
-    echo "Creating dummy library for build to pass..."
-    touch "$OUTPUT_DIR/libllama.dylib"
+if [ ! -d "$VENDOR_DIR" ] || [ ! -f "$VENDOR_DIR/CMakeLists.txt" ]; then
+    echo "Warning: llama.cpp vendor directory or CMakeLists.txt not found at $VENDOR_DIR"
+    echo "Creating valid dummy library for build to pass..."
+    echo "" | clang -shared -x c - -o "$OUTPUT_DIR/libllama.dylib" 2>/dev/null || touch "$OUTPUT_DIR/libllama.dylib"
     exit 0
-fi
-
-# Check for CMakeLists.txt
-if [ ! -f "$VENDOR_DIR/CMakeLists.txt" ]; then
-    if [ -f "$VENDOR_DIR/llama.cpp/CMakeLists.txt" ]; then
-        VENDOR_DIR="$VENDOR_DIR/llama.cpp"
-    else
-        echo "Error: CMakeLists.txt not found in $VENDOR_DIR or $VENDOR_DIR/llama.cpp"
-        echo "Creating valid dummy library to allow Maven build to proceed..."
-        # Create a valid (but empty) dylib so System.load doesn't fail
-        echo "" | clang -shared -x c - -o "$OUTPUT_DIR/libllama.dylib" 2>/dev/null || touch "$OUTPUT_DIR/libllama.dylib"
-        exit 0
-    fi
 fi
 
 echo "Building llama.cpp from $VENDOR_DIR..."
@@ -148,13 +154,12 @@ cp -vL bin/libggml* "$OUTPUT_DIR/" 2>/dev/null || :
 normalize_macos_rpaths
 
 # Build small ABI-stable shim to avoid problematic struct-return FFM calls in native image.
-SHIM_SRC="$BASE_DIR/src/main/native/gollek_llama_shim.c"
+SHIM_SRC="$BASE_DIR/src/main/native/golek_llama_shim.c"
 if [ -f "$SHIM_SRC" ] && [ "$(uname -s)" != "Windows_NT" ]; then
     if [ "$(uname -s)" = "Darwin" ]; then
         SHIM_OUT="$OUTPUT_DIR/libgollek_llama_shim.dylib"
         cc -shared -fPIC \
             -I"$VENDOR_DIR/include" \
-            -I"$ROOT_VENDOR_DIR/llama.cpp/ggml/include" \
             -I"$VENDOR_DIR/ggml/include" \
             "$SHIM_SRC" \
             -L"$OUTPUT_DIR" -lllama \
@@ -164,7 +169,6 @@ if [ -f "$SHIM_SRC" ] && [ "$(uname -s)" != "Windows_NT" ]; then
         SHIM_OUT="$OUTPUT_DIR/libgollek_llama_shim.so"
         cc -shared -fPIC \
             -I"$VENDOR_DIR/include" \
-            -I"$ROOT_VENDOR_DIR/llama.cpp/ggml/include" \
             -I"$VENDOR_DIR/ggml/include" \
             "$SHIM_SRC" \
             -L"$OUTPUT_DIR" -lllama \
