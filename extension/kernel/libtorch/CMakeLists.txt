@@ -14,30 +14,32 @@ find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
 # Create shared library
-add_library(libtorch_wrapper SHARED
+add_library(torch_wrapper SHARED
     src/main/cpp/libtorch_wrapper.cpp
 )
 
 # Link LibTorch
-target_link_libraries(libtorch_wrapper "${TORCH_LIBRARIES}")
-target_include_directories(libtorch_wrapper PRIVATE ${TORCH_INCLUDE_DIRS})
+target_link_libraries(torch_wrapper "${TORCH_LIBRARIES}")
+target_include_directories(torch_wrapper PRIVATE ${TORCH_INCLUDE_DIRS})
 
 # Set output directory
-set_target_properties(libtorch_wrapper PROPERTIES
+set_target_properties(torch_wrapper PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
 
 # Copy library to resources directory
-add_custom_command(TARGET libtorch_wrapper POST_BUILD
+add_custom_command(TARGET torch_wrapper POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        ${CMAKE_SOURCE_DIR}/src/main/resources/native/${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}/
     COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:libtorch_wrapper>
+        $<TARGET_FILE:torch_wrapper>
         ${CMAKE_SOURCE_DIR}/src/main/resources/native/${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}/
     COMMENT "Copying library to resources directory"
 )
 
 # Installation rules
-install(TARGETS libtorch_wrapper
+install(TARGETS torch_wrapper
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
