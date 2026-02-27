@@ -1,0 +1,319 @@
+package tech.kayys.gollek.inference.safetensor;
+
+import io.smallrye.mutiny.Multi;
+import io.smallrye.mutiny.Uni;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import tech.kayys.gollek.inference.djl.DjlProvider;
+import tech.kayys.gollek.inference.libtorch.LibTorchProvider;
+import tech.kayys.gollek.spi.exception.ProviderException;
+import tech.kayys.gollek.spi.inference.InferenceResponse;
+import tech.kayys.gollek.spi.model.ModelFormat;
+import tech.kayys.gollek.spi.provider.ProviderCapabilities;
+import tech.kayys.gollek.spi.provider.ProviderConfig;
+import tech.kayys.gollek.spi.provider.ProviderHealth;
+import tech.kayys.gollek.spi.provider.ProviderMetadata;
+import tech.kayys.gollek.spi.provider.ProviderRequest;
+import tech.kayys.gollek.spi.provider.StreamingProvider;
+import tech.kayys.gollek.spi.stream.StreamChunk;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+@ApplicationScoped
+public class SafetensorProvider implements StreamingProvider {
+
+    private static final String PROVIDER_ID = "safetensor";
+
+    @Inject
+    SafetensorProviderConfig config;
+
+    @Inject
+    LibTorchProvider libTorchProvider;
+
+    @Inject
+    DjlProvider djlProvider;
+
+    @Override
+    public boolean isEnabled() {
+        return config.enabled();
+    }
+
+    @Override
+    public String id() {
+        return PROVIDER_ID;
+    }
+
+    @Override
+    public String name() {
+        return "SafeTensor Provider";
+    }
+
+    @Override
+    public String version() {
+        return "1.0.0";
+    }
+
+    @Override
+    public ProviderMetadata metadata() {
+        return ProviderMetadata.builder()
+                .providerId(PROVIDER_ID)
+                .name(name())
+                .version(version())
+                .description("SafeTensor provider using LibTorch runtime backend")
+                .vendor("Golek / Kayys")
+                .homepage("https://github.com/huggingface/safetensors")
+                .build();
+    }
+
+    @Override
+    public ProviderCapabilities capabilities() {
+        return ProviderCapabilities.builder()
+                .streaming(true)
+                .embeddings(true)
+                .multimodal(false)
+                .functionCalling(false)
+                .toolCalling(false)
+                .structuredOutputs(false)
+                .supportedFormats(Set.of(ModelFormat.SAFETENSORS))
+                .supportedDevices(mergedSupportedDevices())
+                .features(Set.of("safetensors", "djl-backend", "streaming-compat"))
+                .build();
+    }
+
+    @Override
+    public void initialize(ProviderConfig providerConfig) throws ProviderException.ProviderInitializationException {
+        djlProvider.initialize(providerConfig);
+    }
+
+    @Override
+    public boolean supports(String modelId, ProviderRequest request) {
+        if (!config.enabled() || modelId == null || modelId.isBlank()) {
+            return false;
+        }
+        Path modelPath = resolveModelPath(modelId);
+        if (modelPath == null || !Files.exists(modelPath) || Files.isDirectory(modelPath)) {
+            return false;
+        }
+        String name = modelPath.getFileName().toString().toLowerCase(Locale.ROOT);
+        return configuredExtensions().stream().anyMatch(name::endsWith);
+    }
+
+    @Override
+    public Uni<InferenceResponse> infer(ProviderRequest request) {
+        Path resolved = resolveModelPath(request.getModel());
+        if (resolved == null || !Files.exists(resolved)) {
+            String modelName = friendlyModelName(request.getModel());
+            return Uni.createFrom().failure(new ProviderException(PROVIDER_ID,
+                    "Model not found: " + modelName, null, false));
+        }
+        ProviderException validation = validateModelCompatibility(resolved);
+        if (validation != null) {
+            return Uni.createFrom().failure(validation);
+        }
+        ProviderRequest delegated = requestWithModelPath(request, resolved);
+        // Use DJL as the primary runtime for safetensor checkpoints.
+        // Loading them through LibTorch's TorchScript path can crash native runtime.
+        return djlProvider.infer(delegated);
+    }
+
+    @Override
+    public Multi<StreamChunk> inferStream(ProviderRequest request) {
+        Path resolved = resolveModelPath(request.getModel());
+        if (resolved == null || !Files.exists(resolved)) {
+            String modelName = friendlyModelName(request.getModel());
+            return Multi.createFrom().failure(new ProviderException(PROVIDER_ID,
+                    "Model not found: " + modelName, null, false));
+        }
+        ProviderException validation = validateModelCompatibility(resolved);
+        if (validation != null) {
+            return Multi.createFrom().failure(validation);
+        }
+        ProviderRequest delegated = requestWithModelPath(request, resolved);
+        // DJL provider is non-streaming; emulate stream with a single response chunk.
+        return djlProvider.infer(delegated)
+                .onItem().transformToMulti(resp -> Multi.createFrom().items(
+                        StreamChunk.of(delegated.getRequestId(), 0, resp.getContent()),
+                        StreamChunk.finalChunk(delegated.getRequestId(), 1, "")));
+    }
+
+    @Override
+    public Uni<ProviderHealth> health() {
+        if (!config.enabled()) {
+            return Uni.createFrom().item(ProviderHealth.builder()
+                    .status(ProviderHealth.Status.UNHEALTHY)
+                    .message("SafeTensor provider disabled by config")
+                    .timestamp(Instant.now())
+                    .build());
+        }
+        return djlProvider.health().map(h -> ProviderHealth.builder()
+                .status(h.status())
+                .message(h.message())
+                .timestamp(Instant.now())
+                .detail("delegate", "djl")
+                .build());
+    }
+
+    @Override
+    public void shutdown() {
+        // Delegate lifecycle is managed by the underlying provider beans.
+    }
+
+    private ProviderRequest requestWithModelPath(ProviderRequest request, Path modelPath) {
+        return new ProviderRequest(
+                request.getRequestId(),
+                modelPath.toString(),
+                request.getMessages(),
+                request.getParameters(),
+                request.getTools(),
+                request.getToolChoice(),
+                request.isStreaming(),
+                request.getTimeout(),
+                request.getUserId().orElse(null),
+                request.getSessionId().orElse(null),
+                request.getTraceId().orElse(null),
+                request.getApiKey().orElse(null),
+                request.getMetadata());
+    }
+
+    private Path resolveModelPath(String modelId) {
+        Path asGiven = Path.of(modelId);
+        if (asGiven.isAbsolute()) {
+            if (Files.exists(asGiven)) {
+                return resolveToSafetensorFile(asGiven);
+            }
+            for (String ext : configuredExtensions()) {
+                Path withExt = Path.of(modelId + ext);
+                if (Files.exists(withExt)) {
+                    return resolveToSafetensorFile(withExt);
+                }
+            }
+            return resolveToSafetensorFile(asGiven);
+        }
+
+        Path fromBase = Path.of(config.basePath(), modelId);
+        if (Files.exists(fromBase)) {
+            return resolveToSafetensorFile(fromBase);
+        }
+        for (String ext : configuredExtensions()) {
+            Path withExt = Path.of(config.basePath(), modelId + ext);
+            if (Files.exists(withExt)) {
+                return resolveToSafetensorFile(withExt);
+            }
+        }
+
+        return resolveToSafetensorFile(Path.of(config.basePath(), modelId));
+    }
+
+    private java.util.List<String> configuredExtensions() {
+        String raw = config.extensions();
+        if (raw == null || raw.isBlank()) {
+            return java.util.List.of(".safetensors", ".safetensor");
+        }
+        java.util.List<String> exts = Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(s -> s.startsWith(".") ? s.toLowerCase(Locale.ROOT) : "." + s.toLowerCase(Locale.ROOT))
+                .toList();
+        return exts.isEmpty() ? java.util.List.of(".safetensors", ".safetensor") : exts;
+    }
+
+    private Set<tech.kayys.gollek.spi.model.DeviceType> mergedSupportedDevices() {
+        var devices = new LinkedHashSet<>(djlProvider.capabilities().getSupportedDevices());
+        if (djlProvider != null && djlProvider.capabilities() != null) {
+            devices.addAll(djlProvider.capabilities().getSupportedDevices());
+        }
+        if (libTorchProvider != null && libTorchProvider.capabilities() != null) {
+            devices.addAll(libTorchProvider.capabilities().getSupportedDevices());
+        }
+        return Set.copyOf(devices);
+    }
+
+    private ProviderException validateModelCompatibility(Path resolvedModelPath) {
+        String lowerPath = resolvedModelPath.toString().toLowerCase(Locale.ROOT);
+        String modelName = friendlyModelName(resolvedModelPath.toString());
+        if (lowerPath.contains("vlm")
+                || lowerPath.contains("vision")
+                || lowerPath.contains("llava")
+                || lowerPath.contains("idefics")) {
+            return new ProviderException(
+                    PROVIDER_ID,
+                    "Model appears to be multimodal/VLM and is not supported by local safetensor text runtime: "
+                            + modelName,
+                    null,
+                    false);
+        }
+
+        Path checkpointDir = Files.isDirectory(resolvedModelPath) ? resolvedModelPath : resolvedModelPath.getParent();
+        if (checkpointDir != null && !Files.exists(checkpointDir.resolve("config.json"))) {
+            return new ProviderException(
+                    PROVIDER_ID,
+                    "Incomplete safetensor checkpoint (missing config.json). Re-pull model to download metadata sidecars.",
+                    null,
+                    true);
+        }
+        return null;
+    }
+
+    private Path resolveToSafetensorFile(Path candidate) {
+        if (candidate == null) {
+            return null;
+        }
+        if (!Files.exists(candidate)) {
+            return candidate;
+        }
+        if (!Files.isDirectory(candidate)) {
+            return candidate;
+        }
+
+        Path preferred = candidate.resolve("model.safetensors");
+        if (Files.isRegularFile(preferred)) {
+            return preferred;
+        }
+        preferred = candidate.resolve("model.safetensor");
+        if (Files.isRegularFile(preferred)) {
+            return preferred;
+        }
+
+        try (var files = Files.walk(candidate, 3)) {
+            return files
+                    .filter(Files::isRegularFile)
+                    .filter(this::isSafetensorFilePath)
+                    .findFirst()
+                    .orElse(candidate);
+        } catch (Exception ignored) {
+            return candidate;
+        }
+    }
+
+    private boolean isSafetensorFilePath(Path path) {
+        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+        return name.endsWith(".safetensors") || name.endsWith(".safetensor");
+    }
+
+    private String friendlyModelName(String modelRef) {
+        if (modelRef == null || modelRef.isBlank()) {
+            return "unknown";
+        }
+        try {
+            Path path = Path.of(modelRef);
+            Path fileName = path.getFileName();
+            String file = fileName != null ? fileName.toString() : modelRef;
+            String lower = file.toLowerCase(Locale.ROOT);
+            if (lower.endsWith(".safetensors") || lower.endsWith(".safetensor")) {
+                Path parent = path.getParent();
+                if (parent != null && parent.getFileName() != null) {
+                    return parent.getFileName().toString();
+                }
+            }
+            return file;
+        } catch (Exception ignored) {
+            return modelRef;
+        }
+    }
+}

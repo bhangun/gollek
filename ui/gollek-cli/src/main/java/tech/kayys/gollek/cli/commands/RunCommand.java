@@ -55,7 +55,7 @@ public class RunCommand implements Runnable {
     public String prompt;
 
     @Option(names = {
-            "--provider" }, description = "Provider: litert, gguf, djl, libtorch(experimental), ollama, gemini, openai, anthropic, cerebras")
+            "--provider" }, description = "Provider: litert, gguf, djl, safetensor, libtorch(experimental), ollama, gemini, openai, anthropic, cerebras")
     String providerId;
 
     @Option(names = { "-s", "--stream" }, description = "Stream output", defaultValue = "true")
@@ -253,8 +253,10 @@ public class RunCommand implements Runnable {
             if (!ensureProviderReady()) {
                 return;
             }
-            if (stream && "djl".equalsIgnoreCase(providerId)) {
-                System.out.println("Provider 'djl' does not support streaming; switching to non-streaming mode.");
+            printCompatibilityHintBeforeInference();
+            if (stream && ("djl".equalsIgnoreCase(providerId) || "safetensor".equalsIgnoreCase(providerId))) {
+                System.out.println(
+                        "Provider '" + providerId + "' does not support streaming; switching to non-streaming mode.");
                 stream = false;
             }
 
@@ -292,7 +294,8 @@ public class RunCommand implements Runnable {
             requestBuilder.cacheBypass(noCache);
 
             InferenceRequest request = requestBuilder.build();
-            boolean directProviderBypass = "djl".equalsIgnoreCase(providerId);
+            boolean directProviderBypass = "djl".equalsIgnoreCase(providerId)
+                    || "safetensor".equalsIgnoreCase(providerId);
 
             System.out.printf(BOLD + "Model: " + RESET + CYAN + "%s" + RESET + "%n", modelId);
             System.out.printf(BOLD + "Provider: " + RESET + YELLOW + "%s" + RESET + "%n",
@@ -476,7 +479,8 @@ public class RunCommand implements Runnable {
         return switch (normalized) {
             case "GGUF" -> "gguf";
             case "TORCHSCRIPT" -> "djl";
-            case "PYTORCH", "SAFETENSORS" -> "djl";
+            case "PYTORCH" -> "djl";
+            case "SAFETENSORS" -> "safetensor";
             case "ONNX" -> "onnx";
             default -> null;
         };
@@ -665,6 +669,42 @@ public class RunCommand implements Runnable {
             System.err.println(
                     "GGUF runtime is not loaded. Set GOLEK_LLAMA_LIB_DIR/GOLEK_LLAMA_LIB_PATH and include gollek-ext-format-gguf.");
         }
+    }
+
+    private void printCompatibilityHintBeforeInference() {
+        if (providerId == null || providerId.isBlank() || modelId == null || modelId.isBlank()) {
+            return;
+        }
+
+        String provider = providerId.trim().toLowerCase(java.util.Locale.ROOT);
+        String model = modelId.trim().toLowerCase(java.util.Locale.ROOT);
+        String modelName = Path.of(modelId).getFileName() != null ? Path.of(modelId).getFileName().toString() : modelId;
+
+        if ("safetensor".equals(provider)) {
+            if (looksLikeMultimodalModel(model)) {
+                System.err.println(
+                        "Hint: provider 'safetensor' is text-checkpoint oriented. This model looks multimodal/VLM and may fail.");
+                System.err.println(
+                        "Hint: try a text-only checkpoint, or use a provider/runtime with multimodal support.");
+            } else if (model.endsWith(".gguf") || model.endsWith(".pt") || model.endsWith(".pth")) {
+                System.err.println(
+                        "Hint: provider 'safetensor' expects .safetensor/.safetensors weights, but got: " + modelName);
+            }
+            return;
+        }
+
+        if ("gguf".equals(provider) && !(model.endsWith(".gguf") || model.contains("/models/gguf/"))) {
+            System.err.println("Hint: provider 'gguf' works best with GGUF models (.gguf).");
+        }
+    }
+
+    private boolean looksLikeMultimodalModel(String normalizedModel) {
+        return normalizedModel.contains("vlm")
+                || normalizedModel.contains("vision")
+                || normalizedModel.contains("llava")
+                || normalizedModel.contains("idefics")
+                || normalizedModel.contains("qwen-vl")
+                || normalizedModel.contains("smolvlm");
     }
 
     private void printProviderHintFromError(Throwable throwable) {

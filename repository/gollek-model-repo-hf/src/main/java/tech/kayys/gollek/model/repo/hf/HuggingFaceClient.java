@@ -64,24 +64,17 @@ public class HuggingFaceClient {
     }
 
     private HuggingFaceModelInfo fetchModelInfo(String url) throws IOException, InterruptedException {
-        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(config.timeoutSeconds()))
-                .header("User-Agent", config.userAgent())
-                .GET();
-
-        // Add auth token if configured and not blank
-        config.token()
-                .filter(t -> !t.isBlank())
-                .ifPresent(token -> requestBuilder.header("Authorization", "Bearer " + token));
-
-        HttpRequest request = requestBuilder.build();
-
         LOG.infof("Fetching model info from: %s", url);
 
         HttpResponse<String> response = httpClient.send(
-                request,
+                buildGetRequest(url, true),
                 HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() == 401 && hasUsableToken()) {
+            response = httpClient.send(
+                    buildGetRequest(url, false),
+                    HttpResponse.BodyHandlers.ofString());
+        }
 
         if (response.statusCode() != 200) {
             String body = response.body();
@@ -124,23 +117,20 @@ public class HuggingFaceClient {
 
         LOG.infof("Downloading: %s from %s", filename, modelId);
 
-        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(config.timeoutSeconds()))
-                .header("User-Agent", config.userAgent())
-                .GET();
-
-        // Add auth token if configured and not blank
-        config.token()
-                .filter(t -> !t.isBlank())
-                .ifPresent(token -> requestBuilder.header("Authorization", "Bearer " + token));
-
-        HttpRequest request = requestBuilder.build();
-
         // First, get content length
         HttpResponse<InputStream> response = httpClient.send(
-                request,
+                buildGetRequest(url, true),
                 HttpResponse.BodyHandlers.ofInputStream());
+
+        if (response.statusCode() == 401 && hasUsableToken()) {
+            try (InputStream ignored = response.body()) {
+                // close first response before retry
+            } catch (Exception ignored) {
+            }
+            response = httpClient.send(
+                    buildGetRequest(url, false),
+                    HttpResponse.BodyHandlers.ofInputStream());
+        }
 
         if (response.statusCode() != 200) {
             String detail = "";
@@ -281,5 +271,42 @@ public class HuggingFaceClient {
         } catch (Exception e) {
             throw new IOException("Failed to parse model info: " + e.getMessage(), e);
         }
+    }
+
+    private HttpRequest buildGetRequest(String url, boolean withAuth) {
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(config.timeoutSeconds()))
+                .header("User-Agent", config.userAgent())
+                .GET();
+        if (withAuth) {
+            configuredToken().ifPresent(token -> requestBuilder.header("Authorization", "Bearer " + token));
+        }
+        return requestBuilder.build();
+    }
+
+    private java.util.Optional<String> configuredToken() {
+        return config.token()
+                .map(String::trim)
+                .filter(this::isUsableToken);
+    }
+
+    private boolean hasUsableToken() {
+        return configuredToken().isPresent();
+    }
+
+    private boolean isUsableToken(String token) {
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        String normalized = token.trim().toLowerCase();
+        if (normalized.equals("dummy")
+                || normalized.equals("null")
+                || normalized.equals("none")
+                || normalized.equals("changeme")
+                || normalized.equals("your_token_here")) {
+            return false;
+        }
+        return !token.contains("${");
     }
 }
