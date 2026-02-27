@@ -3,6 +3,7 @@ name: Gollek CLI Release
 on:
   push:
     tags:
+      - 'test-latest'
       - 'gollek-v*'
       - 'v*'
       - '*.*.*'
@@ -97,6 +98,9 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#gollek-v}"
           VERSION="${VERSION#v}"
+          if [ "$VERSION" = "test-latest" ]; then
+            VERSION="0.0.0"
+          fi
           PKGROOT="$(pwd)/pkgroot"
           mkdir -p "$PKGROOT/usr/local/bin"
           cp "dist/${{ matrix.binary_name }}" "$PKGROOT/usr/local/bin/gollek"
@@ -213,6 +217,9 @@ jobs:
           VERSION_TAG="${GITHUB_REF_NAME}"
           VERSION="${VERSION_TAG#gollek-v}"
           VERSION="${VERSION#v}"
+          if [ "$VERSION_TAG" = "test-latest" ]; then
+            VERSION="0.0.0"
+          fi
           REPO="${GITHUB_REPOSITORY}"
 
           mkdir -p release
@@ -362,7 +369,8 @@ jobs:
           files: |
             release/*
           draft: false
-          prerelease: false
+          prerelease: ${{ github.ref_name == 'test-latest' }}
+          overwrite_files: true
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
