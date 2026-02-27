@@ -34,6 +34,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -69,7 +71,7 @@ public class ChatCommand implements Runnable {
     public String modelId;
 
     @Option(names = {
-            "--provider" }, description = "Provider: litert, gguf, djl, libtorch(experimental), ollama, gemini, openai, anthropic, cerebras")
+            "--provider" }, description = "Provider: litert, gguf, djl, safetensor, libtorch(experimental), ollama, gemini, openai, anthropic, cerebras")
     public String providerId;
 
     @Option(names = { "--system" }, description = "System prompt")
@@ -152,6 +154,8 @@ public class ChatCommand implements Runnable {
     @Override
     public void run() {
         try {
+            boolean bareChatRequested = (modelId == null || modelId.isBlank())
+                    && (providerId == null || providerId.isBlank());
             if (parentCommand != null) {
                 parentCommand.applyRuntimeOverrides();
             }
@@ -177,14 +181,16 @@ public class ChatCommand implements Runnable {
 
             // Resolve default model from provider if omitted
             if (modelId == null || modelId.isBlank()) {
-                if (providerId != null && !providerId.isBlank()) {
-                    providerRegistry.getProvider(providerId).ifPresent(p -> {
-                        modelId = p.metadata().getDefaultModel();
-                    });
-                }
+                modelId = resolveDefaultModelForProvider().orElse(null);
                 if (modelId == null || modelId.isBlank()) {
-                    System.err.println(
-                            "Error: Missing required option: '--model=<modelId>' (or specify a provider with a default model)");
+                    if ("safetensor".equalsIgnoreCase(providerId)) {
+                        System.err.println(
+                                "Error: No local safetensor model found. Pull one first, or pass --model <id|path>.");
+                    } else {
+                        System.err.println(
+                                "Error: Missing required option: '--model=<modelId>' (or specify a provider with a default model)");
+                    }
+                    printStartupCatalog();
                     return;
                 }
             }
@@ -195,9 +201,16 @@ public class ChatCommand implements Runnable {
                 }
                 maybeAutoSelectProvider();
             }
+            if (!ensureSafetensorMetadataReady()) {
+                return;
+            }
             if (!ensureProviderReady()) {
                 return;
             }
+            if (!prepareSafeRuntimeForSafetensor()) {
+                return;
+            }
+            printCompatibilityHintBeforeInference();
 
             addInitialSystemPromptIfNeeded();
 
@@ -207,9 +220,9 @@ public class ChatCommand implements Runnable {
                 System.out.println(BOLD + YELLOW + "| |  __  ___ | || | ___| | __" + RESET);
                 System.out.println(BOLD + YELLOW + "| | |_ |/ _ \\| || |/ _ \\ |/ /" + RESET);
                 System.out.println(BOLD + YELLOW + "| |__| | (_) | || |  __/   < " + RESET);
-                System.out.println(BOLD + YELLOW + " \\_____|\\___/|_||_\\___|_|\\_\\" + RESET);
+                System.out.println(BOLD + YELLOW + " \\_____|\\___/|_||_|\\___|_|\\_\\" + RESET);
                 System.out.println();
-                System.out.printf(BOLD + "Model: " + RESET + CYAN + "%s" + RESET + "%n", modelId);
+                System.out.printf(BOLD + "Model: " + RESET + CYAN + "%s" + RESET + "%n", displayModelName(modelId));
                 System.out.printf(BOLD + "Provider: " + RESET + YELLOW + "%s" + RESET + "%n",
                         providerId != null ? providerId : "auto-select");
                 if (outputFile != null) {
@@ -218,6 +231,9 @@ public class ChatCommand implements Runnable {
                 }
                 System.out.println(DIM + "Commands: 'exit' to quit, '/reset' to clear history." + RESET);
                 System.out.println(DIM + "Note: Use '\\' at the end of a line for multiline input." + RESET);
+                if (bareChatRequested) {
+                    printStartupCatalog();
+                }
                 System.out.println(DIM + "-".repeat(50) + RESET);
             }
             if (enableSession) {
@@ -229,407 +245,438 @@ public class ChatCommand implements Runnable {
             }
 
             boolean effectiveStream = stream;
-            if (effectiveStream && "djl".equalsIgnoreCase(providerId)) {
+            if (effectiveStream && ("djl".equalsIgnoreCase(providerId) || "safetensor".equalsIgnoreCase(providerId))) {
                 effectiveStream = false;
                 if (!quiet) {
-                    System.out.println(DIM + "Provider 'djl' does not support streaming; using non-streaming mode."
+                    System.out.println(DIM + "Provider '" + providerId
+                            + "' does not support streaming; using non-streaming mode."
                             + RESET);
                 }
             }
 
             // Initialize JLine Terminal and LineReader
-            Terminal terminal;
+            Terminal terminal = null;
             try {
-                terminal = TerminalBuilder.builder()
-                        .system(true)
-                        .dumb(true)
-                        .build();
-            } catch (Exception e) {
-                // Fallback to dumb terminal
-                terminal = TerminalBuilder.builder().dumb(true).build();
-            }
-
-            // Custom Completer for slash commands
-            Completer slashCompleter = (lineReader, parsedLine, candidates) -> {
-                String word = parsedLine.word();
-                if (word.startsWith("/")) {
-                    candidates.add(new Candidate("/help", "/help", null, "Show available commands", null, null, true));
-                    candidates.add(
-                            new Candidate("/reset", "/reset", null, "Clear conversation history", null, null, true));
-                    candidates.add(new Candidate("/quit", "/quit", null, "Exit the chat session", null, null, true));
-                    candidates.add(
-                            new Candidate("/log", "/log", null, "Show last 100 lines of CLI log", null, null, true));
-                    candidates.add(new Candidate("/list", "/list", null, "List available models", null, null, true));
-                    candidates.add(new Candidate("/providers", "/providers", null, "List available LLM providers", null,
-                            null, true));
-                    candidates.add(new Candidate("/info", "/info", null, "Display system info and adapters", null, null,
-                            true));
-                    candidates.add(new Candidate("/extensions", "/extensions", null, "Show packaged extension modules",
-                            null, null, true));
-                }
-            };
-
-            LineReader reader = LineReaderBuilder.builder()
-                    .terminal(terminal)
-                    .completer(slashCompleter)
-                    .variable(LineReader.HISTORY_FILE,
-                            Path.of(System.getProperty("user.home"), ".gollek", "chat_history"))
-                    .variable(LineReader.LIST_MAX, 50)
-                    .option(LineReader.Option.AUTO_MENU, true)
-                    .option(LineReader.Option.AUTO_LIST, true)
-                    .option(LineReader.Option.COMPLETE_IN_WORD, true)
-                    .build();
-
-            // Enable autosuggestions (ghost text)
-            AutosuggestionWidgets autosuggestionWidgets = new AutosuggestionWidgets(reader);
-            autosuggestionWidgets.enable();
-
-            // Enable TailTip (descriptions at the bottom)
-            java.util.Map<String, CmdDesc> commandHelp = new java.util.HashMap<>();
-            commandHelp.put("/help", createCmdDesc("Show available commands"));
-            commandHelp.put("/reset", createCmdDesc("Clear conversation history"));
-            commandHelp.put("/quit", createCmdDesc("Exit the chat session"));
-            commandHelp.put("/log", createCmdDesc("Show last 100 lines of CLI log"));
-            commandHelp.put("/list", createCmdDesc("List available models"));
-            commandHelp.put("/providers", createCmdDesc("List available LLM providers"));
-            commandHelp.put("/info", createCmdDesc("Display system info and adapters"));
-            commandHelp.put("/extensions", createCmdDesc("Show packaged extension modules"));
-
-            TailTipWidgets tailTipWidgets = new TailTipWidgets(reader, commandHelp, 0,
-                    TailTipWidgets.TipType.COMPLETER);
-            tailTipWidgets.enable();
-
-            // Set prompt
-            String promptText = quiet ? "\n>>> " : "\n" + BOLD + CYAN + ">>> " + RESET;
-            String secondaryPrompt = quiet ? "... " : DIM + "... " + RESET;
-
-            // Open output file if specified (append mode)
-            java.io.PrintWriter fileWriter = null;
-            if (outputFile != null) {
                 try {
-                    // Create parent dirs if needed
-                    if (outputFile.getParentFile() != null) {
-                        outputFile.getParentFile().mkdirs();
-                    }
-                    fileWriter = new java.io.PrintWriter(new java.io.FileWriter(outputFile, true), true);
-                    fileWriter.println("\n--- Chat Session Started " + java.time.Instant.now() + " ---");
+                    terminal = TerminalBuilder.builder()
+                            .system(true)
+                            .dumb(true)
+                            .build();
                 } catch (Exception e) {
-                    System.err.println(YELLOW + "Failed to open output file: " + e.getMessage() + RESET);
+                    // Fallback to dumb terminal
+                    terminal = TerminalBuilder.builder().dumb(true).build();
                 }
-            }
 
-            while (true) {
-                StringBuilder inputBuffer = new StringBuilder();
-                String currentPrompt = promptText;
-                boolean interrupted = false;
+                // Custom Completer for slash commands
+                Completer slashCompleter = (lineReader, parsedLine, candidates) -> {
+                    String word = parsedLine.word();
+                    if (word.startsWith("/")) {
+                        candidates.add(
+                                new Candidate("/help", "/help", null, "Show available commands", null, null, true));
+                        candidates.add(new Candidate("/reset", "/reset", null, "Clear conversation history", null, null,
+                                true));
+                        candidates
+                                .add(new Candidate("/quit", "/quit", null, "Exit the chat session", null, null, true));
+                        candidates.add(new Candidate("/log", "/log", null, "Show last 100 lines of CLI log", null, null,
+                                true));
+                        candidates
+                                .add(new Candidate("/list", "/list", null, "List available models", null, null, true));
+                        candidates.add(new Candidate("/providers", "/providers", null, "List available LLM providers",
+                                null, null, true));
+                        candidates.add(new Candidate("/provider", "/provider", null,
+                                "Switch provider (e.g., /provider gemini)", null, null, true));
+                        candidates.add(new Candidate("/info", "/info", null, "Display system info and adapters", null,
+                                null, true));
+                        candidates.add(new Candidate("/extensions", "/extensions", null,
+                                "Show packaged extension modules", null, null, true));
+                    }
+                };
+
+                LineReader reader = LineReaderBuilder.builder()
+                        .terminal(terminal)
+                        .completer(slashCompleter)
+                        .variable(LineReader.HISTORY_FILE,
+                                Path.of(System.getProperty("user.home"), ".gollek", "chat_history"))
+                        .variable(LineReader.LIST_MAX, 50)
+                        .option(LineReader.Option.AUTO_MENU, true)
+                        .option(LineReader.Option.AUTO_LIST, true)
+                        .option(LineReader.Option.COMPLETE_IN_WORD, true)
+                        .build();
+
+                // Enable autosuggestions (ghost text)
+                AutosuggestionWidgets autosuggestionWidgets = new AutosuggestionWidgets(reader);
+                autosuggestionWidgets.enable();
+
+                // Enable TailTip (descriptions at the bottom)
+                java.util.Map<String, CmdDesc> commandHelp = new java.util.HashMap<>();
+                commandHelp.put("/help", createCmdDesc("Show available commands"));
+                commandHelp.put("/reset", createCmdDesc("Clear conversation history"));
+                commandHelp.put("/quit", createCmdDesc("Exit the chat session"));
+                commandHelp.put("/log", createCmdDesc("Show last 100 lines of CLI log"));
+                commandHelp.put("/list", createCmdDesc("List available models"));
+                commandHelp.put("/providers", createCmdDesc("List available LLM providers"));
+                commandHelp.put("/provider", createCmdDesc("Switch provider (e.g., /provider gemini)"));
+                commandHelp.put("/info", createCmdDesc("Display system info and adapters"));
+                commandHelp.put("/extensions", createCmdDesc("Show packaged extension modules"));
+
+                TailTipWidgets tailTipWidgets = new TailTipWidgets(reader, commandHelp, 0,
+                        TailTipWidgets.TipType.COMPLETER);
+                tailTipWidgets.enable();
+
+                // Set prompt
+                String promptText = quiet ? "\n>>> " : "\n" + BOLD + CYAN + ">>> " + RESET;
+                String secondaryPrompt = quiet ? "... " : DIM + "... " + RESET;
+
+                // Open output file if specified (append mode)
+                java.io.PrintWriter fileWriter = null;
+                if (outputFile != null) {
+                    try {
+                        // Create parent dirs if needed
+                        if (outputFile.getParentFile() != null) {
+                            outputFile.getParentFile().mkdirs();
+                        }
+                        fileWriter = new java.io.PrintWriter(new java.io.FileWriter(outputFile, true), true);
+                        fileWriter.println("\n--- Chat Session Started " + java.time.Instant.now() + " ---");
+                    } catch (Exception e) {
+                        System.err.println(YELLOW + "Failed to open output file: " + e.getMessage() + RESET);
+                    }
+                }
 
                 while (true) {
-                    String lineInput;
-                    try {
-                        lineInput = reader.readLine(currentPrompt);
-                    } catch (org.jline.reader.UserInterruptException e) {
-                        interrupted = true;
-                        break;
-                    } catch (org.jline.reader.EndOfFileException e) {
+                    StringBuilder inputBuffer = new StringBuilder();
+                    String currentPrompt = promptText;
+                    boolean interrupted = false;
+
+                    while (true) {
+                        String lineInput;
+                        try {
+                            lineInput = reader.readLine(currentPrompt);
+                        } catch (org.jline.reader.UserInterruptException e) {
+                            interrupted = true;
+                            break;
+                        } catch (org.jline.reader.EndOfFileException e) {
+                            if (!quiet) {
+                                System.out.println("\n" + YELLOW + "Goodbye!" + RESET);
+                            }
+                            return;
+                        }
+
+                        if (lineInput.endsWith("\\")) {
+                            inputBuffer.append(lineInput, 0, lineInput.length() - 1).append("\n");
+                            currentPrompt = secondaryPrompt;
+                        } else {
+                            inputBuffer.append(lineInput);
+                            break;
+                        }
+                    }
+
+                    if (interrupted) {
+                        continue;
+                    }
+
+                    String finalInput = inputBuffer.toString().trim();
+
+                    if (finalInput.equalsIgnoreCase("exit") || finalInput.equalsIgnoreCase("quit")) {
                         if (!quiet) {
                             System.out.println("\n" + YELLOW + "Goodbye!" + RESET);
                         }
-                        return;
-                    }
-
-                    if (lineInput.endsWith("\\")) {
-                        inputBuffer.append(lineInput, 0, lineInput.length() - 1).append("\n");
-                        currentPrompt = secondaryPrompt;
-                    } else {
-                        inputBuffer.append(lineInput);
                         break;
                     }
-                }
 
-                if (interrupted) {
-                    continue;
-                }
-
-                String finalInput = inputBuffer.toString().trim();
-
-                if (finalInput.equalsIgnoreCase("exit") || finalInput.equalsIgnoreCase("quit")) {
-                    if (!quiet) {
-                        System.out.println("\n" + YELLOW + "Goodbye!" + RESET);
+                    if (finalInput.isEmpty()) {
+                        continue;
                     }
-                    break;
-                }
 
-                if (finalInput.isEmpty()) {
-                    continue;
-                }
-
-                // Echo user input to file
-                if (fileWriter != null) {
-                    fileWriter.println("\n>>> User: " + finalInput);
-                }
-
-                // Handle special commands
-                if (finalInput.equalsIgnoreCase("/reset")) {
-                    conversationHistory.clear();
-                    addInitialSystemPromptIfNeeded();
-                    System.out.println(YELLOW + "[Conversation reset]" + RESET);
-                    if (fileWriter != null)
-                        fileWriter.println("[Conversation reset]");
-                    continue;
-                }
-
-                if (finalInput.equalsIgnoreCase("/quit")) {
-                    if (!quiet) {
-                        System.out.println("\n" + YELLOW + "Goodbye!" + RESET);
-                    }
-                    break;
-                }
-
-                if (finalInput.equalsIgnoreCase("/help")) {
-                    System.out.println(DIM + "Available commands:" + RESET);
-                    System.out.println(DIM + "  /reset      - Clear conversation history" + RESET);
-                    System.out.println(DIM + "  /quit       - Exit the chat session" + RESET);
-                    System.out.println(DIM + "  /log        - Show last 100 lines of log" + RESET);
-                    System.out.println(DIM + "  /list       - List available models" + RESET);
-                    System.out.println(DIM + "  /providers  - List available LLM providers" + RESET);
-                    System.out.println(DIM + "  /info       - Display system info" + RESET);
-                    System.out.println(DIM + "  /extensions - Show packaged extension modules" + RESET);
-                    System.out.println(DIM + "  /help       - Show this help message" + RESET);
-                    continue;
-                }
-
-                if (finalInput.equalsIgnoreCase("/list")) {
-                    listCommand.run();
-                    continue;
-                }
-
-                if (finalInput.equalsIgnoreCase("/providers")) {
-                    providersCommand.run();
-                    continue;
-                }
-
-                if (finalInput.equalsIgnoreCase("/info")) {
-                    infoCommand.run();
-                    continue;
-                }
-
-                if (finalInput.equalsIgnoreCase("/extensions")) {
-                    extensionsCommand.run();
-                    continue;
-                }
-
-                if (finalInput.equalsIgnoreCase("/log")) {
-                    try {
-                        String userHome = System.getProperty("user.home");
-                        java.nio.file.Path logPath = java.nio.file.Paths.get(userHome, ".gollek", "logs", "cli.log");
-                        if (java.nio.file.Files.exists(logPath)) {
-                            List<String> lines = java.nio.file.Files.readAllLines(logPath);
-                            int start = Math.max(0, lines.size() - 100);
-                            System.out.println(DIM + "--- Last 100 log lines ---" + RESET);
-                            for (int i = start; i < lines.size(); i++) {
-                                System.out.println(DIM + lines.get(i) + RESET);
-                            }
-                            System.out.println(DIM + "--------------------------" + RESET);
-                        } else {
-                            System.out.println(YELLOW + "Log file not found at: " + logPath + RESET);
-                        }
-                    } catch (Exception e) {
-                        System.err.println(YELLOW + "Failed to read logs: " + e.getMessage() + RESET);
-                    }
-                    continue;
-                }
-
-                // Add user message to history
-                conversationHistory.add(Message.user(finalInput));
-
-                // Build request with conversation history
-                InferenceRequest.Builder reqBuilder = InferenceRequest.builder()
-                        .requestId(UUID.randomUUID().toString())
-                        .model(modelId)
-                        .messages(new ArrayList<>(conversationHistory))
-                        .temperature(temperature)
-                        .parameter("top_p", topP)
-                        .parameter("top_k", topK)
-                        .parameter("repeat_penalty", repeatPenalty)
-                        .parameter("json_mode", jsonMode)
-                        .parameter("inference_timeout_ms", inferenceTimeoutMs)
-                        .maxTokens(maxTokens)
-                        .preferredProvider(providerId)
-                        .cacheBypass(noCache);
-
-                if (mirostat > 0) {
-                    reqBuilder.parameter("mirostat", mirostat);
-                }
-                if (grammar != null && !grammar.isEmpty()) {
-                    reqBuilder.parameter("grammar", grammar);
-                }
-                if (modelPathOverride != null && !modelPathOverride.isBlank()) {
-                    reqBuilder.parameter("model_path", modelPathOverride);
-                }
-
-                if (enableSession && sessionId != null) {
-                    reqBuilder.parameter("session_id", sessionId);
-                }
-
-                InferenceRequest request = reqBuilder.build();
-
-                try {
+                    // Echo user input to file
                     if (fileWriter != null) {
+                        fileWriter.println("\n>>> User: " + finalInput);
+                    }
+
+                    // Handle special commands
+                    if (finalInput.equalsIgnoreCase("/reset")) {
+                        conversationHistory.clear();
+                        addInitialSystemPromptIfNeeded();
+                        System.out.println(YELLOW + "[Conversation reset]" + RESET);
+                        if (fileWriter != null)
+                            fileWriter.println("[Conversation reset]");
+                        continue;
+                    }
+
+                    if (finalInput.equalsIgnoreCase("/quit")) {
                         if (!quiet) {
-                            System.out.print(DIM + "Thinking... (Outputting to file)" + RESET);
-                            System.out.flush();
+                            System.out.println("\n" + YELLOW + "Goodbye!" + RESET);
                         }
-                        fileWriter.println("Assistant: ");
-                    } else {
-                        System.out.print("\n");
-                        System.out.flush();
+                        break;
                     }
 
-                    if (verbose) {
-                        // Dynamically adjust log level if verbose flag is set (Java Util Logging /
-                        // JBoss Logging)
-                        // This might not work in native if not configured for runtime init, but
-                        // harmless to try
-                        java.util.logging.Logger.getLogger("").setLevel(java.util.logging.Level.INFO);
-                        java.util.logging.Logger.getLogger("tech.kayys.gollek").setLevel(java.util.logging.Level.FINE);
-                    } else {
-                        // Ensure quiet by default
-                        java.util.logging.Logger.getLogger("tech.kayys.gollek")
-                                .setLevel(java.util.logging.Level.WARNING);
+                    if (finalInput.equalsIgnoreCase("/help")) {
+                        System.out.println(DIM + "Available commands:" + RESET);
+                        System.out.println(DIM + "  /reset      - Clear conversation history" + RESET);
+                        System.out.println(DIM + "  /quit       - Exit the chat session" + RESET);
+                        System.out.println(DIM + "  /log        - Show last 100 lines of log" + RESET);
+                        System.out.println(DIM + "  /list       - List available models" + RESET);
+                        System.out.println(DIM + "  /providers  - List available LLM providers" + RESET);
+                        System.out.println(DIM + "  /provider <id> - Switch to a different provider" + RESET);
+                        System.out.println(DIM + "  /info       - Display system info" + RESET);
+                        System.out.println(DIM + "  /extensions - Show packaged extension modules" + RESET);
+                        System.out.println(DIM + "  /help       - Show this help message" + RESET);
+                        continue;
                     }
 
-                    if (effectiveStream) {
-                        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
-                        java.util.concurrent.atomic.AtomicInteger tokenCount = new java.util.concurrent.atomic.AtomicInteger(
-                                0);
-                        long startTime = System.currentTimeMillis();
-                        StringBuilder fullResponse = new StringBuilder();
-                        final java.io.PrintWriter finalFileWriter = fileWriter;
+                    if (finalInput.equalsIgnoreCase("/list")) {
+                        listCommand.run();
+                        continue;
+                    }
 
-                        if (!quiet && finalFileWriter == null) {
-                            System.out.print(BOLD + GREEN + "Assistant: " + RESET);
-                            System.out.flush();
+                    if (finalInput.equalsIgnoreCase("/providers")) {
+                        providersCommand.run();
+                        continue;
+                    }
+
+                    if (finalInput.toLowerCase().startsWith("/provider ")) {
+                        String newProviderId = finalInput.substring(10).trim();
+                        if (newProviderId.isEmpty()) {
+                            System.out.println(YELLOW + "Usage: /provider <provider-id>" + RESET);
+                        } else if (ensureProviderHealthy(newProviderId)) {
+                            this.providerId = newProviderId;
+                            sdk.setPreferredProvider(newProviderId);
+                            System.out.println(GREEN + "Switched to provider: " + RESET + CYAN + providerId + RESET);
                         }
+                        continue;
+                    }
 
-                        sdk.streamCompletion(request)
-                                .subscribe().with(
-                                        chunk -> {
-                                            String delta = chunk.getDelta();
-                                            if (delta == null) {
-                                                return;
-                                            }
-                                            if (finalFileWriter != null) {
-                                                finalFileWriter.print(delta);
-                                                finalFileWriter.flush();
-                                            } else {
-                                                System.out.print(delta);
-                                                System.out.flush();
-                                            }
-                                            fullResponse.append(delta);
-                                            tokenCount.incrementAndGet();
-                                        },
-                                        error -> {
-                                            if (quiet) {
-                                                System.err.println("\nStream error: " + error.getMessage());
-                                            } else {
-                                                System.err.println("\n" + YELLOW + "Stream error: " + RESET
-                                                        + error.getMessage());
-                                            }
-                                            printProviderHintFromError(error);
-                                            if (finalFileWriter != null) {
-                                                finalFileWriter.println("\n[Error: " + error.getMessage() + "]");
-                                            }
-                                            latch.countDown();
-                                        },
-                                        () -> {
-                                            long duration = System.currentTimeMillis() - startTime;
-                                            double tps = (tokenCount.get() / (duration / 1000.0));
+                    if (finalInput.equalsIgnoreCase("/info")) {
+                        infoCommand.run();
+                        continue;
+                    }
 
-                                            if (finalFileWriter != null) {
-                                                if (!quiet) {
-                                                    System.out.printf(DIM + "\n[Done. Tokens: %d, Speed: %.2f t/s]"
-                                                            + RESET + "%n", tokenCount.get(), tps);
-                                                }
-                                                finalFileWriter.println();
-                                                finalFileWriter.printf(
-                                                        "\n[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]%n",
-                                                        tokenCount.get(), duration / 1000.0, tps);
-                                                finalFileWriter.println("-".repeat(30));
-                                            } else {
-                                                System.out.println();
-                                                if (!quiet) {
-                                                    System.out.printf(
-                                                            DIM + "\n[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]"
-                                                                    + RESET + "%n",
-                                                            tokenCount.get(), duration / 1000.0, tps);
-                                                }
-                                            }
-                                            conversationHistory.add(Message.assistant(fullResponse.toString()));
-                                            latch.countDown();
-                                        });
+                    if (finalInput.equalsIgnoreCase("/extensions")) {
+                        extensionsCommand.run();
+                        continue;
+                    }
 
+                    if (finalInput.equalsIgnoreCase("/log")) {
                         try {
-                            latch.await();
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            if (!quiet) {
-                                System.out.println("\nInterrupted.");
+                            String userHome = System.getProperty("user.home");
+                            java.nio.file.Path logPath = java.nio.file.Paths.get(userHome, ".gollek", "logs",
+                                    "cli.log");
+                            if (java.nio.file.Files.exists(logPath)) {
+                                List<String> lines = java.nio.file.Files.readAllLines(logPath);
+                                int start = Math.max(0, lines.size() - 100);
+                                System.out.println(DIM + "--- Last 100 log lines ---" + RESET);
+                                for (int i = start; i < lines.size(); i++) {
+                                    System.out.println(DIM + lines.get(i) + RESET);
+                                }
+                                System.out.println(DIM + "--------------------------" + RESET);
+                            } else {
+                                System.out.println(YELLOW + "Log file not found at: " + logPath + RESET);
                             }
+                        } catch (Exception e) {
+                            System.err.println(YELLOW + "Failed to read logs: " + e.getMessage() + RESET);
                         }
-                    } else {
-                        // Non-streaming logic
-                        if (verbose && !quiet) {
-                            System.out.println(DIM + "Non-streaming mode..." + RESET);
-                        }
+                        continue;
+                    }
 
-                        long startTime = System.currentTimeMillis();
-                        InferenceResponse response = shouldDirectProviderBypass(effectiveStream)
-                                ? inferDirectWithProvider(providerId, request)
-                                : sdk.createCompletion(request);
-                        long duration = System.currentTimeMillis() - startTime;
-                        String content = response.getContent();
+                    // Add user message to history
+                    conversationHistory.add(Message.user(finalInput));
 
-                        // Handle tool calls if present
-                        if (response.hasToolCalls() && !quiet) {
-                            System.out.println();
-                            for (var toolCall : response.getToolCalls()) {
-                                System.out.printf(YELLOW + "  [Tool Call] %s(%s)" + RESET + "%n",
-                                        toolCall.name(), toolCall.arguments());
-                            }
-                        }
+                    // Build request with conversation history
+                    InferenceRequest.Builder reqBuilder = InferenceRequest.builder()
+                            .requestId(UUID.randomUUID().toString())
+                            .model(modelId)
+                            .messages(new ArrayList<>(conversationHistory))
+                            .temperature(temperature)
+                            .parameter("top_p", topP)
+                            .parameter("top_k", topK)
+                            .parameter("repeat_penalty", repeatPenalty)
+                            .parameter("json_mode", jsonMode)
+                            .parameter("inference_timeout_ms", inferenceTimeoutMs)
+                            .maxTokens(maxTokens)
+                            .preferredProvider(providerId)
+                            .cacheBypass(noCache);
 
+                    if (mirostat > 0) {
+                        reqBuilder.parameter("mirostat", mirostat);
+                    }
+                    if (grammar != null && !grammar.isEmpty()) {
+                        reqBuilder.parameter("grammar", grammar);
+                    }
+                    if (modelPathOverride != null && !modelPathOverride.isBlank()) {
+                        reqBuilder.parameter("model_path", modelPathOverride);
+                    }
+
+                    if (enableSession && sessionId != null) {
+                        reqBuilder.parameter("session_id", sessionId);
+                    }
+
+                    InferenceRequest request = reqBuilder.build();
+
+                    try {
                         if (fileWriter != null) {
-                            fileWriter.println("\nAssistant: " + content);
-                            fileWriter.printf("\n[Duration: %.2fs, Tokens: %d]%n", duration / 1000.0,
-                                    response.getTokensUsed());
-                            fileWriter.println("-".repeat(30));
                             if (!quiet) {
-                                System.out.print(DIM + "Response written to file." + RESET);
+                                System.out.print(DIM + "Thinking... (Outputting to file)" + RESET);
+                                System.out.flush();
+                            }
+                            fileWriter.println("Assistant: ");
+                        } else {
+                            System.out.print("\n");
+                            System.out.flush();
+                        }
+
+                        if (verbose) {
+                            // Dynamically adjust log level if verbose flag is set (Java Util Logging /
+                            // JBoss Logging)
+                            // This might not work in native if not configured for runtime init, but
+                            // harmless to try
+                            java.util.logging.Logger.getLogger("").setLevel(java.util.logging.Level.INFO);
+                            java.util.logging.Logger.getLogger("tech.kayys.gollek")
+                                    .setLevel(java.util.logging.Level.FINE);
+                        } else {
+                            // Ensure quiet by default
+                            java.util.logging.Logger.getLogger("tech.kayys.gollek")
+                                    .setLevel(java.util.logging.Level.WARNING);
+                        }
+
+                        if (effectiveStream) {
+                            java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+                            java.util.concurrent.atomic.AtomicInteger tokenCount = new java.util.concurrent.atomic.AtomicInteger(
+                                    0);
+                            long startTime = System.currentTimeMillis();
+                            StringBuilder fullResponse = new StringBuilder();
+                            final java.io.PrintWriter finalFileWriter = fileWriter;
+
+                            if (!quiet && finalFileWriter == null) {
+                                System.out.print(BOLD + GREEN + "Assistant: " + RESET);
+                                System.out.flush();
+                            }
+
+                            sdk.streamCompletion(request)
+                                    .subscribe().with(
+                                            chunk -> {
+                                                String delta = chunk.getDelta();
+                                                if (delta == null) {
+                                                    return;
+                                                }
+                                                if (finalFileWriter != null) {
+                                                    finalFileWriter.print(delta);
+                                                    finalFileWriter.flush();
+                                                } else {
+                                                    System.out.print(delta);
+                                                    System.out.flush();
+                                                }
+                                                fullResponse.append(delta);
+                                                tokenCount.incrementAndGet();
+                                            },
+                                            error -> {
+                                                if (quiet) {
+                                                    System.err.println("\nStream error: " + error.getMessage());
+                                                } else {
+                                                    System.err.println("\n" + YELLOW + "Stream error: " + RESET
+                                                            + error.getMessage());
+                                                }
+                                                printProviderHintFromError(error);
+                                                if (finalFileWriter != null) {
+                                                    finalFileWriter.println("\n[Error: " + error.getMessage() + "]");
+                                                }
+                                                latch.countDown();
+                                            },
+                                            () -> {
+                                                long duration = System.currentTimeMillis() - startTime;
+                                                double tps = (tokenCount.get() / (duration / 1000.0));
+
+                                                if (finalFileWriter != null) {
+                                                    if (!quiet) {
+                                                        System.out.printf(DIM + "\n[Done. Tokens: %d, Speed: %.2f t/s]"
+                                                                + RESET + "%n", tokenCount.get(), tps);
+                                                    }
+                                                    finalFileWriter.println();
+                                                    finalFileWriter.printf(
+                                                            "\n[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]%n",
+                                                            tokenCount.get(), duration / 1000.0, tps);
+                                                    finalFileWriter.println("-".repeat(30));
+                                                } else {
+                                                    System.out.println();
+                                                    if (!quiet) {
+                                                        System.out.printf(
+                                                                DIM + "\n[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]"
+                                                                        + RESET + "%n",
+                                                                tokenCount.get(), duration / 1000.0, tps);
+                                                    }
+                                                }
+                                                conversationHistory.add(Message.assistant(fullResponse.toString()));
+                                                latch.countDown();
+                                            });
+
+                            try {
+                                latch.await();
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                if (!quiet) {
+                                    System.out.println("\nInterrupted.");
+                                }
                             }
                         } else {
-                            System.out.println(content);
-                            if (!quiet) {
-                                System.out.printf(DIM + "\n[Duration: %.2fs, Tokens: %d]" + RESET + "%n",
-                                        duration / 1000.0, response.getTokensUsed());
+                            // Non-streaming logic
+                            if (verbose && !quiet) {
+                                System.out.println(DIM + "Non-streaming mode..." + RESET);
                             }
+
+                            long startTime = System.currentTimeMillis();
+                            InferenceResponse response = shouldDirectProviderBypass(effectiveStream)
+                                    ? inferDirectWithProvider(providerId, request)
+                                    : sdk.createCompletion(request);
+                            long duration = System.currentTimeMillis() - startTime;
+                            String content = response.getContent();
+
+                            // Handle tool calls if present
+                            if (response.hasToolCalls() && !quiet) {
+                                System.out.println();
+                                for (var toolCall : response.getToolCalls()) {
+                                    System.out.printf(YELLOW + "  [Tool Call] %s(%s)" + RESET + "%n",
+                                            toolCall.name(), toolCall.arguments());
+                                }
+                            }
+
+                            if (fileWriter != null) {
+                                fileWriter.println("\nAssistant: " + content);
+                                fileWriter.printf("\n[Duration: %.2fs, Tokens: %d]%n", duration / 1000.0,
+                                        response.getTokensUsed());
+                                fileWriter.println("-".repeat(30));
+                                if (!quiet) {
+                                    System.out.print(DIM + "Response written to file." + RESET);
+                                }
+                            } else {
+                                System.out.println(content);
+                                if (!quiet) {
+                                    System.out.printf(DIM + "\n[Duration: %.2fs, Tokens: %d]" + RESET + "%n",
+                                            duration / 1000.0, response.getTokensUsed());
+                                }
+                            }
+
+                            // Add assistant response to history
+                            conversationHistory.add(Message.assistant(content));
                         }
 
-                        // Add assistant response to history
-                        conversationHistory.add(Message.assistant(content));
+                    } catch (Exception e) {
+                        if (quiet) {
+                            System.err.println("\nError: " + e.getMessage());
+                        } else {
+                            System.err.println("\n" + YELLOW + "Error: " + RESET + e.getMessage());
+                        }
+                        printProviderHintFromError(e);
                     }
+                }
 
-                } catch (Exception e) {
-                    if (quiet) {
-                        System.err.println("\nError: " + e.getMessage());
-                    } else {
-                        System.err.println("\n" + YELLOW + "Error: " + RESET + e.getMessage());
+                if (fileWriter != null)
+                    fileWriter.close();
+            } finally {
+                if (terminal != null) {
+                    try {
+                        terminal.close();
+                    } catch (Exception ignored) {
                     }
-                    printProviderHintFromError(e);
                 }
             }
-
-            if (fileWriter != null)
-                fileWriter.close();
 
         } catch (Exception e) {
             if (quiet) {
@@ -905,7 +952,8 @@ public class ChatCommand implements Runnable {
         return switch (normalized) {
             case "GGUF" -> "gguf";
             case "TORCHSCRIPT" -> "djl";
-            case "PYTORCH", "SAFETENSORS" -> "djl";
+            case "PYTORCH" -> "djl";
+            case "SAFETENSORS" -> "safetensor";
             case "ONNX" -> "onnx";
             default -> null;
         };
@@ -1076,6 +1124,284 @@ public class ChatCommand implements Runnable {
         return false;
     }
 
+    private boolean prepareSafeRuntimeForSafetensor() {
+        if (!"safetensor".equalsIgnoreCase(providerId)) {
+            return true;
+        }
+
+        String repo = inferCurrentHfRepo();
+        if (repo == null || repo.isBlank()) {
+            System.err.println(
+                    "Error: Safetensor runtime is unstable in this environment and direct in-process loading is not safe.");
+            System.err.println(
+                    "Use a GGUF/TorchScript model instead, or pass an explicit runnable model with --model.");
+            return false;
+        }
+
+        if (!quiet) {
+            System.out.println("Preparing runnable runtime for checkpoint model: " + displayModelName(modelId));
+        }
+
+        try {
+            // For safetensor fallback, force converter-on so pull can produce runnable
+            // GGUF.
+            if (System.getProperty("gollek.gguf.converter.auto") == null) {
+                System.setProperty("gollek.gguf.converter.auto", "true");
+            }
+            if (System.getProperty("gollek.gguf.converter.outtype") == null) {
+                System.setProperty("gollek.gguf.converter.outtype", defaultGgufOutType());
+            }
+
+            java.util.LinkedHashSet<String> specs = new java.util.LinkedHashSet<>();
+            specs.add(repo);
+            specs.add("hf:" + repo);
+
+            for (String spec : specs) {
+                try {
+                    sdk.pullModel(spec, null);
+                } catch (Exception ignored) {
+                    // continue trying alternatives
+                }
+            }
+
+            for (String candidate : runtimeModelCandidates(repo)) {
+                if (tryActivateRuntimeCandidate(candidate)) {
+                    return true;
+                }
+            }
+        } catch (Exception ignored) {
+            // handled by fallback message below
+        }
+
+        if (hasOnlyEmptyGgufCacheDirs(repo)) {
+            System.err.println("Note: GGUF cache folders exist but contain no runnable model files yet.");
+        }
+        System.err.println(
+                "Error: Unable to prepare a runnable model from safetensor checkpoint in this environment.");
+        System.err.println("Try: pull a GGUF variant and run with --provider gguf.");
+        return false;
+    }
+
+    private List<String> runtimeModelCandidates(String repo) {
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        out.add(repo + "-GGUF");
+        out.add("hf:" + repo + "-GGUF");
+        out.add(repo);
+        out.add("hf:" + repo);
+        return List.copyOf(out);
+    }
+
+    private boolean tryActivateRuntimeCandidate(String candidate) {
+        if (candidate == null || candidate.isBlank()) {
+            return false;
+        }
+
+        // Local filesystem candidate: never route through HF resolver.
+        if (looksLikeLocalPath(candidate)) {
+            Path p = Path.of(candidate);
+            if (!Files.exists(p)) {
+                return false;
+            }
+            String lower = p.getFileName() != null ? p.getFileName().toString().toLowerCase() : "";
+            if (!(lower.endsWith(".gguf") || lower.endsWith(".pt") || lower.endsWith(".pth"))) {
+                return false;
+            }
+            modelId = p.toString();
+            modelPathOverride = p.toString();
+            providerId = lower.endsWith(".gguf") ? "gguf" : "djl";
+            try {
+                sdk.setPreferredProvider(providerId);
+            } catch (tech.kayys.gollek.sdk.exception.SdkException e) {
+                // Ignore or log
+            }
+            if (!quiet) {
+                System.out.println("Using compatible runtime model: " + displayModelName(modelId)
+                        + " (provider: " + providerId + ")");
+            }
+            return true;
+        }
+
+        var resolved = LocalModelResolver.resolve(sdk, candidate);
+        if (resolved.isEmpty()) {
+            return false;
+        }
+        var found = resolved.get();
+        String format = found.info() != null ? found.info().getFormat() : null;
+        if (isCheckpointOnlyFormat(format)) {
+            return false;
+        }
+
+        modelId = found.modelId();
+        modelPathOverride = found.localPath() != null ? found.localPath().toString() : null;
+        String upgradedProvider = providerForFormat(format);
+        if (upgradedProvider != null && !upgradedProvider.isBlank()) {
+            providerId = upgradedProvider;
+            try {
+                sdk.setPreferredProvider(upgradedProvider);
+            } catch (tech.kayys.gollek.sdk.exception.SdkException e) {
+                // Ignore or log
+            }
+        }
+        if (!quiet) {
+            System.out.println("Using compatible runtime model: " + displayModelName(modelId)
+                    + " (provider: " + providerId + ")");
+        }
+        return true;
+    }
+
+    private boolean looksLikeLocalPath(String value) {
+        if (value.startsWith("/") || value.startsWith("~")) {
+            return true;
+        }
+        return value.length() > 2 && Character.isLetter(value.charAt(0)) && value.charAt(1) == ':';
+    }
+
+    private boolean hasOnlyEmptyGgufCacheDirs(String repo) {
+        Path base = Path.of(System.getProperty("user.home"), ".gollek", "models", "safetensors");
+        String org = repo.contains("/") ? repo.substring(0, repo.indexOf('/')) : "";
+        String name = repo.contains("/") ? repo.substring(repo.indexOf('/') + 1) : repo;
+        if (org.isBlank() || name.isBlank()) {
+            return false;
+        }
+        Path ggufDir = base.resolve(org).resolve(name + "-GGUF");
+        Path ggufDir2 = base.resolve(org).resolve(name + "-GGUF-GGUF");
+        return (Files.isDirectory(ggufDir) && isDirEmpty(ggufDir))
+                || (Files.isDirectory(ggufDir2) && isDirEmpty(ggufDir2));
+    }
+
+    private boolean isDirEmpty(Path dir) {
+        try (var files = Files.list(dir)) {
+            return files.findAny().isEmpty();
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private boolean ensureSafetensorMetadataReady() {
+        if (!"safetensor".equalsIgnoreCase(providerId)) {
+            return true;
+        }
+
+        Path modelPath = resolveEffectiveModelPath();
+        if (modelPath == null || !Files.exists(modelPath)) {
+            return true;
+        }
+
+        Path parent = modelPath.getParent();
+        if (parent == null || Files.exists(parent.resolve("config.json"))) {
+            return true;
+        }
+
+        if (!quiet) {
+            System.out.println("Safetensor metadata is incomplete (missing config.json). Attempting auto-refresh...");
+        }
+
+        java.util.LinkedHashSet<String> refreshSpecs = new java.util.LinkedHashSet<>();
+        if (isHuggingFaceSpec(modelId)) {
+            refreshSpecs.addAll(buildPullSpecs(modelId));
+        }
+        inferHfRepoFromSafetensorPath(modelPath).ifPresent(repo -> refreshSpecs.addAll(buildPullSpecs(repo)));
+
+        Exception lastError = null;
+        for (String spec : refreshSpecs) {
+            try {
+                if (!quiet) {
+                    System.out.println("Refreshing checkpoint metadata from Hugging Face: " + spec);
+                }
+                sdk.pullModel(spec, progress -> {
+                    if (quiet) {
+                        return;
+                    }
+                    if (progress.getTotal() > 0) {
+                        System.out.printf("\rDownloading: %s %d%% (%d/%d MB)",
+                                progress.getProgressBar(20),
+                                progress.getPercentComplete(),
+                                progress.getCompleted() / 1024 / 1024,
+                                progress.getTotal() / 1024 / 1024);
+                    } else {
+                        System.out.print("\rDownloading: " + progress.getStatus());
+                    }
+                });
+                if (!quiet) {
+                    System.out.println();
+                }
+                break;
+            } catch (Exception e) {
+                lastError = e;
+            }
+        }
+
+        var resolved = LocalModelResolver.resolve(sdk, modelId);
+        if (resolved.isPresent()) {
+            var found = resolved.get();
+            modelId = found.modelId();
+            modelPathOverride = found.localPath() != null ? found.localPath().toString() : modelPathOverride;
+            modelPath = found.localPath() != null ? found.localPath() : modelPath;
+        }
+
+        Path updatedParent = modelPath != null ? modelPath.getParent() : null;
+        if (updatedParent != null && Files.exists(updatedParent.resolve("config.json"))) {
+            return true;
+        }
+
+        if (!quiet && lastError != null) {
+            System.err.println("Metadata auto-refresh failed: " + describeError(lastError));
+        }
+        System.err.println("Error: Incomplete safetensor checkpoint for " + displayModelName(modelId)
+                + " (missing config.json). Re-pull model to download metadata sidecars.");
+        return false;
+    }
+
+    private Path resolveEffectiveModelPath() {
+        if (modelPathOverride != null && !modelPathOverride.isBlank()) {
+            try {
+                return Path.of(modelPathOverride);
+            } catch (Exception ignored) {
+                // fallback below
+            }
+        }
+        try {
+            Path candidate = Path.of(modelId);
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+        } catch (Exception ignored) {
+            // fallback below
+        }
+        return LocalModelResolver.resolve(sdk, modelId)
+                .map(LocalModelResolver.ResolvedModel::localPath)
+                .orElse(null);
+    }
+
+    private Optional<String> inferHfRepoFromSafetensorPath(Path modelPath) {
+        if (modelPath == null) {
+            return Optional.empty();
+        }
+        Path base = Path.of(System.getProperty("user.home"), ".gollek", "models", "safetensors");
+        try {
+            Path parent = modelPath.getParent();
+            if (parent == null || !parent.startsWith(base)) {
+                return Optional.empty();
+            }
+            Path rel = base.relativize(parent);
+            String repo = rel.toString().replace('\\', '/');
+            if (repo.isBlank()) {
+                return Optional.empty();
+            }
+            return Optional.of(repo);
+        } catch (Exception ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private String inferCurrentHfRepo() {
+        if (isHuggingFaceSpec(modelId)) {
+            return modelId.startsWith("hf:") ? modelId.substring(3) : modelId;
+        }
+        Path effective = resolveEffectiveModelPath();
+        return inferHfRepoFromSafetensorPath(effective).orElse(null);
+    }
+
     private void printGenericProviderSetupHint(String providerId) {
         if ("djl".equalsIgnoreCase(providerId)) {
             System.err.println(
@@ -1150,6 +1476,189 @@ public class ChatCommand implements Runnable {
         }
     }
 
+    private Optional<String> resolveDefaultModelForProvider() {
+        if (providerId == null || providerId.isBlank()) {
+            return findPreferredLocalModelForBareChat();
+        }
+
+        if ("safetensor".equalsIgnoreCase(providerId)) {
+            return findLocalSafetensorModelPath();
+        }
+
+        return providerRegistry.getProvider(providerId)
+                .map(LLMProvider::metadata)
+                .map(meta -> meta.getDefaultModel())
+                .filter(v -> v != null && !v.isBlank());
+    }
+
+    private Optional<String> findPreferredLocalModelForBareChat() {
+        List<ModelInfo> local = listLocalModelsSafe(64);
+        return local.stream()
+                .max(Comparator.comparingInt(this::autoPickScore)
+                        .thenComparing(m -> m.getUpdatedAt() != null ? m.getUpdatedAt() : java.time.Instant.EPOCH))
+                .map(ModelInfo::getModelId)
+                .filter(v -> v != null && !v.isBlank());
+    }
+
+    private int autoPickScore(ModelInfo model) {
+        if (model == null || model.getFormat() == null) {
+            return 0;
+        }
+        String format = model.getFormat().trim().toUpperCase(java.util.Locale.ROOT);
+        return switch (format) {
+            case "GGUF" -> 400;
+            case "TORCHSCRIPT" -> 300;
+            case "SAFETENSORS" -> 250;
+            case "PYTORCH" -> 200;
+            case "BIN" -> 100;
+            default -> 50;
+        };
+    }
+
+    private List<ModelInfo> listLocalModelsSafe(int limit) {
+        try {
+            List<ModelInfo> models = sdk.listModels(0, Math.max(limit, 32));
+            LinkedHashSet<String> seen = new LinkedHashSet<>();
+            List<ModelInfo> out = new ArrayList<>();
+            for (ModelInfo model : models) {
+                if (model == null || model.getModelId() == null) {
+                    continue;
+                }
+                if (seen.add(model.getModelId())) {
+                    out.add(model);
+                }
+            }
+            return out;
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
+    private void printStartupCatalog() {
+        if (quiet) {
+            return;
+        }
+
+        List<String> localModels = listLocalModelsSafe(8).stream()
+                .map(ModelInfo::getModelId)
+                .filter(id -> id != null && !id.isBlank())
+                .map(this::displayModelName)
+                .distinct()
+                .limit(8)
+                .toList();
+
+        List<String> providers;
+        try {
+            providers = sdk.listAvailableProviders().stream()
+                    .map(ProviderInfo::id)
+                    .filter(id -> id != null && !id.isBlank())
+                    .distinct()
+                    .sorted(String::compareToIgnoreCase)
+                    .toList();
+        } catch (Exception ignored) {
+            providers = List.of();
+        }
+
+        if (!localModels.isEmpty()) {
+            System.out.println(DIM + "Local models: " + RESET + String.join(", ", localModels));
+        } else {
+            System.out.println(DIM + "Local models: " + RESET + "(none)");
+        }
+        if (!providers.isEmpty()) {
+            System.out.println(DIM + "Providers: " + RESET + String.join(", ", providers));
+        }
+    }
+
+    private Optional<String> findLocalSafetensorModelPath() {
+        Path base = Path.of(System.getProperty("user.home"), ".gollek", "models", "safetensors");
+        if (!Files.isDirectory(base)) {
+            return Optional.empty();
+        }
+
+        try (var files = Files.walk(base, 6)) {
+            return files
+                    .filter(Files::isRegularFile)
+                    .filter(this::isSafetensorFile)
+                    .max(Comparator.comparing(this::lastModifiedSafe))
+                    .map(path -> path.toAbsolutePath().toString());
+        } catch (Exception ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private boolean isSafetensorFile(Path path) {
+        String name = path.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        return name.endsWith(".safetensors") || name.endsWith(".safetensor");
+    }
+
+    private java.time.Instant lastModifiedSafe(Path path) {
+        try {
+            return Files.getLastModifiedTime(path).toInstant();
+        } catch (Exception ignored) {
+            return java.time.Instant.EPOCH;
+        }
+    }
+
+    private String displayModelName(String modelRef) {
+        if (modelRef == null || modelRef.isBlank()) {
+            return "unknown";
+        }
+        try {
+            Path path = Path.of(modelRef);
+            Path fileName = path.getFileName();
+            String file = fileName != null ? fileName.toString() : modelRef;
+            String lower = file.toLowerCase(java.util.Locale.ROOT);
+            if (lower.endsWith(".safetensors") || lower.endsWith(".safetensor")) {
+                Path parent = path.getParent();
+                if (parent != null && parent.getFileName() != null) {
+                    return parent.getFileName().toString();
+                }
+            }
+            return file;
+        } catch (Exception ignored) {
+            return modelRef;
+        }
+    }
+
+    private void printCompatibilityHintBeforeInference() {
+        if (providerId == null || providerId.isBlank() || modelId == null || modelId.isBlank()) {
+            return;
+        }
+
+        String provider = providerId.trim().toLowerCase(java.util.Locale.ROOT);
+        String model = modelId.trim().toLowerCase(java.util.Locale.ROOT);
+        String modelName = Path.of(modelId).getFileName() != null ? Path.of(modelId).getFileName().toString() : modelId;
+
+        if ("safetensor".equals(provider)) {
+            if (looksLikeMultimodalModel(model)) {
+                System.err.println(YELLOW
+                        + "Hint: provider 'safetensor' is text-checkpoint oriented. This model looks multimodal/VLM and may fail."
+                        + RESET);
+                System.err.println(
+                        YELLOW + "Hint: try a text-only checkpoint, or use a provider/runtime with multimodal support."
+                                + RESET);
+            } else if (model.endsWith(".gguf") || model.endsWith(".pt") || model.endsWith(".pth")) {
+                System.err.println(
+                        YELLOW + "Hint: provider 'safetensor' expects .safetensor/.safetensors weights, but got: "
+                                + modelName + RESET);
+            }
+            return;
+        }
+
+        if ("gguf".equals(provider) && !(model.endsWith(".gguf") || model.contains("/models/gguf/"))) {
+            System.err.println(YELLOW + "Hint: provider 'gguf' works best with GGUF models (.gguf)." + RESET);
+        }
+    }
+
+    private boolean looksLikeMultimodalModel(String normalizedModel) {
+        return normalizedModel.contains("vlm")
+                || normalizedModel.contains("vision")
+                || normalizedModel.contains("llava")
+                || normalizedModel.contains("idefics")
+                || normalizedModel.contains("qwen-vl")
+                || normalizedModel.contains("smolvlm");
+    }
+
     private void printProviderSetupHint(ProviderInfo provider) {
         String id = provider.id();
         System.err.printf("Provider '%s' is installed but not healthy.%n", id);
@@ -1188,7 +1697,9 @@ public class ChatCommand implements Runnable {
         if (effectiveStream || providerId == null || providerId.isBlank()) {
             return false;
         }
-        return "djl".equalsIgnoreCase(providerId) || "libtorch".equalsIgnoreCase(providerId);
+        return "djl".equalsIgnoreCase(providerId)
+                || "safetensor".equalsIgnoreCase(providerId)
+                || "libtorch".equalsIgnoreCase(providerId);
     }
 
     private InferenceResponse inferDirectWithProvider(String id, InferenceRequest request) {

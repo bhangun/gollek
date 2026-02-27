@@ -6,6 +6,7 @@ quarkus:
   http:
     port: 8080
     cors: true
+
     limits:
       max-body-size: 100M
   

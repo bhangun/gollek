@@ -14,6 +14,7 @@
 
     <properties>
         <quarkus.package.type>uber-jar</quarkus.package.type>
+        <quarkus.package.jar.add-runner-suffix>false</quarkus.package.jar.add-runner-suffix>
     </properties>
 
     <dependencyManagement>
@@ -48,6 +49,10 @@
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-engine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-cache</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -158,6 +163,7 @@
     </dependencies>
 
     <build>
+        <finalName>gollek</finalName>
         <plugins>
             <plugin>
                 <groupId>io.quarkus</groupId>
@@ -169,7 +175,6 @@
                         <goals>
                             <goal>build</goal>
                             <goal>generate-code</goal>
-                            <goal>generate-code-tests</goal>
                         </goals>
                     </execution>
                 </executions>

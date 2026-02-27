@@ -34,6 +34,7 @@ class GeminiProviderTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        when(geminiConfig.apiKey()).thenReturn("test-api-key");
     }
 
     @Test
@@ -118,13 +119,6 @@ class GeminiProviderTest {
 
     @Test
     void health() {
-        // Mocking listModels if used, but my implementation simplified it to just
-        // return healthy if key present.
-        // If I want to test the key presence:
-        geminiProvider.initialize(tech.kayys.gollek.spi.provider.ProviderConfig.builder("gemini")
-                .secret("api.key", "test-key")
-                .build());
-
         assertTrue(geminiProvider.health().await().indefinitely().isHealthy());
     }
 }

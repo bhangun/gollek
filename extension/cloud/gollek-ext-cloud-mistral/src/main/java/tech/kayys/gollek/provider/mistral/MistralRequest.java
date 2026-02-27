@@ -2,7 +2,6 @@ package tech.kayys.gollek.provider.mistral;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
-import java.util.Map;
 
 public class MistralRequest {
     private String model;
@@ -11,6 +10,17 @@ public class MistralRequest {
     @JsonProperty("max_tokens")
     private Integer maxTokens;
     private boolean stream;
+
+    @JsonProperty("top_p")
+    private Double topP;
+
+    public Double getTopP() {
+        return topP;
+    }
+
+    public void setTopP(Double topP) {
+        this.topP = topP;
+    }
 
     public String getModel() {
         return model;

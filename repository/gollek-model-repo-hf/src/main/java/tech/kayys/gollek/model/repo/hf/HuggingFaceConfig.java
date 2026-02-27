@@ -58,4 +58,10 @@ public interface HuggingFaceConfig {
      */
     @WithDefault("wayang-inference/1.0")
     String userAgent();
+
+    /**
+     * Auto-download remote HF models when not found in local cache.
+     */
+    @WithDefault("true")
+    boolean autoDownload();
 }
