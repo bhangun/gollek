@@ -1,41 +1,21 @@
 package tech.kayys.gollek.provider.cerebras;
 
+/* 
+ * Obsolete REST client - replaced by tech.kayys.gollek.provider.cerebras.CerebrasProvider 
+ * using java.net.http.HttpClient for better compatibility.
+ *
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 
-/**
- * REST client for Cerebras API (OpenAI-compatible)
- */
-/*
- * @RegisterRestClient(configKey = "cerebras-api", baseUri =
- * "https://api.cerebras.ai")
- * 
- * @Path("/v1")
- */
+@RegisterRestClient(configKey = "cerebras-api", baseUri = "https://api.cerebras.ai")
+@Path("/v1")
 public interface CerebrasClient {
-
-        /**
-         * Chat completions (non-streaming)
-         */
-        @POST
-        @Path("/chat/completions")
-        @Consumes(MediaType.APPLICATION_JSON)
-        @Produces(MediaType.APPLICATION_JSON)
-        Uni<CerebrasResponse> chatCompletions(
-                        @HeaderParam("Authorization") String authorization,
-                        CerebrasRequest request);
-
-        /**
-         * Chat completions (streaming)
-         */
-        @POST
-        @Path("/chat/completions")
-        @Consumes(MediaType.APPLICATION_JSON)
-        @Produces(MediaType.APPLICATION_JSON)
-        Multi<CerebrasStreamResponse> chatCompletionsStream(
-                        @HeaderParam("Authorization") String authorization,
-                        CerebrasRequest request);
+...
+}
+*/
+public interface CerebrasClient {
+        // Empty interface to satisfy dependencies if any, though none should remain.
 }

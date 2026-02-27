@@ -112,7 +112,8 @@ public class MistralProvider implements StreamingProvider {
 
     @Override
     public boolean supports(String model, ProviderRequest request) {
-        return model.startsWith("mistral") || model.startsWith("pixtral") || model.startsWith("codestral");
+        return model != null
+                && (model.startsWith("mistral") || model.startsWith("pixtral") || model.startsWith("codestral"));
     }
 
     @Override
@@ -125,14 +126,15 @@ public class MistralProvider implements StreamingProvider {
 
         if (currentApiKey == null || currentApiKey.isBlank()) {
             return Uni.createFrom().failure(new ProviderException.ProviderAuthenticationException(PROVIDER_ID,
-                    "Mistral API key not configured."));
+                    "Mistral API key not configured. Set MISTRAL_API_KEY environment variable."));
         }
 
         String baseUrl = configDetails.baseUrl();
         if (baseUrl.endsWith("/")) {
             baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
         }
-        String url = baseUrl + "/chat/completions";
+        // Ensure /v1 is present if not already in baseUrl
+        String url = baseUrl.contains("/v1") ? baseUrl + "/chat/completions" : baseUrl + "/v1/chat/completions";
 
         try {
             String body = objectMapper.writeValueAsString(mistralRequest);
@@ -178,14 +180,14 @@ public class MistralProvider implements StreamingProvider {
 
         if (currentApiKey == null || currentApiKey.isBlank()) {
             return Multi.createFrom().failure(new ProviderException.ProviderAuthenticationException(PROVIDER_ID,
-                    "Mistral API key not configured."));
+                    "Mistral API key not configured. Set MISTRAL_API_KEY environment variable."));
         }
 
         String baseUrl = configDetails.baseUrl();
         if (baseUrl.endsWith("/")) {
             baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
         }
-        String url = baseUrl + "/chat/completions";
+        String url = baseUrl.contains("/v1") ? baseUrl + "/chat/completions" : baseUrl + "/v1/chat/completions";
 
         try {
             String body = objectMapper.writeValueAsString(mistralRequest);
@@ -239,7 +241,8 @@ public class MistralProvider implements StreamingProvider {
 
     private MistralRequest buildMistralRequest(ProviderRequest request) {
         MistralRequest mistralRequest = new MistralRequest();
-        mistralRequest.setModel(request.getModel());
+        String model = request.getModel() != null ? request.getModel().trim() : "mistral-small-latest";
+        mistralRequest.setModel(model);
 
         if (request.getMessages() != null) {
             List<MistralMessage> messages = request.getMessages().stream()
@@ -267,7 +270,12 @@ public class MistralProvider implements StreamingProvider {
         if (request != null && request.getApiKey().isPresent()) {
             return request.getApiKey().get();
         }
-        return configDetails.apiKey();
+        String key = configDetails.apiKey();
+        if (key != null && !key.isBlank() && !"dummy".equals(key)) {
+            return key;
+        }
+        // Fallback to standard environment variable
+        return System.getenv("MISTRAL_API_KEY");
     }
 
     private String extractContent(MistralResponse response) {

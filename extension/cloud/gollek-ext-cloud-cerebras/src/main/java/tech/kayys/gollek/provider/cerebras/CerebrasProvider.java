@@ -29,7 +29,6 @@ import java.util.stream.Collectors;
 
 /**
  * Cerebras provider adapter for cloud LLM inference.
- * Uses OpenAI-compatible chat completions API.
  */
 @ApplicationScoped
 public class CerebrasProvider implements StreamingProvider {
@@ -123,9 +122,9 @@ public class CerebrasProvider implements StreamingProvider {
         CerebrasRequest cerebrasRequest = buildCerebrasRequest(request);
         String currentApiKey = getApiKey(request);
 
-        if (currentApiKey == null || currentApiKey.isBlank() || currentApiKey.equals("dummy")) {
+        if (currentApiKey == null || currentApiKey.isBlank()) {
             return Uni.createFrom().failure(new ProviderException.ProviderAuthenticationException(PROVIDER_ID,
-                    "Cerebras API key not configured."));
+                    "Cerebras API key not configured. Set CEREBRAS_API_KEY environment variable."));
         }
 
         String baseUrl = configDetails.baseUrl();
@@ -176,9 +175,9 @@ public class CerebrasProvider implements StreamingProvider {
         cerebrasRequest.setStream(true);
         String currentApiKey = getApiKey(request);
 
-        if (currentApiKey == null || currentApiKey.isBlank() || currentApiKey.equals("dummy")) {
+        if (currentApiKey == null || currentApiKey.isBlank()) {
             return Multi.createFrom().failure(new ProviderException.ProviderAuthenticationException(PROVIDER_ID,
-                    "Cerebras API key not configured."));
+                    "Cerebras API key not configured. Set CEREBRAS_API_KEY environment variable."));
         }
 
         String baseUrl = configDetails.baseUrl();
@@ -270,7 +269,12 @@ public class CerebrasProvider implements StreamingProvider {
         if (request != null && request.getApiKey().isPresent()) {
             return request.getApiKey().get();
         }
-        return configDetails.apiKey();
+        String key = configDetails.apiKey();
+        if (key != null && !key.isBlank() && !"dummy".equals(key)) {
+            return key;
+        }
+        // Fallback to standard environment variable
+        return System.getenv("CEREBRAS_API_KEY");
     }
 
     private String extractContent(CerebrasResponse response) {

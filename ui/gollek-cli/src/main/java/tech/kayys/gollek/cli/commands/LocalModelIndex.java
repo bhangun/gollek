@@ -90,6 +90,7 @@ final class LocalModelIndex {
         }
         scanFlat(root.resolve("gguf"), "gguf", true, out);
         scanFlat(root.resolve("torchscript"), "torchscript", true, out);
+        scanFlat(root.resolve("safetensors"), "safetensors", false, out);
         scanDjl(root.resolve("djl"), out);
         out.sort(Comparator.comparing((Entry e) -> parseInstant(e.updatedAt)).reversed());
         return out;

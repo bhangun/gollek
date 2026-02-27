@@ -3,6 +3,38 @@
 
 Production-ready CLI similar to Ollama CLI, integrating with existing providers and model repository.
 
+## Install (Release Artifacts)
+
+Release workflow: `.github/workflows/golek-cli-release.yml`
+
+```bash
+# macOS / Linux (curl installer)
+curl -fsSL https://github.com/<org>/<repo>/releases/download/gollek-v<version>/install.sh | bash
+```
+
+```bash
+# Homebrew (after adding generated formula to your tap)
+brew tap <org>/<tap>
+brew install gollek
+```
+
+```powershell
+# Chocolatey
+choco install gollek
+```
+
+```powershell
+# Windows native executable
+Invoke-WebRequest -Uri "https://github.com/<org>/<repo>/releases/download/gollek-v<version>/gollek-windows-x64.exe" -OutFile "gollek.exe"
+.\gollek.exe --version
+```
+
+```powershell
+# Windows JVM fallback package (Java 21+)
+# Extract gollek-jvm.zip first
+.\bin\gollek.bat --version
+```
+
 
 ```bash
   _____       _      _    

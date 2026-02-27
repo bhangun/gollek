@@ -254,7 +254,9 @@ public class RunCommand implements Runnable {
                 return;
             }
             printCompatibilityHintBeforeInference();
-            if (stream && ("djl".equalsIgnoreCase(providerId) || "safetensor".equalsIgnoreCase(providerId))) {
+            if (stream && ("djl".equalsIgnoreCase(providerId)
+                    || "safetensor".equalsIgnoreCase(providerId)
+                    || "gemini".equalsIgnoreCase(providerId))) {
                 System.out.println(
                         "Provider '" + providerId + "' does not support streaming; switching to non-streaming mode.");
                 stream = false;

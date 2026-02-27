@@ -5,10 +5,13 @@ import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
 import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.gollek.sdk.model.SystemInfo;
-import tech.kayys.gollek.spi.provider.ProviderInfo;
+import tech.kayys.gollek.spi.provider.ProviderRegistry;
+import tech.kayys.gollek.spi.provider.LLMProvider;
 import io.quarkus.arc.Unremovable;
 
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Comparator;
 
 /**
  * Display system information and available adapters/providers using GollekSdk.
@@ -21,6 +24,8 @@ public class InfoCommand implements Runnable {
 
     @Inject
     GollekSdk sdk;
+    @Inject
+    ProviderRegistry providerRegistry;
 
     @Override
     public void run() {
@@ -33,6 +38,8 @@ public class InfoCommand implements Runnable {
 
             // Print available providers
             printProviders();
+            // Print local model details
+            printLocalModels();
 
         } catch (Exception e) {
             System.err.println("Failed to retrieve system information: " + e.getMessage());
@@ -88,7 +95,9 @@ public class InfoCommand implements Runnable {
 
     private void printProviders() {
         try {
-            List<ProviderInfo> providers = sdk.listAvailableProviders();
+            List<LLMProvider> providers = providerRegistry.getAllProviders().stream()
+                    .sorted(Comparator.comparing(LLMProvider::id))
+                    .toList();
 
             if (providers.isEmpty()) {
                 System.out.println("\nNo providers available.");
@@ -96,19 +105,20 @@ public class InfoCommand implements Runnable {
             }
 
             System.out.println("\n┌──────────────────────── Available Providers ───────────────────────┐");
-            System.out.printf("│ %-15s │ %-20s │ %-10s │ %-10s │%n", "ID", "NAME", "VERSION", "STATUS");
+            System.out.printf("│ %-12s │ %-18s │ %-14s │ %-12s │%n", "ID", "NAME", "DEFAULT MODEL", "FEATURES");
             System.out.println("├────────────────────────────────────────────────────────────────────┤");
 
-            for (ProviderInfo provider : providers) {
-                String status = provider.healthStatus() != null
-                        ? provider.healthStatus().toString()
-                        : "UNKNOWN";
-
-                System.out.printf("│ %-15s │ %-20s │ %-10s │ %-10s │%n",
+            for (LLMProvider provider : providers) {
+                var meta = provider.metadata();
+                var caps = provider.capabilities();
+                String features = caps != null
+                        ? (caps.isStreaming() ? "stream" : "sync") + (caps.isMultimodal() ? ",mm" : "")
+                        : "n/a";
+                System.out.printf("│ %-12s │ %-18s │ %-14s │ %-12s │%n",
                         provider.id(),
-                        truncate(provider.name(), 20),
-                        provider.version() != null ? provider.version() : "N/A",
-                        status);
+                        truncate(provider.name(), 18),
+                        truncate(meta != null ? meta.getDefaultModel() : "N/A", 14),
+                        truncate(features, 12));
             }
             System.out.printf("│ Total: %-52d │%n", providers.size());
             System.out.println("└────────────────────────────────────────────────────────────────────┘");
@@ -116,6 +126,59 @@ public class InfoCommand implements Runnable {
         } catch (Exception e) {
             System.err.println("Failed to retrieve provider information: " + e.getMessage());
         }
+    }
+
+    private void printLocalModels() {
+        try {
+            List<LocalModelIndex.Entry> entries = LocalModelIndex.refreshFromDisk().stream()
+                    .sorted(Comparator.comparing((LocalModelIndex.Entry e) -> LocalModelIndex.parseInstant(e.updatedAt))
+                            .reversed())
+                    .toList();
+
+            if (entries.isEmpty()) {
+                System.out.println("\nNo local models found.");
+                return;
+            }
+
+            System.out.println("\n┌──────────────────────── Local Models ──────────────────────────────┐");
+            System.out.printf("│ %-20s │ %-12s │ %-7s │ %-7s │%n", "MODEL", "FORMAT", "SOURCE", "RUN");
+            System.out.println("├────────────────────────────────────────────────────────────────────┤");
+            for (LocalModelIndex.Entry e : entries) {
+                String display = modelDisplay(e);
+                System.out.printf("│ %-20s │ %-12s │ %-7s │ %-7s │%n",
+                        truncate(display, 20),
+                        truncate(e.format != null ? e.format : "n/a", 12),
+                        truncate(e.source != null ? e.source : "local", 7),
+                        e.runnable ? "yes" : "no");
+                if (e.path != null && !e.path.isBlank()) {
+                    System.out.println("│   path: " + truncate(e.path, 58));
+                }
+            }
+            System.out.printf("│ Total: %-52d │%n", entries.size());
+            System.out.println("└────────────────────────────────────────────────────────────────────┘");
+        } catch (Exception e) {
+            System.err.println("Failed to retrieve local model details: " + e.getMessage());
+        }
+    }
+
+    private String modelDisplay(LocalModelIndex.Entry e) {
+        if (e == null) {
+            return "unknown";
+        }
+        if (e.name != null && !e.name.isBlank()) {
+            return e.name;
+        }
+        if (e.path != null && !e.path.isBlank()) {
+            try {
+                Path p = Path.of(e.path);
+                if (p.getFileName() != null) {
+                    return p.getFileName().toString();
+                }
+            } catch (Exception ignored) {
+                // fallback below
+            }
+        }
+        return e.id != null ? e.id : "unknown";
     }
 
     private String truncate(String str, int maxLen) {
