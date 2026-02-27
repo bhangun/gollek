@@ -49,7 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp" \
-          ./inference-gollek/scripts/prepare-llama-source.sh
+          ./scripts/prepare-llama-source.sh
 
       - name: Prepare libtorch source (Linux/macOS)
         if: runner.os != 'Windows'
@@ -57,7 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch" \
-          ./inference-gollek/scripts/prepare-libtorch-source.sh
+          ./scripts/prepare-libtorch-source.sh
 
       - name: Install native build dependencies (Linux)
         if: runner.os == 'Linux'
@@ -74,7 +74,6 @@ jobs:
           export GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp"
           export GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch"
           export GOLEK_LIBTORCH_LIB_PATH="$HOME/.gollek/source/vendor/libtorch/lib"
-          cd inference-gollek
           mvn -B clean package -pl ui/gollek-cli -am -DskipTests -Pnative
         env:
           MAVEN_OPTS: -Xmx3G
@@ -85,7 +84,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          BIN_PATH=$(ls inference-gollek/ui/gollek-cli/target/${{ matrix.runner_pattern }} | head -n 1)
+          BIN_PATH=$(ls ui/gollek-cli/target/${{ matrix.runner_pattern }} | head -n 1)
           cp "$BIN_PATH" "dist/${{ matrix.binary_name }}"
           chmod +x "dist/${{ matrix.binary_name }}"
           tar -czf "dist/${{ matrix.binary_name }}.tar.gz" -C dist "${{ matrix.binary_name }}"
@@ -113,7 +112,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $bin = Get-ChildItem "inference-gollek/ui/gollek-cli/target/${{ matrix.runner_pattern }}" | Select-Object -First 1
+          $bin = Get-ChildItem "ui/gollek-cli/target/${{ matrix.runner_pattern }}" | Select-Object -First 1
           Copy-Item $bin.FullName "dist/${{ matrix.binary_name }}"
           Compress-Archive -Path "dist/${{ matrix.binary_name }}" -DestinationPath "dist/gollek-windows-x64.zip" -Force
 
@@ -141,21 +140,20 @@ jobs:
         run: |
           set -euo pipefail
           GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp" \
-          ./inference-gollek/scripts/prepare-llama-source.sh
+          ./scripts/prepare-llama-source.sh
 
       - name: Prepare libtorch source
         shell: bash
         run: |
           set -euo pipefail
           GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch" \
-          ./inference-gollek/scripts/prepare-libtorch-source.sh
+          ./scripts/prepare-libtorch-source.sh
 
       - name: Build JVM package
         run: |
           export GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp"
           export GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch"
           export GOLEK_LIBTORCH_LIB_PATH="$HOME/.gollek/source/vendor/libtorch/lib"
-          cd inference-gollek
           mvn -B clean package -pl ui/gollek-cli -am -DskipTests
 
       - name: Stage JVM bundle
@@ -163,7 +161,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/jvm/bin dist/jvm/app
-          cp -R inference-gollek/ui/gollek-cli/target/quarkus-app/. dist/jvm/app/
+          cp -R ui/gollek-cli/target/quarkus-app/. dist/jvm/app/
 
           cat > dist/jvm/bin/gollek <<'SH'
           #!/usr/bin/env bash
