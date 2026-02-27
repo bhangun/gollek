@@ -76,7 +76,10 @@ public class RunCommand implements Runnable {
     @Option(names = { "--json" }, description = "Enable JSON mode", defaultValue = "false")
     boolean jsonMode;
 
-    @Option(names = { "--max-tokens" }, description = "Maximum tokens to generate", defaultValue = "96")
+    @Option(names = { "--enable-json" }, description = "Emit OpenAI-compatible SSE JSON for streamed chunks", defaultValue = "false")
+    boolean enableJsonSse;
+
+    @Option(names = { "--max-tokens" }, description = "Maximum tokens to generate", defaultValue = "256")
     int maxTokens;
 
     @Option(names = { "--mirostat" }, description = "Mirostat mode (0, 1, 2)", defaultValue = "0")
@@ -123,13 +126,15 @@ public class RunCommand implements Runnable {
             configureCheckpointConversionPreference();
 
             boolean customModelPathUsed = false;
-            System.out.println(BOLD + YELLOW + "  _____       _      _    " + RESET);
-            System.out.println(BOLD + YELLOW + " / ____|     | |    | |   " + RESET);
-            System.out.println(BOLD + YELLOW + "| |  __  ___ | | ___| | __" + RESET);
-            System.out.println(BOLD + YELLOW + "| | |_ |/ _ \\| |/ _ \\ |/ /" + RESET);
-            System.out.println(BOLD + YELLOW + "| |__| | (_) | |  __/   < " + RESET);
-            System.out.println(BOLD + YELLOW + " \\_____|\\___/|_|\\___|_|\\_\\" + RESET);
-            System.out.println();
+            if (!enableJsonSse) {
+                System.out.println(BOLD + YELLOW + "  _____       _      _    " + RESET);
+                System.out.println(BOLD + YELLOW + " / ____|     | |    | |   " + RESET);
+                System.out.println(BOLD + YELLOW + "| |  __  ___ | | ___| | __" + RESET);
+                System.out.println(BOLD + YELLOW + "| | |_ |/ _ \\| |/ _ \\ |/ /" + RESET);
+                System.out.println(BOLD + YELLOW + "| |__| | (_) | |  __/   < " + RESET);
+                System.out.println(BOLD + YELLOW + " \\_____|\\___/|_|\\___|_|\\_\\" + RESET);
+                System.out.println();
+            }
 
             if (isMcpProvider()) {
                 System.out.println("MCP provider selected; skipping local model lookup.");
@@ -255,8 +260,7 @@ public class RunCommand implements Runnable {
             }
             printCompatibilityHintBeforeInference();
             if (stream && ("djl".equalsIgnoreCase(providerId)
-                    || "safetensor".equalsIgnoreCase(providerId)
-                    || "gemini".equalsIgnoreCase(providerId))) {
+                    || "safetensor".equalsIgnoreCase(providerId))) {
                 System.out.println(
                         "Provider '" + providerId + "' does not support streaming; switching to non-streaming mode.");
                 stream = false;
@@ -299,10 +303,12 @@ public class RunCommand implements Runnable {
             boolean directProviderBypass = "djl".equalsIgnoreCase(providerId)
                     || "safetensor".equalsIgnoreCase(providerId);
 
-            System.out.printf(BOLD + "Model: " + RESET + CYAN + "%s" + RESET + "%n", modelId);
-            System.out.printf(BOLD + "Provider: " + RESET + YELLOW + "%s" + RESET + "%n",
-                    providerId != null ? providerId : "auto-select");
-            System.out.println(DIM + "-".repeat(50) + RESET);
+            if (!enableJsonSse) {
+                System.out.printf(BOLD + "Model: " + RESET + CYAN + "%s" + RESET + "%n", modelId);
+                System.out.printf(BOLD + "Provider: " + RESET + YELLOW + "%s" + RESET + "%n",
+                        providerId != null ? providerId : "auto-select");
+                System.out.println(DIM + "-".repeat(50) + RESET);
+            }
 
             if (directProviderBypass) {
                 InferenceResponse response = inferDirectWithProvider(providerId, request);
@@ -320,9 +326,13 @@ public class RunCommand implements Runnable {
                                 chunk -> {
                                     String delta = chunk.getDelta();
                                     if (delta != null) {
-                                        System.out.print(delta);
+                                        if (enableJsonSse) {
+                                            printOpenAiSseDelta(request.getRequestId(), request.getModel(), delta);
+                                        } else {
+                                            System.out.print(delta);
+                                            System.out.flush();
+                                        }
                                         tokenCount.incrementAndGet();
-                                        System.out.flush();
                                     }
                                 },
                                 error -> {
@@ -333,10 +343,14 @@ public class RunCommand implements Runnable {
                                 () -> {
                                     long duration = System.currentTimeMillis() - startTime;
                                     double tps = (tokenCount.get() / (duration / 1000.0));
-                                    System.out.printf(
-                                            "%n" + DIM + "[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]" + RESET
-                                                    + "%n",
-                                            tokenCount.get(), duration / 1000.0, tps);
+                                    if (enableJsonSse) {
+                                        printOpenAiSseFinal(request.getRequestId(), request.getModel());
+                                    } else {
+                                        System.out.printf(
+                                                "%n" + DIM + "[Chunks: %d, Duration: %.2fs, Speed: %.2f t/s]" + RESET
+                                                        + "%n",
+                                                tokenCount.get(), duration / 1000.0, tps);
+                                    }
                                     latch.countDown();
                                 });
                 try {
@@ -386,6 +400,66 @@ public class RunCommand implements Runnable {
                 response.getTokensUsed(),
                 response.getDurationMs() / 1000.0,
                 tps);
+    }
+
+    private void printOpenAiSseDelta(String requestId, String model, String delta) {
+        long created = System.currentTimeMillis() / 1000L;
+        String id = "chatcmpl-" + (requestId != null ? requestId : UUID.randomUUID().toString());
+        String payload = "{\"id\":\"" + escapeJson(id)
+                + "\",\"object\":\"chat.completion.chunk\""
+                + ",\"created\":" + created
+                + ",\"model\":\"" + escapeJson(model != null ? model : "") + "\""
+                + ",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"" + escapeJson(delta)
+                + "\"},\"finish_reason\":null}]}";
+        System.out.println("data: " + payload);
+        System.out.flush();
+    }
+
+    private void printOpenAiSseFinal(String requestId, String model) {
+        long created = System.currentTimeMillis() / 1000L;
+        String id = "chatcmpl-" + (requestId != null ? requestId : UUID.randomUUID().toString());
+        String payload = "{\"id\":\"" + escapeJson(id)
+                + "\",\"object\":\"chat.completion.chunk\""
+                + ",\"created\":" + created
+                + ",\"model\":\"" + escapeJson(model != null ? model : "") + "\""
+                + ",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}";
+        System.out.println("data: " + payload);
+        System.out.println("data: [DONE]");
+        System.out.flush();
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder(value.length() + 16);
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '\\':
+                    out.append("\\\\");
+                    break;
+                case '"':
+                    out.append("\\\"");
+                    break;
+                case '\n':
+                    out.append("\\n");
+                    break;
+                case '\r':
+                    out.append("\\r");
+                    break;
+                case '\t':
+                    out.append("\\t");
+                    break;
+                default:
+                    if (c < 0x20) {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+            }
+        }
+        return out.toString();
     }
 
     private InferenceResponse inferDirectWithProvider(String id, InferenceRequest request) {
@@ -666,7 +740,7 @@ public class RunCommand implements Runnable {
                     "DJL runtime is not loaded. Ensure gollek-ext-format-djl is on classpath and DJL native runtime can initialize.");
         } else if ("libtorch".equalsIgnoreCase(providerId)) {
             System.err.println(
-                    "LibTorch runtime is not loaded. Set LIBTORCH_PATH and include gollek-ext-format-libtorch.");
+                    "LibTorch runtime is not loaded. Set GOLEK_LIBTORCH_LIB_PATH (or LIBTORCH_PATH) and include gollek-ext-format-libtorch.");
         } else if ("gguf".equalsIgnoreCase(providerId)) {
             System.err.println(
                     "GGUF runtime is not loaded. Set GOLEK_LLAMA_LIB_DIR/GOLEK_LLAMA_LIB_PATH and include gollek-ext-format-gguf.");
@@ -717,6 +791,9 @@ public class RunCommand implements Runnable {
             printGenericProviderSetupHint("djl");
         } else if (detail.contains("provider not available: gguf")) {
             printGenericProviderSetupHint("gguf");
+        } else if (detail.contains("429") || detail.contains("resource_exhausted") || detail.contains("quota")) {
+            System.err.println(
+                    "Hint: Provider quota/rate limit reached. Wait for retry window, or switch provider/model.");
         }
     }
 
@@ -756,7 +833,8 @@ public class RunCommand implements Runnable {
             System.err.println(
                     "DJL PyTorch engine is unavailable. Ensure internet access for first-run native download or pre-install DJL native runtime.");
         } else if ("libtorch".equalsIgnoreCase(id)) {
-            System.err.println("Set LIBTORCH_PATH to your libtorch native library directory.");
+            System.err.println(
+                    "Set GOLEK_LIBTORCH_LIB_PATH (or LIBTORCH_PATH) to your libtorch native library directory.");
         } else if ("gguf".equalsIgnoreCase(id)) {
             System.err.println("Set GOLEK_LLAMA_LIB_DIR or GOLEK_LLAMA_LIB_PATH to llama.cpp native libraries.");
         }

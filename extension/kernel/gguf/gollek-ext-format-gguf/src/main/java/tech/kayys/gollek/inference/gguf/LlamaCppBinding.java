@@ -715,6 +715,8 @@ public class LlamaCppBinding {
         dirs.add(Path.of("native-libs").toAbsolutePath().normalize());
         dirs.add(Path.of("lib").toAbsolutePath().normalize());
         dirs.add(Path.of(System.getProperty("user.home"), ".gollek", "native-libs").toAbsolutePath().normalize());
+        dirs.add(Path.of(System.getProperty("user.home"), ".gollek", "source", "vendor", "llama.cpp", "build", "bin")
+                .toAbsolutePath().normalize());
 
         ProcessHandle.current().info().command().ifPresent(command -> {
             Path binary = Path.of(command).toAbsolutePath().normalize();

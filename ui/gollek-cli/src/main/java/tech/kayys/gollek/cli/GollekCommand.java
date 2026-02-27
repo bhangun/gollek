@@ -173,7 +173,8 @@ public class GollekCommand implements Runnable {
         Path cwd = Path.of(System.getProperty("user.dir")).toAbsolutePath();
         String[] candidates = {
                 "extension/format/gguf/gollek-ext-format-gguf/target/llama-cpp/lib",
-                "inference/format/gguf/source/llama-cpp/llama.cpp/build/bin"
+                "inference/format/gguf/source/llama-cpp/llama.cpp/build/bin",
+                ".gollek/source/vendor/llama.cpp/build/bin"
         };
 
         Path current = cwd;

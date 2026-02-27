@@ -28,7 +28,7 @@ Makefile
 *.a
 
 # LibTorch
-libtorch/
+/libtorch/
 libtorch.zip
 
 # IDE

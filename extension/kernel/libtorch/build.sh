@@ -54,6 +54,14 @@ check_requirements() {
 
 # Download LibTorch
 download_libtorch() {
+    if [ -z "${LIBTORCH_PATH:-}" ]; then
+        if [ -n "${GOLEK_LIBTORCH_SOURCE_DIR:-}" ] && [ -d "${GOLEK_LIBTORCH_SOURCE_DIR}" ]; then
+            export LIBTORCH_PATH="${GOLEK_LIBTORCH_SOURCE_DIR}"
+        elif [ -d "$HOME/.gollek/source/vendor/libtorch" ]; then
+            export LIBTORCH_PATH="$HOME/.gollek/source/vendor/libtorch"
+        fi
+    fi
+
     if [ -z "$LIBTORCH_PATH" ]; then
         echo -e "${YELLOW}LIBTORCH_PATH not set. Downloading LibTorch...${NC}"
         
@@ -86,7 +94,10 @@ download_libtorch() {
         unzip -q libtorch.zip
         rm libtorch.zip
         
-        export LIBTORCH_PATH=$(pwd)/libtorch
+        mkdir -p "$HOME/.gollek/source/vendor"
+        rm -rf "$HOME/.gollek/source/vendor/libtorch"
+        mv "$(pwd)/libtorch" "$HOME/.gollek/source/vendor/libtorch"
+        export LIBTORCH_PATH="$HOME/.gollek/source/vendor/libtorch"
         echo -e "${GREEN}✓ LibTorch downloaded to $LIBTORCH_PATH${NC}"
     else
         echo -e "${GREEN}✓ Using existing LibTorch at $LIBTORCH_PATH${NC}"

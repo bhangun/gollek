@@ -9,6 +9,7 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 import tech.kayys.gollek.cli.GollekCommand;
 import tech.kayys.gollek.sdk.core.GollekSdk;
+import tech.kayys.gollek.sdk.exception.SdkException;
 import tech.kayys.gollek.sdk.model.ModelInfo;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
@@ -96,6 +97,9 @@ public class ChatCommand implements Runnable {
     @Option(names = { "--json" }, description = "Enable JSON mode", defaultValue = "false")
     boolean jsonMode;
 
+    @Option(names = { "--enable-json" }, description = "Emit OpenAI-compatible SSE JSON for streamed chunks", defaultValue = "false")
+    boolean enableJsonSse;
+
     @Option(names = { "--no-cache" }, description = "Bypass response cache")
     boolean noCache;
 
@@ -119,6 +123,9 @@ public class ChatCommand implements Runnable {
 
     @Option(names = { "--max-tokens" }, description = "Maximum tokens to generate per response", defaultValue = "256")
     int maxTokens;
+
+    @Option(names = { "--auto-continue" }, description = "Automatically request one continuation if a reply appears cut off", defaultValue = "true", negatable = true)
+    boolean autoContinue;
 
     @Option(names = {
             "--inference-timeout-ms" }, description = "Hard timeout for one inference call in milliseconds", defaultValue = "180000")
@@ -246,8 +253,7 @@ public class ChatCommand implements Runnable {
 
             boolean effectiveStream = stream;
             if (effectiveStream && ("djl".equalsIgnoreCase(providerId)
-                    || "safetensor".equalsIgnoreCase(providerId)
-                    || "gemini".equalsIgnoreCase(providerId))) {
+                    || "safetensor".equalsIgnoreCase(providerId))) {
                 effectiveStream = false;
                 if (!quiet) {
                     System.out.println(DIM + "Provider '" + providerId
@@ -440,17 +446,27 @@ public class ChatCommand implements Runnable {
                         if (newProviderId.isEmpty()) {
                             System.out.println(YELLOW + "Usage: /provider <provider-id>" + RESET);
                         } else if (ensureProviderHealthy(newProviderId)) {
-                            this.providerId = newProviderId;
+                            String previousProvider = this.providerId;
+                            String previousModel = this.modelId;
+                            String previousModelPathOverride = this.modelPathOverride;
                             try {
+                                this.providerId = newProviderId;
                                 sdk.setPreferredProvider(newProviderId);
                                 applyModelForProviderSwitch(newProviderId);
                                 System.out
                                         .println(GREEN + "Switched to provider: " + RESET + CYAN + providerId + RESET);
                             } catch (tech.kayys.gollek.sdk.exception.SdkException e) {
+                                this.providerId = previousProvider;
+                                this.modelId = previousModel;
+                                this.modelPathOverride = previousModelPathOverride;
                                 System.err.println(YELLOW + "Warning: Could not set preferred provider on SDK: "
                                         + describeError(e) + RESET);
-                                System.out.println(
-                                        GREEN + "Switched to provider (local): " + RESET + CYAN + providerId + RESET);
+                            } catch (Throwable t) {
+                                this.providerId = previousProvider;
+                                this.modelId = previousModel;
+                                this.modelPathOverride = previousModelPathOverride;
+                                System.err.println(YELLOW + "Failed to switch provider: " + describeError(t) + RESET);
+                                printProviderHintFromError(t);
                             }
                         }
                         continue;
@@ -549,6 +565,7 @@ public class ChatCommand implements Runnable {
                         }
 
                         if (effectiveStream) {
+                            final boolean streamMode = effectiveStream;
                             java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
                             java.util.concurrent.atomic.AtomicInteger tokenCount = new java.util.concurrent.atomic.AtomicInteger(
                                     0);
@@ -556,7 +573,7 @@ public class ChatCommand implements Runnable {
                             StringBuilder fullResponse = new StringBuilder();
                             final java.io.PrintWriter finalFileWriter = fileWriter;
 
-                            if (!quiet && finalFileWriter == null) {
+                            if (!quiet && finalFileWriter == null && !enableJsonSse) {
                                 System.out.print(BOLD + GREEN + "Assistant: " + RESET);
                                 System.out.flush();
                             }
@@ -571,6 +588,8 @@ public class ChatCommand implements Runnable {
                                                 if (finalFileWriter != null) {
                                                     finalFileWriter.print(delta);
                                                     finalFileWriter.flush();
+                                                } else if (enableJsonSse) {
+                                                    printOpenAiSseDelta(request.getRequestId(), request.getModel(), delta);
                                                 } else {
                                                     System.out.print(delta);
                                                     System.out.flush();
@@ -594,27 +613,31 @@ public class ChatCommand implements Runnable {
                                             () -> {
                                                 long duration = System.currentTimeMillis() - startTime;
                                                 double tps = (tokenCount.get() / (duration / 1000.0));
+                                                if (enableJsonSse && finalFileWriter == null) {
+                                                    printOpenAiSseFinal(request.getRequestId(), request.getModel());
+                                                }
 
                                                 if (finalFileWriter != null) {
                                                     if (!quiet) {
-                                                        System.out.printf(DIM + "\n[Done. Tokens: %d, Speed: %.2f t/s]"
+                                                        System.out.printf(DIM + "\n[Done. Chunks: %d, Speed: %.2f t/s]"
                                                                 + RESET + "%n", tokenCount.get(), tps);
                                                     }
                                                     finalFileWriter.println();
                                                     finalFileWriter.printf(
-                                                            "\n[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]%n",
+                                                            "\n[Chunks: %d, Duration: %.2fs, Speed: %.2f t/s]%n",
                                                             tokenCount.get(), duration / 1000.0, tps);
                                                     finalFileWriter.println("-".repeat(30));
                                                 } else {
                                                     System.out.println();
                                                     if (!quiet) {
                                                         System.out.printf(
-                                                                DIM + "\n[Tokens: %d, Duration: %.2fs, Speed: %.2f t/s]"
+                                                                DIM + "\n[Chunks: %d, Duration: %.2fs, Speed: %.2f t/s]"
                                                                         + RESET + "%n",
                                                                 tokenCount.get(), duration / 1000.0, tps);
                                                     }
                                                 }
                                                 conversationHistory.add(Message.assistant(fullResponse.toString()));
+                                                maybeContinueIfTruncated(fullResponse, streamMode, finalFileWriter);
                                                 latch.countDown();
                                             });
 
@@ -666,6 +689,7 @@ public class ChatCommand implements Runnable {
 
                             // Add assistant response to history
                             conversationHistory.add(Message.assistant(content));
+                            maybeContinueIfTruncated(new StringBuilder(content), effectiveStream, fileWriter);
                         }
 
                     } catch (Exception e) {
@@ -1419,7 +1443,7 @@ public class ChatCommand implements Runnable {
                     "DJL runtime is not loaded. Ensure gollek-ext-format-djl is on classpath and DJL native runtime can initialize.");
         } else if ("libtorch".equalsIgnoreCase(providerId)) {
             System.err.println(
-                    "LibTorch runtime is not loaded. Set LIBTORCH_PATH and include gollek-ext-format-libtorch.");
+                    "LibTorch runtime is not loaded. Set GOLEK_LIBTORCH_LIB_PATH (or LIBTORCH_PATH) and include gollek-ext-format-libtorch.");
         } else if ("gguf".equalsIgnoreCase(providerId)) {
             System.err.println(
                     "GGUF runtime is not loaded. Set GOLEK_LLAMA_LIB_DIR/GOLEK_LLAMA_LIB_PATH and include gollek-ext-format-gguf.");
@@ -1434,6 +1458,10 @@ public class ChatCommand implements Runnable {
             printGenericProviderSetupHint("djl");
         } else if (detail.contains("provider not available: gguf")) {
             printGenericProviderSetupHint("gguf");
+        } else if (detail.contains("429") || detail.contains("resource_exhausted") || detail.contains("quota")) {
+            System.err.println(YELLOW
+                    + "Hint: Provider quota/rate limit reached. Wait for retry window, or switch provider/model."
+                    + RESET);
         } else if (detail.contains("404")) {
             System.err.println(YELLOW
                     + "Hint: A 404 error usually means the endpoint URL is incorrect or the requested model is not found on this provider."
@@ -1474,14 +1502,102 @@ public class ChatCommand implements Runnable {
             modelPathOverride = null;
         }
 
-        resolveDefaultModelForProvider(newProviderId).ifPresent(defaultModel -> {
-            if (!defaultModel.equals(modelId)) {
-                modelId = defaultModel;
-                if (!quiet) {
-                    System.out.println(DIM + "Using model: " + CYAN + displayModelName(modelId) + RESET);
+        Optional<String> selectedModel = resolveDefaultModelForProvider(newProviderId);
+
+        if (selectedModel.isEmpty() && isLocalRuntimeProvider(newProviderId)) {
+            selectedModel = resolveCompatibleCurrentModelForProvider(newProviderId);
+        }
+
+        if (selectedModel.isPresent()) {
+            String chosen = selectedModel.get();
+            if (!chosen.equals(modelId)) {
+                modelId = chosen;
+            }
+            if (isLocalRuntimeProvider(newProviderId)) {
+                try {
+                    Path p = Path.of(chosen);
+                    modelPathOverride = Files.exists(p) ? p.toAbsolutePath().toString() : null;
+                } catch (Exception ignored) {
+                    modelPathOverride = null;
                 }
             }
-        });
+            if (!quiet) {
+                System.out.println(DIM + "Using model: " + CYAN + displayModelName(modelId) + RESET);
+            }
+            return;
+        }
+
+        if (isLocalRuntimeProvider(newProviderId)) {
+            throw new IllegalStateException("No compatible local model found for provider '" + newProviderId
+                    + "'. Pull one first or pass --model <local-model-path>.");
+        }
+    }
+
+    private boolean isLocalRuntimeProvider(String providerId) {
+        if (providerId == null) {
+            return false;
+        }
+        String p = providerId.trim().toLowerCase(java.util.Locale.ROOT);
+        return p.equals("gguf") || p.equals("libtorch") || p.equals("djl") || p.equals("safetensor");
+    }
+
+    private Optional<String> resolveCompatibleCurrentModelForProvider(String providerId) {
+        if (modelId == null || modelId.isBlank()) {
+            return Optional.empty();
+        }
+
+        try {
+            var resolved = LocalModelResolver.resolve(sdk, modelId);
+            if (resolved.isPresent()) {
+                var r = resolved.get();
+                String format = r.info() != null && r.info().getFormat() != null
+                        ? r.info().getFormat().toLowerCase(java.util.Locale.ROOT)
+                        : "";
+                if (isFormatCompatibleWithProvider(format, providerId)) {
+                    if (r.localPath() != null) {
+                        return Optional.of(r.localPath().toAbsolutePath().toString());
+                    }
+                    return Optional.ofNullable(r.modelId());
+                }
+            }
+        } catch (Exception ignored) {
+            // fallback extension check below
+        }
+
+        try {
+            String lower = modelId.toLowerCase(java.util.Locale.ROOT);
+            return switch (providerId.toLowerCase(java.util.Locale.ROOT)) {
+                case "gguf" -> lower.endsWith(".gguf") ? Optional.of(modelId) : Optional.empty();
+                case "safetensor" -> (lower.endsWith(".safetensor") || lower.endsWith(".safetensors"))
+                        ? Optional.of(modelId)
+                        : Optional.empty();
+                case "libtorch" -> (lower.endsWith(".pt") || lower.endsWith(".pts") || lower.endsWith(".jit")
+                        || lower.endsWith(".ts") || lower.endsWith(".pth")) ? Optional.of(modelId) : Optional.empty();
+                case "djl" -> (lower.endsWith(".pt") || lower.endsWith(".pth") || lower.endsWith(".onnx")
+                        || lower.endsWith(".safetensor") || lower.endsWith(".safetensors"))
+                                ? Optional.of(modelId)
+                                : Optional.empty();
+                default -> Optional.empty();
+            };
+        } catch (Exception ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private boolean isFormatCompatibleWithProvider(String format, String providerId) {
+        if (providerId == null) {
+            return false;
+        }
+        String provider = providerId.toLowerCase(java.util.Locale.ROOT);
+        String f = format == null ? "" : format.toLowerCase(java.util.Locale.ROOT);
+        return switch (provider) {
+            case "gguf" -> f.contains("gguf");
+            case "safetensor" -> f.contains("safetensor");
+            case "libtorch" -> f.contains("torchscript") || f.contains("pytorch");
+            case "djl" -> f.contains("torchscript") || f.contains("safetensor") || f.contains("onnx")
+                    || f.contains("bin") || f.contains("pytorch");
+            default -> false;
+        };
     }
 
     private boolean isFatalPullError(Throwable throwable) {
@@ -1526,6 +1642,15 @@ public class ChatCommand implements Runnable {
 
         if ("safetensor".equalsIgnoreCase(provider)) {
             return findLocalSafetensorModelPath();
+        }
+        if ("gguf".equalsIgnoreCase(provider)) {
+            return findLocalModelPathByExtension(".gguf");
+        }
+        if ("libtorch".equalsIgnoreCase(provider)) {
+            return findLocalModelPathByExtension(".pt", ".pts", ".jit", ".ts", ".pth");
+        }
+        if ("djl".equalsIgnoreCase(provider)) {
+            return findLocalModelPathByExtension(".pt", ".pth", ".onnx", ".safetensors", ".safetensor");
         }
 
         return providerRegistry.getProvider(provider)
@@ -1622,6 +1747,38 @@ public class ChatCommand implements Runnable {
             return files
                     .filter(Files::isRegularFile)
                     .filter(this::isSafetensorFile)
+                    .max(Comparator.comparing(this::lastModifiedSafe))
+                    .map(path -> path.toAbsolutePath().toString());
+        } catch (Exception ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<String> findLocalModelPathByExtension(String... extensions) {
+        if (extensions == null || extensions.length == 0) {
+            return Optional.empty();
+        }
+        Path base = Path.of(System.getProperty("user.home"), ".gollek", "models");
+        if (!Files.isDirectory(base)) {
+            return Optional.empty();
+        }
+        java.util.Set<String> allowed = java.util.Arrays.stream(extensions)
+                .filter(s -> s != null && !s.isBlank())
+                .map(s -> s.startsWith(".") ? s.toLowerCase(java.util.Locale.ROOT)
+                        : "." + s.toLowerCase(java.util.Locale.ROOT))
+                .collect(java.util.stream.Collectors.toSet());
+        try (var files = Files.walk(base, 6)) {
+            return files
+                    .filter(Files::isRegularFile)
+                    .filter(path -> {
+                        String name = path.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+                        for (String ext : allowed) {
+                            if (name.endsWith(ext)) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    })
                     .max(Comparator.comparing(this::lastModifiedSafe))
                     .map(path -> path.toAbsolutePath().toString());
         } catch (Exception ignored) {
@@ -1730,7 +1887,8 @@ public class ChatCommand implements Runnable {
             System.err.println(
                     "DJL PyTorch engine is unavailable. Ensure internet access for first-run native download or pre-install DJL native runtime.");
         } else if ("libtorch".equalsIgnoreCase(id)) {
-            System.err.println("Set LIBTORCH_PATH to your libtorch native library directory.");
+            System.err.println(
+                    "Set GOLEK_LIBTORCH_LIB_PATH (or LIBTORCH_PATH) to your libtorch native library directory.");
         } else if ("gguf".equalsIgnoreCase(id)) {
             System.err.println("Set GOLEK_LLAMA_LIB_DIR or GOLEK_LLAMA_LIB_PATH to llama.cpp native libraries.");
         }
@@ -1786,6 +1944,176 @@ public class ChatCommand implements Runnable {
                 .infer(providerRequest)
                 .await()
                 .atMost(Duration.ofMillis(Math.max(inferenceTimeoutMs + 60_000L, 90_000L)));
+    }
+
+    private void maybeContinueIfTruncated(StringBuilder responseBuilder, boolean effectiveStream, java.io.PrintWriter fileWriter) {
+        if (!autoContinue || responseBuilder == null) {
+            return;
+        }
+        String current = responseBuilder.toString();
+        if (!looksTruncated(current)) {
+            return;
+        }
+
+        if (!quiet) {
+            System.out.println(DIM + "Response appears cut off; requesting continuation..." + RESET);
+        }
+
+        String continuation;
+        try {
+            continuation = requestSingleContinuation(effectiveStream);
+        } catch (Exception e) {
+            if (!quiet) {
+                System.err.println(DIM + "Auto-continuation failed: " + describeError(e) + RESET);
+            }
+            return;
+        }
+
+        if (continuation == null || continuation.isBlank()) {
+            return;
+        }
+
+        if (fileWriter != null) {
+            fileWriter.print(continuation);
+            fileWriter.flush();
+        } else {
+            System.out.print(continuation);
+            System.out.flush();
+        }
+
+        responseBuilder.append(continuation);
+        if (!conversationHistory.isEmpty()) {
+            int last = conversationHistory.size() - 1;
+            Message lastMessage = conversationHistory.get(last);
+            if (lastMessage != null && lastMessage.getRole() == Message.Role.ASSISTANT) {
+                conversationHistory.set(last, Message.assistant(responseBuilder.toString()));
+            }
+        }
+    }
+
+    private String requestSingleContinuation(boolean effectiveStream) {
+        List<Message> continuationMessages = new ArrayList<>(conversationHistory);
+        continuationMessages.add(Message.user(
+                "Continue from exactly where you stopped. Output only the continuation with no repetition or preface."));
+
+        InferenceRequest.Builder continuationBuilder = InferenceRequest.builder()
+                .requestId(UUID.randomUUID().toString())
+                .model(modelId)
+                .messages(continuationMessages)
+                .temperature(temperature)
+                .parameter("top_p", topP)
+                .parameter("top_k", topK)
+                .parameter("repeat_penalty", repeatPenalty)
+                .parameter("json_mode", jsonMode)
+                .parameter("inference_timeout_ms", inferenceTimeoutMs)
+                .maxTokens(Math.max(64, Math.min(maxTokens, 512)))
+                .preferredProvider(providerId)
+                .cacheBypass(true);
+
+        if (mirostat > 0) {
+            continuationBuilder.parameter("mirostat", mirostat);
+        }
+        if (grammar != null && !grammar.isEmpty()) {
+            continuationBuilder.parameter("grammar", grammar);
+        }
+        if (modelPathOverride != null && !modelPathOverride.isBlank()) {
+            continuationBuilder.parameter("model_path", modelPathOverride);
+        }
+        if (enableSession && sessionId != null) {
+            continuationBuilder.parameter("session_id", sessionId);
+        }
+
+        InferenceRequest continuationRequest = continuationBuilder.build();
+
+        InferenceResponse continuation;
+        if (shouldDirectProviderBypass(effectiveStream)) {
+            continuation = inferDirectWithProvider(providerId, continuationRequest);
+        } else {
+            try {
+                continuation = sdk.createCompletion(continuationRequest);
+            } catch (SdkException e) {
+                throw new RuntimeException("Auto-continuation failed: " + e.getMessage(), e);
+            }
+        }
+        return continuation.getContent();
+    }
+
+    private boolean looksTruncated(String content) {
+        if (content == null) {
+            return false;
+        }
+        String trimmed = content.trim();
+        if (trimmed.length() < 24) {
+            return false;
+        }
+        if (trimmed.endsWith(".") || trimmed.endsWith("!") || trimmed.endsWith("?")
+                || trimmed.endsWith("\"") || trimmed.endsWith("'")
+                || trimmed.endsWith("```") || trimmed.endsWith("</s>")) {
+            return false;
+        }
+
+        char last = trimmed.charAt(trimmed.length() - 1);
+        return Character.isLetterOrDigit(last) || last == ',' || last == ':' || last == ';' || last == '-';
+    }
+
+    private void printOpenAiSseDelta(String requestId, String model, String delta) {
+        long created = System.currentTimeMillis() / 1000L;
+        String id = "chatcmpl-" + (requestId != null ? requestId : UUID.randomUUID().toString());
+        String payload = "{\"id\":\"" + escapeJson(id)
+                + "\",\"object\":\"chat.completion.chunk\""
+                + ",\"created\":" + created
+                + ",\"model\":\"" + escapeJson(model != null ? model : "") + "\""
+                + ",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"" + escapeJson(delta)
+                + "\"},\"finish_reason\":null}]}";
+        System.out.println("data: " + payload);
+        System.out.flush();
+    }
+
+    private void printOpenAiSseFinal(String requestId, String model) {
+        long created = System.currentTimeMillis() / 1000L;
+        String id = "chatcmpl-" + (requestId != null ? requestId : UUID.randomUUID().toString());
+        String payload = "{\"id\":\"" + escapeJson(id)
+                + "\",\"object\":\"chat.completion.chunk\""
+                + ",\"created\":" + created
+                + ",\"model\":\"" + escapeJson(model != null ? model : "") + "\""
+                + ",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}";
+        System.out.println("data: " + payload);
+        System.out.println("data: [DONE]");
+        System.out.flush();
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder(value.length() + 16);
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '\\':
+                    out.append("\\\\");
+                    break;
+                case '"':
+                    out.append("\\\"");
+                    break;
+                case '\n':
+                    out.append("\\n");
+                    break;
+                case '\r':
+                    out.append("\\r");
+                    break;
+                case '\t':
+                    out.append("\\t");
+                    break;
+                default:
+                    if (c < 0x20) {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+            }
+        }
+        return out.toString();
     }
 
     private boolean shouldFallbackToLibtorch(String providerId, String providerModel) {

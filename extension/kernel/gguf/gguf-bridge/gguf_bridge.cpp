@@ -6,6 +6,7 @@
 
 #include "gguf_bridge.hpp"
 #include <atomic>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -351,10 +352,39 @@ int gguf_convert(gguf_ctx_t ctx) {
       ctx->set_progress(0.2f, "Preparing conversion parameters");
 
       // Build command to call the Python conversion script
+      fs::path converter_script;
+      if (const char *configured = std::getenv("GOLEK_GGUF_CONVERTER_SCRIPT");
+          configured && std::strlen(configured) > 0 &&
+          fs::exists(fs::path(configured))) {
+        converter_script = fs::path(configured);
+      } else {
+        std::vector<fs::path> candidates;
+        if (const char *source_dir = std::getenv("GOLEK_LLAMA_SOURCE_DIR");
+            source_dir && std::strlen(source_dir) > 0) {
+          candidates.emplace_back(fs::path(source_dir) / "convert_hf_to_gguf.py");
+        }
+        if (const char *home = std::getenv("HOME");
+            home && std::strlen(home) > 0) {
+          candidates.emplace_back(
+              fs::path(home) / ".gollek/source/vendor/llama.cpp/convert_hf_to_gguf.py");
+        }
+
+        for (const auto &candidate : candidates) {
+          if (fs::exists(candidate)) {
+            converter_script = candidate;
+            break;
+          }
+        }
+      }
+      if (converter_script.empty()) {
+        set_error("Could not locate convert_hf_to_gguf.py. Set "
+                  "GOLEK_GGUF_CONVERTER_SCRIPT or GOLEK_LLAMA_SOURCE_DIR.");
+        llama_backend_free();
+        return GGUF_ERROR_CONVERSION_FAILED;
+      }
+
       std::string cmd = "python3 ";
-      cmd += fs::path(__FILE__).parent_path().string() +
-             "/../../../../../../inference-gollek-vendor//llama-cpp/llama.cpp/"
-             "convert_hf_to_gguf.py ";
+      cmd += "\"" + converter_script.string() + "\" ";
       cmd += "\"" + input_path + "\" ";
       cmd += "--outfile \"" + output_path + "\" ";
 

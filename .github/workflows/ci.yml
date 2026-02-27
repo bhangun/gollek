@@ -1,0 +1,73 @@
+name: Gollek CI
+
+on:
+  pull_request:
+    paths:
+      - "core/**"
+      - "extension/**"
+      - "plugins/**"
+      - "repository/**"
+      - "sdk/**"
+      - "ui/**"
+      - "scripts/**"
+      - "pom.xml"
+      - "inference-gollek/**"
+      - ".github/workflows/ci.yml"
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "core/**"
+      - "extension/**"
+      - "plugins/**"
+      - "repository/**"
+      - "sdk/**"
+      - "ui/**"
+      - "scripts/**"
+      - "pom.xml"
+      - "inference-gollek/**"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+jobs:
+  build-cli:
+    name: Build CLI (JVM)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Prepare llama.cpp source
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp" \
+          ./inference-gollek/scripts/prepare-llama-source.sh
+
+      - name: Prepare libtorch source
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch" \
+          ./inference-gollek/scripts/prepare-libtorch-source.sh
+
+      - name: Build Gollek CLI
+        shell: bash
+        env:
+          MAVEN_OPTS: -Xmx3G
+        run: |
+          set -euo pipefail
+          export GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp"
+          export GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch"
+          export GOLEK_LIBTORCH_LIB_PATH="$HOME/.gollek/source/vendor/libtorch/lib"
+          cd inference-gollek
+          mvn -B clean package -pl ui/gollek-cli -am -DskipTests

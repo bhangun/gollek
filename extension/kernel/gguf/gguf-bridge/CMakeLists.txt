@@ -72,14 +72,18 @@ find_package(Threads REQUIRED)
 # llama.cpp integration
 set(LLAMA_BUILD_TESTS OFF CACHE BOOL "Build llama.cpp tests" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "Build llama.cpp examples" FORCE)
+set(LLAMA_SOURCE_DIR "$ENV{GOLEK_LLAMA_SOURCE_DIR}" CACHE PATH "Path to llama.cpp source directory")
+if(NOT LLAMA_SOURCE_DIR)
+    set(LLAMA_SOURCE_DIR "$ENV{HOME}/.gollek/source/vendor/llama.cpp")
+endif()
 
 # Check if llama.cpp is available as subdirectory
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/CMakeLists.txt")
     add_subdirectory(llama.cpp)
     set(LLAMA_FOUND TRUE)
-# Check vendor directory (llama.cpp moved to Inference-gollek-vendor/llama-cpp/llama-cpp)
-elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../Inference-gollek-vendor/llama-cpp/llama-cpp/CMakeLists.txt")
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../Inference-gollek-vendor/llama-cpp/llama-cpp llama.cpp)
+# Standard user-local vendor path
+elseif(EXISTS "${LLAMA_SOURCE_DIR}/CMakeLists.txt")
+    add_subdirectory("${LLAMA_SOURCE_DIR}" llama.cpp)
     set(LLAMA_FOUND TRUE)
 else()
     # Try to find installed llama.cpp
@@ -148,7 +152,7 @@ target_include_directories(gguf_bridge
         $<INSTALL_INTERFACE:include>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../Inference-gollek-vendor/llama-cpp/llama-cpp
+        ${LLAMA_SOURCE_DIR}
 )
 
 # Link libraries

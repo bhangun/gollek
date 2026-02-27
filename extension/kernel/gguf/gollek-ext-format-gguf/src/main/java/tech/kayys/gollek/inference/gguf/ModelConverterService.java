@@ -130,9 +130,29 @@ public class ModelConverterService {
             }
         }
 
+        String llamaSourceDir = System.getenv("GOLEK_LLAMA_SOURCE_DIR");
+        if (llamaSourceDir != null && !llamaSourceDir.isBlank()) {
+            Path source = Paths.get(llamaSourceDir.trim());
+            Path candidate = source.resolve(CONVERT_SCRIPT);
+            if (Files.exists(candidate)) {
+                scriptPath = candidate;
+                LOG.infof("Using conversion script from GOLEK_LLAMA_SOURCE_DIR: %s", scriptPath);
+                return;
+            }
+        } else {
+            Path defaultSource = Paths.get(System.getProperty("user.home"), ".gollek", "source", "vendor", "llama.cpp");
+            Path candidate = defaultSource.resolve(CONVERT_SCRIPT);
+            if (Files.exists(candidate)) {
+                scriptPath = candidate;
+                LOG.infof("Using conversion script from default source path: %s", scriptPath);
+                return;
+            }
+        }
+
         // 2. Check common relative paths from current working directory and parents.
         Path cwd = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
         String[] relativeCandidates = {
+                ".gollek/source/vendor/llama.cpp/convert_hf_to_gguf.py",
                 "extension/format/gguf/vendor/llama-cpp/llama.cpp/convert_hf_to_gguf.py",
                 "inference/format/gguf/source/llama-cpp/llama.cpp/convert_hf_to_gguf.py"
         };

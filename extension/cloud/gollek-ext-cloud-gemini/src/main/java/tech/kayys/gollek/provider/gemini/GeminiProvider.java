@@ -25,7 +25,12 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.StringJoiner;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -39,6 +44,9 @@ public class GeminiProvider implements StreamingProvider {
         private static final String PROVIDER_NAME = "Google Gemini";
         private static final String VERSION = "1.0.0";
         private static final String GEMINI_OPENAI_COMPAT_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+        private static final long MAX_AUTO_RETRY_MS = 60_000L;
+        private static final Pattern RETRY_SECONDS_PATTERN = Pattern
+                        .compile("retry\\s+in\\s+([0-9]+(?:\\.[0-9]+)?)s", Pattern.CASE_INSENSITIVE);
         private static final Logger log = Logger.getLogger(GeminiProvider.class);
 
         @Inject
@@ -160,12 +168,10 @@ public class GeminiProvider implements StreamingProvider {
                                         .build();
 
                         return Uni.createFrom()
-                                        .completionStage(httpClient.sendAsync(httpRequest,
-                                                        HttpResponse.BodyHandlers.ofString()))
+                                        .completionStage(sendWithQuotaRetry(httpRequest))
                                         .map(resp -> {
                                                 if (resp.statusCode() != 200) {
-                                                        throw new RuntimeException("Gemini failed: " + resp.statusCode()
-                                                                        + " " + resp.body());
+                                                        throw buildHttpException(resp.statusCode(), resp.body());
                                                 }
                                                 try {
                                                         com.fasterxml.jackson.databind.JsonNode root = objectMapper
@@ -232,9 +238,14 @@ public class GeminiProvider implements StreamingProvider {
                                 httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofInputStream())
                                                 .thenAccept(resp -> {
                                                         if (resp.statusCode() != 200) {
-                                                                emitter.fail(new RuntimeException(
-                                                                                "Gemini streaming failed (OpenAI-compatible): "
-                                                                                                + resp.statusCode()));
+                                                                if (resp.statusCode() == 429) {
+                                                                        emitter.fail(new RuntimeException(
+                                                                                        "Gemini quota exceeded (429). Wait before retrying, or use another provider/model."));
+                                                                } else {
+                                                                        emitter.fail(new RuntimeException(
+                                                                                        "Gemini streaming failed (OpenAI-compatible): "
+                                                                                                        + resp.statusCode()));
+                                                                }
                                                                 return;
                                                         }
                                                         try (BufferedReader reader = new BufferedReader(
@@ -366,6 +377,17 @@ public class GeminiProvider implements StreamingProvider {
                 if (contentNode.isTextual()) {
                         return contentNode.asText("");
                 }
+                if (contentNode.isObject()) {
+                        String text = contentNode.path("text").asText("");
+                        if (!text.isBlank()) {
+                                return text;
+                        }
+                        com.fasterxml.jackson.databind.JsonNode parts = contentNode.path("parts");
+                        if (parts.isArray()) {
+                                return readContentNode(parts);
+                        }
+                        return "";
+                }
                 if (contentNode.isArray()) {
                         StringJoiner joiner = new StringJoiner("");
                         for (com.fasterxml.jackson.databind.JsonNode part : contentNode) {
@@ -377,15 +399,138 @@ public class GeminiProvider implements StreamingProvider {
                                         continue;
                                 }
                                 String type = part.path("type").asText("");
-                                if ("text".equalsIgnoreCase(type) || type.isBlank()) {
-                                        String text = part.path("text").asText("");
-                                        if (!text.isBlank()) {
-                                                joiner.add(text);
+                                String text = part.path("text").asText("");
+                                if (!text.isBlank()) {
+                                        joiner.add(text);
+                                        continue;
+                                }
+                                if ("text".equalsIgnoreCase(type)
+                                                || "output_text".equalsIgnoreCase(type)
+                                                || "input_text".equalsIgnoreCase(type)
+                                                || type.isBlank()) {
+                                        String nested = readContentNode(part.path("content"));
+                                        if (!nested.isBlank()) {
+                                                joiner.add(nested);
                                         }
                                 }
                         }
                         return joiner.toString();
                 }
                 return "";
+        }
+
+        private CompletionStage<HttpResponse<String>> sendWithQuotaRetry(HttpRequest httpRequest) {
+                return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                                .thenCompose(resp -> {
+                                        if (resp.statusCode() != 429) {
+                                                return CompletableFuture.completedFuture(resp);
+                                        }
+                                        long retryDelayMs = extractRetryDelayMillis(resp.body());
+                                        if (retryDelayMs <= 0 || retryDelayMs > MAX_AUTO_RETRY_MS) {
+                                                return CompletableFuture.completedFuture(resp);
+                                        }
+                                        log.warnf("Gemini quota hit; retrying once after %d ms", retryDelayMs);
+                                        return CompletableFuture.supplyAsync(
+                                                        () -> null,
+                                                        CompletableFuture.delayedExecutor(retryDelayMs,
+                                                                        TimeUnit.MILLISECONDS))
+                                                        .thenCompose(ignored -> httpClient.sendAsync(httpRequest,
+                                                                        HttpResponse.BodyHandlers.ofString()));
+                                });
+        }
+
+        private RuntimeException buildHttpException(int statusCode, String body) {
+                if (statusCode == 429) {
+                        String message = extractErrorMessage(body);
+                        long retryDelayMs = extractRetryDelayMillis(body);
+                        if (retryDelayMs > 0) {
+                                return new RuntimeException(
+                                                "Gemini quota exceeded (429). Retry in about "
+                                                                + Math.max(1L, retryDelayMs / 1000L)
+                                                                + "s. " + message);
+                        }
+                        return new RuntimeException("Gemini quota exceeded (429). " + message);
+                }
+                String message = extractErrorMessage(body);
+                return new RuntimeException("Gemini failed: " + statusCode + " - " + message);
+        }
+
+        private String extractErrorMessage(String body) {
+                if (body == null || body.isBlank()) {
+                        return "No error details";
+                }
+                try {
+                        com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(body);
+                        String message = root.path("error").path("message").asText("");
+                        if (!message.isBlank()) {
+                                return message.replace('\n', ' ').trim();
+                        }
+                } catch (Exception ignored) {
+                        // fallback below
+                }
+                return body.length() > 240 ? body.substring(0, 240) + "..." : body;
+        }
+
+        private long extractRetryDelayMillis(String body) {
+                if (body == null || body.isBlank()) {
+                        return -1L;
+                }
+                try {
+                        com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(body);
+                        com.fasterxml.jackson.databind.JsonNode details = root.path("error").path("details");
+                        if (details.isArray()) {
+                                for (com.fasterxml.jackson.databind.JsonNode detail : details) {
+                                        String retryDelay = detail.path("retryDelay").asText("");
+                                        long parsed = parseRetryDelayMillis(retryDelay);
+                                        if (parsed > 0) {
+                                                return parsed;
+                                        }
+                                }
+                        }
+                        String message = root.path("error").path("message").asText("");
+                        long fromMessage = parseRetryFromMessage(message);
+                        if (fromMessage > 0) {
+                                return fromMessage;
+                        }
+                } catch (Exception ignored) {
+                        // ignore and try regex fallback
+                }
+                return parseRetryFromMessage(body);
+        }
+
+        private long parseRetryFromMessage(String message) {
+                if (message == null || message.isBlank()) {
+                        return -1L;
+                }
+                Matcher m = RETRY_SECONDS_PATTERN.matcher(message);
+                if (!m.find()) {
+                        return -1L;
+                }
+                try {
+                        double seconds = Double.parseDouble(m.group(1));
+                        return Math.max(1L, Math.round(seconds * 1000.0));
+                } catch (Exception ignored) {
+                        return -1L;
+                }
+        }
+
+        private long parseRetryDelayMillis(String retryDelay) {
+                if (retryDelay == null || retryDelay.isBlank()) {
+                        return -1L;
+                }
+                String s = retryDelay.trim().toLowerCase();
+                try {
+                        if (s.endsWith("ms")) {
+                                double ms = Double.parseDouble(s.substring(0, s.length() - 2).trim());
+                                return Math.max(1L, Math.round(ms));
+                        }
+                        if (s.endsWith("s")) {
+                                double sec = Double.parseDouble(s.substring(0, s.length() - 1).trim());
+                                return Math.max(1L, Math.round(sec * 1000.0));
+                        }
+                } catch (Exception ignored) {
+                        return -1L;
+                }
+                return -1L;
         }
 }
