@@ -3,8 +3,8 @@
 ## Trigger
 
 ```bash
-git tag gollek-v1.0.0
-git push origin gollek-v1.0.0
+git tag 0.1.0
+git push origin 0.1.0
 ```
 
 Workflow: `.github/workflows/golek-cli-release.yml`
@@ -37,7 +37,7 @@ The release now includes:
 ### curl (macOS/Linux)
 
 ```bash
-curl -fsSL https://github.com/<org>/<repo>/releases/download/gollek-v1.0.0/install.sh | bash
+curl -fsSL https://github.com/bhangun/gollek/releases/latest/download/install.sh | bash
 ```
 
 ### Homebrew (tap formula)
@@ -45,7 +45,7 @@ curl -fsSL https://github.com/<org>/<repo>/releases/download/gollek-v1.0.0/insta
 Use the generated `gollek.rb` in your tap repo, then:
 
 ```bash
-brew tap <org>/<tap>
+brew tap bhangun/gollek
 brew install gollek
 ```
 
@@ -60,7 +60,7 @@ choco install gollek
 ### Windows Native (direct)
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/<org>/<repo>/releases/download/gollek-v1.0.0/gollek-windows-x64.exe" -OutFile "gollek.exe"
+Invoke-WebRequest -Uri "https://github.com/bhangun/gollek/releases/latest/download/gollek-windows-x64.exe" -OutFile "gollek.exe"
 .\gollek.exe --version
 ```
 

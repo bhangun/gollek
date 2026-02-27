@@ -9,12 +9,12 @@ Release workflow: `.github/workflows/golek-cli-release.yml`
 
 ```bash
 # macOS / Linux (curl installer)
-curl -fsSL https://github.com/<org>/<repo>/releases/download/gollek-v<version>/install.sh | bash
+curl -fsSL https://github.com/bhangun/gollek/releases/latest/download/install.sh | bash
 ```
 
 ```bash
 # Homebrew (after adding generated formula to your tap)
-brew tap <org>/<tap>
+brew tap bhangun/gollek
 brew install gollek
 ```
 
@@ -25,7 +25,7 @@ choco install gollek
 
 ```powershell
 # Windows native executable
-Invoke-WebRequest -Uri "https://github.com/<org>/<repo>/releases/download/gollek-v<version>/gollek-windows-x64.exe" -OutFile "gollek.exe"
+Invoke-WebRequest -Uri "https://github.com/bhangun/gollek/releases/latest/download/gollek-windows-x64.exe" -OutFile "gollek.exe"
 .\gollek.exe --version
 ```
 

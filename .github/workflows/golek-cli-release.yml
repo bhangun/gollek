@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'gollek-v*'
+      - 'v*'
+      - '*.*.*'
   workflow_dispatch:
 
 concurrency:
@@ -94,6 +96,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#gollek-v}"
+          VERSION="${VERSION#v}"
           PKGROOT="$(pwd)/pkgroot"
           mkdir -p "$PKGROOT/usr/local/bin"
           cp "dist/${{ matrix.binary_name }}" "$PKGROOT/usr/local/bin/gollek"
@@ -209,6 +212,7 @@ jobs:
           set -euo pipefail
           VERSION_TAG="${GITHUB_REF_NAME}"
           VERSION="${VERSION_TAG#gollek-v}"
+          VERSION="${VERSION#v}"
           REPO="${GITHUB_REPOSITORY}"
 
           mkdir -p release
