@@ -73,6 +73,11 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
+            <artifactId>gollek-ext-format-safetensor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-sdk-java-local</artifactId>
             <exclusions>
                 <exclusion>
@@ -91,7 +96,34 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
+            <artifactId>gollek-model-repo-hf</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-plugin-mcp</artifactId>
+        </dependency>
+
+        <!-- Terminal UI -->
+        <dependency>
+            <groupId>org.jline</groupId>
+            <artifactId>jline-reader</artifactId>
+            <version>3.26.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jline</groupId>
+            <artifactId>jline-terminal</artifactId>
+            <version>3.26.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jline</groupId>
+            <artifactId>jline-terminal-jna</artifactId>
+            <version>3.26.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jline</groupId>
+            <artifactId>jline-console</artifactId>
+            <version>3.26.3</version>
         </dependency>
 
         <!-- Cloud Providers -->
