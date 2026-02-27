@@ -9,37 +9,29 @@ case $0 in
   *) SCRIPT_DIR=$(pwd)/$(dirname "$0");;
 esac
 
-# Find project root (walk up from BASE_DIR until Inference-gollek-vendor is found)
-PROJECT_ROOT="$BASE_DIR"
-while [ "$PROJECT_ROOT" != "/" ] && [ ! -d "$PROJECT_ROOT/Inference-gollek-vendor" ]; do
-    PROJECT_ROOT=$(dirname "$PROJECT_ROOT")
-done
+DEFAULT_LLAMA_SOURCE="$HOME/.gollek/source/vendor/llama.cpp"
+LLAMA_SOURCE_DIR="${GOLEK_LLAMA_SOURCE_DIR:-$DEFAULT_LLAMA_SOURCE}"
 
-# Normalize potential relative paths
-VENDOR_DIR="$PROJECT_ROOT/Inference-gollek-vendor/llama-cpp"
-ROOT_VENDOR_DIR="$VENDOR_DIR"
 BUILD_DIR="$BASE_DIR/target/llama-cpp-build"
 OUTPUT_DIR="$BASE_DIR/target/llama-cpp/lib"
 
 echo "Running build-llama-cpp.sh..."
 echo "Base Dir: $BASE_DIR"
-echo "Project Root: $PROJECT_ROOT"
-echo "Vendor Dir: $VENDOR_DIR"
+echo "GOLEK_LLAMA_SOURCE_DIR: $LLAMA_SOURCE_DIR"
 echo "Output Dir: $OUTPUT_DIR"
 
-# Check for vendor directory and find the actual llama.cpp source root
-if [ ! -d "$VENDOR_DIR" ]; then
-    echo "Warning: llama.cpp vendor directory not found at $VENDOR_DIR"
-else
-    # Check for CMakeLists.txt to find the real source root
-    if [ ! -f "$VENDOR_DIR/CMakeLists.txt" ]; then
-        if [ -f "$VENDOR_DIR/llama.cpp/CMakeLists.txt" ]; then
-            VENDOR_DIR="$VENDOR_DIR/llama.cpp"
-        elif [ -f "$VENDOR_DIR/llama-cpp/llama.cpp/CMakeLists.txt" ]; then
-            VENDOR_DIR="$VENDOR_DIR/llama-cpp/llama.cpp"
-        fi
+VENDOR_DIR="$LLAMA_SOURCE_DIR"
+
+# Backward-compatible source-root normalization
+if [ ! -f "$VENDOR_DIR/CMakeLists.txt" ]; then
+    if [ -f "$VENDOR_DIR/llama.cpp/CMakeLists.txt" ]; then
+        VENDOR_DIR="$VENDOR_DIR/llama.cpp"
+    elif [ -f "$VENDOR_DIR/llama-cpp/llama.cpp/CMakeLists.txt" ]; then
+        VENDOR_DIR="$VENDOR_DIR/llama-cpp/llama.cpp"
     fi
 fi
+
+echo "Resolved llama.cpp source: $VENDOR_DIR"
 
 mkdir -p "$OUTPUT_DIR"
 
@@ -106,7 +98,8 @@ if { [ -f "$OUTPUT_DIR/libllama.dylib" ] || [ -f "$OUTPUT_DIR/libllama.so" ]; } 
 fi
 
 if [ ! -d "$VENDOR_DIR" ] || [ ! -f "$VENDOR_DIR/CMakeLists.txt" ]; then
-    echo "Warning: llama.cpp vendor directory or CMakeLists.txt not found at $VENDOR_DIR"
+    echo "Warning: llama.cpp source or CMakeLists.txt not found at $VENDOR_DIR"
+    echo "Set GOLEK_LLAMA_SOURCE_DIR or place source at $DEFAULT_LLAMA_SOURCE"
     echo "Creating valid dummy library for build to pass..."
     echo "" | clang -shared -x c - -o "$OUTPUT_DIR/libllama.dylib" 2>/dev/null || touch "$OUTPUT_DIR/libllama.dylib"
     exit 0

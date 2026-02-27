@@ -24,6 +24,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -152,13 +153,18 @@ public class MistralProvider implements StreamingProvider {
                             throw new RuntimeException("Mistral failed: " + resp.statusCode() + " " + resp.body());
                         }
                         try {
-                            MistralResponse response = objectMapper.readValue(resp.body(), MistralResponse.class);
+                            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(resp.body());
+                            MistralResponse response = objectMapper.treeToValue(root, MistralResponse.class);
                             long duration = System.currentTimeMillis() - startTime;
                             return InferenceResponse.builder()
                                     .requestId(request.getRequestId() != null ? request.getRequestId()
                                             : String.valueOf(requestId))
-                                    .content(extractContent(response))
+                                    .content(extractContent(root, false))
                                     .model(request.getModel())
+                                    .inputTokens(response.getUsage() != null ? response.getUsage().getPromptTokens() : 0)
+                                    .outputTokens(
+                                            response.getUsage() != null ? response.getUsage().getCompletionTokens() : 0)
+                                    .tokensUsed(response.getUsage() != null ? response.getUsage().getTotalTokens() : 0)
                                     .durationMs(duration)
                                     .metadata("provider", PROVIDER_ID)
                                     .build();
@@ -213,9 +219,12 @@ public class MistralProvider implements StreamingProvider {
                                         String data = line.substring(6).trim();
                                         if (!data.isEmpty() && !"[DONE]".equals(data)) {
                                             try {
-                                                MistralStreamResponse chunk = objectMapper.readValue(data,
-                                                        MistralStreamResponse.class);
-                                                String content = extractContent(chunk);
+                                                com.fasterxml.jackson.databind.JsonNode root = objectMapper
+                                                        .readTree(data);
+                                                String content = extractContent(root, true);
+                                                if (content == null || content.isBlank()) {
+                                                    continue;
+                                                }
                                                 int index = chunkIndex.getAndIncrement();
                                                 emitter.emit(StreamChunk.of(request.getRequestId(), index, content));
                                             } catch (Exception e) {
@@ -278,16 +287,64 @@ public class MistralProvider implements StreamingProvider {
         return System.getenv("MISTRAL_API_KEY");
     }
 
-    private String extractContent(MistralResponse response) {
-        if (response.getChoices() != null && !response.getChoices().isEmpty()) {
-            return response.getChoices().get(0).getMessage().getContent();
+    private String extractContent(com.fasterxml.jackson.databind.JsonNode root, boolean streaming) {
+        if (root == null) {
+            return "";
         }
-        return "";
+        com.fasterxml.jackson.databind.JsonNode choices = root.get("choices");
+        if (choices == null || !choices.isArray() || choices.isEmpty()) {
+            return "";
+        }
+        com.fasterxml.jackson.databind.JsonNode choice = choices.get(0);
+        com.fasterxml.jackson.databind.JsonNode primary = streaming ? choice.path("delta") : choice.path("message");
+        com.fasterxml.jackson.databind.JsonNode fallback = streaming ? choice.path("message") : choice.path("delta");
+
+        String content = readContentNode(primary.path("content"));
+        if (!content.isBlank()) {
+            return content;
+        }
+        return readContentNode(fallback.path("content"));
     }
 
-    private String extractContent(MistralStreamResponse chunk) {
-        if (chunk.getChoices() != null && !chunk.getChoices().isEmpty()) {
-            return chunk.getChoices().get(0).getDelta().getContent();
+    private String readContentNode(com.fasterxml.jackson.databind.JsonNode contentNode) {
+        if (contentNode == null || contentNode.isMissingNode() || contentNode.isNull()) {
+            return "";
+        }
+        if (contentNode.isTextual()) {
+            return contentNode.asText("");
+        }
+        if (contentNode.isObject()) {
+            String text = contentNode.path("text").asText("");
+            if (!text.isBlank()) {
+                return text;
+            }
+            com.fasterxml.jackson.databind.JsonNode parts = contentNode.path("parts");
+            if (parts.isArray()) {
+                return readContentNode(parts);
+            }
+            return "";
+        }
+        if (contentNode.isArray()) {
+            StringJoiner joiner = new StringJoiner("");
+            for (com.fasterxml.jackson.databind.JsonNode part : contentNode) {
+                if (part == null || part.isNull()) {
+                    continue;
+                }
+                if (part.isTextual()) {
+                    joiner.add(part.asText(""));
+                    continue;
+                }
+                String text = part.path("text").asText("");
+                if (!text.isBlank()) {
+                    joiner.add(text);
+                    continue;
+                }
+                String nested = readContentNode(part.path("content"));
+                if (!nested.isBlank()) {
+                    joiner.add(nested);
+                }
+            }
+            return joiner.toString();
         }
         return "";
     }

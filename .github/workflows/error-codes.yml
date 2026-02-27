@@ -1,0 +1,36 @@
+name: Error Codes Doc Check
+
+on:
+  push:
+    paths:
+      - "inference-gollek/core/gollek-spi/src/main/java/tech/kayys/gollek/spi/error/**"
+      - "inference-gollek/scripts/generate-error-codes.sh"
+      - "inference-gollek/docs/error-codes.md"
+      - ".github/workflows/error-codes.yml"
+  pull_request:
+    paths:
+      - "inference-gollek/core/gollek-spi/src/main/java/tech/kayys/gollek/spi/error/**"
+      - "inference-gollek/scripts/generate-error-codes.sh"
+      - "inference-gollek/docs/error-codes.md"
+      - ".github/workflows/error-codes.yml"
+
+jobs:
+  check-error-codes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Generate error codes
+        run: ./inference-gollek/scripts/generate-error-codes.sh
+
+      - name: Verify docs are up-to-date
+        run: |
+          git status --porcelain
+          git diff --exit-code inference-gollek/docs/error-codes.md

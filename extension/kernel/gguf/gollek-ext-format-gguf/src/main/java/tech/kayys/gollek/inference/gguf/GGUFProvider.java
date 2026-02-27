@@ -458,7 +458,7 @@ public class GGUFProvider implements StreamingProvider {
                 .model(request.getModel())
                 .messages(request.getMessages())
                 .parameter("prompt", prompt)
-                .parameter("max_tokens", Math.min(128, Math.max(16, request.getMaxTokens())))
+                .parameter("max_tokens", Math.max(16, request.getMaxTokens()))
                 .parameter("temperature", request.getTemperature())
                 .parameter("top_p", request.getTopP())
                 .parameter("top_k", request.getParameter("top_k", Integer.class).orElse(config.defaultTopK()))

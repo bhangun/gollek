@@ -1,0 +1,364 @@
+name: Gollek CLI Release
+
+on:
+  push:
+    tags:
+      - 'gollek-v*'
+  workflow_dispatch:
+
+concurrency:
+  group: gollek-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-native:
+    name: Build Native (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            binary_name: gollek-linux-x64
+            runner_pattern: gollek-cli-*-runner
+          - os: macos-latest
+            platform: macos
+            binary_name: gollek-macos-x64
+            runner_pattern: gollek-cli-*-runner
+          - os: windows-latest
+            platform: windows
+            binary_name: gollek-windows-x64.exe
+            runner_pattern: gollek-cli-*-runner.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: graalvm
+          java-version: '25'
+
+      - name: Prepare llama.cpp source (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp" \
+          ./inference-gollek/scripts/prepare-llama-source.sh
+
+      - name: Prepare libtorch source (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch" \
+          ./inference-gollek/scripts/prepare-libtorch-source.sh
+
+      - name: Install native build dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libssl-dev zlib1g-dev pkg-config
+
+      - name: Install native build dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install automake
+
+      - name: Build native executable
+        run: |
+          export GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp"
+          export GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch"
+          export GOLEK_LIBTORCH_LIB_PATH="$HOME/.gollek/source/vendor/libtorch/lib"
+          cd inference-gollek
+          mvn -B clean package -pl ui/gollek-cli -am -DskipTests -Pnative
+        env:
+          MAVEN_OPTS: -Xmx3G
+
+      - name: Stage native artifacts (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          BIN_PATH=$(ls inference-gollek/ui/gollek-cli/target/${{ matrix.runner_pattern }} | head -n 1)
+          cp "$BIN_PATH" "dist/${{ matrix.binary_name }}"
+          chmod +x "dist/${{ matrix.binary_name }}"
+          tar -czf "dist/${{ matrix.binary_name }}.tar.gz" -C dist "${{ matrix.binary_name }}"
+
+      - name: Build macOS pkg installer
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#gollek-v}"
+          PKGROOT="$(pwd)/pkgroot"
+          mkdir -p "$PKGROOT/usr/local/bin"
+          cp "dist/${{ matrix.binary_name }}" "$PKGROOT/usr/local/bin/gollek"
+          chmod +x "$PKGROOT/usr/local/bin/gollek"
+          pkgbuild \
+            --identifier tech.kayys.gollek.cli \
+            --version "$VERSION" \
+            --install-location / \
+            "$PKGROOT" \
+            "dist/gollek-macos-x64.pkg"
+
+      - name: Stage native artifacts (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $bin = Get-ChildItem "inference-gollek/ui/gollek-cli/target/${{ matrix.runner_pattern }}" | Select-Object -First 1
+          Copy-Item $bin.FullName "dist/${{ matrix.binary_name }}"
+          Compress-Archive -Path "dist/${{ matrix.binary_name }}" -DestinationPath "dist/gollek-windows-x64.zip" -Force
+
+      - name: Upload native artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gollek-native-${{ matrix.platform }}
+          path: dist/*
+
+  build-jvm-dist:
+    name: Build JVM Distribution
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Prepare llama.cpp source
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp" \
+          ./inference-gollek/scripts/prepare-llama-source.sh
+
+      - name: Prepare libtorch source
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch" \
+          ./inference-gollek/scripts/prepare-libtorch-source.sh
+
+      - name: Build JVM package
+        run: |
+          export GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp"
+          export GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch"
+          export GOLEK_LIBTORCH_LIB_PATH="$HOME/.gollek/source/vendor/libtorch/lib"
+          cd inference-gollek
+          mvn -B clean package -pl ui/gollek-cli -am -DskipTests
+
+      - name: Stage JVM bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/jvm/bin dist/jvm/app
+          cp -R inference-gollek/ui/gollek-cli/target/quarkus-app/. dist/jvm/app/
+
+          cat > dist/jvm/bin/gollek <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+          APP_DIR="${SCRIPT_DIR}/../app"
+          exec java -jar "${APP_DIR}/quarkus-run.jar" "$@"
+          SH
+          chmod +x dist/jvm/bin/gollek
+
+          cat > dist/jvm/bin/gollek.bat <<'BAT'
+          @echo off
+          set SCRIPT_DIR=%~dp0
+          set APP_DIR=%SCRIPT_DIR%..\app
+          java -jar "%APP_DIR%\quarkus-run.jar" %*
+          BAT
+
+          (cd dist/jvm && zip -r ../gollek-jvm.zip .)
+
+      - name: Upload JVM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gollek-jvm
+          path: dist/*
+
+  release:
+    name: Create GitHub Release
+    needs:
+      - build-native
+      - build-jvm-dist
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: incoming
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION_TAG="${GITHUB_REF_NAME}"
+          VERSION="${VERSION_TAG#gollek-v}"
+          REPO="${GITHUB_REPOSITORY}"
+
+          mkdir -p release
+          find incoming -type f -maxdepth 3 -print -exec cp {} release/ \;
+
+          pushd release >/dev/null
+          sha256sum * > SHA256SUMS
+          popd >/dev/null
+
+          cat > release/install.sh <<'INSTALL_SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          REPO="__REPO__"
+          TAG="__TAG__"
+          INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          case "$OS" in
+            darwin) ASSET="gollek-macos-x64" ;;
+            linux) ASSET="gollek-linux-x64" ;;
+            *)
+              echo "Unsupported OS: $OS"
+              exit 1
+              ;;
+          esac
+
+          BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
+          curl -fsSL "${BASE_URL}/${ASSET}" -o "${TMP_DIR}/gollek"
+          chmod +x "${TMP_DIR}/gollek"
+
+          if [ -w "${INSTALL_DIR}" ]; then
+            cp "${TMP_DIR}/gollek" "${INSTALL_DIR}/gollek"
+          else
+            sudo cp "${TMP_DIR}/gollek" "${INSTALL_DIR}/gollek"
+          fi
+
+          echo "Installed to ${INSTALL_DIR}/gollek"
+          "${INSTALL_DIR}/gollek" --version || true
+          INSTALL_SH
+
+          cat > release/install.ps1 <<'INSTALL_PS1'
+          $ErrorActionPreference = 'Stop'
+          $repo = '__REPO__'
+          $tag = '__TAG__'
+          $asset = 'gollek-windows-x64.exe'
+          $installDir = "$env:ProgramFiles\\Gollek"
+          $tmpExe = Join-Path $env:TEMP 'gollek.exe'
+          $url = "https://github.com/$repo/releases/download/$tag/$asset"
+
+          if (!(Test-Path $installDir)) {
+            New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+          }
+
+          Invoke-WebRequest -Uri $url -OutFile $tmpExe
+          Copy-Item $tmpExe (Join-Path $installDir 'gollek.exe') -Force
+
+          $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+          if ($userPath -notlike "*$installDir*") {
+            [Environment]::SetEnvironmentVariable('Path', "$userPath;$installDir", 'User')
+          }
+
+          Write-Host "Installed to $installDir\\gollek.exe"
+          INSTALL_PS1
+
+          sed -i "s#__REPO__#${REPO}#g" release/install.sh release/install.ps1
+          sed -i "s#__TAG__#${VERSION_TAG}#g" release/install.sh release/install.ps1
+          chmod +x release/install.sh
+
+          MAC_SHA=$(sha256sum release/gollek-macos-x64.tar.gz | awk '{print $1}')
+          WIN_SHA=$(sha256sum release/gollek-windows-x64.exe | awk '{print $1}')
+
+          cat > release/gollek.rb <<FORMULA
+          class Gollek < Formula
+            desc "Production-ready CLI for Gollek inference platform"
+            homepage "https://github.com/${REPO}"
+            url "https://github.com/${REPO}/releases/download/${VERSION_TAG}/gollek-macos-x64.tar.gz"
+            sha256 "${MAC_SHA}"
+            version "${VERSION}"
+
+            def install
+              bin.install "gollek-macos-x64" => "gollek"
+            end
+
+            test do
+              system "#{bin}/gollek", "--version"
+            end
+          end
+          FORMULA
+
+          mkdir -p release/chocolatey/tools
+          cat > release/chocolatey/gollek.nuspec <<NUSPEC
+          <?xml version="1.0" encoding="utf-8"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+            <metadata>
+              <id>gollek</id>
+              <version>${VERSION}</version>
+              <title>Gollek CLI</title>
+              <authors>Kayys Technologies</authors>
+              <owners>Kayys Technologies</owners>
+              <projectUrl>https://github.com/${REPO}</projectUrl>
+              <packageSourceUrl>https://github.com/${REPO}</packageSourceUrl>
+              <requireLicenseAcceptance>false</requireLicenseAcceptance>
+              <summary>Production-ready CLI for Gollek inference platform</summary>
+              <description>Native-compiled Gollek CLI for Windows.</description>
+              <releaseNotes>https://github.com/${REPO}/releases/tag/${VERSION_TAG}</releaseNotes>
+              <tags>gollek cli inference ai llm</tags>
+            </metadata>
+            <files>
+              <file src="tools\\**" target="tools" />
+            </files>
+          </package>
+          NUSPEC
+
+          cat > release/chocolatey/tools/chocolateyinstall.ps1 <<'CHOC'
+          $ErrorActionPreference = 'Stop'
+          $toolsDir = Split-Path -parent $MyInvocation.MyCommand.Definition
+          $url64 = 'https://github.com/__REPO__/releases/download/__TAG__/gollek-windows-x64.exe'
+
+          $packageArgs = @{
+            packageName    = $env:ChocolateyPackageName
+            fileFullPath   = Join-Path $toolsDir 'gollek.exe'
+            url64bit       = $url64
+            checksum64     = '__WIN_SHA__'
+            checksumType64 = 'sha256'
+          }
+
+          Get-ChocolateyWebFile @packageArgs
+          CHOC
+
+          cat > release/chocolatey/tools/chocolateyuninstall.ps1 <<'CHOCU'
+          # no-op
+          CHOCU
+
+          sed -i "s#__REPO__#${REPO}#g" release/chocolatey/tools/chocolateyinstall.ps1
+          sed -i "s#__TAG__#${VERSION_TAG}#g" release/chocolatey/tools/chocolateyinstall.ps1
+          sed -i "s#__WIN_SHA__#${WIN_SHA}#g" release/chocolatey/tools/chocolateyinstall.ps1
+
+          (cd release && zip -r gollek-chocolatey-template.zip chocolatey)
+          rm -rf release/chocolatey
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
