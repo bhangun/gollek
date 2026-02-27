@@ -27,3 +27,6 @@ fi
 
 echo "No libtorch source prepared. Expected existing directory at: $LIBTORCH_SRC"
 echo "Set GOLEK_LIBTORCH_ARCHIVE_URL to auto-download in CI when needed."
+echo "Continuing without libtorch source; build may skip libtorch-dependent paths."
+mkdir -p "$LIBTORCH_SRC/lib"
+exit 0

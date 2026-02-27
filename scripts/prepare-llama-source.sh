@@ -11,7 +11,23 @@ if [ ! -d "$LLAMA_SRC/.git" ]; then
 fi
 
 git -C "$LLAMA_SRC" fetch --depth 1 origin
-git -C "$LLAMA_SRC" checkout -q "${LLAMA_REF#origin/}" 2>/dev/null || true
-git -C "$LLAMA_SRC" reset --hard "$LLAMA_REF"
 
-echo "Prepared llama.cpp source at: $LLAMA_SRC"
+TARGET_REF="$LLAMA_REF"
+if ! git -C "$LLAMA_SRC" show-ref --verify --quiet "refs/remotes/${TARGET_REF}"; then
+  if git -C "$LLAMA_SRC" show-ref --verify --quiet "refs/remotes/origin/main"; then
+    TARGET_REF="origin/main"
+  elif git -C "$LLAMA_SRC" show-ref --verify --quiet "refs/remotes/origin/master"; then
+    TARGET_REF="origin/master"
+  else
+    TARGET_REF="$(git -C "$LLAMA_SRC" for-each-ref --format='%(refname:short)' refs/remotes/origin | head -n 1)"
+  fi
+fi
+
+if [ -z "$TARGET_REF" ]; then
+  echo "Unable to resolve a remote ref for llama.cpp"
+  exit 1
+fi
+
+git -C "$LLAMA_SRC" reset --hard "$TARGET_REF"
+
+echo "Prepared llama.cpp source at: $LLAMA_SRC ($TARGET_REF)"

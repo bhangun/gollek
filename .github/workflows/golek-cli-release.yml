@@ -70,6 +70,7 @@ jobs:
         run: brew install automake
 
       - name: Build native executable
+        shell: bash
         run: |
           export GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp"
           export GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch"
@@ -150,6 +151,7 @@ jobs:
           ./scripts/prepare-libtorch-source.sh
 
       - name: Build JVM package
+        shell: bash
         run: |
           export GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp"
           export GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch"
