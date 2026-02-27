@@ -30,7 +30,7 @@ public enum ModelFormat {
             "PyTorch"),
 
     SAFETENSORS("safetensors", "SafeTensors",
-            Set.of(".safetensors"),
+            Set.of(".safetensors", ".safetensor"),
             Set.of("model.safetensors"),
             true,
             "SafeTensors"),
