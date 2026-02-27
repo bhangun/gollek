@@ -3,12 +3,18 @@ name: Error Codes Doc Check
 on:
   push:
     paths:
+      - "core/gollek-spi/src/main/java/tech/kayys/gollek/spi/error/**"
+      - "scripts/generate-error-codes.sh"
+      - "docs/error-codes.md"
       - "inference-gollek/core/gollek-spi/src/main/java/tech/kayys/gollek/spi/error/**"
       - "inference-gollek/scripts/generate-error-codes.sh"
       - "inference-gollek/docs/error-codes.md"
       - ".github/workflows/error-codes.yml"
   pull_request:
     paths:
+      - "core/gollek-spi/src/main/java/tech/kayys/gollek/spi/error/**"
+      - "scripts/generate-error-codes.sh"
+      - "docs/error-codes.md"
       - "inference-gollek/core/gollek-spi/src/main/java/tech/kayys/gollek/spi/error/**"
       - "inference-gollek/scripts/generate-error-codes.sh"
       - "inference-gollek/docs/error-codes.md"
@@ -28,9 +34,28 @@ jobs:
           java-version: "21"
 
       - name: Generate error codes
-        run: ./inference-gollek/scripts/generate-error-codes.sh
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -x ./scripts/generate-error-codes.sh ]; then
+            ./scripts/generate-error-codes.sh
+          elif [ -x ./inference-gollek/scripts/generate-error-codes.sh ]; then
+            ./inference-gollek/scripts/generate-error-codes.sh
+          else
+            echo "generate-error-codes.sh not found in expected locations"
+            exit 1
+          fi
 
       - name: Verify docs are up-to-date
+        shell: bash
         run: |
+          set -euo pipefail
           git status --porcelain
-          git diff --exit-code inference-gollek/docs/error-codes.md
+          if [ -f ./docs/error-codes.md ]; then
+            git diff --exit-code docs/error-codes.md
+          elif [ -f ./inference-gollek/docs/error-codes.md ]; then
+            git diff --exit-code inference-gollek/docs/error-codes.md
+          else
+            echo "docs/error-codes.md not found in expected locations"
+            exit 1
+          fi
