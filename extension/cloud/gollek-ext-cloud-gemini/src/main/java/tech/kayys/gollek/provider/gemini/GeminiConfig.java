@@ -22,7 +22,7 @@ public interface GeminiConfig {
      * Default model to use if not specified
      */
     @WithName("default-model")
-    @WithDefault("gemini-1.5-flash")
+    @WithDefault("gemini-2.5-flash")
     String defaultModel();
 
     /**

@@ -24,11 +24,13 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
  * Google Gemini provider adapter for cloud LLM inference.
+ * Standardized on OpenAI-compatible API for maximum stability.
  */
 @ApplicationScoped
 public class GeminiProvider implements StreamingProvider {
@@ -36,6 +38,7 @@ public class GeminiProvider implements StreamingProvider {
         private static final String PROVIDER_ID = "gemini";
         private static final String PROVIDER_NAME = "Google Gemini";
         private static final String VERSION = "1.0.0";
+        private static final String GEMINI_OPENAI_COMPAT_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
         private static final Logger log = Logger.getLogger(GeminiProvider.class);
 
         @Inject
@@ -105,7 +108,7 @@ public class GeminiProvider implements StreamingProvider {
                                 .version(VERSION)
                                 .vendor("Google")
                                 .homepage("https://ai.google.dev/docs")
-                                .defaultModel("gemini-1.5-flash")
+                                .defaultModel(configDetails != null ? configDetails.defaultModel() : "gemini-2.5-flash")
                                 .build();
         }
 
@@ -118,10 +121,16 @@ public class GeminiProvider implements StreamingProvider {
                 if (request != null && request.getApiKey().isPresent()) {
                         return request.getApiKey().get();
                 }
-                if (configDetails == null)
-                        return null;
-                String key = configDetails.apiKey();
-                return (key != null && key.equals("dummy")) ? null : key;
+                String key = (configDetails != null) ? configDetails.apiKey() : null;
+                if (key != null && !key.isBlank() && !"dummy".equals(key)) {
+                        return key;
+                }
+                // Fallback to standard environment variables
+                String envKey = System.getenv("GEMINI_API_KEY");
+                if (envKey == null || envKey.isBlank()) {
+                        envKey = System.getenv("GOOGLE_API_KEY");
+                }
+                return envKey;
         }
 
         @Override
@@ -129,25 +138,24 @@ public class GeminiProvider implements StreamingProvider {
                 long startTime = System.currentTimeMillis();
                 int requestId = requestCounter.incrementAndGet();
 
-                GeminiRequest geminiRequest = buildGeminiRequest(request);
+                GeminiRequest geminiRequest = buildOpenAICompatibleRequest(request);
                 String currentApiKey = getApiKey(request);
 
                 if (currentApiKey == null || currentApiKey.isBlank()) {
                         return Uni.createFrom()
                                         .failure(new ProviderException.ProviderAuthenticationException(PROVIDER_ID,
-                                                        "Gemini API key not configured."));
+                                                        "Gemini API key not configured. Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable."));
                 }
 
-                String model = request.getModel() != null ? request.getModel().trim() : "gemini-1.5-flash";
-                String url = String.format(
-                                "https://generativelanguage.googleapis.com/v1/models/%s:generateContent?key=%s",
-                                model, currentApiKey);
+                // Using OpenAI compatible endpoint for Google AI Studio
+                String url = GEMINI_OPENAI_COMPAT_URL;
 
                 try {
                         String body = objectMapper.writeValueAsString(geminiRequest);
                         HttpRequest httpRequest = HttpRequest.newBuilder()
                                         .uri(URI.create(url))
                                         .header("Content-Type", "application/json")
+                                        .header("Authorization", "Bearer " + currentApiKey)
                                         .POST(HttpRequest.BodyPublishers.ofString(body))
                                         .build();
 
@@ -160,15 +168,26 @@ public class GeminiProvider implements StreamingProvider {
                                                                         + " " + resp.body());
                                                 }
                                                 try {
-                                                        GeminiResponse response = objectMapper.readValue(resp.body(),
+                                                        com.fasterxml.jackson.databind.JsonNode root = objectMapper
+                                                                        .readTree(resp.body());
+                                                        GeminiResponse response = objectMapper.treeToValue(root,
                                                                         GeminiResponse.class);
+                                                        String content = extractContent(root, false);
+                                                        GeminiUsage usage = response != null ? response.getUsage() : null;
                                                         long duration = System.currentTimeMillis() - startTime;
                                                         return InferenceResponse.builder()
                                                                         .requestId(request.getRequestId() != null
                                                                                         ? request.getRequestId()
                                                                                         : String.valueOf(requestId))
-                                                                        .content(extractContent(response))
-                                                                        .model(model)
+                                                                        .content(content)
+                                                                        .model(request.getModel())
+                                                                        .inputTokens(usage != null ? usage.getPromptTokens()
+                                                                                        : 0)
+                                                                        .outputTokens(usage != null
+                                                                                        ? usage.getCompletionTokens()
+                                                                                        : 0)
+                                                                        .tokensUsed(usage != null ? usage.getTotalTokens()
+                                                                                        : 0)
                                                                         .durationMs(duration)
                                                                         .metadata("provider", PROVIDER_ID)
                                                                         .build();
@@ -184,27 +203,27 @@ public class GeminiProvider implements StreamingProvider {
         @Override
         public Multi<StreamChunk> inferStream(ProviderRequest request) {
                 AtomicInteger chunkIndex = new AtomicInteger(0);
-                GeminiRequest geminiRequest = buildGeminiRequest(request);
+                GeminiRequest geminiRequest = buildOpenAICompatibleRequest(request);
+                geminiRequest.setStream(true);
                 String currentApiKey = getApiKey(request);
 
                 if (currentApiKey == null || currentApiKey.isBlank()) {
                         return Multi.createFrom()
                                         .failure(new ProviderException.ProviderAuthenticationException(PROVIDER_ID,
-                                                        "Gemini API key not configured."));
+                                                        "Gemini API key not configured. Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable."));
                 }
 
-                String model = request.getModel() != null ? request.getModel().trim() : "gemini-1.5-flash";
-                String url = String.format(
-                                "https://generativelanguage.googleapis.com/v1/models/%s:streamGenerateContent?alt=sse&key=%s",
-                                model, currentApiKey);
+                // Using OpenAI compatible endpoint for Google AI Studio
+                String url = GEMINI_OPENAI_COMPAT_URL;
 
-                log.debug("Gemini streaming URL: " + url.replaceAll("key=.*", "key=REDACTED"));
+                log.debug("Gemini streaming URL (OpenAI-compatible): " + url);
 
                 try {
                         String body = objectMapper.writeValueAsString(geminiRequest);
                         HttpRequest httpRequest = HttpRequest.newBuilder()
                                         .uri(URI.create(url))
                                         .header("Content-Type", "application/json")
+                                        .header("Authorization", "Bearer " + currentApiKey)
                                         .header("Accept", "text/event-stream")
                                         .POST(HttpRequest.BodyPublishers.ofString(body))
                                         .build();
@@ -214,7 +233,7 @@ public class GeminiProvider implements StreamingProvider {
                                                 .thenAccept(resp -> {
                                                         if (resp.statusCode() != 200) {
                                                                 emitter.fail(new RuntimeException(
-                                                                                "Gemini streaming failed: "
+                                                                                "Gemini streaming failed (OpenAI-compatible): "
                                                                                                 + resp.statusCode()));
                                                                 return;
                                                         }
@@ -222,45 +241,26 @@ public class GeminiProvider implements StreamingProvider {
                                                                         new InputStreamReader(resp.body()))) {
                                                                 String line;
                                                                 while ((line = reader.readLine()) != null) {
-                                                                        if (line.startsWith("data:")) {
-                                                                                String data = line.startsWith("data: ")
-                                                                                                ? line.substring(6)
-                                                                                                                .trim()
-                                                                                                : line.substring(5)
-                                                                                                                .trim();
-                                                                                if (!data.isEmpty()) {
+                                                                        if (line.startsWith("data: ")) {
+                                                                                String data = line.substring(6).trim();
+                                                                                if (!data.isEmpty() && !"[DONE]"
+                                                                                                .equals(data)) {
                                                                                         try {
-                                                                                                GeminiResponse chunk = objectMapper
-                                                                                                                .readValue(data, GeminiResponse.class);
+                                                                                                com.fasterxml.jackson.databind.JsonNode root = objectMapper
+                                                                                                                .readTree(data);
                                                                                                 String content = extractContent(
-                                                                                                                chunk);
+                                                                                                                root, true);
+                                                                                                if (content == null
+                                                                                                                || content.isBlank()) {
+                                                                                                        continue;
+                                                                                                }
                                                                                                 int index = chunkIndex
                                                                                                                 .getAndIncrement();
 
-                                                                                                boolean isFinal = false;
-                                                                                                if (chunk.getCandidates() != null
-                                                                                                                && !chunk.getCandidates()
-                                                                                                                                .isEmpty()) {
-                                                                                                        String reason = chunk
-                                                                                                                        .getCandidates()
-                                                                                                                        .get(0)
-                                                                                                                        .getFinishReason();
-                                                                                                        isFinal = reason != null
-                                                                                                                        && !reason.isEmpty();
-                                                                                                }
-
-                                                                                                if (isFinal) {
-                                                                                                        emitter.emit(StreamChunk
-                                                                                                                        .finalChunk(request
-                                                                                                                                        .getRequestId(),
-                                                                                                                                        index,
-                                                                                                                                        content));
-                                                                                                } else {
-                                                                                                        emitter.emit(StreamChunk
-                                                                                                                        .of(request.getRequestId(),
-                                                                                                                                        index,
-                                                                                                                                        content));
-                                                                                                }
+                                                                                                emitter.emit(StreamChunk
+                                                                                                                .of(request.getRequestId(),
+                                                                                                                                index,
+                                                                                                                                content));
                                                                                         } catch (Exception e) {
                                                                                                 log.warn("Failed to parse Gemini chunk: "
                                                                                                                 + data,
@@ -284,51 +284,108 @@ public class GeminiProvider implements StreamingProvider {
                 }
         }
 
-        private GeminiRequest buildGeminiRequest(ProviderRequest request) {
+        private GeminiRequest buildOpenAICompatibleRequest(ProviderRequest request) {
                 GeminiRequest geminiRequest = new GeminiRequest();
+                String model = request.getModel() != null ? request.getModel().trim()
+                                : (configDetails != null ? configDetails.defaultModel() : "gemini-2.5-flash");
+                model = normalizeModel(model);
+                geminiRequest.setModel(model);
+
                 if (request.getMessages() != null) {
-                        List<GeminiContent> contents = request.getMessages().stream()
-                                        .map(msg -> {
-                                                GeminiContent content = new GeminiContent();
-                                                content.setRole(mapRole(msg.getRole().toString()));
-                                                content.setParts(List.of(new GeminiPart(msg.getContent())));
-                                                return content;
-                                        })
+                        List<GeminiMessage> messages = request.getMessages().stream()
+                                        .map(msg -> new GeminiMessage(mapRole(msg.getRole().toString()),
+                                                        msg.getContent()))
                                         .collect(Collectors.toList());
-                        geminiRequest.setContents(contents);
+                        geminiRequest.setMessages(messages);
                 }
-                GeminiGenerationConfig genConfig = new GeminiGenerationConfig();
+
                 if (request.getParameters() != null) {
                         if (request.getParameters().containsKey("temperature")) {
-                                genConfig.setTemperature(
+                                geminiRequest.setTemperature(
                                                 ((Number) request.getParameters().get("temperature")).doubleValue());
                         }
                         if (request.getParameters().containsKey("max_tokens")) {
-                                genConfig.setMaxOutputTokens(
+                                geminiRequest.setMaxTokens(
                                                 ((Number) request.getParameters().get("max_tokens")).intValue());
+                        } else {
+                                geminiRequest.setMaxTokens(request.getMaxTokens());
+                        }
+                        if (request.getParameters().containsKey("top_p")) {
+                                geminiRequest.setTopP(
+                                                ((Number) request.getParameters().get("top_p")).doubleValue());
                         }
                 }
-                geminiRequest.setGenerationConfig(genConfig);
                 return geminiRequest;
         }
 
+        private String normalizeModel(String model) {
+                if (model == null || model.isBlank()) {
+                        return configDetails != null ? configDetails.defaultModel() : "gemini-2.5-flash";
+                }
+                String normalized = model.trim();
+                // Gemini 1.5 models are deprecated/shut down; route to current default.
+                if (normalized.startsWith("gemini-1.5-")) {
+                        return configDetails != null ? configDetails.defaultModel() : "gemini-2.5-flash";
+                }
+                return normalized;
+        }
+
         private String mapRole(String role) {
-                return switch (role.toLowerCase()) {
-                        case "system", "user" -> "user";
-                        case "assistant" -> "model";
+                String r = role.toLowerCase();
+                return switch (r) {
+                        case "user" -> "user";
+                        case "assistant" -> "assistant";
+                        case "system" -> "system";
                         default -> "user";
                 };
         }
 
-        private String extractContent(GeminiResponse response) {
-                if (response.getCandidates() == null || response.getCandidates().isEmpty())
+        private String extractContent(com.fasterxml.jackson.databind.JsonNode root, boolean streaming) {
+                if (root == null) {
                         return "";
-                GeminiCandidate candidate = response.getCandidates().get(0);
-                if (candidate.getContent() == null || candidate.getContent().getParts() == null)
+                }
+                com.fasterxml.jackson.databind.JsonNode choices = root.get("choices");
+                if (choices == null || !choices.isArray() || choices.isEmpty()) {
                         return "";
-                return candidate.getContent().getParts().stream()
-                                .map(GeminiPart::getText)
-                                .filter(java.util.Objects::nonNull)
-                                .collect(Collectors.joining());
+                }
+                com.fasterxml.jackson.databind.JsonNode choice = choices.get(0);
+                com.fasterxml.jackson.databind.JsonNode primary = streaming ? choice.path("delta") : choice.path("message");
+                com.fasterxml.jackson.databind.JsonNode fallback = streaming ? choice.path("message") : choice.path("delta");
+
+                String content = readContentNode(primary.path("content"));
+                if (!content.isBlank()) {
+                        return content;
+                }
+                return readContentNode(fallback.path("content"));
+        }
+
+        private String readContentNode(com.fasterxml.jackson.databind.JsonNode contentNode) {
+                if (contentNode == null || contentNode.isMissingNode() || contentNode.isNull()) {
+                        return "";
+                }
+                if (contentNode.isTextual()) {
+                        return contentNode.asText("");
+                }
+                if (contentNode.isArray()) {
+                        StringJoiner joiner = new StringJoiner("");
+                        for (com.fasterxml.jackson.databind.JsonNode part : contentNode) {
+                                if (part == null || part.isNull()) {
+                                        continue;
+                                }
+                                if (part.isTextual()) {
+                                        joiner.add(part.asText(""));
+                                        continue;
+                                }
+                                String type = part.path("type").asText("");
+                                if ("text".equalsIgnoreCase(type) || type.isBlank()) {
+                                        String text = part.path("text").asText("");
+                                        if (!text.isBlank()) {
+                                                joiner.add(text);
+                                        }
+                                }
+                        }
+                        return joiner.toString();
+                }
+                return "";
         }
 }

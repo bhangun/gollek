@@ -117,7 +117,7 @@ public class ChatCommand implements Runnable {
     @Option(names = { "--grammar" }, description = "GBNF grammar string")
     String grammar;
 
-    @Option(names = { "--max-tokens" }, description = "Maximum tokens to generate per response", defaultValue = "48")
+    @Option(names = { "--max-tokens" }, description = "Maximum tokens to generate per response", defaultValue = "256")
     int maxTokens;
 
     @Option(names = {
@@ -245,7 +245,9 @@ public class ChatCommand implements Runnable {
             }
 
             boolean effectiveStream = stream;
-            if (effectiveStream && ("djl".equalsIgnoreCase(providerId) || "safetensor".equalsIgnoreCase(providerId))) {
+            if (effectiveStream && ("djl".equalsIgnoreCase(providerId)
+                    || "safetensor".equalsIgnoreCase(providerId)
+                    || "gemini".equalsIgnoreCase(providerId))) {
                 effectiveStream = false;
                 if (!quiet) {
                     System.out.println(DIM + "Provider '" + providerId
@@ -439,8 +441,17 @@ public class ChatCommand implements Runnable {
                             System.out.println(YELLOW + "Usage: /provider <provider-id>" + RESET);
                         } else if (ensureProviderHealthy(newProviderId)) {
                             this.providerId = newProviderId;
-                            sdk.setPreferredProvider(newProviderId);
-                            System.out.println(GREEN + "Switched to provider: " + RESET + CYAN + providerId + RESET);
+                            try {
+                                sdk.setPreferredProvider(newProviderId);
+                                applyModelForProviderSwitch(newProviderId);
+                                System.out
+                                        .println(GREEN + "Switched to provider: " + RESET + CYAN + providerId + RESET);
+                            } catch (tech.kayys.gollek.sdk.exception.SdkException e) {
+                                System.err.println(YELLOW + "Warning: Could not set preferred provider on SDK: "
+                                        + describeError(e) + RESET);
+                                System.out.println(
+                                        GREEN + "Switched to provider (local): " + RESET + CYAN + providerId + RESET);
+                            }
                         }
                         continue;
                     }
@@ -1423,6 +1434,11 @@ public class ChatCommand implements Runnable {
             printGenericProviderSetupHint("djl");
         } else if (detail.contains("provider not available: gguf")) {
             printGenericProviderSetupHint("gguf");
+        } else if (detail.contains("404")) {
+            System.err.println(YELLOW
+                    + "Hint: A 404 error usually means the endpoint URL is incorrect or the requested model is not found on this provider."
+                    + RESET);
+            System.err.println(YELLOW + "Current provider: " + providerId + " | Model: " + modelId + RESET);
         }
     }
 
@@ -1447,6 +1463,25 @@ public class ChatCommand implements Runnable {
             return throwable.getClass().getSimpleName();
         }
         return sb.toString();
+    }
+
+    private void applyModelForProviderSwitch(String newProviderId) {
+        if (newProviderId == null || newProviderId.isBlank()) {
+            return;
+        }
+        // Local file path overrides should not leak into cloud provider requests.
+        if (isCloudProvider(newProviderId)) {
+            modelPathOverride = null;
+        }
+
+        resolveDefaultModelForProvider(newProviderId).ifPresent(defaultModel -> {
+            if (!defaultModel.equals(modelId)) {
+                modelId = defaultModel;
+                if (!quiet) {
+                    System.out.println(DIM + "Using model: " + CYAN + displayModelName(modelId) + RESET);
+                }
+            }
+        });
     }
 
     private boolean isFatalPullError(Throwable throwable) {
@@ -1481,11 +1516,19 @@ public class ChatCommand implements Runnable {
             return findPreferredLocalModelForBareChat();
         }
 
-        if ("safetensor".equalsIgnoreCase(providerId)) {
+        return resolveDefaultModelForProvider(providerId);
+    }
+
+    private Optional<String> resolveDefaultModelForProvider(String provider) {
+        if (provider == null || provider.isBlank()) {
+            return Optional.empty();
+        }
+
+        if ("safetensor".equalsIgnoreCase(provider)) {
             return findLocalSafetensorModelPath();
         }
 
-        return providerRegistry.getProvider(providerId)
+        return providerRegistry.getProvider(provider)
                 .map(LLMProvider::metadata)
                 .map(meta -> meta.getDefaultModel())
                 .filter(v -> v != null && !v.isBlank());

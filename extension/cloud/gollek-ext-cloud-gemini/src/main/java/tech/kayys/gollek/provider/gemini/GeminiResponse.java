@@ -1,37 +1,66 @@
 package tech.kayys.gollek.provider.gemini;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 
 /**
- * Gemini API response
+ * Gemini OpenAI-compatible response
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class GeminiResponse {
 
-    private List<GeminiCandidate> candidates;
-    private GeminiUsageMetadata usageMetadata;
-    private String promptFeedback;
+    private String id;
+    private String object;
+    private long created;
+    private String model;
+    private List<GeminiChoice> choices;
+    private GeminiUsage usage;
 
-    public List<GeminiCandidate> getCandidates() {
-        return candidates;
+    public String getId() {
+        return id;
     }
 
-    public void setCandidates(List<GeminiCandidate> candidates) {
-        this.candidates = candidates;
+    public void setId(String id) {
+        this.id = id;
     }
 
-    public GeminiUsageMetadata getUsageMetadata() {
-        return usageMetadata;
+    public String getObject() {
+        return object;
     }
 
-    public void setUsageMetadata(GeminiUsageMetadata usageMetadata) {
-        this.usageMetadata = usageMetadata;
+    public void setObject(String object) {
+        this.object = object;
     }
 
-    public String getPromptFeedback() {
-        return promptFeedback;
+    public long getCreated() {
+        return created;
     }
 
-    public void setPromptFeedback(String promptFeedback) {
-        this.promptFeedback = promptFeedback;
+    public void setCreated(long created) {
+        this.created = created;
+    }
+
+    public String getModel() {
+        return model;
+    }
+
+    public void setModel(String model) {
+        this.model = model;
+    }
+
+    public List<GeminiChoice> getChoices() {
+        return choices;
+    }
+
+    public void setChoices(List<GeminiChoice> choices) {
+        this.choices = choices;
+    }
+
+    public GeminiUsage getUsage() {
+        return usage;
+    }
+
+    public void setUsage(GeminiUsage usage) {
+        this.usage = usage;
     }
 }
