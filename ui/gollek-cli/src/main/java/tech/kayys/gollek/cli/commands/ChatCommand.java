@@ -19,9 +19,17 @@ import tech.kayys.gollek.spi.provider.ProviderHealth;
 import tech.kayys.gollek.spi.provider.ProviderRegistry;
 import tech.kayys.gollek.spi.provider.ProviderRequest;
 import tech.kayys.gollek.model.repo.hf.HuggingFaceClient;
+import org.jline.reader.Candidate;
+import org.jline.reader.Completer;
+import org.jline.reader.LineReader;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.console.CmdDesc;
+import org.jline.utils.AttributedString;
+import org.jline.widget.AutosuggestionWidgets;
+import org.jline.widget.TailTipWidgets;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -48,6 +56,14 @@ public class ChatCommand implements Runnable {
     Instance<HuggingFaceClient> hfClientInstance;
     @Inject
     ProviderRegistry providerRegistry;
+    @Inject
+    ListCommand listCommand;
+    @Inject
+    ProvidersCommand providersCommand;
+    @Inject
+    InfoCommand infoCommand;
+    @Inject
+    ExtensionsCommand extensionsCommand;
 
     @Option(names = { "-m", "--model" }, description = "Model ID or path (optional if provider has default)")
     public String modelId;
@@ -186,12 +202,12 @@ public class ChatCommand implements Runnable {
             addInitialSystemPromptIfNeeded();
 
             if (!quiet) {
-                System.out.println(BOLD + YELLOW + "  _____       _      _    " + RESET);
-                System.out.println(BOLD + YELLOW + " / ____|     | |    | |   " + RESET);
-                System.out.println(BOLD + YELLOW + "| |  __  ___ | | ___| | __" + RESET);
-                System.out.println(BOLD + YELLOW + "| | |_ |/ _ \\| |/ _ \\ |/ /" + RESET);
-                System.out.println(BOLD + YELLOW + "| |__| | (_) | |  __/   < " + RESET);
-                System.out.println(BOLD + YELLOW + " \\_____|\\___/|_|\\___|_|\\_\\" + RESET);
+                System.out.println(BOLD + YELLOW + "  _____       _  _      _    " + RESET);
+                System.out.println(BOLD + YELLOW + " / ____|     | || |    | |   " + RESET);
+                System.out.println(BOLD + YELLOW + "| |  __  ___ | || | ___| | __" + RESET);
+                System.out.println(BOLD + YELLOW + "| | |_ |/ _ \\| || |/ _ \\ |/ /" + RESET);
+                System.out.println(BOLD + YELLOW + "| |__| | (_) | || |  __/   < " + RESET);
+                System.out.println(BOLD + YELLOW + " \\_____|\\___/|_||_\\___|_|\\_\\" + RESET);
                 System.out.println();
                 System.out.printf(BOLD + "Model: " + RESET + CYAN + "%s" + RESET + "%n", modelId);
                 System.out.printf(BOLD + "Provider: " + RESET + YELLOW + "%s" + RESET + "%n",
@@ -221,8 +237,71 @@ public class ChatCommand implements Runnable {
                 }
             }
 
-            BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-            String line;
+            // Initialize JLine Terminal and LineReader
+            Terminal terminal;
+            try {
+                terminal = TerminalBuilder.builder()
+                        .system(true)
+                        .dumb(true)
+                        .build();
+            } catch (Exception e) {
+                // Fallback to dumb terminal
+                terminal = TerminalBuilder.builder().dumb(true).build();
+            }
+
+            // Custom Completer for slash commands
+            Completer slashCompleter = (lineReader, parsedLine, candidates) -> {
+                String word = parsedLine.word();
+                if (word.startsWith("/")) {
+                    candidates.add(new Candidate("/help", "/help", null, "Show available commands", null, null, true));
+                    candidates.add(
+                            new Candidate("/reset", "/reset", null, "Clear conversation history", null, null, true));
+                    candidates.add(new Candidate("/quit", "/quit", null, "Exit the chat session", null, null, true));
+                    candidates.add(
+                            new Candidate("/log", "/log", null, "Show last 100 lines of CLI log", null, null, true));
+                    candidates.add(new Candidate("/list", "/list", null, "List available models", null, null, true));
+                    candidates.add(new Candidate("/providers", "/providers", null, "List available LLM providers", null,
+                            null, true));
+                    candidates.add(new Candidate("/info", "/info", null, "Display system info and adapters", null, null,
+                            true));
+                    candidates.add(new Candidate("/extensions", "/extensions", null, "Show packaged extension modules",
+                            null, null, true));
+                }
+            };
+
+            LineReader reader = LineReaderBuilder.builder()
+                    .terminal(terminal)
+                    .completer(slashCompleter)
+                    .variable(LineReader.HISTORY_FILE,
+                            Path.of(System.getProperty("user.home"), ".gollek", "chat_history"))
+                    .variable(LineReader.LIST_MAX, 50)
+                    .option(LineReader.Option.AUTO_MENU, true)
+                    .option(LineReader.Option.AUTO_LIST, true)
+                    .option(LineReader.Option.COMPLETE_IN_WORD, true)
+                    .build();
+
+            // Enable autosuggestions (ghost text)
+            AutosuggestionWidgets autosuggestionWidgets = new AutosuggestionWidgets(reader);
+            autosuggestionWidgets.enable();
+
+            // Enable TailTip (descriptions at the bottom)
+            java.util.Map<String, CmdDesc> commandHelp = new java.util.HashMap<>();
+            commandHelp.put("/help", createCmdDesc("Show available commands"));
+            commandHelp.put("/reset", createCmdDesc("Clear conversation history"));
+            commandHelp.put("/quit", createCmdDesc("Exit the chat session"));
+            commandHelp.put("/log", createCmdDesc("Show last 100 lines of CLI log"));
+            commandHelp.put("/list", createCmdDesc("List available models"));
+            commandHelp.put("/providers", createCmdDesc("List available LLM providers"));
+            commandHelp.put("/info", createCmdDesc("Display system info and adapters"));
+            commandHelp.put("/extensions", createCmdDesc("Show packaged extension modules"));
+
+            TailTipWidgets tailTipWidgets = new TailTipWidgets(reader, commandHelp, 0,
+                    TailTipWidgets.TipType.COMPLETER);
+            tailTipWidgets.enable();
+
+            // Set prompt
+            String promptText = quiet ? "\n>>> " : "\n" + BOLD + CYAN + ">>> " + RESET;
+            String secondaryPrompt = quiet ? "... " : DIM + "... " + RESET;
 
             // Open output file if specified (append mode)
             java.io.PrintWriter fileWriter = null;
@@ -240,35 +319,36 @@ public class ChatCommand implements Runnable {
             }
 
             while (true) {
-                if (quiet) {
-                    System.out.print("\n>>> ");
-                } else {
-                    System.out.print("\n" + BOLD + CYAN + ">>> " + RESET);
-                }
-                System.out.flush();
                 StringBuilder inputBuffer = new StringBuilder();
+                String currentPrompt = promptText;
+                boolean interrupted = false;
 
                 while (true) {
-                    line = reader.readLine();
-                    if (line == null)
+                    String lineInput;
+                    try {
+                        lineInput = reader.readLine(currentPrompt);
+                    } catch (org.jline.reader.UserInterruptException e) {
+                        interrupted = true;
                         break;
-
-                    if (line.endsWith("\\")) {
-                        inputBuffer.append(line, 0, line.length() - 1).append("\n");
-                        if (quiet) {
-                            System.out.print("... ");
-                        } else {
-                            System.out.print(DIM + "... " + RESET);
+                    } catch (org.jline.reader.EndOfFileException e) {
+                        if (!quiet) {
+                            System.out.println("\n" + YELLOW + "Goodbye!" + RESET);
                         }
-                        System.out.flush();
+                        return;
+                    }
+
+                    if (lineInput.endsWith("\\")) {
+                        inputBuffer.append(lineInput, 0, lineInput.length() - 1).append("\n");
+                        currentPrompt = secondaryPrompt;
                     } else {
-                        inputBuffer.append(line);
+                        inputBuffer.append(lineInput);
                         break;
                     }
                 }
 
-                if (line == null)
-                    break;
+                if (interrupted) {
+                    continue;
+                }
 
                 String finalInput = inputBuffer.toString().trim();
 
@@ -307,10 +387,34 @@ public class ChatCommand implements Runnable {
 
                 if (finalInput.equalsIgnoreCase("/help")) {
                     System.out.println(DIM + "Available commands:" + RESET);
-                    System.out.println(DIM + "  /reset  - Clear conversation history" + RESET);
-                    System.out.println(DIM + "  /quit   - Exit the chat" + RESET);
-                    System.out.println(DIM + "  /log    - Show last 100 lines of log" + RESET);
-                    System.out.println(DIM + "  /help   - Show this help message" + RESET);
+                    System.out.println(DIM + "  /reset      - Clear conversation history" + RESET);
+                    System.out.println(DIM + "  /quit       - Exit the chat session" + RESET);
+                    System.out.println(DIM + "  /log        - Show last 100 lines of log" + RESET);
+                    System.out.println(DIM + "  /list       - List available models" + RESET);
+                    System.out.println(DIM + "  /providers  - List available LLM providers" + RESET);
+                    System.out.println(DIM + "  /info       - Display system info" + RESET);
+                    System.out.println(DIM + "  /extensions - Show packaged extension modules" + RESET);
+                    System.out.println(DIM + "  /help       - Show this help message" + RESET);
+                    continue;
+                }
+
+                if (finalInput.equalsIgnoreCase("/list")) {
+                    listCommand.run();
+                    continue;
+                }
+
+                if (finalInput.equalsIgnoreCase("/providers")) {
+                    providersCommand.run();
+                    continue;
+                }
+
+                if (finalInput.equalsIgnoreCase("/info")) {
+                    infoCommand.run();
+                    continue;
+                }
+
+                if (finalInput.equalsIgnoreCase("/extensions")) {
+                    extensionsCommand.run();
                     continue;
                 }
 
@@ -1160,5 +1264,11 @@ public class ChatCommand implements Runnable {
             // best effort only
         }
         return false;
+    }
+
+    private CmdDesc createCmdDesc(String description) {
+        CmdDesc desc = new CmdDesc();
+        desc.setMainDesc(List.of(new AttributedString(description)));
+        return desc;
     }
 }
