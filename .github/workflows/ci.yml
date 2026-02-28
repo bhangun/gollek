@@ -50,15 +50,44 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp" \
-          ./inference-gollek/scripts/prepare-llama-source.sh
+          if [ -x ./scripts/prepare-llama-source.sh ]; then
+            GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp" \
+            ./scripts/prepare-llama-source.sh
+          elif [ -x ./inference-gollek/scripts/prepare-llama-source.sh ]; then
+            GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp" \
+            ./inference-gollek/scripts/prepare-llama-source.sh
+          else
+            echo "prepare-llama-source.sh not found"
+            exit 1
+          fi
 
       - name: Prepare libtorch source
         shell: bash
         run: |
           set -euo pipefail
-          GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch" \
-          ./inference-gollek/scripts/prepare-libtorch-source.sh
+          if [ -x ./scripts/prepare-libtorch-source.sh ]; then
+            GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch" \
+            ./scripts/prepare-libtorch-source.sh
+          elif [ -x ./inference-gollek/scripts/prepare-libtorch-source.sh ]; then
+            GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch" \
+            ./inference-gollek/scripts/prepare-libtorch-source.sh
+          else
+            echo "prepare-libtorch-source.sh not found"
+            exit 1
+          fi
+
+      - name: Check markdown path hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -x ./scripts/check-no-local-paths.sh ]; then
+            ./scripts/check-no-local-paths.sh
+          elif [ -x ./inference-gollek/scripts/check-no-local-paths.sh ]; then
+            ./inference-gollek/scripts/check-no-local-paths.sh
+          else
+            echo "check-no-local-paths.sh not found"
+            exit 1
+          fi
 
       - name: Build Gollek CLI
         shell: bash

@@ -26,7 +26,7 @@ quarkus:
   
   # OpenTelemetry
   otel:
-    enabled: true
+    enabled: ${GOLLEK_TRACING_ENABLED:true}
     exporter:
       otlp:
         endpoint: http://otel-collector:4317
@@ -53,6 +53,10 @@ quarkus:
   flyway:
     migrate-at-start: true
     baseline-on-migrate: true
+
+gollek:
+  distribution:
+    mode: ${GOLLEK_DISTRIBUTION_MODE:cloud}
 
 # Inference Platform Configuration
 inference:
@@ -178,17 +182,38 @@ tenants:
         triton:
           enabled: true
 
+# LiteRT provider session pool defaults (adaptive eviction telemetry-ready)
+litert:
+  provider:
+    session:
+      max-per-tenant: ${LITERT_SESSION_MAX_PER_TENANT:4}
+      idle-timeout-seconds: ${LITERT_SESSION_IDLE_TIMEOUT_SECONDS:300}
+      max-total: ${LITERT_SESSION_MAX_TOTAL:32}
+
+libtorch:
+  provider:
+    advanced:
+      enabled: ${LIBTORCH_ADVANCED_ENABLED:false}
+      attention-mode: ${LIBTORCH_ADVANCED_ATTENTION_MODE:baseline}
+      fp8-rowwise-enabled: ${LIBTORCH_ADVANCED_FP8_ROWWISE_ENABLED:false}
+      sage-attention2-enabled: ${LIBTORCH_ADVANCED_SAGE2_ENABLED:false}
+      sage-attention2-allowed-tenants: ${LIBTORCH_ADVANCED_SAGE2_ALLOWED_TENANTS:}
+      sage-attention2-allowed-models: ${LIBTORCH_ADVANCED_SAGE2_ALLOWED_MODELS:}
+      sage-attention2-blocked-tenants: ${LIBTORCH_ADVANCED_SAGE2_BLOCKED_TENANTS:}
+      sage-attention2-blocked-models: ${LIBTORCH_ADVANCED_SAGE2_BLOCKED_MODELS:}
+      allowed-gpu-sm: ${LIBTORCH_ADVANCED_ALLOWED_GPU_SM:89,90}
+
 # Observability
 observability:
   metrics:
-    enabled: true
+    enabled: ${GOLLEK_METRICS_ENABLED:true}
     export:
       prometheus:
-        enabled: true
+        enabled: ${GOLLEK_PROMETHEUS_ENABLED:true}
         path: /metrics
   
   tracing:
-    enabled: true
+    enabled: ${GOLLEK_TRACING_ENABLED:true}
     sampler:
       probability: 0.1  # 10% sampling
     exporter:

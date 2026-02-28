@@ -4,9 +4,11 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 import tech.kayys.gollek.inference.libtorch.binding.LibTorchBinding;
+import tech.kayys.gollek.inference.libtorch.core.ScalarType;
 import tech.kayys.gollek.inference.libtorch.core.Tensor;
 
 import java.lang.invoke.MethodHandle;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Mixed precision inference manager for LibTorch.
@@ -56,6 +58,7 @@ public class MixedPrecisionManager {
     LibTorchProviderConfig config;
 
     private volatile Precision activePrecision = Precision.FP32;
+    private final AtomicBoolean initialized = new AtomicBoolean(false);
 
     /**
      * Determine the best precision for the current hardware.
@@ -72,11 +75,17 @@ public class MixedPrecisionManager {
         // GPU — try BF16 first (better range than FP16), fallback to FP16
         try {
             LibTorchBinding binding = LibTorchBinding.getInstance();
-            if (binding.hasSymbol("at_cuda_is_bf16_supported")) {
-                log.info("GPU supports BF16 — using BF16 precision");
-                return Precision.BF16;
+            if (binding.hasSymbol(LibTorchBinding.CUDA_IS_BF16_SUPPORTED)) {
+                MethodHandle bf16Check = binding.bind(
+                        LibTorchBinding.CUDA_IS_BF16_SUPPORTED,
+                        LibTorchBinding.CUDA_IS_BF16_SUPPORTED_DESC);
+                boolean supported = (boolean) bf16Check.invoke();
+                if (supported) {
+                    log.info("GPU supports BF16 — using BF16 precision");
+                    return Precision.BF16;
+                }
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log.debug("BF16 check failed, trying FP16");
         }
 
@@ -98,6 +107,26 @@ public class MixedPrecisionManager {
 
         log.infof("Mixed precision initialized: %s (dtype=%s)",
                 activePrecision.name(), activePrecision.getTorchDtype());
+        initialized.set(true);
+    }
+
+    public void initializeIfNeeded() {
+        if (!initialized.get()) {
+            synchronized (this) {
+                if (!initialized.get()) {
+                    initialize();
+                }
+            }
+        }
+    }
+
+    /**
+     * Cast input for hybrid attention path (prefers BF16 on supported GPUs,
+     * otherwise FP16).
+     */
+    public Tensor castForHybridInput(Tensor input) {
+        initializeIfNeeded();
+        return castToActivePrecision(input);
     }
 
     /**
@@ -113,20 +142,10 @@ public class MixedPrecisionManager {
         }
 
         try {
-            LibTorchBinding binding = LibTorchBinding.getInstance();
-            // Use the binding to cast tensor dtype
-            if (binding.hasSymbol("at_tensor_to_dtype")) {
-                MethodHandle castFn = binding.bind("at_tensor_to_dtype",
-                        java.lang.foreign.FunctionDescriptor.of(
-                                java.lang.foreign.ValueLayout.ADDRESS,
-                                java.lang.foreign.ValueLayout.ADDRESS,
-                                java.lang.foreign.ValueLayout.JAVA_INT));
-
-                int dtypeCode = activePrecision == Precision.FP16 ? 5 : 15; // PyTorch dtype codes
-                var result = (java.lang.foreign.MemorySegment) castFn.invoke(
-                        input.nativeHandle(), dtypeCode);
-                return new Tensor(result, java.lang.foreign.Arena.ofAuto());
-            }
+            int dtypeCode = activePrecision == Precision.FP16
+                    ? ScalarType.HALF.code()
+                    : ScalarType.BFLOAT16.code();
+            return castTensorToDtype(input, dtypeCode);
         } catch (Throwable t) {
             log.warnf(t, "Failed to cast tensor to %s, using FP32 fallback", activePrecision);
         }
@@ -146,19 +165,7 @@ public class MixedPrecisionManager {
         }
 
         try {
-            LibTorchBinding binding = LibTorchBinding.getInstance();
-            if (binding.hasSymbol("at_tensor_to_dtype")) {
-                MethodHandle castFn = binding.bind("at_tensor_to_dtype",
-                        java.lang.foreign.FunctionDescriptor.of(
-                                java.lang.foreign.ValueLayout.ADDRESS,
-                                java.lang.foreign.ValueLayout.ADDRESS,
-                                java.lang.foreign.ValueLayout.JAVA_INT));
-
-                int fp32Code = 6; // float32 dtype code
-                var result = (java.lang.foreign.MemorySegment) castFn.invoke(
-                        output.nativeHandle(), fp32Code);
-                return new Tensor(result, java.lang.foreign.Arena.ofAuto());
-            }
+            return castTensorToDtype(output, ScalarType.FLOAT.code());
         } catch (Throwable t) {
             log.warnf(t, "Failed to cast tensor to FP32");
         }
@@ -178,5 +185,18 @@ public class MixedPrecisionManager {
      */
     public boolean isMixedPrecisionActive() {
         return activePrecision != Precision.FP32;
+    }
+
+    private Tensor castTensorToDtype(Tensor tensor, int dtypeCode) throws Throwable {
+        LibTorchBinding binding = LibTorchBinding.getInstance();
+        if (!binding.hasSymbol(LibTorchBinding.TENSOR_TO_DTYPE)) {
+            return tensor;
+        }
+        MethodHandle castFn = binding.bind(
+                LibTorchBinding.TENSOR_TO_DTYPE,
+                LibTorchBinding.TENSOR_TO_DTYPE_DESC);
+        var result = (java.lang.foreign.MemorySegment) castFn.invoke(
+                tensor.nativeHandle(), dtypeCode);
+        return new Tensor(result, java.lang.foreign.Arena.ofAuto());
     }
 }

@@ -37,6 +37,7 @@ import tech.kayys.gollek.spi.provider.RoutingContext;
 import tech.kayys.gollek.spi.provider.RoutingDecision;
 import tech.kayys.gollek.spi.provider.ProviderCandidate;
 import tech.kayys.gollek.engine.observability.RuntimeMetricsCache;
+import tech.kayys.gollek.engine.observability.AdapterRoutingMetricsCollector;
 import tech.kayys.gollek.model.core.HardwareDetector;
 import tech.kayys.gollek.spi.context.RequestContext;
 import tech.kayys.gollek.spi.exception.ModelException;
@@ -72,6 +73,9 @@ public class ModelRouterService {
 
         @Inject
         RuntimeMetricsCache metricsCache;
+
+        @Inject
+        AdapterRoutingMetricsCollector adapterRoutingMetricsCollector;
 
         @Inject
         HardwareDetector hardwareDetector;
@@ -218,6 +222,8 @@ public class ModelRouterService {
                 ProviderRequest checkRequest = ProviderRequest.builder()
                                 .model(manifest.modelId())
                                 .messages(context.request().getMessages())
+                                .parameters(context.request().getParameters())
+                                .metadata(context.request().getMetadata())
                                 .metadata("tenantId", getTenantId(context.request()))
                                 .build();
 
@@ -240,14 +246,10 @@ public class ModelRouterService {
                         }
                 }
 
-                for (LLMProvider p : providers) {
-                        boolean supported = p.supports(manifest.modelId(), checkRequest);
-                        LOG.debugf("Provider %s support for %s: %b", p.id(), manifest.modelId(), supported);
-                }
-
                 // Filter compatible providers
                 List<ProviderCandidate> candidates = providers.stream()
                                 .filter(p -> isFormatCompatible(p, manifest))
+                                .filter(p -> isAdapterCompatible(p, checkRequest))
                                 .filter(p -> p.supports(manifest.modelId(), checkRequest))
                                 .map(p -> scoreProvider(p, manifest, context))
                                 .filter(Optional::isPresent)
@@ -255,7 +257,7 @@ public class ModelRouterService {
                                 .collect(Collectors.toList());
 
                 if (candidates.isEmpty()) {
-                        Optional<ProviderCandidate> ggufFallback = tryGgufFallback(providers, manifest, context);
+                        Optional<ProviderCandidate> ggufFallback = tryGgufFallback(providers, manifest, context, checkRequest);
                         if (ggufFallback.isPresent()) {
                                 ProviderCandidate fallback = ggufFallback.get();
                                 LOG.warnf("Using GGUF fallback provider for model %s", manifest.modelId());
@@ -336,6 +338,29 @@ public class ModelRouterService {
                                 .anyMatch(providerFormats::contains);
         }
 
+        private boolean isAdapterCompatible(LLMProvider provider, ProviderRequest request) {
+                if (!AdapterRoutingSupport.hasAdapterRequest(request)) {
+                        return true;
+                }
+
+                ProviderCapabilities capabilities = provider.capabilities();
+                if (AdapterRoutingSupport.isAdapterUnsupported(capabilities)) {
+                        LOG.debugf("Skipping provider %s for adapter request due to adapter_unsupported capability",
+                                        provider.id());
+                        if (adapterRoutingMetricsCollector != null) {
+                                String tenantId = String.valueOf(request.getMetadata().getOrDefault("tenantId", "community"));
+                                adapterRoutingMetricsCollector.recordProviderFiltered(
+                                                "model-router-service",
+                                                provider.id(),
+                                                request.getModel(),
+                                                tenantId,
+                                                "adapter_unsupported");
+                        }
+                        return false;
+                }
+                return true;
+        }
+
         private Optional<ProviderCandidate> scoreProvider(
                         LLMProvider provider,
                         ModelManifest manifest,
@@ -385,8 +410,10 @@ public class ModelRouterService {
         private Optional<ProviderCandidate> tryGgufFallback(
                         List<LLMProvider> providers,
                         ModelManifest manifest,
-                        RoutingContext context) {
+                        RoutingContext context,
+                        ProviderRequest checkRequest) {
                 return providers.stream()
+                                .filter(p -> isAdapterCompatible(p, checkRequest))
                                 .filter(p -> p.id().toLowerCase().contains("gguf")
                                                 || p.id().toLowerCase().contains("llama"))
                                 .map(p -> new ProviderCandidate(p.id(), p, 40, Duration.ZERO, 0.0))

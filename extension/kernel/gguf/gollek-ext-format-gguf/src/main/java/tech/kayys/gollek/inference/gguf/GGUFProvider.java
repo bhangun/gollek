@@ -15,6 +15,9 @@ import org.eclipse.microprofile.faulttolerance.Timeout;
 import org.jboss.logging.Logger;
 import tech.kayys.gollek.spi.stream.StreamChunk;
 import tech.kayys.gollek.spi.inference.AdapterSpec;
+import tech.kayys.gollek.spi.observability.AdapterMetricSchema;
+import tech.kayys.gollek.spi.observability.AdapterMetricsRecorder;
+import tech.kayys.gollek.spi.observability.NoopAdapterMetricsRecorder;
 
 import tech.kayys.gollek.spi.exception.ProviderException;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
@@ -49,18 +52,26 @@ public class GGUFProvider implements StreamingProvider {
     private final GGUFSessionManager sessionManager;
     private final MeterRegistry meterRegistry;
     private final Tracer tracer;
+    private final AdapterMetricsRecorder adapterMetricsRecorder;
     @Inject
     LoraAdapterManager loraAdapterManager;
 
     @Inject
     public GGUFProvider(GGUFProviderConfig config, LlamaCppBinding binding, GGUFSessionManager sessionManager,
-            MeterRegistry meterRegistry, Tracer tracer) {
+            MeterRegistry meterRegistry, Tracer tracer, AdapterMetricsRecorder adapterMetricsRecorder) {
         this.config = config;
         this.binding = binding;
         this.sessionManager = sessionManager;
         this.meterRegistry = meterRegistry;
         this.tracer = tracer;
+        this.adapterMetricsRecorder = adapterMetricsRecorder;
         initializeStaticMetadata();
+    }
+
+    // Backward-compatible ctor for tests and older wiring paths.
+    public GGUFProvider(GGUFProviderConfig config, LlamaCppBinding binding, GGUFSessionManager sessionManager,
+            MeterRegistry meterRegistry, Tracer tracer) {
+        this(config, binding, sessionManager, meterRegistry, tracer, new NoopAdapterMetricsRecorder());
     }
 
     private final AtomicBoolean initialized = new AtomicBoolean(false);
@@ -70,6 +81,7 @@ public class GGUFProvider implements StreamingProvider {
 
     private ProviderMetadata metadata;
     private ProviderCapabilities capabilities;
+    private static final String ADAPTER_PROVIDER_TAG = "gguf";
 
     void onStart(@Observes StartupEvent event) {
         // Keep provider lazy by default to avoid loading GGUF runtime when not
@@ -126,6 +138,19 @@ public class GGUFProvider implements StreamingProvider {
         }
 
         if (this.capabilities == null) {
+            var features = new java.util.LinkedHashSet<>(Set.of(
+                    "local_inference",
+                    "cpu_inference",
+                    config.gpuEnabled() ? "gpu_acceleration" : "cpu_only"));
+            features.addAll(AdapterCapabilityProfile.builder()
+                    .adapterSupported(config.loraEnabled())
+                    .adapterTypes(Set.of("lora"))
+                    .runtimeApply(true)
+                    .precompiledModelPath(false)
+                    .rolloutGuard(config.loraRolloutGuardEnabled())
+                    .metricsSchema(true)
+                    .build()
+                    .toFeatureFlags());
             this.capabilities = ProviderCapabilities.builder()
                     .streaming(true)
                     .functionCalling(false)
@@ -137,10 +162,7 @@ public class GGUFProvider implements StreamingProvider {
                     .supportedFormats(Set.of(ModelFormat.GGUF))
                     .supportedDevices(buildSupportedDevices())
                     .supportedLanguages(java.util.List.of("en"))
-                    .features(Set.of("local_inference", "cpu_inference",
-                            config.gpuEnabled() ? "gpu_acceleration" : "cpu_only",
-                            "adapter_spec_v1",
-                            "adapter_type_lora"))
+                    .features(Set.copyOf(features))
                     .build();
         }
     }
@@ -193,14 +215,18 @@ public class GGUFProvider implements StreamingProvider {
                 log.debugf("Starting inference for model=%s, tenant=%s",
                         request.getModel(), tenantId);
 
-                adapterSpec = resolveAdapterSpec(request);
+                adapterSpec = resolveAdapterSpec(request, tenantId);
                 InferenceRequest inferenceRequest = convertToInferenceRequest(request, adapterSpec);
+                Instant adapterAcquireStart = Instant.now();
 
                 sessionContext = sessionManager.getSession(
                         tenantId,
                         request.getModel(),
                         config,
                         adapterSpec);
+                if (adapterSpec != null) {
+                    recordAdapterMetrics(adapterSpec, Duration.between(adapterAcquireStart, Instant.now()));
+                }
 
                 if (sessionContext == null) {
                     throw new IllegalStateException(
@@ -257,14 +283,18 @@ public class GGUFProvider implements StreamingProvider {
                 log.debugf("Starting streaming inference for model=%s, tenant=%s",
                         request.getModel(), tenantId);
 
-                AdapterSpec adapterSpec = resolveAdapterSpec(request);
+                AdapterSpec adapterSpec = resolveAdapterSpec(request, tenantId);
                 InferenceRequest inferenceRequest = convertToInferenceRequest(request, adapterSpec);
+                Instant adapterAcquireStart = Instant.now();
 
                 sessionContext = sessionManager.getSession(
                         tenantId,
                         request.getModel(),
                         config,
                         adapterSpec);
+                if (adapterSpec != null) {
+                    recordAdapterMetrics(adapterSpec, Duration.between(adapterAcquireStart, Instant.now()));
+                }
 
                 if (sessionContext == null) {
                     return Multi.createFrom().failure(new IllegalStateException(
@@ -500,11 +530,11 @@ public class GGUFProvider implements StreamingProvider {
         return builder.build();
     }
 
-    private AdapterSpec resolveAdapterSpec(ProviderRequest request) {
+    private AdapterSpec resolveAdapterSpec(ProviderRequest request, String tenantId) {
         if (loraAdapterManager == null) {
             return null;
         }
-        return loraAdapterManager.resolve(request).orElse(null);
+        return loraAdapterManager.resolve(request, tenantId).orElse(null);
     }
 
     private String applyChatMLTemplate(java.util.List<Message> messages) {
@@ -526,6 +556,15 @@ public class GGUFProvider implements StreamingProvider {
                 meterRegistry.timer("gguf.inference.duration", "model", modelId).record(duration);
             }
         }
+    }
+
+    private void recordAdapterMetrics(AdapterSpec adapterSpec, Duration acquireDuration) {
+        if (!config.metricsEnabled() || adapterSpec == null) {
+            return;
+        }
+        String type = adapterSpec.type() == null ? AdapterMetricSchema.TYPE_UNKNOWN : adapterSpec.type();
+        adapterMetricsRecorder.recordRequest(ADAPTER_PROVIDER_TAG, type);
+        adapterMetricsRecorder.recordSessionAcquire(ADAPTER_PROVIDER_TAG, type, acquireDuration);
     }
 
     private boolean isRetryable(Throwable error) {

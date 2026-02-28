@@ -243,7 +243,7 @@ google/gemma-2b-it
 
 GGUF_GPU_ENABLED=true \GGUF_GPU_LAYERS=8 \GGUF_BATCH_SIZE=64 \
 GGUF_THREADS=8 \
-java -jar /Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/ui/gollek-cli/target/gollek-cli-1.0.0-SNAPSHOT-runner.jar \
+java -jar ui/gollek-cli/target/gollek-cli-1.0.0-SNAPSHOT-runner.jar \
 chat --model meta-llama/Llama-3.2-1B-Instruct
 
 # Run with different providers
@@ -346,7 +346,7 @@ gollek chat --model <tool-model> --session
 
 ### Build Configuration
 
-#### [MODIFY] [pom.xml](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/ui/gollek-cli/pom.xml)
+#### [MODIFY] [pom.xml](ui/gollek-cli/pom.xml)
 Add dependencies for all providers and model repository:
 - `gollek-sdk-java-local` - Local SDK
 - `gollek-model-repo-core` - Model repository
@@ -359,16 +359,16 @@ Add dependencies for all providers and model repository:
 
 ### CLI Commands
 
-#### [MODIFY] [GollekCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/GollekCommand.java)
+#### [MODIFY] [GollekCommand.java](ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/GollekCommand.java)
 Update to include all subcommands.
 
-#### [MODIFY] [RunCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/RunCommand.java)
+#### [MODIFY] [RunCommand.java](ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/RunCommand.java)
 Enhanced run command with:
 - `--provider` option to select provider (litert, gguf, ollama, gemini)
 - `--stream` flag for streaming output
 - `--temperature`, `--max-tokens` options
 
-#### [NEW] [PullCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/PullCommand.java)
+#### [NEW] [PullCommand.java](ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/PullCommand.java)
 ```java
 @Command(name = "pull", description = "Pull a model from registry")
 ```
@@ -376,35 +376,35 @@ Enhanced run command with:
 - Support Ollama: `gollek pull ollama:llama2`
 - Progress bar display
 
-#### [NEW] [ListCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/ListCommand.java)
+#### [NEW] [ListCommand.java](ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/ListCommand.java)
 ```java
 @Command(name = "list", aliases = "ls", description = "List local models")
 ```
 - Display: NAME, SIZE, FORMAT, MODIFIED
 
-#### [NEW] [ShowCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/ShowCommand.java)
+#### [NEW] [ShowCommand.java](ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/ShowCommand.java)
 Show model details (parameters, license, architecture).
 
-#### [NEW] [ProvidersCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/ProvidersCommand.java)
+#### [NEW] [ProvidersCommand.java](ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/ProvidersCommand.java)
 List available providers with status (healthy/unhealthy).
 
-#### [NEW] [ChatCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/ChatCommand.java)
+#### [NEW] [ChatCommand.java](ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/ChatCommand.java)
 Interactive chat mode with conversation history.
 
-#### [NEW] [ServeCommand.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/ServeCommand.java)
+#### [NEW] [ServeCommand.java](ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/ServeCommand.java)
 Start local API server (OpenAI-compatible).
 
 ---
 
 ### Supporting Classes
 
-#### [NEW] [ProgressBar.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/util/ProgressBar.java)
+#### [NEW] [ProgressBar.java](ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/util/ProgressBar.java)
 Console progress bar for downloads.
 
-#### [NEW] [OutputFormatter.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/util/OutputFormatter.java)
+#### [NEW] [OutputFormatter.java](ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/util/OutputFormatter.java)
 Format output as table, JSON, or plain text.
 
-#### [NEW] [ProviderResolver.java](file://~/Workspace/workkayys/Products/Wayang/wayang-platform/inference-gollek/ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/service/ProviderResolver.java)
+#### [NEW] [ProviderResolver.java](ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/service/ProviderResolver.java)
 Resolve model name to appropriate provider.
 
 ---

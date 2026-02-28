@@ -109,6 +109,8 @@ class GGUFProviderConfigTest {
 
         // Then: Should have expected values
         assertThat(config.metricsEnabled()).isTrue();
+        assertThat(config.loraMaxActiveAdaptersPerTenant()).isEqualTo(16);
+        assertThat(config.loraRolloutGuardEnabled()).isFalse();
     }
 
     @Test

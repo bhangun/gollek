@@ -305,6 +305,81 @@ class LibTorchTokenizerTest {
                     public boolean allowPrecompiledModelPath() {
                         return true;
                     }
+
+                    @Override
+                    public int maxActivePoolsPerTenant() {
+                        return 0;
+                    }
+
+                    @Override
+                    public boolean rolloutGuardEnabled() {
+                        return false;
+                    }
+
+                    @Override
+                    public Optional<java.util.List<String>> rolloutAllowedTenants() {
+                        return Optional.empty();
+                    }
+
+                    @Override
+                    public Optional<java.util.List<String>> rolloutBlockedAdapterIds() {
+                        return Optional.empty();
+                    }
+
+                    @Override
+                    public Optional<java.util.List<String>> rolloutBlockedPathPrefixes() {
+                        return Optional.empty();
+                    }
+                };
+            }
+
+            @Override
+            public AdvancedConfig advanced() {
+                return new AdvancedConfig() {
+                    @Override
+                    public boolean enabled() {
+                        return false;
+                    }
+
+                    @Override
+                    public String attentionMode() {
+                        return "baseline";
+                    }
+
+                    @Override
+                    public boolean fp8RowwiseEnabled() {
+                        return false;
+                    }
+
+                    @Override
+                    public boolean sageAttention2Enabled() {
+                        return false;
+                    }
+
+                    @Override
+                    public Optional<java.util.List<String>> sageAttention2AllowedTenants() {
+                        return Optional.empty();
+                    }
+
+                    @Override
+                    public Optional<java.util.List<String>> sageAttention2AllowedModels() {
+                        return Optional.empty();
+                    }
+
+                    @Override
+                    public Optional<java.util.List<String>> sageAttention2BlockedTenants() {
+                        return Optional.empty();
+                    }
+
+                    @Override
+                    public Optional<java.util.List<String>> sageAttention2BlockedModels() {
+                        return Optional.empty();
+                    }
+
+                    @Override
+                    public String allowedGpuSm() {
+                        return "89,90";
+                    }
                 };
             }
 

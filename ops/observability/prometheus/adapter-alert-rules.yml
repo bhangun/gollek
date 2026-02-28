@@ -1,0 +1,158 @@
+groups:
+  - name: gollek-adapter-metrics
+    interval: 30s
+    rules:
+      - alert: GollekAdapterCacheHitRatioLow
+        expr: |
+          100 * sum by (provider) (rate(adapter_cache_hit_total[10m]))
+          /
+          clamp_min(
+            sum by (provider) (rate(adapter_cache_hit_total[10m]))
+            +
+            sum by (provider) (rate(adapter_cache_miss_total[10m])),
+            0.001
+          ) < 85
+        for: 15m
+        labels:
+          severity: warning
+          team: inference
+        annotations:
+          summary: "Adapter cache hit ratio is low"
+          description: "Provider {{ $labels.provider }} cache hit ratio stayed below 85% for 15m."
+
+      - alert: GollekAdapterSessionAcquireLatencyHigh
+        expr: |
+          (
+            sum by (provider, type) (rate(adapter_session_acquire_duration_seconds_sum[10m]))
+            /
+            clamp_min(sum by (provider, type) (rate(adapter_session_acquire_duration_seconds_count[10m])), 0.001)
+          ) > 0.25
+        for: 10m
+        labels:
+          severity: warning
+          team: inference
+        annotations:
+          summary: "Adapter session acquire latency is high"
+          description: "Provider {{ $labels.provider }} type {{ $labels.type }} avg session acquire latency > 250ms for 10m."
+
+      - alert: GollekAdapterApplyLatencyHigh
+        expr: |
+          (
+            sum by (provider, type) (rate(adapter_apply_duration_seconds_sum[10m]))
+            /
+            clamp_min(sum by (provider, type) (rate(adapter_apply_duration_seconds_count[10m])), 0.001)
+          ) > 0.35
+        for: 10m
+        labels:
+          severity: critical
+          team: inference
+        annotations:
+          summary: "Adapter apply latency is high"
+          description: "Provider {{ $labels.provider }} type {{ $labels.type }} avg adapter apply latency > 350ms for 10m."
+
+      - alert: GollekAdapterInitWaitHigh
+        expr: |
+          (
+            sum by (provider) (rate(adapter_init_wait_duration_seconds_sum[10m]))
+            /
+            clamp_min(sum by (provider) (rate(adapter_init_wait_duration_seconds_count[10m])), 0.001)
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          team: inference
+        annotations:
+          summary: "Adapter initialization wait is high"
+          description: "Provider {{ $labels.provider }} avg adapter init wait > 500ms for 10m, likely contention or cold-start storms."
+
+      - alert: GollekAdapterCacheMissSpike
+        expr: |
+          100 * sum by (provider) (rate(adapter_cache_miss_total[5m]))
+          /
+          clamp_min(
+            sum by (provider) (rate(adapter_cache_hit_total[5m]))
+            +
+            sum by (provider) (rate(adapter_cache_miss_total[5m])),
+            0.001
+          ) > 30
+        for: 10m
+        labels:
+          severity: warning
+          team: inference
+        annotations:
+          summary: "Adapter cache miss rate spike"
+          description: "Provider {{ $labels.provider }} cache miss ratio exceeded 30% for 10m."
+
+      - alert: GollekAdapterUnsupportedRoutingFilteredHighManaged
+        expr: |
+          sum by (provider, mode) (
+            rate(inference_routing_adapter_filtered_total{
+              reason="adapter_unsupported",
+              mode!~"standalone|demo"
+            }[10m])
+          ) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          team: inference
+        annotations:
+          summary: "High adapter routing filter rate (managed mode)"
+          description: "Provider {{ $labels.provider }} mode {{ $labels.mode }} filtered adapter-incompatible routes above 0.2 rps for 10m."
+
+      - alert: GollekAdapterUnsupportedRoutingFilteredHighStandalone
+        expr: |
+          sum by (provider, mode) (
+            rate(inference_routing_adapter_filtered_total{
+              reason="adapter_unsupported",
+              mode=~"standalone|demo"
+            }[10m])
+          ) > 2
+        for: 15m
+        labels:
+          severity: info
+          team: inference
+        annotations:
+          summary: "High adapter routing filter rate (standalone/demo mode)"
+          description: "Provider {{ $labels.provider }} mode {{ $labels.mode }} filtered adapter-incompatible routes above 2 rps for 15m."
+
+  - name: gollek-session-eviction-metrics
+    interval: 30s
+    rules:
+      - alert: GollekSessionEvictionPressureHigh
+        expr: |
+          max by (provider) (gollek_session_eviction_pressure_score) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          team: inference
+        annotations:
+          summary: "Session eviction pressure is high"
+          description: "Provider {{ $labels.provider }} adaptive eviction pressure score stayed above 0.85 for 10m."
+
+      - alert: GollekSessionEvictionIdleTimeoutCollapsed
+        expr: |
+          min by (provider) (gollek_session_eviction_idle_timeout_seconds) < 20
+        for: 15m
+        labels:
+          severity: warning
+          team: inference
+        annotations:
+          summary: "Adaptive idle timeout is heavily compressed"
+          description: "Provider {{ $labels.provider }} idle timeout stayed below 20s for 15m, indicating sustained pool pressure."
+
+      - alert: GollekSessionEvictionReclaimStallUnderPressure
+        expr: |
+          (
+            max by (provider) (gollek_session_eviction_pressure_score) > 0.70
+          )
+          and on(provider)
+          (
+            sum by (provider) (rate(gollek_session_eviction_reclaimed_total[10m])) < 0.01
+          )
+        for: 10m
+        labels:
+          severity: critical
+          team: inference
+        annotations:
+          summary: "Session reclaim stalled under pressure"
+          description: "Provider {{ $labels.provider }} is under sustained pressure but reclaim rate remained near zero for 10m."

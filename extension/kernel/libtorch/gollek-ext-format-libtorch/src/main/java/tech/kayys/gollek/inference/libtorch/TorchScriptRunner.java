@@ -110,6 +110,11 @@ public class TorchScriptRunner implements AutoCloseable {
         return closed;
     }
 
+    MemorySegment moduleHandle() {
+        checkClosed();
+        return moduleHandle;
+    }
+
     private void checkClosed() {
         if (closed) {
             throw new IllegalStateException("TorchScriptRunner has been closed");

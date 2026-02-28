@@ -280,6 +280,16 @@ public final class LibTorchBinding {
         public static final String JIT_MODULE_FREE = "at_jit_module_free";
         public static final FunctionDescriptor JIT_MODULE_FREE_DESC = FunctionDescriptor.ofVoid(ValueLayout.ADDRESS);
 
+        /** apply LoRA adapter weights to a target module parameter */
+        public static final String JIT_APPLY_LORA = "at_jit_apply_lora";
+        public static final FunctionDescriptor JIT_APPLY_LORA_DESC = FunctionDescriptor.of(
+                        ValueLayout.JAVA_INT,
+                        ValueLayout.ADDRESS, // module ptr
+                        ValueLayout.ADDRESS, // base_name C string
+                        ValueLayout.ADDRESS, // lora_A tensor ptr
+                        ValueLayout.ADDRESS, // lora_B tensor ptr
+                        ValueLayout.JAVA_FLOAT); // scale
+
         /** torch::save(tensor, path) */
         public static final String TENSOR_SAVE = "at_save";
         public static final FunctionDescriptor TENSOR_SAVE_DESC = FunctionDescriptor.ofVoid(
@@ -299,6 +309,21 @@ public final class LibTorchBinding {
         /** torch::cuda::device_count() → int */
         public static final String CUDA_DEVICE_COUNT = "at_cuda_device_count";
         public static final FunctionDescriptor CUDA_DEVICE_COUNT_DESC = FunctionDescriptor.of(ValueLayout.JAVA_INT);
+
+        /** Whether active CUDA device supports BF16 acceleration. */
+        public static final String CUDA_IS_BF16_SUPPORTED = "at_cuda_is_bf16_supported";
+        public static final FunctionDescriptor CUDA_IS_BF16_SUPPORTED_DESC = FunctionDescriptor.of(
+                        ValueLayout.JAVA_BOOLEAN);
+
+        /** CUDA device SM capability (major*10 + minor), e.g. 89 for Ada. */
+        public static final String CUDA_DEVICE_SM = "at_cuda_device_sm";
+        public static final FunctionDescriptor CUDA_DEVICE_SM_DESC = FunctionDescriptor.of(
+                        ValueLayout.JAVA_INT, ValueLayout.JAVA_INT);
+
+        /** Cast tensor to target dtype (at::ScalarType code). */
+        public static final String TENSOR_TO_DTYPE = "at_tensor_to_dtype";
+        public static final FunctionDescriptor TENSOR_TO_DTYPE_DESC = FunctionDescriptor.of(
+                        ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
 
         /** tensor.to(device) → Tensor */
         public static final String TENSOR_TO_DEVICE = "at_to_device";

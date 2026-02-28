@@ -18,12 +18,16 @@ import tech.kayys.gollek.spi.exception.ProviderException;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.model.DeviceType;
 import tech.kayys.gollek.spi.model.ModelFormat;
+import tech.kayys.gollek.spi.observability.AdapterMetricTagResolver;
+import tech.kayys.gollek.spi.observability.AdapterMetricsRecorder;
+import tech.kayys.gollek.spi.observability.NoopAdapterMetricsRecorder;
 import tech.kayys.gollek.spi.provider.LLMProvider;
 import tech.kayys.gollek.spi.provider.ProviderCapabilities;
 import tech.kayys.gollek.spi.provider.ProviderConfig;
 import tech.kayys.gollek.spi.provider.ProviderHealth;
 import tech.kayys.gollek.spi.provider.ProviderMetadata;
 import tech.kayys.gollek.spi.provider.ProviderRequest;
+import tech.kayys.gollek.spi.provider.AdapterCapabilityProfile;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -43,6 +47,9 @@ public class DjlProvider implements LLMProvider {
 
     @Inject
     DjlProviderConfig config;
+
+    @Inject
+    AdapterMetricsRecorder adapterMetricsRecorder = new NoopAdapterMetricsRecorder();
 
     private final AtomicReference<ProviderHealth.Status> status = new AtomicReference<>(ProviderHealth.Status.UNKNOWN);
     private volatile String startupFailure;
@@ -100,6 +107,8 @@ public class DjlProvider implements LLMProvider {
 
     @Override
     public ProviderCapabilities capabilities() {
+        var features = new java.util.LinkedHashSet<>(Set.of("djl", "pytorch-engine"));
+        features.addAll(AdapterCapabilityProfile.unsupportedWithMetrics().toFeatureFlags());
         return ProviderCapabilities.builder()
                 .streaming(false)
                 .embeddings(false)
@@ -109,7 +118,7 @@ public class DjlProvider implements LLMProvider {
                 .structuredOutputs(false)
                 .supportedFormats(Set.of(ModelFormat.TORCHSCRIPT, ModelFormat.SAFETENSORS, ModelFormat.PYTORCH))
                 .supportedDevices(Set.of(DeviceType.CPU))
-                .features(Set.of("djl", "pytorch-engine"))
+                .features(Set.copyOf(features))
                 .build();
     }
 
@@ -157,6 +166,7 @@ public class DjlProvider implements LLMProvider {
     public Uni<InferenceResponse> infer(ProviderRequest request) {
         return Uni.createFrom().item(() -> {
             ensureEngineInitialized();
+            adapterMetricsRecorder.recordRequest(PROVIDER_ID, AdapterMetricTagResolver.resolveAdapterType(request));
             Path modelPath = resolveModelPath(request.getModel());
             if (modelPath == null || !Files.exists(modelPath)) {
                 throw new IllegalArgumentException("Model not found: " + request.getModel());

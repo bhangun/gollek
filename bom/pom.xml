@@ -171,12 +171,6 @@
             </dependency>
             <dependency>
                 <groupId>tech.kayys.gollek</groupId>
-                <artifactId>gollek-ext-format-transformers</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>tech.kayys.gollek</groupId>
                 <artifactId>gollek-plugin-content-safety</artifactId>
                 <version>${project.version}</version>
             </dependency>

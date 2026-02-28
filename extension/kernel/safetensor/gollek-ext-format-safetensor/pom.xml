@@ -30,11 +30,6 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-ext-format-djl</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-arc</artifactId>
         </dependency>

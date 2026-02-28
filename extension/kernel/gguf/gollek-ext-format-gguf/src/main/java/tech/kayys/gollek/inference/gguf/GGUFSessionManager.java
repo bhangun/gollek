@@ -1,17 +1,29 @@
 package tech.kayys.gollek.inference.gguf;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
+import tech.kayys.gollek.provider.core.session.AdaptiveSessionEvictionPolicy;
+import tech.kayys.gollek.provider.core.session.AdaptiveSessionEvictionState;
+import tech.kayys.gollek.provider.core.session.EwmaAdaptiveSessionEvictionPolicy;
 import tech.kayys.gollek.spi.inference.AdapterSpec;
+import tech.kayys.gollek.spi.observability.AdapterMetricSchema;
+import tech.kayys.gollek.spi.observability.AdapterMetricsRecorder;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Manages GGUF model sessions with pooling and tenant isolation.
@@ -29,9 +41,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class GGUFSessionManager {
 
     private static final Logger log = Logger.getLogger(GGUFSessionManager.class);
+    private static final Duration DEFAULT_IDLE_TIMEOUT = Duration.ofMinutes(5);
+    private static final long MIN_CLEANUP_INTERVAL_SECONDS = 10L;
 
     private final LlamaCppBinding binding;
     private final GGUFChatTemplateService templateService;
+    @Inject
+    AdapterMetricsRecorder adapterMetricsRecorder;
+    @Inject
+    MeterRegistry meterRegistry;
+    @Inject
+    AdaptiveSessionEvictionPolicy adaptiveEvictionPolicy;
 
     @Inject
     public GGUFSessionManager(LlamaCppBinding binding, GGUFChatTemplateService templateService) {
@@ -41,6 +61,12 @@ public class GGUFSessionManager {
 
     private final Map<String, SessionPool> pools = new ConcurrentHashMap<>();
     private final AtomicInteger totalActiveSessions = new AtomicInteger(0);
+    private final AdaptiveSessionEvictionState adaptiveEvictionState = new AdaptiveSessionEvictionState();
+    private final AtomicLong adaptiveIdleTimeoutSeconds = new AtomicLong(300);
+    private final AtomicLong adaptivePressureScorePermille = new AtomicLong(0);
+    private volatile Counter evictionReclaimedCounter;
+    private volatile boolean adaptiveMetricsRegistered;
+    private volatile ScheduledExecutorService cleanupExecutor;
     private volatile boolean initialized = false;
     private volatile boolean shutdown = false;
 
@@ -88,13 +114,16 @@ public class GGUFSessionManager {
 
             try {
                 // Try to find an idle session
-                SessionContext session = findIdleSession();
+                SessionContext session = findIdleSession(resolveAdaptiveIdleTimeout(config));
                 if (session != null) {
                     log.debugf("Reusing session %s for pool %s", session.sessionId(), poolKey);
                     return session.touch();
                 }
 
                 // Create new session
+                if (currentUtilization(config) >= 0.75d) {
+                    recordAdaptiveTelemetry(true, 0);
+                }
                 session = createSession();
                 sessions.put(session.sessionId(), session);
                 totalActiveSessions.incrementAndGet();
@@ -116,9 +145,9 @@ public class GGUFSessionManager {
             permits.release();
         }
 
-        private SessionContext findIdleSession() {
+        private SessionContext findIdleSession(Duration timeout) {
             return sessions.values().stream()
-                    .filter(s -> !s.isIdle(config.sessionPoolIdleTimeout()))
+                    .filter(s -> !s.isIdle(timeout))
                     .findFirst()
                     .orElse(null);
         }
@@ -169,7 +198,14 @@ public class GGUFSessionManager {
             LlamaCppRunner runner = new LlamaCppRunner(binding, config, templateService);
 
             try {
+                Instant initStart = Instant.now();
                 runner.initialize(manifest, runnerConfig);
+                if (config.metricsEnabled() && adapterSpec != null && adapterMetricsRecorder != null) {
+                    adapterMetricsRecorder.recordApply(
+                            "gguf",
+                            adapterSpec.type() == null ? AdapterMetricSchema.TYPE_UNKNOWN : adapterSpec.type(),
+                            Duration.between(initStart, Instant.now()));
+                }
 
                 // Warmup runner if configured
                 if (config.prewarmEnabled()) {
@@ -189,8 +225,7 @@ public class GGUFSessionManager {
                     Instant.now());
         }
 
-        void cleanup() {
-            Duration timeout = config.sessionPoolIdleTimeout();
+        void cleanup(Duration timeout) {
             int minSize = config.sessionPoolMinSize();
 
             var it = sessions.entrySet().iterator();
@@ -248,6 +283,7 @@ public class GGUFSessionManager {
         }
 
         log.info("Initializing GGUF Session Manager");
+        registerAdaptiveMetrics();
 
         // Start cleanup task
         startCleanupTask();
@@ -332,6 +368,9 @@ public class GGUFSessionManager {
         shutdown = true;
 
         // Shutdown all pools
+        if (cleanupExecutor != null) {
+            cleanupExecutor.shutdownNow();
+        }
         pools.values().forEach(SessionPool::shutdown);
         pools.clear();
 
@@ -377,8 +416,22 @@ public class GGUFSessionManager {
     }
 
     private void startCleanupTask() {
-        // TODO: Implement periodic cleanup task using Quarkus Scheduler
-        // For now, cleanup is manual via cleanupIdleSessions()
+        if (cleanupExecutor != null) {
+            return;
+        }
+
+        long idleSeconds = pools.values().stream()
+                .findFirst()
+                .map(pool -> Math.max(1L, pool.config.sessionPoolIdleTimeout().getSeconds()))
+                .orElse(Math.max(1L, DEFAULT_IDLE_TIMEOUT.getSeconds()));
+        long intervalSeconds = Math.max(MIN_CLEANUP_INTERVAL_SECONDS, idleSeconds / 2L);
+        cleanupExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "gollek-gguf-session-cleanup");
+            t.setDaemon(true);
+            return t;
+        });
+        cleanupExecutor.scheduleAtFixedRate(this::cleanupIdleSessions, intervalSeconds, intervalSeconds, TimeUnit.SECONDS);
+        log.infof("Started GGUF session cleanup task (interval=%ds)", intervalSeconds);
     }
 
     /**
@@ -389,8 +442,18 @@ public class GGUFSessionManager {
             return;
         }
 
+        Duration adaptiveTimeout = resolveAdaptiveIdleTimeout(null);
+        int before = totalActiveSessions.get();
+        GGUFProviderConfig representativeConfig = pools.values().stream()
+                .findFirst()
+                .map(p -> p.config)
+                .orElse(null);
+        boolean pressure = representativeConfig != null && currentUtilization(representativeConfig) >= 0.75d;
         log.debug("Running idle session cleanup");
-        pools.values().forEach(SessionPool::cleanup);
+        pools.values().forEach(pool -> pool.cleanup(adaptiveTimeout));
+        int after = totalActiveSessions.get();
+        int reclaimed = Math.max(0, before - after);
+        recordAdaptiveTelemetry(pressure, reclaimed);
 
         // Remove empty pools
         pools.entrySet().removeIf(entry -> {
@@ -408,6 +471,88 @@ public class GGUFSessionManager {
         }
         if (shutdown) {
             throw new IllegalStateException("Session manager has been shutdown");
+        }
+    }
+
+    private Duration resolveAdaptiveIdleTimeout(GGUFProviderConfig poolConfig) {
+        GGUFProviderConfig effective = poolConfig;
+        if (effective == null) {
+            effective = pools.values().stream()
+                    .findFirst()
+                    .map(p -> p.config)
+                    .orElse(null);
+        }
+        if (effective == null) {
+            return DEFAULT_IDLE_TIMEOUT;
+        }
+
+        Duration base = effective.sessionPoolIdleTimeout();
+        double utilization = currentUtilization(effective);
+        int resolved = policy().resolveIdleTimeoutSeconds(
+                adaptiveEvictionState,
+                (int) Math.max(1, base.getSeconds()),
+                utilization);
+        adaptiveIdleTimeoutSeconds.set(resolved);
+        return Duration.ofSeconds(resolved);
+    }
+
+    Duration resolveAdaptiveIdleTimeoutForTest(GGUFProviderConfig poolConfig) {
+        return resolveAdaptiveIdleTimeout(poolConfig);
+    }
+
+    void recordAdaptiveTelemetryForTest(boolean underPressure, int reclaimed) {
+        recordAdaptiveTelemetry(underPressure, reclaimed);
+    }
+
+    double adaptivePressureScoreForTest() {
+        return adaptivePressureScore();
+    }
+
+    private double currentUtilization(GGUFProviderConfig config) {
+        int maxSessions = Math.max(1, config.maxSessions());
+        return (double) totalActiveSessions.get() / maxSessions;
+    }
+
+    private void recordAdaptiveTelemetry(boolean underPressure, int reclaimedSessions) {
+        policy().recordTelemetry(adaptiveEvictionState, underPressure, reclaimedSessions);
+        double pressure = adaptivePressureScore();
+        adaptivePressureScorePermille.set(Math.round(pressure * 1000.0d));
+        if (reclaimedSessions > 0 && evictionReclaimedCounter != null) {
+            evictionReclaimedCounter.increment(reclaimedSessions);
+        }
+    }
+
+    private double adaptivePressureScore() {
+        return policy().pressureScore(adaptiveEvictionState);
+    }
+
+    private AdaptiveSessionEvictionPolicy policy() {
+        return adaptiveEvictionPolicy != null ? adaptiveEvictionPolicy : EwmaAdaptiveSessionEvictionPolicy.DEFAULT;
+    }
+
+    private void registerAdaptiveMetrics() {
+        if (adaptiveMetricsRegistered || meterRegistry == null) {
+            return;
+        }
+        synchronized (this) {
+            if (adaptiveMetricsRegistered) {
+                return;
+            }
+            Gauge.builder("gollek.session.eviction.idle_timeout.seconds", adaptiveIdleTimeoutSeconds, AtomicLong::get)
+                    .tag("provider", "gguf")
+                    .description("Adaptive idle-timeout selected by session eviction policy")
+                    .baseUnit("seconds")
+                    .register(meterRegistry);
+            Gauge.builder("gollek.session.eviction.pressure.score", adaptivePressureScorePermille,
+                    value -> value.get() / 1000.0d)
+                    .tag("provider", "gguf")
+                    .description("Adaptive session-eviction pressure score (0..1)")
+                    .register(meterRegistry);
+            evictionReclaimedCounter = Counter.builder("gollek.session.eviction.reclaimed_total")
+                    .tag("provider", "gguf")
+                    .description("Total sessions reclaimed by idle-eviction loops")
+                    .register(meterRegistry);
+            adaptiveMetricsRegistered = true;
         }
     }
 }

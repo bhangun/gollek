@@ -3,6 +3,7 @@ package tech.kayys.gollek.inference.libtorch;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -59,6 +60,11 @@ public interface LibTorchProviderConfig {
      * Adapter (PEFT) configuration.
      */
     AdapterConfig adapter();
+
+    /**
+     * Advanced CUDA optimization configuration (feature-flagged).
+     */
+    AdvancedConfig advanced();
 
     /**
      * Default generation parameters.
@@ -200,10 +206,121 @@ public interface LibTorchProviderConfig {
 
         /**
          * If true, adapter_path may point to a precompiled TorchScript model variant.
-         * Runtime LoRA patching is not enabled yet for LibTorch.
+         * Runtime LoRA patching from safetensors is supported regardless of this flag.
          */
         @WithDefault("true")
         boolean allowPrecompiledModelPath();
+
+        /**
+         * Maximum unique adapter pools per tenant.
+         * 0 = fallback to session.max-per-tenant.
+         */
+        @WithDefault("0")
+        int maxActivePoolsPerTenant();
+
+        /**
+         * Enable rollout-guard policy checks for adapters.
+         */
+        @WithDefault("false")
+        boolean rolloutGuardEnabled();
+
+        /**
+         * Optional allow-list of tenant IDs allowed to use adapters.
+         * Empty = all tenants allowed.
+         */
+        Optional<List<String>> rolloutAllowedTenants();
+
+        /**
+         * Optional deny-list of adapter IDs blocked from serving.
+         */
+        Optional<List<String>> rolloutBlockedAdapterIds();
+
+        /**
+         * Optional deny-list of adapter path prefixes blocked from serving.
+         */
+        Optional<List<String>> rolloutBlockedPathPrefixes();
+    }
+
+    interface AdvancedConfig {
+        /**
+         * Master switch for advanced CUDA optimization path.
+         */
+        @WithDefault("false")
+        boolean enabled();
+
+        /**
+         * Attention implementation mode.
+         * Supported values: baseline, hybrid_fp8_bf16
+         */
+        @WithDefault("baseline")
+        String attentionMode();
+
+        /**
+         * Enable FP8 row-wise quantized weight path.
+         */
+        @WithDefault("false")
+        boolean fp8RowwiseEnabled();
+
+        /**
+         * Optional tenant allow-list for FP8 rowwise canary mode.
+         * Empty = all tenants are eligible.
+         */
+        Optional<List<String>> fp8RowwiseAllowedTenants();
+
+        /**
+         * Optional model allow-list for FP8 rowwise canary mode.
+         * Empty = all models are eligible.
+         */
+        Optional<List<String>> fp8RowwiseAllowedModels();
+
+        /**
+         * Optional tenant deny-list for FP8 rowwise canary mode.
+         * Deny-list takes precedence over allow-list.
+         */
+        Optional<List<String>> fp8RowwiseBlockedTenants();
+
+        /**
+         * Optional model deny-list for FP8 rowwise canary mode.
+         * Deny-list takes precedence over allow-list.
+         */
+        Optional<List<String>> fp8RowwiseBlockedModels();
+
+        /**
+         * Enable SageAttention2-like experimental path.
+         */
+        @WithDefault("false")
+        boolean sageAttention2Enabled();
+
+        /**
+         * Optional tenant allow-list for SageAttention2 canary mode.
+         * Empty = all tenants are eligible.
+         */
+        Optional<List<String>> sageAttention2AllowedTenants();
+
+        /**
+         * Optional model allow-list for SageAttention2 canary mode.
+         * Empty = all models are eligible.
+         */
+        Optional<List<String>> sageAttention2AllowedModels();
+
+        /**
+         * Optional tenant deny-list for SageAttention2 canary mode.
+         * Deny-list takes precedence over allow-list.
+         */
+        Optional<List<String>> sageAttention2BlockedTenants();
+
+        /**
+         * Optional model deny-list for SageAttention2 canary mode.
+         * Deny-list takes precedence over allow-list.
+         */
+        Optional<List<String>> sageAttention2BlockedModels();
+
+        /**
+         * Allow-list of GPU SM versions for advanced path (comma-separated).
+         * Example: "89,90"
+         */
+        @WithDefault("89,90")
+        String allowedGpuSm();
     }
 
     interface GenerationConfig {

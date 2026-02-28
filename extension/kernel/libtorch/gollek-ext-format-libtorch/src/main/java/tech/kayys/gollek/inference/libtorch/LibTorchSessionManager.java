@@ -4,12 +4,19 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 import tech.kayys.gollek.inference.libtorch.core.Device;
+import tech.kayys.gollek.provider.core.session.AdaptiveSessionEvictionPolicy;
+import tech.kayys.gollek.provider.core.session.AdaptiveSessionEvictionState;
+import tech.kayys.gollek.provider.core.session.EwmaAdaptiveSessionEvictionPolicy;
 import tech.kayys.gollek.spi.inference.AdapterSpec;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Manages a pool of {@link TorchScriptRunner} sessions per tenant and model.
@@ -26,10 +33,21 @@ public class LibTorchSessionManager {
     private static final Logger log = Logger.getLogger(LibTorchSessionManager.class);
 
     private final Map<String, SessionPool> pools = new ConcurrentHashMap<>();
+    private final Map<String, ReentrantLock> adapterInitLocks = new ConcurrentHashMap<>();
+    private final Map<String, java.util.Set<String>> tenantAdapterPoolKeys = new ConcurrentHashMap<>();
+    private final AdaptiveSessionEvictionState adaptiveEvictionState = new AdaptiveSessionEvictionState();
     private ScheduledExecutorService evictor;
 
     @Inject
     LibTorchProviderConfig config;
+
+    @Inject
+    LibTorchAdapterApplier adapterApplier;
+
+    @Inject
+    LibTorchMetrics metrics;
+    @Inject
+    AdaptiveSessionEvictionPolicy adaptiveEvictionPolicy;
 
     /**
      * Start the idle session evictor. Called after CDI init.
@@ -62,10 +80,12 @@ public class LibTorchSessionManager {
 
     public SessionContext getSession(String tenantId, String modelId, LibTorchProviderConfig config,
             AdapterSpec adapterSpec) {
-        Path modelPath = resolveModelPath(modelId, config, adapterSpec);
+        ModelSelection selection = resolveModelSelection(tenantId, modelId, config, adapterSpec);
         String poolKey = buildPoolKey(tenantId, modelId, adapterSpec);
+        enforceTenantAdapterQuota(tenantId, poolKey, adapterSpec);
         SessionPool pool = pools.computeIfAbsent(poolKey,
-                k -> new SessionPool(modelPath, getDevice()));
+                k -> new SessionPool(k, tenantId, selection.modelPath(), getDevice(), selection.runtimeLoraPath(),
+                        adapterSpec));
 
         return pool.acquire();
     }
@@ -77,7 +97,7 @@ public class LibTorchSessionManager {
     public SessionContext acquire(String tenantId, String modelId, Path modelPath) {
         String poolKey = tenantId + ":" + modelId;
         SessionPool pool = pools.computeIfAbsent(poolKey,
-                k -> new SessionPool(modelPath, getDevice()));
+                k -> new SessionPool(k, tenantId, modelPath, getDevice(), null, null));
         return pool.acquire();
     }
 
@@ -108,36 +128,63 @@ public class LibTorchSessionManager {
     }
 
     public Path resolveModelPath(String modelId, LibTorchProviderConfig config) {
-        return resolveModelPath(modelId, config, null);
+        return resolveModelPath("community", modelId, config, null);
     }
 
     public Path resolveModelPath(String modelId, LibTorchProviderConfig config, AdapterSpec adapterSpec) {
+        return resolveModelPath("community", modelId, config, adapterSpec);
+    }
+
+    public Path resolveModelPath(String tenantId, String modelId, LibTorchProviderConfig config, AdapterSpec adapterSpec) {
+        return resolveModelSelection(tenantId, modelId, config, adapterSpec).modelPath();
+    }
+
+    private ModelSelection resolveModelSelection(String tenantId, String modelId, LibTorchProviderConfig config,
+            AdapterSpec adapterSpec) {
+        Path baseModelPath = resolveBaseModelPath(modelId, config);
+        if (adapterSpec == null) {
+            return new ModelSelection(baseModelPath, null);
+        }
+
+        Path adapterPath = resolveAdapterPath(adapterSpec, config, tenantId);
+        if (isRuntimeLoraArtifact(adapterPath)) {
+            return new ModelSelection(baseModelPath, adapterPath);
+        }
+
+        if (!config.adapter().allowPrecompiledModelPath()) {
+            throw new UnsupportedOperationException(
+                    "Adapter path '" + adapterPath + "' requires precompiled-model routing, but "
+                            + "libtorch.provider.adapter.allow-precompiled-model-path=false.");
+        }
+        if (!isPrecompiledModelArtifact(adapterPath)) {
+            throw new UnsupportedOperationException(
+                    "Unsupported LibTorch adapter artifact: " + adapterPath
+                            + ". Expected runtime LoRA (.safetensors/.safetensor) or precompiled model (.pt/.pts/.pth/.bin).");
+        }
+        return new ModelSelection(adapterPath, null);
+    }
+
+    private Path resolveBaseModelPath(String modelId, LibTorchProviderConfig config) {
         String basePath = config.model().basePath();
         String extensions = config.model().extensions();
 
         for (String ext : extensions.split(",")) {
-            Path path = java.nio.file.Paths.get(basePath, modelId + ext.trim());
-            if (java.nio.file.Files.exists(path)) {
-                if (adapterSpec == null) {
-                    return path;
-                }
-                return resolveAdapterModelPath(adapterSpec, config);
+            Path path = Path.of(basePath, modelId + ext.trim());
+            if (Files.exists(path)) {
+                return path;
             }
         }
 
         // Fallback for absolute paths or already-extensioned IDs
-        Path directPath = java.nio.file.Paths.get(modelId);
-        if (java.nio.file.Files.exists(directPath)) {
-            if (adapterSpec == null) {
-                return directPath;
-            }
-            return resolveAdapterModelPath(adapterSpec, config);
+        Path directPath = Path.of(modelId);
+        if (Files.exists(directPath)) {
+            return directPath;
         }
 
         throw new RuntimeException("Model not found: " + modelId + " in " + basePath);
     }
 
-    private Path resolveAdapterModelPath(AdapterSpec adapterSpec, LibTorchProviderConfig config) {
+    private Path resolveAdapterPath(AdapterSpec adapterSpec, LibTorchProviderConfig config, String tenantId) {
         if (adapterSpec == null) {
             throw new IllegalArgumentException("adapterSpec cannot be null");
         }
@@ -157,29 +204,24 @@ public class LibTorchSessionManager {
         if (!adapterPath.isAbsolute()) {
             adapterPath = Path.of(config.adapter().basePath()).resolve(adapterPath).normalize();
         }
-        if (!java.nio.file.Files.exists(adapterPath)) {
+        if (!Files.exists(adapterPath)) {
             throw new IllegalArgumentException("Adapter path not found: " + adapterPath);
         }
+        enforceRolloutPolicy(normalizeTenantId(tenantId), adapterSpec, adapterPath, config);
+        return adapterPath;
+    }
 
-        if (!config.adapter().allowPrecompiledModelPath()) {
-            throw new UnsupportedOperationException(
-                    "LibTorch adapter runtime patching is not enabled. Enable "
-                            + "libtorch.provider.adapter.allow-precompiled-model-path=true or provide a merged model.");
-        }
-
+    private boolean isRuntimeLoraArtifact(Path adapterPath) {
         String name = adapterPath.getFileName().toString().toLowerCase();
-        boolean isModelArtifact = name.endsWith(".pt")
+        return name.endsWith(".safetensors") || name.endsWith(".safetensor");
+    }
+
+    private boolean isPrecompiledModelArtifact(Path adapterPath) {
+        String name = adapterPath.getFileName().toString().toLowerCase();
+        return name.endsWith(".pt")
                 || name.endsWith(".pts")
                 || name.endsWith(".pth")
-                || name.endsWith(".bin")
-                || name.endsWith(".safetensors")
-                || name.endsWith(".safetensor");
-        if (!isModelArtifact) {
-            throw new UnsupportedOperationException(
-                    "Adapter path is not a loadable model artifact for LibTorch: " + adapterPath
-                            + ". Runtime LoRA patching is pending; pass a precompiled TorchScript/SafeTensors model.");
-        }
-        return adapterPath;
+                || name.endsWith(".bin");
     }
 
     private String buildPoolKey(String tenantId, String modelId, AdapterSpec adapterSpec) {
@@ -201,15 +243,69 @@ public class LibTorchSessionManager {
      * Evict sessions that have been idle beyond the configured timeout.
      */
     private void evictIdleSessions() {
+        int maxTotal = Math.max(1, config.session().maxTotal());
+        double utilization = (double) totalSessionCount() / maxTotal;
         long idleThreshold = System.currentTimeMillis()
-                - (config.session().idleTimeoutSeconds() * 1000L);
-
+                - (adaptiveIdleTimeoutSeconds() * 1000L);
+        int evictedTotal = 0;
         for (var entry : pools.entrySet()) {
-            int evicted = entry.getValue().evictIdle(idleThreshold);
+            SessionPool pool = entry.getValue();
+            int evicted = pool.evictIdle(idleThreshold);
+            evictedTotal += evicted;
             if (evicted > 0) {
                 log.debugf("Evicted %d idle sessions from pool %s", evicted, entry.getKey());
             }
+            if (pool.isDrained() && pools.remove(entry.getKey(), pool)) {
+                deregisterTenantAdapterPool(pool);
+            }
         }
+        recordAdaptiveTelemetry(utilization >= 0.75d, evictedTotal);
+    }
+
+    private int evictIdleSessionsUnderPressure() {
+        long aggressiveThreshold = System.currentTimeMillis()
+                - (Math.max(5, config.session().idleTimeoutSeconds() / 4) * 1000L);
+        int evictedTotal = 0;
+        for (var entry : pools.entrySet()) {
+            SessionPool pool = entry.getValue();
+            int evicted = pool.evictIdle(aggressiveThreshold);
+            evictedTotal += evicted;
+            if (pool.isDrained() && pools.remove(entry.getKey(), pool)) {
+                deregisterTenantAdapterPool(pool);
+            }
+        }
+        recordAdaptiveTelemetry(true, evictedTotal);
+        return evictedTotal;
+    }
+
+    int adaptiveIdleTimeoutSeconds() {
+        int base = Math.max(1, config.session().idleTimeoutSeconds());
+        int maxTotal = Math.max(1, config.session().maxTotal());
+        double utilization = (double) totalSessionCount() / maxTotal;
+        int resolved = policy().resolveIdleTimeoutSeconds(adaptiveEvictionState, base, utilization);
+        if (metrics != null) {
+            metrics.recordSessionEvictionTelemetry(adaptivePressureScore(), resolved, 0);
+        }
+        return resolved;
+    }
+
+    void recordAdaptiveTelemetryForTest(boolean underPressure, int reclaimedSessions) {
+        recordAdaptiveTelemetry(underPressure, reclaimedSessions);
+    }
+
+    double adaptivePressureScoreForTest() {
+        return adaptivePressureScore();
+    }
+
+    private void recordAdaptiveTelemetry(boolean underPressure, int reclaimedSessions) {
+        policy().recordTelemetry(adaptiveEvictionState, underPressure, reclaimedSessions);
+        if (metrics != null) {
+            metrics.recordSessionEvictionTelemetry(adaptivePressureScore(), adaptiveIdleTimeoutSeconds(), reclaimedSessions);
+        }
+    }
+
+    private double adaptivePressureScore() {
+        return policy().pressureScore(adaptiveEvictionState);
     }
 
     /**
@@ -222,6 +318,7 @@ public class LibTorchSessionManager {
         }
         pools.values().forEach(SessionPool::shutdown);
         pools.clear();
+        tenantAdapterPoolKeys.clear();
     }
 
     /**
@@ -268,6 +365,111 @@ public class LibTorchSessionManager {
         }
     }
 
+    void enforceTenantAdapterQuota(String tenantId, String poolKey, AdapterSpec adapterSpec) {
+        if (adapterSpec == null) {
+            return;
+        }
+        synchronized (tenantAdapterPoolKeys) {
+            if (pools.containsKey(poolKey)) {
+                return;
+            }
+            java.util.Set<String> poolsForTenant = tenantAdapterPoolKeys.computeIfAbsent(
+                    normalizeTenantId(tenantId), __ -> ConcurrentHashMap.newKeySet());
+            if (poolsForTenant.contains(poolKey)) {
+                return;
+            }
+
+            int configured = config.adapter().maxActivePoolsPerTenant();
+            int maxPerTenant = configured > 0
+                    ? configured
+                    : Math.max(1, config.session().maxPerTenant());
+            if (poolsForTenant.size() >= maxPerTenant) {
+                throw new RuntimeException(
+                        "Adapter pool quota exceeded for tenant '" + normalizeTenantId(tenantId) + "': max="
+                                + maxPerTenant
+                                + " unique adapter pools. Increase libtorch.provider.session.max-per-tenant or reuse adapters.");
+            }
+            poolsForTenant.add(poolKey);
+        }
+    }
+
+    private void deregisterTenantAdapterPool(SessionPool pool) {
+        if (!pool.hasAdapter()) {
+            return;
+        }
+        synchronized (tenantAdapterPoolKeys) {
+            java.util.Set<String> poolsForTenant = tenantAdapterPoolKeys.get(pool.tenantId());
+            if (poolsForTenant == null) {
+                return;
+            }
+            poolsForTenant.remove(pool.poolKey());
+            if (poolsForTenant.isEmpty()) {
+                tenantAdapterPoolKeys.remove(pool.tenantId(), poolsForTenant);
+            }
+        }
+    }
+
+    private String normalizeTenantId(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            return "community";
+        }
+        return tenantId;
+    }
+
+    private AdaptiveSessionEvictionPolicy policy() {
+        return adaptiveEvictionPolicy != null ? adaptiveEvictionPolicy : EwmaAdaptiveSessionEvictionPolicy.DEFAULT;
+    }
+
+    private void enforceRolloutPolicy(String tenantId, AdapterSpec adapterSpec, Path adapterPath,
+            LibTorchProviderConfig config) {
+        if (!config.adapter().rolloutGuardEnabled()) {
+            return;
+        }
+        if (isBlockedTenant(tenantId, config)) {
+            throw new IllegalArgumentException("Tenant '" + tenantId + "' is not allowed for adapter rollout");
+        }
+        if (isBlockedAdapterId(adapterSpec.adapterId(), config)) {
+            throw new IllegalArgumentException(
+                    "Adapter id '" + adapterSpec.adapterId() + "' is blocked by rollout policy");
+        }
+        if (isBlockedPath(adapterPath, config)) {
+            throw new IllegalArgumentException(
+                    "Adapter path '" + adapterPath + "' is blocked by rollout policy");
+        }
+    }
+
+    private boolean isBlockedTenant(String tenantId, LibTorchProviderConfig config) {
+        var allowed = config.adapter().rolloutAllowedTenants().orElse(java.util.List.of());
+        if (allowed.isEmpty()) {
+            return false;
+        }
+        return allowed.stream()
+                .filter(v -> v != null && !v.isBlank())
+                .noneMatch(v -> v.equalsIgnoreCase(tenantId));
+    }
+
+    private boolean isBlockedAdapterId(String adapterId, LibTorchProviderConfig config) {
+        if (adapterId == null || adapterId.isBlank()) {
+            return false;
+        }
+        var blocked = config.adapter().rolloutBlockedAdapterIds().orElse(java.util.List.of());
+        return blocked.stream()
+                .filter(v -> v != null && !v.isBlank())
+                .anyMatch(v -> v.equalsIgnoreCase(adapterId));
+    }
+
+    private boolean isBlockedPath(Path adapterPath, LibTorchProviderConfig config) {
+        if (adapterPath == null) {
+            return false;
+        }
+        String normalized = adapterPath.toString().toLowerCase(Locale.ROOT);
+        var blockedPrefixes = config.adapter().rolloutBlockedPathPrefixes().orElse(java.util.List.of());
+        return blockedPrefixes.stream()
+                .filter(v -> v != null && !v.isBlank())
+                .map(v -> v.toLowerCase(Locale.ROOT))
+                .anyMatch(normalized::startsWith);
+    }
+
     // ── Session context ───────────────────────────────────────────────
 
     /**
@@ -308,16 +510,25 @@ public class LibTorchSessionManager {
     // ── Internal pool ─────────────────────────────────────────────────
 
     private class SessionPool {
+        private final String poolKey;
+        private final String tenantId;
         private final Path modelPath;
         private final Device device;
+        private final Path runtimeLoraPath;
+        private final AdapterSpec adapterSpec;
         private final ConcurrentHashMap<SessionContext, Boolean> activeSessions = new ConcurrentHashMap<>();
         private final ConcurrentLinkedDeque<SessionContext> idleSessions = new ConcurrentLinkedDeque<>();
         private final AtomicInteger totalCreatedCounter = new AtomicInteger(0);
         private final Semaphore permits;
 
-        SessionPool(Path modelPath, Device device) {
+        SessionPool(String poolKey, String tenantId, Path modelPath, Device device, Path runtimeLoraPath,
+                AdapterSpec adapterSpec) {
+            this.poolKey = poolKey;
+            this.tenantId = normalizeTenantId(tenantId);
             this.modelPath = modelPath;
             this.device = device;
+            this.runtimeLoraPath = runtimeLoraPath;
+            this.adapterSpec = adapterSpec;
             // Use the smaller of per-tenant and global max as the permit count
             int maxPerTenant = config.session().maxPerTenant();
             this.permits = new Semaphore(maxPerTenant, /* fair */ true);
@@ -355,22 +566,20 @@ public class LibTorchSessionManager {
                 int maxTotal = config.session().maxTotal();
                 int globalTotal = LibTorchSessionManager.this.totalSessionCount();
                 if (globalTotal >= maxTotal) {
-                    permits.release(); // Give back the per-tenant permit
-                    throw new RuntimeException(
-                            "Global session pool exhausted. Max total sessions: " + maxTotal
-                                    + ". Active: " + LibTorchSessionManager.this.activeSessionCount()
-                                    + ", Idle: " + LibTorchSessionManager.this.idleSessionCount());
+                    int reclaimed = LibTorchSessionManager.this.evictIdleSessionsUnderPressure();
+                    globalTotal = LibTorchSessionManager.this.totalSessionCount();
+                    if (globalTotal >= maxTotal) {
+                        permits.release(); // Give back the per-tenant permit
+                        throw new RuntimeException(
+                                "Global session pool exhausted. Max total sessions: " + maxTotal
+                                        + ". Active: " + LibTorchSessionManager.this.activeSessionCount()
+                                        + ", Idle: " + LibTorchSessionManager.this.idleSessionCount()
+                                        + ", Reclaimed: " + reclaimed);
+                    }
                 }
 
-                // 4. Create a new session
-                TorchScriptRunner runner = TorchScriptRunner.load(modelPath, device);
-                SessionContext ctx = new SessionContext(runner);
-                activeSessions.put(ctx, Boolean.TRUE);
-                totalCreatedCounter.incrementAndGet();
-                log.debugf("Created new session (active=%d, idle=%d, total_created=%d, permits=%d)",
-                        activeSessions.size(), idleSessions.size(),
-                        totalCreatedCounter.get(), permits.availablePermits());
-                return ctx;
+                // 4. Create a new session (guarded for adapter cold-start stampede)
+                return createSessionWithGuard();
             } catch (RuntimeException e) {
                 // If session creation fails, release the permit
                 if (!(e.getMessage() != null && e.getMessage().startsWith("Global session pool"))) {
@@ -378,6 +587,65 @@ public class LibTorchSessionManager {
                 }
                 throw e;
             }
+        }
+
+        private SessionContext createSessionWithGuard() {
+            String adapterKey = adapterSpec != null ? adapterSpec.cacheKey() : null;
+            ReentrantLock initLock = adapterKey == null
+                    ? null
+                    : adapterInitLocks.computeIfAbsent(adapterKey, __ -> new ReentrantLock(true));
+
+            if (initLock != null) {
+                long waitStartNanos = System.nanoTime();
+                initLock.lock();
+                if (metrics != null) {
+                    metrics.recordAdapterInitWait(Duration.ofNanos(System.nanoTime() - waitStartNanos));
+                }
+            }
+            try {
+                // Double-check idle after waiting on the adapter init lock.
+                SessionContext idle = pollIdleSession();
+                if (idle != null) {
+                    activeSessions.put(idle, Boolean.TRUE);
+                    log.debugf("Reused idle session after adapter init lock (active=%d, idle=%d, permits=%d)",
+                            activeSessions.size(), idleSessions.size(), permits.availablePermits());
+                    return idle;
+                }
+
+                TorchScriptRunner runner = TorchScriptRunner.load(modelPath, device);
+                if (runtimeLoraPath != null) {
+                    float scale = adapterSpec != null ? adapterSpec.scale() : 1.0f;
+                    long applyStartNanos = System.nanoTime();
+                    int applied = adapterApplier.applyRuntimeLora(runner, runtimeLoraPath, scale);
+                    if (metrics != null) {
+                        metrics.recordAdapterApply(Duration.ofNanos(System.nanoTime() - applyStartNanos));
+                    }
+                    log.debugf("Applied runtime LoRA adapter (path=%s, updates=%d, scale=%.4f)",
+                            runtimeLoraPath.getFileName(), applied, scale);
+                }
+
+                SessionContext ctx = new SessionContext(runner);
+                activeSessions.put(ctx, Boolean.TRUE);
+                totalCreatedCounter.incrementAndGet();
+                log.debugf("Created new session (active=%d, idle=%d, total_created=%d, permits=%d)",
+                        activeSessions.size(), idleSessions.size(),
+                        totalCreatedCounter.get(), permits.availablePermits());
+                return ctx;
+            } finally {
+                if (initLock != null) {
+                    initLock.unlock();
+                }
+            }
+        }
+
+        private SessionContext pollIdleSession() {
+            SessionContext idle;
+            while ((idle = idleSessions.pollFirst()) != null) {
+                if (!idle.runner().isClosed()) {
+                    return idle;
+                }
+            }
+            return null;
         }
 
         void release(SessionContext session) {
@@ -423,6 +691,22 @@ public class LibTorchSessionManager {
             return totalCreatedCounter.get();
         }
 
+        boolean isDrained() {
+            return activeSessions.isEmpty() && idleSessions.isEmpty();
+        }
+
+        boolean hasAdapter() {
+            return adapterSpec != null;
+        }
+
+        String tenantId() {
+            return tenantId;
+        }
+
+        String poolKey() {
+            return poolKey;
+        }
+
         void shutdown() {
             // Close all active sessions
             activeSessions.keySet().forEach(ctx -> {
@@ -440,5 +724,8 @@ public class LibTorchSessionManager {
                 closeRunner(ctx);
             }
         }
+    }
+
+    private record ModelSelection(Path modelPath, Path runtimeLoraPath) {
     }
 }
