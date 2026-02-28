@@ -3,10 +3,6 @@
 
 ![Error Codes Doc Check](https://github.com/bhangun/gollek/actions/workflows/error-codes.yml/badge.svg)
 
-```mermaid
-flowchart 
-
-```
 
 
 
@@ -129,9 +125,27 @@ make ci
 ```
 
 
-### Git Submodules
+# update tag to current commit
 
-- To update to the latest version of llama.cpp: git submodule update --remote
-- To pull the latest changes from the parent repository (including submodule updates): git pull 
-   --recurse-submodules
-- To initialize and update submodules when cloning: git clone --recurse-submodules <repository-url>
+Add all changes
+```bash
+git add <EVERYTHING>
+
+git commit -m "<COMMIT MESSAGE>"
+git push origin main
+```
+
+And then update tag
+```bash
+git tag -f test-latest
+git push origin :refs/tags/test-latest
+git push origin test-latest
+```
+then watch
+```bash
+gh run list -R bhangun/gollek --workflow "Gollek CLI Release" --limit 5
+gh run watch -R bhangun/gollek --exit-status
+gh release view test-latest -R bhangun/gollek
+
+
+```

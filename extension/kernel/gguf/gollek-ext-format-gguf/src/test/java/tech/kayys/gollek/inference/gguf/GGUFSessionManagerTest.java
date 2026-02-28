@@ -75,6 +75,7 @@ class GGUFSessionManagerTest {
         var context = new GGUFSessionManager.SessionContext(
                 "session-1",
                 runner,
+                null,
                 Instant.now(),
                 Instant.now());
 
@@ -103,6 +104,7 @@ class GGUFSessionManagerTest {
         var context = new GGUFSessionManager.SessionContext(
                 "session-1",
                 runner,
+                null,
                 oldTime,
                 oldTime);
 

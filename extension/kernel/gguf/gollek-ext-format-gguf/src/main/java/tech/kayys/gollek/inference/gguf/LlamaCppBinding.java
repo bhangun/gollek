@@ -80,6 +80,11 @@ public class LlamaCppBinding {
     private final MethodHandle llama_sampler_init_grammar;
     private final MethodHandle llama_sampler_init_typical;
     private final MethodHandle llama_vocab_is_eog;
+    private final MethodHandle llama_adapter_lora_init;
+    private final MethodHandle llama_set_adapter_lora;
+    private final MethodHandle llama_rm_adapter_lora;
+    private final MethodHandle llama_clear_adapter_lora;
+    private final MethodHandle llama_adapter_lora_free;
 
     // Struct layouts
     private static final MemoryLayout LLAMA_MODEL_PARAMS_LAYOUT = MemoryLayout.structLayout(
@@ -344,6 +349,19 @@ public class LlamaCppBinding {
         // llama_vocab_is_eog(const llama_vocab* vocab, llama_token token) -> bool
         this.llama_vocab_is_eog = linkFunction(linker, "llama_vocab_is_eog",
                 FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+
+        // LoRA adapter API (optional at runtime depending on llama.cpp build)
+        this.llama_adapter_lora_init = linkOptionalFunction(linker, "llama_adapter_lora_init",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+        this.llama_set_adapter_lora = linkOptionalFunction(linker, "llama_set_adapter_lora",
+                FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
+                        ValueLayout.JAVA_FLOAT));
+        this.llama_rm_adapter_lora = linkOptionalFunction(linker, "llama_rm_adapter_lora",
+                FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+        this.llama_clear_adapter_lora = linkOptionalFunction(linker, "llama_clear_adapter_lora",
+                FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+        this.llama_adapter_lora_free = linkOptionalFunction(linker, "llama_adapter_lora_free",
+                FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     }
 
     private boolean verbose = false;
@@ -985,6 +1003,62 @@ public class LlamaCppBinding {
             llama_free.invoke(context);
         } catch (Throwable e) {
             log.error("Failed to free context", e);
+        }
+    }
+
+    public MemorySegment loadLoraAdapter(MemorySegment model, String adapterPath) {
+        try {
+            checkHandle(llama_adapter_lora_init, "llama_adapter_lora_init");
+            MemorySegment path = arena.allocateFrom(adapterPath);
+            MemorySegment adapter = (MemorySegment) llama_adapter_lora_init.invoke(model, path);
+            if (adapter == null || adapter.equals(MemorySegment.NULL) || adapter.address() == 0) {
+                throw new RuntimeException("llama_adapter_lora_init returned null");
+            }
+            return adapter;
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to load LoRA adapter: " + adapterPath, e);
+        }
+    }
+
+    public void setLoraAdapter(MemorySegment context, MemorySegment adapter, float scale) {
+        try {
+            checkHandle(llama_set_adapter_lora, "llama_set_adapter_lora");
+            int rc = (int) llama_set_adapter_lora.invoke(context, adapter, scale);
+            if (rc != 0) {
+                throw new RuntimeException("llama_set_adapter_lora failed with code: " + rc);
+            }
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to set LoRA adapter", e);
+        }
+    }
+
+    public void removeLoraAdapter(MemorySegment context, MemorySegment adapter) {
+        try {
+            checkHandle(llama_rm_adapter_lora, "llama_rm_adapter_lora");
+            int rc = (int) llama_rm_adapter_lora.invoke(context, adapter);
+            if (rc != 0) {
+                throw new RuntimeException("llama_rm_adapter_lora failed with code: " + rc);
+            }
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to remove LoRA adapter", e);
+        }
+    }
+
+    public void clearLoraAdapters(MemorySegment context) {
+        try {
+            checkHandle(llama_clear_adapter_lora, "llama_clear_adapter_lora");
+            llama_clear_adapter_lora.invoke(context);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to clear LoRA adapters", e);
+        }
+    }
+
+    public void freeLoraAdapter(MemorySegment adapter) {
+        try {
+            checkHandle(llama_adapter_lora_free, "llama_adapter_lora_free");
+            llama_adapter_lora_free.invoke(adapter);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to free LoRA adapter", e);
         }
     }
 
