@@ -70,13 +70,25 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install automake
 
-      - name: Build native executable
+      - name: Build native executable (Linux/macOS)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           export GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp"
           export GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch"
           export GOLEK_LIBTORCH_LIB_PATH="$HOME/.gollek/source/vendor/libtorch/lib"
           mvn -B clean package -pl ui/gollek-cli -am -DskipTests -Pnative
+        env:
+          MAVEN_OPTS: -Xmx3G
+
+      - name: Build native executable (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          export GOLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp"
+          export GOLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch"
+          export GOLEK_LIBTORCH_LIB_PATH="$HOME/.gollek/source/vendor/libtorch/lib"
+          mvn -B clean package -pl ui/gollek-cli -am -DskipTests -Pnative -Dexec.skip=true
         env:
           MAVEN_OPTS: -Xmx3G
 
