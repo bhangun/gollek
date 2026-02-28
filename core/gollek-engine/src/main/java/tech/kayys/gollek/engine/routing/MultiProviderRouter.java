@@ -4,12 +4,14 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
+import tech.kayys.gollek.engine.observability.AdapterRoutingMetricsCollector;
 
 import tech.kayys.gollek.spi.provider.RoutingContext;
 import tech.kayys.gollek.spi.routing.ModelProviderMapping;
 import tech.kayys.gollek.spi.routing.ProviderPool;
 import tech.kayys.gollek.spi.routing.QuotaExhaustedException;
 import tech.kayys.gollek.spi.routing.RoutingConfig;
+import tech.kayys.gollek.spi.provider.ProviderCapabilities;
 import tech.kayys.gollek.spi.provider.RoutingDecision;
 import tech.kayys.gollek.spi.routing.SelectionStrategy;
 import tech.kayys.gollek.spi.provider.LLMProvider;
@@ -41,6 +43,9 @@ public class MultiProviderRouter {
 
     @Inject
     tech.kayys.gollek.provider.core.quota.ProviderQuotaService providerQuotaService;
+
+    @Inject
+    AdapterRoutingMetricsCollector adapterRoutingMetricsCollector;
 
     private final Map<SelectionStrategy, ProviderSelector> strategies = new ConcurrentHashMap<>();
     private RoutingConfig config = RoutingConfig.defaults();
@@ -180,8 +185,38 @@ public class MultiProviderRouter {
                 .filter(p -> providerQuotaService.hasQuota(p.id()))
                 .collect(Collectors.toList());
 
+        // Filter by adapter capabilities
+        providers = providers.stream()
+                .filter(p -> isAdapterCompatible(p, context))
+                .collect(Collectors.toList());
+
         LOG.debugf("Found %d candidate providers for model %s", providers.size(), modelId);
         return providers;
+    }
+
+    private boolean isAdapterCompatible(LLMProvider provider, RoutingContext context) {
+        if (context == null || context.request() == null || !AdapterRoutingSupport.hasAdapterRequest(context.request())) {
+            return true;
+        }
+
+        ProviderCapabilities capabilities = provider.capabilities();
+        if (AdapterRoutingSupport.isAdapterUnsupported(capabilities)) {
+            LOG.debugf("Skipping provider %s for adapter request due to adapter_unsupported capability",
+                    provider.id());
+            if (adapterRoutingMetricsCollector != null) {
+                String tenantId = context.requestContext() != null
+                        ? context.requestContext().getTenantId()
+                        : "community";
+                adapterRoutingMetricsCollector.recordProviderFiltered(
+                        "multi-provider-router",
+                        provider.id(),
+                        context.request().getModel(),
+                        tenantId,
+                        "adapter_unsupported");
+            }
+            return false;
+        }
+        return true;
     }
 
     /**

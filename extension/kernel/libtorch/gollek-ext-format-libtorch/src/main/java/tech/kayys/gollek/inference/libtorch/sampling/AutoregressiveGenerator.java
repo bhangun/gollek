@@ -3,6 +3,10 @@ package tech.kayys.gollek.inference.libtorch.sampling;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
+import tech.kayys.gollek.inference.libtorch.LibTorchExecutionHints;
+import tech.kayys.gollek.inference.libtorch.LibTorchFp8RowwiseTransformer;
+import tech.kayys.gollek.inference.libtorch.LibTorchMetrics;
+import tech.kayys.gollek.inference.libtorch.MixedPrecisionManager;
 import tech.kayys.gollek.inference.libtorch.LibTorchProviderConfig;
 import tech.kayys.gollek.inference.libtorch.LibTorchSessionManager;
 import tech.kayys.gollek.inference.libtorch.TorchScriptRunner;
@@ -12,6 +16,7 @@ import tech.kayys.gollek.spi.inference.AdapterSpec;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -42,6 +47,15 @@ public class AutoregressiveGenerator {
     @Inject
     LibTorchProviderConfig config;
 
+    @Inject
+    LibTorchMetrics metrics;
+
+    @Inject
+    MixedPrecisionManager mixedPrecisionManager;
+
+    private final LibTorchFp8RowwiseTransformer rowwiseTransformer = new LibTorchFp8RowwiseTransformer();
+    private final AtomicBoolean hybridFallbackForced = new AtomicBoolean(false);
+
     /**
      * Generate tokens autoregressively using the given sampling strategy.
      *
@@ -60,7 +74,8 @@ public class AutoregressiveGenerator {
             String tenantId, String modelId, Path modelPath,
             long[] promptTokens, SamplingStrategy strategy,
             int maxNewTokens, Consumer<Long> onToken) {
-        return generate(tenantId, modelId, modelPath, promptTokens, strategy, maxNewTokens, onToken, null);
+        return generate(tenantId, modelId, modelPath, promptTokens, strategy, maxNewTokens, onToken, null,
+                LibTorchExecutionHints.baseline());
     }
 
     public List<Long> generate(
@@ -68,6 +83,16 @@ public class AutoregressiveGenerator {
             long[] promptTokens, SamplingStrategy strategy,
             int maxNewTokens, Consumer<Long> onToken,
             AdapterSpec adapterSpec) {
+        return generate(tenantId, modelId, modelPath, promptTokens, strategy, maxNewTokens, onToken, adapterSpec,
+                LibTorchExecutionHints.baseline());
+    }
+
+    public List<Long> generate(
+            String tenantId, String modelId, Path modelPath,
+            long[] promptTokens, SamplingStrategy strategy,
+            int maxNewTokens, Consumer<Long> onToken,
+            AdapterSpec adapterSpec,
+            LibTorchExecutionHints executionHints) {
 
         List<Long> generated = new ArrayList<>();
 
@@ -87,7 +112,7 @@ public class AutoregressiveGenerator {
                 long[] shape = { 1, inputData.length };
 
                 try (Tensor input = Tensor.fromLongArray(inputData, shape);
-                        Tensor logits = runner.forward(input)) {
+                        Tensor logits = forwardWithHybridFallback(runner, input, executionHints)) {
 
                     // Extract logits for the last token position
                     // logits shape: [1, seq_len, vocab_size] or [1, vocab_size]
@@ -95,9 +120,10 @@ public class AutoregressiveGenerator {
                     long[] logitsShape = logits.shape();
 
                     float[] lastTokenLogits;
+                    int vocabSize;
                     if (logitsShape.length == 3) {
                         // [1, seq_len, vocab_size] → take last seq position
-                        int vocabSize = (int) logitsShape[2];
+                        vocabSize = (int) logitsShape[2];
                         int seqLen = (int) logitsShape[1];
                         int offset = (seqLen - 1) * vocabSize;
                         lastTokenLogits = new float[vocabSize];
@@ -105,6 +131,14 @@ public class AutoregressiveGenerator {
                     } else {
                         // [1, vocab_size] or [vocab_size]
                         lastTokenLogits = allLogits;
+                        vocabSize = lastTokenLogits.length;
+                    }
+
+                    if (executionHints != null && executionHints.fp8RowwiseEnabled()) {
+                        if (!rowwiseTransformer.canApply(vocabSize, executionHints.fp8RowwiseScales())) {
+                            throw new RuntimeException("FP8 rowwise scale mismatch at logits apply step");
+                        }
+                        rowwiseTransformer.applyInPlace(lastTokenLogits, executionHints.fp8RowwiseScales());
                     }
 
                     // Sample next token using the strategy
@@ -148,6 +182,77 @@ public class AutoregressiveGenerator {
             String tenantId, String modelId, Path modelPath,
             long[] promptTokens, SamplingStrategy strategy,
             int maxNewTokens) {
-        return generate(tenantId, modelId, modelPath, promptTokens, strategy, maxNewTokens, null, null);
+        return generate(tenantId, modelId, modelPath, promptTokens, strategy, maxNewTokens, null, null,
+                LibTorchExecutionHints.baseline());
+    }
+
+    private Tensor forwardWithHybridFallback(
+            TorchScriptRunner runner,
+            Tensor input,
+            LibTorchExecutionHints executionHints) {
+        boolean hybridAttempt = executionHints != null
+                && executionHints.hybridFp8Bf16AttentionEnabled()
+                && !hybridFallbackForced.get();
+
+        if (!hybridAttempt) {
+            return runner.forward(input);
+        }
+
+        metrics.recordAdvancedHybridAttempt();
+        Tensor mixedInput = null;
+        Tensor mixedOutput = null;
+        try {
+            mixedInput = mixedPrecisionManager.castForHybridInput(input);
+            mixedOutput = runner.forward(mixedInput);
+            if (executionHints.fp8RowwiseEnabled()) {
+                int expected = executionHints.fp8RowwiseScaleCount();
+                int actual = inferVocabSize(mixedOutput);
+                if (expected <= 0 || actual <= 0 || expected != actual) {
+                    throw new RuntimeException("FP8 rowwise calibration mismatch: expected_scales="
+                            + expected + ", actual_vocab=" + actual);
+                }
+            }
+            Tensor logits = mixedPrecisionManager.castToFP32(mixedOutput);
+            if (logits == mixedOutput) {
+                mixedOutput = null;
+            }
+            metrics.recordAdvancedHybridSuccess();
+            return logits;
+        } catch (RuntimeException e) {
+            if (hybridFallbackForced.compareAndSet(false, true)) {
+                log.warnf(e, "Hybrid FP8/BF16 path failed once; forcing baseline fallback for subsequent requests");
+            }
+            metrics.recordAdvancedHybridFallback();
+            return runner.forward(input);
+        } finally {
+            if (mixedOutput != null) {
+                try {
+                    mixedOutput.close();
+                } catch (Exception ignored) {
+                    // best-effort cleanup
+                }
+            }
+            if (mixedInput != null && mixedInput != input) {
+                try {
+                    mixedInput.close();
+                } catch (Exception ignored) {
+                    // best-effort cleanup
+                }
+            }
+        }
+    }
+
+    private int inferVocabSize(Tensor tensor) {
+        long[] shape = tensor.shape();
+        if (shape == null || shape.length == 0) {
+            return -1;
+        }
+        if (shape.length >= 3) {
+            return (int) shape[shape.length - 1];
+        }
+        if (shape.length == 2) {
+            return (int) shape[1];
+        }
+        return (int) shape[0];
     }
 }

@@ -293,4 +293,37 @@ public interface GGUFProviderConfig {
     @WithName("lora.max-active-adapters")
     @WithDefault("128")
     int loraMaxActiveAdapters();
+
+    /**
+     * Per-tenant cap for unique active adapters.
+     */
+    @WithName("lora.max-active-adapters-per-tenant")
+    @WithDefault("16")
+    int loraMaxActiveAdaptersPerTenant();
+
+    /**
+     * Enable rollout-guard policy checks for LoRA adapters.
+     */
+    @WithName("lora.rollout.guard-enabled")
+    @WithDefault("false")
+    boolean loraRolloutGuardEnabled();
+
+    /**
+     * Optional allow-list of tenant IDs allowed to use adapters.
+     * Empty = all tenants allowed.
+     */
+    @WithName("lora.rollout.allowed-tenants")
+    Optional<List<String>> loraRolloutAllowedTenants();
+
+    /**
+     * Optional deny-list of adapter IDs blocked from serving.
+     */
+    @WithName("lora.rollout.blocked-adapter-ids")
+    Optional<List<String>> loraRolloutBlockedAdapterIds();
+
+    /**
+     * Optional deny-list of adapter path prefixes blocked from serving.
+     */
+    @WithName("lora.rollout.blocked-path-prefixes")
+    Optional<List<String>> loraRolloutBlockedPathPrefixes();
 }

@@ -95,6 +95,12 @@ public class LibTorchProvider implements StreamingProvider {
 
     private final AtomicReference<ProviderHealth.Status> status = new AtomicReference<>(ProviderHealth.Status.UNKNOWN);
     private final AtomicReference<String> startupFailure = new AtomicReference<>(null);
+    private final AtomicReference<LibTorchAdvancedModeResolver.EffectiveAdvancedMode> effectiveAdvancedMode =
+            new AtomicReference<>(LibTorchAdvancedModeResolver.EffectiveAdvancedMode.baseline(
+                    "startup.pending",
+                    Set.of()));
+    private final AtomicReference<LibTorchExecutionHints> lastExecutionHints =
+            new AtomicReference<>(LibTorchExecutionHints.baseline());
     private final AtomicLong requestCount = new AtomicLong(0);
     private final AtomicLong errorCount = new AtomicLong(0);
     private Instant startedAt;
@@ -124,6 +130,8 @@ public class LibTorchProvider implements StreamingProvider {
 
             // Initialize plugin registry
             pluginRegistry.initialize(binding);
+
+            resolveAndLogAdvancedMode(binding);
 
             // Start session evictor for idle pooling
             sessionManager.startEvictor();
@@ -246,7 +254,26 @@ public class LibTorchProvider implements StreamingProvider {
                         .detail("sessions_active", sessionManager.activeSessionCount())
                         .detail("sessions_idle", sessionManager.idleSessionCount())
                         .detail("sessions_total_created", sessionManager.totalCreatedCount())
-                        .detail("batching_enabled", config.batching().enabled());
+                        .detail("batching_enabled", config.batching().enabled())
+                        .detail("advanced_effective_enabled", effectiveAdvancedMode.get().advancedEnabled())
+                        .detail("advanced_attention_mode", effectiveAdvancedMode.get().attentionMode())
+                        .detail("advanced_reason", effectiveAdvancedMode.get().reason())
+                        .detail("advanced_allowed_gpu_sm", effectiveAdvancedMode.get().allowedGpuSm().toString())
+                        .detail("advanced_detected_gpu_sm",
+                                effectiveAdvancedMode.get().detectedGpuSm().map(Object::toString).orElse("unknown"))
+                        .detail("advanced_fp8_rowwise_enabled", effectiveAdvancedMode.get().fp8RowwiseEnabled())
+                        .detail("advanced_sage_attention2_requested", effectiveAdvancedMode.get().sageAttention2Requested())
+                        .detail("advanced_sage_attention2_enabled", effectiveAdvancedMode.get().sageAttention2Enabled())
+                        .detail("advanced_sage_attention2_rollback_reason",
+                                effectiveAdvancedMode.get().sageAttention2RollbackReason())
+                        .detail("advanced_sage_attention2_active", lastExecutionHints.get().sageAttention2Enabled())
+                        .detail("advanced_sage_attention2_reason", lastExecutionHints.get().sageAttention2Reason())
+                        .detail("advanced_fp8_rowwise_active", lastExecutionHints.get().fp8RowwiseEnabled())
+                        .detail("advanced_fp8_rowwise_reason", lastExecutionHints.get().fp8RowwiseReason())
+                        .detail("advanced_fp8_rowwise_scale_count", lastExecutionHints.get().fp8RowwiseScaleCount())
+                        .detail("advanced_fp8_rowwise_scale_mean", lastExecutionHints.get().fp8RowwiseScaleMean())
+                        .detail("advanced_fp8_rowwise_calibration_source",
+                                lastExecutionHints.get().fp8RowwiseCalibrationSource());
 
                 if (config.batching().enabled()) {
                     builder.detail("batches_processed", batchingManager.getBatchCount())
@@ -276,9 +303,13 @@ public class LibTorchProvider implements StreamingProvider {
     @Timeout(value = 30, unit = java.time.temporal.ChronoUnit.SECONDS)
     public Uni<InferenceResponse> infer(ProviderRequest request) {
         String tenantId = resolveTenantId(request);
+        var advanced = effectiveAdvancedMode.get();
         var span = tracer.spanBuilder("libtorch.infer")
                 .setAttribute("model", request.getModel())
                 .setAttribute("tenant", tenantId)
+                .setAttribute("advanced.enabled", advanced.advancedEnabled())
+                .setAttribute("advanced.attention_mode", advanced.attentionMode())
+                .setAttribute("advanced.reason", advanced.reason())
                 .startSpan();
 
         metrics.recordRequest();
@@ -305,13 +336,21 @@ public class LibTorchProvider implements StreamingProvider {
                 long[] promptTokens = tokenizer.encode(request.getModel(), prompt, true);
 
                 // Use the AutoregressiveGenerator which manages its own session
-                Path modelPath = sessionManager.resolveModelPath(request.getModel(), config, adapterSpec);
+                Path modelPath = sessionManager.resolveModelPath(tenantId, request.getModel(), config, adapterSpec);
                 SamplingStrategy strategy = SamplingStrategyFactory.create(
                         "top_p", params.getTemperature(), params.getTopP(), params.getTopK());
+                LibTorchExecutionHints executionHints = resolveExecutionHints(modelPath, tenantId, request.getModel());
+                span.setAttribute("advanced.sage_attention2_requested", executionHints.sageAttention2Requested());
+                span.setAttribute("advanced.sage_attention2_active", executionHints.sageAttention2Enabled());
+                span.setAttribute("advanced.sage_attention2_reason", executionHints.sageAttention2Reason());
+                span.setAttribute("advanced.fp8_rowwise_active", executionHints.fp8RowwiseEnabled());
+                span.setAttribute("advanced.fp8_rowwise_reason", executionHints.fp8RowwiseReason());
+                span.setAttribute("advanced.fp8_rowwise_scale_count", executionHints.fp8RowwiseScaleCount());
+                span.setAttribute("advanced.fp8_rowwise_scale_mean", executionHints.fp8RowwiseScaleMean());
 
                 List<Long> generated = generator.generate(
                         tenantId, request.getModel(), modelPath,
-                        promptTokens, strategy, params.getMaxTokens(), null, adapterSpec);
+                        promptTokens, strategy, params.getMaxTokens(), null, adapterSpec, executionHints);
 
                 // Decode generated tokens back to text
                 String responseText = tokenizer.decode(
@@ -360,9 +399,10 @@ public class LibTorchProvider implements StreamingProvider {
                 }
 
                 long[] promptTokens = tokenizer.encode(request.getModel(), prompt, true);
-                Path modelPath = sessionManager.resolveModelPath(request.getModel(), config, adapterSpec);
+                Path modelPath = sessionManager.resolveModelPath(tenantId, request.getModel(), config, adapterSpec);
                 SamplingStrategy strategy = SamplingStrategyFactory.create(
                         "top_p", params.getTemperature(), params.getTopP(), params.getTopK());
+                LibTorchExecutionHints executionHints = resolveExecutionHints(modelPath, tenantId, request.getModel());
 
                 java.util.concurrent.atomic.AtomicInteger index = new java.util.concurrent.atomic.AtomicInteger(0);
 
@@ -377,7 +417,7 @@ public class LibTorchProvider implements StreamingProvider {
                                     request.getRequestId(),
                                     index.getAndIncrement(),
                                     tokenText));
-                        }, adapterSpec);
+                        }, adapterSpec, executionHints);
 
                 // Send final chunk
                 emitter.emit(StreamChunk.finalChunk(request.getRequestId(), index.get(), ""));
@@ -526,14 +566,206 @@ public class LibTorchProvider implements StreamingProvider {
         var features = new java.util.LinkedHashSet<>(List.of(
                 "tensor-inference", "jit-scripting", "ffm-binding",
                 "safetensors-loading", "streaming-generation",
-                "sampling-strategies",
-                "adapter_spec_v1",
-                "adapter_type_lora",
-                "adapter_precompiled_model_path"));
+                "sampling-strategies"));
+        var advanced = effectiveAdvancedMode.get();
+        if (advanced.advancedEnabled()) {
+            features.add("advanced_cuda_path");
+            features.add("attention_mode_" + advanced.attentionMode());
+            if (advanced.fp8RowwiseEnabled()) {
+                features.add("fp8_rowwise_weights");
+            }
+            if (advanced.sageAttention2Enabled()) {
+                features.add("sage_attention2_experimental");
+            }
+        } else {
+            features.add("attention_mode_baseline");
+        }
+        features.addAll(AdapterCapabilityProfile.builder()
+                .adapterSupported(config.adapter() != null && config.adapter().enabled())
+                .adapterTypes(Set.of("lora"))
+                .runtimeApply(LibTorchBinding.isInitialized()
+                        && LibTorchBinding.getInstance().hasSymbol(LibTorchBinding.JIT_APPLY_LORA))
+                .precompiledModelPath(config.adapter() != null && config.adapter().allowPrecompiledModelPath())
+                .rolloutGuard(config.adapter() != null && config.adapter().rolloutGuardEnabled())
+                .metricsSchema(true)
+                .build()
+                .toFeatureFlags());
+        if (LibTorchBinding.isInitialized()
+                && LibTorchBinding.getInstance().hasSymbol(LibTorchBinding.JIT_APPLY_LORA)) {
+            features.add("adapter_runtime_lora_patch");
+        }
         if (config.batching().enabled()) {
             features.add("continuous-batching");
         }
         return Set.copyOf(features);
+    }
+
+    private void resolveAndLogAdvancedMode(LibTorchBinding binding) {
+        LibTorchAdvancedModeResolver resolver = new LibTorchAdvancedModeResolver();
+        LibTorchAdvancedModeResolver.EffectiveAdvancedMode resolved = resolver.resolve(config, binding);
+        effectiveAdvancedMode.set(resolved);
+        metrics.recordAdvancedModeResolution(resolved);
+        if (resolved.advancedEnabled()) {
+            log.infof("LibTorch advanced path enabled: attention=%s, fp8Rowwise=%s, sageAttention2=%s, sm=%s, allowedSm=%s",
+                    resolved.attentionMode(),
+                    resolved.fp8RowwiseEnabled(),
+                    resolved.sageAttention2Enabled(),
+                    resolved.detectedGpuSm().map(Object::toString).orElse("unknown"),
+                    resolved.allowedGpuSm());
+            if (resolved.sageAttention2Requested() && !resolved.sageAttention2Enabled()) {
+                log.infof("SageAttention2 requested but rolled back (reason=%s)",
+                        resolved.sageAttention2RollbackReason());
+            }
+        } else {
+            log.infof("LibTorch advanced path fallback to baseline (reason=%s, detectedSm=%s, allowedSm=%s)",
+                    resolved.reason(),
+                    resolved.detectedGpuSm().map(Object::toString).orElse("unknown"),
+                    resolved.allowedGpuSm());
+        }
+    }
+
+    private LibTorchExecutionHints resolveExecutionHints(Path modelPath, String tenantId, String modelId) {
+        var advanced = effectiveAdvancedMode.get();
+        SageAttention2Decision sageDecision = resolveSageAttention2Decision(advanced, tenantId, modelId);
+        Fp8RowwiseDecision rowwiseDecision = resolveFp8RowwiseDecision(advanced, tenantId, modelId);
+        if (advanced != null
+                && advanced.advancedEnabled()
+                && "hybrid_fp8_bf16".equals(advanced.attentionMode())) {
+            LibTorchFp8RowwisePlanner.RowwisePlan rowwisePlan;
+            if (rowwiseDecision.enabled()) {
+                LibTorchAdvancedModeResolver.EffectiveAdvancedMode rowwiseMode =
+                        new LibTorchAdvancedModeResolver.EffectiveAdvancedMode(
+                                advanced.advancedEnabled(),
+                                advanced.attentionMode(),
+                                true,
+                                advanced.sageAttention2Requested(),
+                                advanced.sageAttention2Enabled(),
+                                advanced.sageAttention2RollbackReason(),
+                                advanced.reason(),
+                                advanced.detectedGpuSm(),
+                                advanced.allowedGpuSm());
+                rowwisePlan = new LibTorchFp8RowwisePlanner().resolve(modelPath, rowwiseMode);
+            } else {
+                rowwisePlan = new LibTorchFp8RowwisePlanner.RowwisePlan(
+                        false,
+                        rowwiseDecision.reason(),
+                        0,
+                        0.0d,
+                        "none",
+                        null);
+            }
+            if (!rowwisePlan.enabled() && rowwiseDecision.requested()) {
+                log.infof("FP8 rowwise disabled for current run (reason=%s, model=%s)", rowwisePlan.reason(), modelPath);
+            }
+            LibTorchExecutionHints hints = LibTorchExecutionHints.hybridFp8Bf16(
+                    sageDecision.requested(),
+                    sageDecision.enabled(),
+                    sageDecision.reason(),
+                    rowwisePlan.enabled(),
+                    rowwisePlan.reason(),
+                    rowwisePlan.scaleCount(),
+                    rowwisePlan.scaleMean(),
+                    rowwisePlan.calibrationSource(),
+                    rowwisePlan.rowScales());
+            lastExecutionHints.set(hints);
+            if (metrics != null) {
+                metrics.recordFp8RowwiseDecision(hints.fp8RowwiseEnabled(), hints.fp8RowwiseReason());
+            }
+            return hints;
+        }
+        LibTorchExecutionHints baseline = LibTorchExecutionHints.baselineWithSageState(
+                sageDecision.requested(),
+                sageDecision.enabled(),
+                sageDecision.reason());
+        lastExecutionHints.set(baseline);
+        if (metrics != null) {
+            metrics.recordFp8RowwiseDecision(false, baseline.fp8RowwiseReason());
+        }
+        return baseline;
+    }
+
+    private SageAttention2Decision resolveSageAttention2Decision(
+            LibTorchAdvancedModeResolver.EffectiveAdvancedMode advanced,
+            String tenantId,
+            String modelId) {
+        if (advanced == null || !advanced.sageAttention2Requested()) {
+            return SageAttention2Decision.none();
+        }
+        if (isBlocked(config.advanced().sageAttention2BlockedTenants(), tenantId)) {
+            return new SageAttention2Decision(true, false, "sageattention2.canary.denied.tenant");
+        }
+        if (isBlocked(config.advanced().sageAttention2BlockedModels(), modelId)) {
+            return new SageAttention2Decision(true, false, "sageattention2.canary.denied.model");
+        }
+        if (!isAllowed(config.advanced().sageAttention2AllowedTenants(), tenantId)) {
+            return new SageAttention2Decision(true, false, "sageattention2.canary.blocked.tenant");
+        }
+        if (!isAllowed(config.advanced().sageAttention2AllowedModels(), modelId)) {
+            return new SageAttention2Decision(true, false, "sageattention2.canary.blocked.model");
+        }
+        if (advanced.sageAttention2Enabled()) {
+            return new SageAttention2Decision(true, true, "sageattention2.enabled");
+        }
+        String reason = advanced.sageAttention2RollbackReason();
+        return new SageAttention2Decision(true, false, reason == null || reason.isBlank() ? "unknown" : reason);
+    }
+
+    private Fp8RowwiseDecision resolveFp8RowwiseDecision(
+            LibTorchAdvancedModeResolver.EffectiveAdvancedMode advanced,
+            String tenantId,
+            String modelId) {
+        if (advanced == null || !advanced.fp8RowwiseEnabled()) {
+            return Fp8RowwiseDecision.none();
+        }
+        if (isBlocked(config.advanced().fp8RowwiseBlockedTenants(), tenantId)) {
+            return new Fp8RowwiseDecision(true, false, "fp8.rowwise.canary.denied.tenant");
+        }
+        if (isBlocked(config.advanced().fp8RowwiseBlockedModels(), modelId)) {
+            return new Fp8RowwiseDecision(true, false, "fp8.rowwise.canary.denied.model");
+        }
+        if (!isAllowed(config.advanced().fp8RowwiseAllowedTenants(), tenantId)) {
+            return new Fp8RowwiseDecision(true, false, "fp8.rowwise.canary.blocked.tenant");
+        }
+        if (!isAllowed(config.advanced().fp8RowwiseAllowedModels(), modelId)) {
+            return new Fp8RowwiseDecision(true, false, "fp8.rowwise.canary.blocked.model");
+        }
+        return new Fp8RowwiseDecision(true, true, "fp8.rowwise.enabled");
+    }
+
+    private boolean isAllowed(Optional<List<String>> allowList, String value) {
+        if (allowList == null || allowList.isEmpty() || allowList.get().isEmpty()) {
+            return true;
+        }
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        return allowList.get().stream()
+                .filter(s -> s != null && !s.isBlank())
+                .anyMatch(s -> s.trim().equalsIgnoreCase(value));
+    }
+
+    private boolean isBlocked(Optional<List<String>> denyList, String value) {
+        if (denyList == null || denyList.isEmpty() || denyList.get().isEmpty()) {
+            return false;
+        }
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        return denyList.get().stream()
+                .filter(s -> s != null && !s.isBlank())
+                .anyMatch(s -> s.trim().equalsIgnoreCase(value));
+    }
+
+    private record SageAttention2Decision(boolean requested, boolean enabled, String reason) {
+        static SageAttention2Decision none() {
+            return new SageAttention2Decision(false, false, "none");
+        }
+    }
+
+    private record Fp8RowwiseDecision(boolean requested, boolean enabled, String reason) {
+        static Fp8RowwiseDecision none() {
+            return new Fp8RowwiseDecision(false, false, "fp8.rowwise.disabled");
+        }
     }
 
     private AdapterSpec resolveAdapterSpec(ProviderRequest request) {

@@ -3,6 +3,9 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#ifdef USE_CUDA
+#include <ATen/cuda/CUDAContext.h>
+#endif
 
 extern "C" {
 
@@ -384,6 +387,52 @@ void* at_load(const char* path) {
 
 bool at_cuda_is_available() { return torch::cuda::is_available(); }
 int at_cuda_device_count() { return torch::cuda::device_count(); }
+bool at_cuda_is_bf16_supported() {
+#ifdef USE_CUDA
+    if (!torch::cuda::is_available()) {
+        return false;
+    }
+    try {
+        int device_index = torch::cuda::current_device();
+        const auto* props = at::cuda::getDeviceProperties(device_index);
+        if (props == nullptr) {
+            return false;
+        }
+        // Ampere (SM80+) and newer generally support BF16 tensor-core path.
+        return props->major >= 8;
+    } catch (const std::exception& e) {
+        std::cerr << "at_cuda_is_bf16_supported error: " << e.what() << std::endl;
+        return false;
+    }
+#else
+    return false;
+#endif
+}
+int at_cuda_device_sm(int device_index) {
+#ifdef USE_CUDA
+    if (!torch::cuda::is_available()) {
+        return 0;
+    }
+    try {
+        const auto* props = at::cuda::getDeviceProperties(device_index);
+        if (props == nullptr) {
+            return 0;
+        }
+        return (props->major * 10) + props->minor;
+    } catch (const std::exception& e) {
+        std::cerr << "at_cuda_device_sm error: " << e.what() << std::endl;
+        return 0;
+    }
+#else
+    (void)device_index;
+    return 0;
+#endif
+}
+
+void* at_tensor_to_dtype(void* tensor_ptr, int dtype) {
+    auto tensor = static_cast<at::Tensor*>(tensor_ptr);
+    return new at::Tensor(tensor->to(static_cast<at::ScalarType>(dtype)));
+}
 
 void* at_to_device(void* tensor_ptr, int device_type, int device_index) {
     auto tensor = static_cast<at::Tensor*>(tensor_ptr);

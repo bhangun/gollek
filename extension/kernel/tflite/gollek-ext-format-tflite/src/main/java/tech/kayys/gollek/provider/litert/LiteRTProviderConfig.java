@@ -36,4 +36,17 @@ public interface LiteRTProviderConfig {
     @WithName("timeout")
     @WithDefault("PT30S")
     Duration defaultTimeout();
+
+    SessionConfig session();
+
+    interface SessionConfig {
+        @WithDefault("2")
+        int maxPerTenant();
+
+        @WithDefault("300")
+        int idleTimeoutSeconds();
+
+        @WithDefault("8")
+        int maxTotal();
+    }
 }

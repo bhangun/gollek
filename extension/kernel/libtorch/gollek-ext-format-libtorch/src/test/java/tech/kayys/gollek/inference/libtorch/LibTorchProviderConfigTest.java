@@ -29,6 +29,17 @@ class LibTorchProviderConfigTest {
 
         assertThat(config.inference().timeoutSeconds()).isEqualTo(30);
         assertThat(config.inference().threads()).isEqualTo(4);
+        assertThat(config.adapter().maxActivePoolsPerTenant()).isEqualTo(0);
+        assertThat(config.adapter().rolloutGuardEnabled()).isFalse();
+        assertThat(config.advanced().enabled()).isFalse();
+        assertThat(config.advanced().attentionMode()).isEqualTo("baseline");
+        assertThat(config.advanced().fp8RowwiseEnabled()).isFalse();
+        assertThat(config.advanced().sageAttention2Enabled()).isFalse();
+        assertThat(config.advanced().sageAttention2AllowedTenants()).isEmpty();
+        assertThat(config.advanced().sageAttention2AllowedModels()).isEmpty();
+        assertThat(config.advanced().sageAttention2BlockedTenants()).isEmpty();
+        assertThat(config.advanced().sageAttention2BlockedModels()).isEmpty();
+        assertThat(config.advanced().allowedGpuSm()).isEqualTo("89,90");
     }
 
     @Test
@@ -38,5 +49,6 @@ class LibTorchProviderConfigTest {
         assertThat(config.session().maxTotal()).isGreaterThanOrEqualTo(config.session().maxPerTenant());
         assertThat(config.inference().timeoutSeconds()).isPositive();
         assertThat(config.inference().threads()).isPositive();
+        assertThat(config.advanced().attentionMode()).isIn("baseline", "hybrid_fp8_bf16");
     }
 }

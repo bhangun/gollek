@@ -242,4 +242,26 @@ class GGUFSessionManagerTest {
         assertThat(sessionManager.isHealthy()).isFalse();
     }
 
+    @Test
+    @DisplayName("Adaptive idle timeout should tighten under sustained pressure and recover after decay")
+    void testAdaptiveIdleTimeoutFeedbackLoop() {
+        Duration baseline = sessionManager.resolveAdaptiveIdleTimeoutForTest(config);
+
+        for (int i = 0; i < 8; i++) {
+            sessionManager.recordAdaptiveTelemetryForTest(true, 0);
+        }
+
+        Duration tightened = sessionManager.resolveAdaptiveIdleTimeoutForTest(config);
+        assertThat(tightened).isLessThan(baseline);
+        assertThat(sessionManager.adaptivePressureScoreForTest()).isGreaterThan(0.60d);
+
+        for (int i = 0; i < 12; i++) {
+            sessionManager.recordAdaptiveTelemetryForTest(false, 0);
+        }
+
+        Duration recovered = sessionManager.resolveAdaptiveIdleTimeoutForTest(config);
+        assertThat(recovered).isGreaterThan(tightened);
+        assertThat(sessionManager.adaptivePressureScoreForTest()).isLessThan(0.35d);
+    }
+
 }

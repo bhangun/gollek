@@ -10,14 +10,17 @@ import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.model.DeviceType;
 import tech.kayys.gollek.spi.model.ModelFormat;
+import tech.kayys.gollek.spi.observability.AdapterMetricTagResolver;
+import tech.kayys.gollek.spi.observability.AdapterMetricsRecorder;
+import tech.kayys.gollek.spi.observability.NoopAdapterMetricsRecorder;
 import tech.kayys.gollek.spi.provider.*;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 @ApplicationScoped
 public class LiteRTProvider implements LLMProvider {
@@ -29,7 +32,12 @@ public class LiteRTProvider implements LLMProvider {
     @Inject
     LiteRTProviderConfig config;
 
-    private final Map<String, LiteRTCpuRunner> runners = new ConcurrentHashMap<>();
+    @Inject
+    AdapterMetricsRecorder adapterMetricsRecorder = new NoopAdapterMetricsRecorder();
+
+    @Inject
+    LiteRTSessionManager sessionManager;
+
     private volatile boolean initialized = false;
 
     @Override
@@ -60,6 +68,8 @@ public class LiteRTProvider implements LLMProvider {
 
     @Override
     public ProviderCapabilities capabilities() {
+        var features = new java.util.LinkedHashSet<>(Set.of("local_inference", "cpu_inference"));
+        features.addAll(AdapterCapabilityProfile.unsupportedWithMetrics().toFeatureFlags());
         return ProviderCapabilities.builder()
                 .streaming(false)
                 .functionCalling(false)
@@ -70,17 +80,21 @@ public class LiteRTProvider implements LLMProvider {
                 .maxOutputTokens(512)
                 .supportedFormats(Set.of(ModelFormat.LITERT))
                 .supportedDevices(Set.of(DeviceType.CPU))
-                .features(Set.of("local_inference", "cpu_inference"))
+                .features(Set.copyOf(features))
                 .build();
     }
 
     @Override
     public void initialize(ProviderConfig cfg) throws ProviderException.ProviderInitializationException {
         initialized = true;
+        sessionManager.startEvictor();
     }
 
     @Override
     public boolean supports(String modelId, ProviderRequest request) {
+        if (AdapterMetricTagResolver.hasAdapterRequest(request)) {
+            return false;
+        }
         Path path = resolveModelPath(modelId);
         return Files.exists(path);
     }
@@ -89,31 +103,55 @@ public class LiteRTProvider implements LLMProvider {
     public Uni<InferenceResponse> infer(ProviderRequest request) {
         return Uni.createFrom().item(() -> {
             ensureInitialized();
+            if (AdapterMetricTagResolver.hasAdapterRequest(request)) {
+                throw new UnsupportedOperationException(
+                        "LiteRT provider does not support adapters (adapter_unsupported).");
+            }
             String tenantId = resolveTenantId(request);
+            String adapterType = AdapterMetricTagResolver.resolveAdapterType(request);
+            adapterMetricsRecorder.recordRequest(PROVIDER_ID, adapterType);
 
-            LiteRTCpuRunner runner = getOrCreateRunner(
-                    tenantId,
-                    request.getModel());
+            Path modelPath = resolveModelPath(request.getModel());
+            LiteRTRunnerConfig runnerConfig = new LiteRTRunnerConfig(
+                    config.threads(),
+                    config.gpuEnabled(),
+                    config.npuEnabled(),
+                    config.gpuBackend(),
+                    config.npuType());
 
-            InferenceRequest inferenceRequest = InferenceRequest.builder()
-                    .requestId(request.getRequestId())
-                    .model(request.getModel())
-                    .messages(request.getMessages())
-                    .parameters(request.getParameters())
-                    .streaming(request.isStreaming())
-                    .build();
+            LiteRTSessionManager.SessionContext sessionContext = null;
+            Instant sessionAcquireStart = Instant.now();
+            try {
+                sessionContext = sessionManager.getSession(tenantId, request.getModel(), modelPath, runnerConfig);
+                adapterMetricsRecorder.recordSessionAcquire(
+                        PROVIDER_ID,
+                        adapterType,
+                        Duration.between(sessionAcquireStart, Instant.now()));
 
-            InferenceResponse response = runner.infer(inferenceRequest);
+                InferenceRequest inferenceRequest = InferenceRequest.builder()
+                        .requestId(request.getRequestId())
+                        .model(request.getModel())
+                        .messages(request.getMessages())
+                        .parameters(request.getParameters())
+                        .streaming(request.isStreaming())
+                        .build();
 
-            return InferenceResponse.builder()
-                    .requestId(response.getRequestId())
-                    .content(response.getContent())
-                    .model(request.getModel())
-                    .durationMs(response.getDurationMs())
-                    .tokensUsed(response.getTokensUsed())
-                    .metadata(response.getMetadata())
-                    .metadata("provider", PROVIDER_ID)
-                    .build();
+                InferenceResponse response = sessionContext.runner().infer(inferenceRequest);
+
+                return InferenceResponse.builder()
+                        .requestId(response.getRequestId())
+                        .content(response.getContent())
+                        .model(request.getModel())
+                        .durationMs(response.getDurationMs())
+                        .tokensUsed(response.getTokensUsed())
+                        .metadata(response.getMetadata())
+                        .metadata("provider", PROVIDER_ID)
+                        .build();
+            } finally {
+                if (sessionContext != null) {
+                    sessionManager.releaseSession(tenantId, request.getModel(), sessionContext);
+                }
+            }
         });
     }
 
@@ -132,23 +170,6 @@ public class LiteRTProvider implements LLMProvider {
             return request.getApiKey().get();
         }
         return "community";
-    }
-
-    private LiteRTCpuRunner getOrCreateRunner(String requestId, String modelId) {
-        String key = requestId + ":" + modelId;
-        return runners.computeIfAbsent(key, k -> {
-            Path modelPath = resolveModelPath(modelId);
-            LiteRTCpuRunner runner = new LiteRTCpuRunner();
-            LiteRTRunnerConfig runnerConfig = new LiteRTRunnerConfig(
-                    config.threads(),
-                    config.gpuEnabled(),
-                    config.npuEnabled(),
-                    config.gpuBackend(),
-                    config.npuType());
-            runner.initialize(modelPath, runnerConfig);
-            LOG.infof("LiteRT runner initialized for %s", modelId);
-            return runner;
-        });
     }
 
     private Path resolveModelPath(String modelId) {
@@ -179,14 +200,14 @@ public class LiteRTProvider implements LLMProvider {
 
     @Override
     public void shutdown() {
-        runners.values().forEach(LiteRTCpuRunner::close);
-        runners.clear();
+        sessionManager.shutdown();
         initialized = false;
     }
 
     private void ensureInitialized() {
         if (!initialized) {
             initialized = true;
+            sessionManager.startEvictor();
             LOG.info("LiteRT provider lazily initialized");
         }
     }

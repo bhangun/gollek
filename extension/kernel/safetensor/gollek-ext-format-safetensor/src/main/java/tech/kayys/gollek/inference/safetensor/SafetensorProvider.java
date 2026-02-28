@@ -4,17 +4,20 @@ import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import tech.kayys.gollek.inference.djl.DjlProvider;
 import tech.kayys.gollek.inference.libtorch.LibTorchProvider;
 import tech.kayys.gollek.spi.exception.ProviderException;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.model.ModelFormat;
+import tech.kayys.gollek.spi.observability.AdapterMetricTagResolver;
+import tech.kayys.gollek.spi.observability.AdapterMetricsRecorder;
+import tech.kayys.gollek.spi.observability.NoopAdapterMetricsRecorder;
 import tech.kayys.gollek.spi.provider.ProviderCapabilities;
 import tech.kayys.gollek.spi.provider.ProviderConfig;
 import tech.kayys.gollek.spi.provider.ProviderHealth;
 import tech.kayys.gollek.spi.provider.ProviderMetadata;
 import tech.kayys.gollek.spi.provider.ProviderRequest;
 import tech.kayys.gollek.spi.provider.StreamingProvider;
+import tech.kayys.gollek.spi.provider.AdapterCapabilityProfile;
 import tech.kayys.gollek.spi.stream.StreamChunk;
 
 import java.nio.file.Files;
@@ -37,7 +40,7 @@ public class SafetensorProvider implements StreamingProvider {
     LibTorchProvider libTorchProvider;
 
     @Inject
-    DjlProvider djlProvider;
+    AdapterMetricsRecorder adapterMetricsRecorder = new NoopAdapterMetricsRecorder();
 
     @Override
     public boolean isEnabled() {
@@ -73,6 +76,16 @@ public class SafetensorProvider implements StreamingProvider {
 
     @Override
     public ProviderCapabilities capabilities() {
+        var features = new LinkedHashSet<>(Set.of("safetensors", "libtorch-backend", "streaming-native"));
+        features.addAll(AdapterCapabilityProfile.builder()
+                .adapterSupported(true)
+                .adapterTypes(Set.of("lora"))
+                .runtimeApply(false)
+                .precompiledModelPath(false)
+                .rolloutGuard(false)
+                .metricsSchema(true)
+                .build()
+                .toFeatureFlags());
         return ProviderCapabilities.builder()
                 .streaming(true)
                 .embeddings(true)
@@ -82,13 +95,13 @@ public class SafetensorProvider implements StreamingProvider {
                 .structuredOutputs(false)
                 .supportedFormats(Set.of(ModelFormat.SAFETENSORS))
                 .supportedDevices(mergedSupportedDevices())
-                .features(Set.of("safetensors", "djl-backend", "streaming-compat"))
+                .features(Set.copyOf(features))
                 .build();
     }
 
     @Override
     public void initialize(ProviderConfig providerConfig) throws ProviderException.ProviderInitializationException {
-        djlProvider.initialize(providerConfig);
+        libTorchProvider.initialize(providerConfig);
     }
 
     @Override
@@ -106,6 +119,7 @@ public class SafetensorProvider implements StreamingProvider {
 
     @Override
     public Uni<InferenceResponse> infer(ProviderRequest request) {
+        adapterMetricsRecorder.recordRequest(PROVIDER_ID, AdapterMetricTagResolver.resolveAdapterType(request));
         Path resolved = resolveModelPath(request.getModel());
         if (resolved == null || !Files.exists(resolved)) {
             String modelName = friendlyModelName(request.getModel());
@@ -117,13 +131,12 @@ public class SafetensorProvider implements StreamingProvider {
             return Uni.createFrom().failure(validation);
         }
         ProviderRequest delegated = requestWithModelPath(request, resolved);
-        // Use DJL as the primary runtime for safetensor checkpoints.
-        // Loading them through LibTorch's TorchScript path can crash native runtime.
-        return djlProvider.infer(delegated);
+        return libTorchProvider.infer(delegated);
     }
 
     @Override
     public Multi<StreamChunk> inferStream(ProviderRequest request) {
+        adapterMetricsRecorder.recordRequest(PROVIDER_ID, AdapterMetricTagResolver.resolveAdapterType(request));
         Path resolved = resolveModelPath(request.getModel());
         if (resolved == null || !Files.exists(resolved)) {
             String modelName = friendlyModelName(request.getModel());
@@ -135,11 +148,7 @@ public class SafetensorProvider implements StreamingProvider {
             return Multi.createFrom().failure(validation);
         }
         ProviderRequest delegated = requestWithModelPath(request, resolved);
-        // DJL provider is non-streaming; emulate stream with a single response chunk.
-        return djlProvider.infer(delegated)
-                .onItem().transformToMulti(resp -> Multi.createFrom().items(
-                        StreamChunk.of(delegated.getRequestId(), 0, resp.getContent()),
-                        StreamChunk.finalChunk(delegated.getRequestId(), 1, "")));
+        return libTorchProvider.inferStream(delegated);
     }
 
     @Override
@@ -151,11 +160,11 @@ public class SafetensorProvider implements StreamingProvider {
                     .timestamp(Instant.now())
                     .build());
         }
-        return djlProvider.health().map(h -> ProviderHealth.builder()
+        return libTorchProvider.health().map(h -> ProviderHealth.builder()
                 .status(h.status())
                 .message(h.message())
                 .timestamp(Instant.now())
-                .detail("delegate", "djl")
+                .detail("delegate", "libtorch")
                 .build());
     }
 
@@ -224,12 +233,12 @@ public class SafetensorProvider implements StreamingProvider {
     }
 
     private Set<tech.kayys.gollek.spi.model.DeviceType> mergedSupportedDevices() {
-        var devices = new LinkedHashSet<>(djlProvider.capabilities().getSupportedDevices());
-        if (djlProvider != null && djlProvider.capabilities() != null) {
-            devices.addAll(djlProvider.capabilities().getSupportedDevices());
-        }
+        var devices = new LinkedHashSet<tech.kayys.gollek.spi.model.DeviceType>();
         if (libTorchProvider != null && libTorchProvider.capabilities() != null) {
             devices.addAll(libTorchProvider.capabilities().getSupportedDevices());
+        }
+        if (devices.isEmpty()) {
+            devices.add(tech.kayys.gollek.spi.model.DeviceType.CPU);
         }
         return Set.copyOf(devices);
     }

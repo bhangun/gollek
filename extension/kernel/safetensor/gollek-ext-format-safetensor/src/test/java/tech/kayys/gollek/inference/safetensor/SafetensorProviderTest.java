@@ -10,6 +10,7 @@ import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.provider.ProviderCapabilities;
 import tech.kayys.gollek.spi.provider.ProviderHealth;
 import tech.kayys.gollek.spi.provider.ProviderRequest;
+import tech.kayys.gollek.spi.provider.AdapterCapabilityProfile;
 import tech.kayys.gollek.spi.stream.StreamChunk;
 
 import java.nio.file.Files;
@@ -52,6 +53,7 @@ class SafetensorProviderTest {
     void inferDelegatesToLibTorchWithResolvedAbsolutePath() throws Exception {
         Path file = tempDir.resolve("delegate.safetensor");
         Files.writeString(file, "dummy");
+        Files.writeString(tempDir.resolve("config.json"), "{}");
 
         FakeLibTorchProvider delegate = new FakeLibTorchProvider();
         SafetensorProvider provider = newProvider(true, tempDir, ".safetensor");
@@ -74,6 +76,7 @@ class SafetensorProviderTest {
     void inferStreamDelegatesToLibTorchWithResolvedAbsolutePath() throws Exception {
         Path file = tempDir.resolve("stream.safetensor");
         Files.writeString(file, "dummy");
+        Files.writeString(tempDir.resolve("config.json"), "{}");
 
         FakeLibTorchProvider delegate = new FakeLibTorchProvider();
         SafetensorProvider provider = newProvider(true, tempDir, ".safetensor");
@@ -113,6 +116,8 @@ class SafetensorProviderTest {
         assertTrue(capabilities.getSupportedFormats().stream()
                 .anyMatch(format -> "safetensors".equals(format.getId())));
         assertFalse(capabilities.getSupportedDevices().isEmpty());
+        assertTrue(capabilities.getFeatures().contains(AdapterCapabilityProfile.FEATURE_ADAPTER_SUPPORTED));
+        assertTrue(capabilities.getFeatures().contains(AdapterCapabilityProfile.FEATURE_ADAPTER_METRICS_SCHEMA_V1));
     }
 
     private SafetensorProvider newProvider(boolean enabled, Path basePath, String extensions) {
