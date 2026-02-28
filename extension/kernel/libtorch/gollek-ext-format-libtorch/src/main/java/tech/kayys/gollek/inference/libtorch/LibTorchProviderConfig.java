@@ -56,6 +56,11 @@ public interface LibTorchProviderConfig {
     WarmupConfig warmup();
 
     /**
+     * Adapter (PEFT) configuration.
+     */
+    AdapterConfig adapter();
+
+    /**
      * Default generation parameters.
      */
     GenerationConfig generation();
@@ -178,6 +183,27 @@ public interface LibTorchProviderConfig {
          */
         @WithDefault("__warmup__")
         String tenantId();
+    }
+
+    interface AdapterConfig {
+        /**
+         * Whether adapter-aware routing is enabled.
+         */
+        @WithDefault("true")
+        boolean enabled();
+
+        /**
+         * Base directory for relative adapter paths.
+         */
+        @WithDefault("${user.home}/.gollek/models/torchscript/adapters")
+        String basePath();
+
+        /**
+         * If true, adapter_path may point to a precompiled TorchScript model variant.
+         * Runtime LoRA patching is not enabled yet for LibTorch.
+         */
+        @WithDefault("true")
+        boolean allowPrecompiledModelPath();
     }
 
     interface GenerationConfig {

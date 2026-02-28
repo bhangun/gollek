@@ -8,6 +8,7 @@ import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import tech.kayys.gollek.inference.libtorch.core.Tensor;
+import tech.kayys.gollek.spi.inference.AdapterSpec;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 
 import java.nio.file.Path;
@@ -158,7 +159,10 @@ public class ContinuousBatchingManager {
                                     .collect(java.util.stream.Collectors.joining(", ")));
                 }
 
-                processBatch(batch);
+                // Never mix different model/tenant/adapter contexts in one forward pass.
+                for (List<BatchRequest> group : partitionByExecutionKey(batch)) {
+                    processBatch(group);
+                }
                 batchCount.incrementAndGet();
                 totalBatchedRequests.addAndGet(batch.size());
             } catch (InterruptedException e) {
@@ -185,7 +189,7 @@ public class ContinuousBatchingManager {
             var first = batch.get(0);
             LibTorchSessionManager.SessionContext session = null;
             try {
-                session = sessionManager.getSession(first.tenantId(), first.modelId(), config);
+                session = sessionManager.getSession(first.tenantId(), first.modelId(), config, first.adapterSpec());
                 TorchScriptRunner runner = session.runner();
                 Tensor batchedOutput = runner.forward(batchedInput);
 
@@ -196,7 +200,7 @@ public class ContinuousBatchingManager {
                 batchedOutput.close();
             } finally {
                 if (session != null) {
-                    sessionManager.releaseSession(first.tenantId(), first.modelId(), session);
+                    sessionManager.releaseSession(first.tenantId(), first.modelId(), session, first.adapterSpec());
                 }
                 batchedInput.close();
             }
@@ -205,6 +209,16 @@ public class ContinuousBatchingManager {
             batch.forEach(req -> req.future().completeExceptionally(
                     new RuntimeException("Batch inference failed", t)));
         }
+    }
+
+    private List<List<BatchRequest>> partitionByExecutionKey(List<BatchRequest> batch) {
+        java.util.Map<String, List<BatchRequest>> grouped = new java.util.LinkedHashMap<>();
+        for (BatchRequest request : batch) {
+            String key = request.tenantId() + "|" + request.modelId() + "|"
+                    + (request.adapterSpec() == null ? "no-adapter" : request.adapterSpec().cacheKey());
+            grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(request);
+        }
+        return new ArrayList<>(grouped.values());
     }
 
     /**
@@ -258,6 +272,7 @@ public class ContinuousBatchingManager {
     public record BatchRequest(
             String tenantId, String modelId, Path modelPath, String requestId,
             Priority priority, long enqueuedAt,
+            AdapterSpec adapterSpec,
             Tensor input, java.util.function.Function<Tensor, InferenceResponse> handler,
             CompletableFuture<InferenceResponse> future) implements Comparable<BatchRequest> {
 
@@ -266,7 +281,16 @@ public class ContinuousBatchingManager {
                 Tensor input, java.util.function.Function<Tensor, InferenceResponse> handler,
                 CompletableFuture<InferenceResponse> future) {
             this(tenantId, modelId, modelPath, requestId, Priority.NORMAL,
-                    System.nanoTime(), input, handler, future);
+                    System.nanoTime(), null, input, handler, future);
+        }
+
+        public BatchRequest(
+                String tenantId, String modelId, Path modelPath, String requestId,
+                AdapterSpec adapterSpec,
+                Tensor input, java.util.function.Function<Tensor, InferenceResponse> handler,
+                CompletableFuture<InferenceResponse> future) {
+            this(tenantId, modelId, modelPath, requestId, Priority.NORMAL,
+                    System.nanoTime(), adapterSpec, input, handler, future);
         }
 
         @Override
