@@ -117,6 +117,6 @@ class ContinuousBatchingPriorityTest {
         return new BatchRequest(
                 "tenant1", "model1", Path.of("/tmp/model.pt"), requestId,
                 priority, System.nanoTime(),
-                null, t -> null, new CompletableFuture<>());
+                null, null, t -> null, new CompletableFuture<>());
     }
 }

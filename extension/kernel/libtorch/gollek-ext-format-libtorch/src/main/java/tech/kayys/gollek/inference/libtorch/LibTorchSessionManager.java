@@ -4,6 +4,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 import tech.kayys.gollek.inference.libtorch.core.Device;
+import tech.kayys.gollek.spi.inference.AdapterSpec;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -56,8 +57,13 @@ public class LibTorchSessionManager {
      * @return session context
      */
     public SessionContext getSession(String tenantId, String modelId, LibTorchProviderConfig config) {
-        Path modelPath = resolveModelPath(modelId, config);
-        String poolKey = tenantId + ":" + modelId;
+        return getSession(tenantId, modelId, config, null);
+    }
+
+    public SessionContext getSession(String tenantId, String modelId, LibTorchProviderConfig config,
+            AdapterSpec adapterSpec) {
+        Path modelPath = resolveModelPath(modelId, config, adapterSpec);
+        String poolKey = buildPoolKey(tenantId, modelId, adapterSpec);
         SessionPool pool = pools.computeIfAbsent(poolKey,
                 k -> new SessionPool(modelPath, getDevice()));
 
@@ -79,7 +85,11 @@ public class LibTorchSessionManager {
      * Release a session back to the pool.
      */
     public void releaseSession(String tenantId, String modelId, SessionContext session) {
-        String poolKey = tenantId + ":" + modelId;
+        releaseSession(tenantId, modelId, session, null);
+    }
+
+    public void releaseSession(String tenantId, String modelId, SessionContext session, AdapterSpec adapterSpec) {
+        String poolKey = buildPoolKey(tenantId, modelId, adapterSpec);
         SessionPool pool = pools.get(poolKey);
         if (pool != null) {
             pool.release(session);
@@ -98,23 +108,83 @@ public class LibTorchSessionManager {
     }
 
     public Path resolveModelPath(String modelId, LibTorchProviderConfig config) {
+        return resolveModelPath(modelId, config, null);
+    }
+
+    public Path resolveModelPath(String modelId, LibTorchProviderConfig config, AdapterSpec adapterSpec) {
         String basePath = config.model().basePath();
         String extensions = config.model().extensions();
 
         for (String ext : extensions.split(",")) {
             Path path = java.nio.file.Paths.get(basePath, modelId + ext.trim());
             if (java.nio.file.Files.exists(path)) {
-                return path;
+                if (adapterSpec == null) {
+                    return path;
+                }
+                return resolveAdapterModelPath(adapterSpec, config);
             }
         }
 
         // Fallback for absolute paths or already-extensioned IDs
         Path directPath = java.nio.file.Paths.get(modelId);
         if (java.nio.file.Files.exists(directPath)) {
-            return directPath;
+            if (adapterSpec == null) {
+                return directPath;
+            }
+            return resolveAdapterModelPath(adapterSpec, config);
         }
 
         throw new RuntimeException("Model not found: " + modelId + " in " + basePath);
+    }
+
+    private Path resolveAdapterModelPath(AdapterSpec adapterSpec, LibTorchProviderConfig config) {
+        if (adapterSpec == null) {
+            throw new IllegalArgumentException("adapterSpec cannot be null");
+        }
+        if (!config.adapter().enabled()) {
+            throw new IllegalArgumentException("Adapters are disabled for LibTorch provider");
+        }
+        if (!adapterSpec.isType("lora")) {
+            throw new IllegalArgumentException(
+                    "Unsupported adapter_type for LibTorch: " + adapterSpec.type() + " (expected: lora)");
+        }
+        String rawPath = adapterSpec.adapterPath();
+        if (rawPath == null || rawPath.isBlank()) {
+            throw new IllegalArgumentException("adapter_path is required for LibTorch adapter routing");
+        }
+
+        Path adapterPath = Path.of(rawPath);
+        if (!adapterPath.isAbsolute()) {
+            adapterPath = Path.of(config.adapter().basePath()).resolve(adapterPath).normalize();
+        }
+        if (!java.nio.file.Files.exists(adapterPath)) {
+            throw new IllegalArgumentException("Adapter path not found: " + adapterPath);
+        }
+
+        if (!config.adapter().allowPrecompiledModelPath()) {
+            throw new UnsupportedOperationException(
+                    "LibTorch adapter runtime patching is not enabled. Enable "
+                            + "libtorch.provider.adapter.allow-precompiled-model-path=true or provide a merged model.");
+        }
+
+        String name = adapterPath.getFileName().toString().toLowerCase();
+        boolean isModelArtifact = name.endsWith(".pt")
+                || name.endsWith(".pts")
+                || name.endsWith(".pth")
+                || name.endsWith(".bin")
+                || name.endsWith(".safetensors")
+                || name.endsWith(".safetensor");
+        if (!isModelArtifact) {
+            throw new UnsupportedOperationException(
+                    "Adapter path is not a loadable model artifact for LibTorch: " + adapterPath
+                            + ". Runtime LoRA patching is pending; pass a precompiled TorchScript/SafeTensors model.");
+        }
+        return adapterPath;
+    }
+
+    private String buildPoolKey(String tenantId, String modelId, AdapterSpec adapterSpec) {
+        String adapterKey = adapterSpec == null ? "no-adapter" : adapterSpec.cacheKey();
+        return tenantId + ":" + modelId + ":" + adapterKey;
     }
 
     /**

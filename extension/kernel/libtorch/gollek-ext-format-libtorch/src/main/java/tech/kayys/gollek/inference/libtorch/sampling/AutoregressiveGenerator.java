@@ -7,6 +7,7 @@ import tech.kayys.gollek.inference.libtorch.LibTorchProviderConfig;
 import tech.kayys.gollek.inference.libtorch.LibTorchSessionManager;
 import tech.kayys.gollek.inference.libtorch.TorchScriptRunner;
 import tech.kayys.gollek.inference.libtorch.core.Tensor;
+import tech.kayys.gollek.spi.inference.AdapterSpec;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -59,6 +60,14 @@ public class AutoregressiveGenerator {
             String tenantId, String modelId, Path modelPath,
             long[] promptTokens, SamplingStrategy strategy,
             int maxNewTokens, Consumer<Long> onToken) {
+        return generate(tenantId, modelId, modelPath, promptTokens, strategy, maxNewTokens, onToken, null);
+    }
+
+    public List<Long> generate(
+            String tenantId, String modelId, Path modelPath,
+            long[] promptTokens, SamplingStrategy strategy,
+            int maxNewTokens, Consumer<Long> onToken,
+            AdapterSpec adapterSpec) {
 
         List<Long> generated = new ArrayList<>();
 
@@ -68,7 +77,8 @@ public class AutoregressiveGenerator {
             context.add(id);
         }
 
-        LibTorchSessionManager.SessionContext session = sessionManager.getSession(tenantId, modelId, config);
+        LibTorchSessionManager.SessionContext session = sessionManager.getSession(tenantId, modelId, config,
+                adapterSpec);
         try {
             TorchScriptRunner runner = session.runner();
 
@@ -125,7 +135,7 @@ public class AutoregressiveGenerator {
             log.errorf(e, "Autoregressive generation failed at step %d", generated.size());
             throw new RuntimeException("Generation failed", e);
         } finally {
-            sessionManager.releaseSession(tenantId, modelId, session);
+            sessionManager.releaseSession(tenantId, modelId, session, adapterSpec);
         }
 
         return generated;
@@ -138,6 +148,6 @@ public class AutoregressiveGenerator {
             String tenantId, String modelId, Path modelPath,
             long[] promptTokens, SamplingStrategy strategy,
             int maxNewTokens) {
-        return generate(tenantId, modelId, modelPath, promptTokens, strategy, maxNewTokens, null);
+        return generate(tenantId, modelId, modelPath, promptTokens, strategy, maxNewTokens, null, null);
     }
 }

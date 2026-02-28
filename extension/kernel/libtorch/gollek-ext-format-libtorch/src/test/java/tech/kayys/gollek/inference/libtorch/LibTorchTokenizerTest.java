@@ -289,6 +289,26 @@ class LibTorchTokenizerTest {
             }
 
             @Override
+            public AdapterConfig adapter() {
+                return new AdapterConfig() {
+                    @Override
+                    public boolean enabled() {
+                        return true;
+                    }
+
+                    @Override
+                    public String basePath() {
+                        return basePath.resolve("adapters").toString();
+                    }
+
+                    @Override
+                    public boolean allowPrecompiledModelPath() {
+                        return true;
+                    }
+                };
+            }
+
+            @Override
             public GenerationConfig generation() {
                 return new GenerationConfig() {
                     @Override

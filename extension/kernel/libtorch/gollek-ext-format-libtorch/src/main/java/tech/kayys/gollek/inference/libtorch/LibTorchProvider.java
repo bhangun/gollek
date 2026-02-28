@@ -21,6 +21,8 @@ import tech.kayys.gollek.inference.libtorch.sampling.AutoregressiveGenerator;
 import tech.kayys.gollek.inference.libtorch.sampling.SamplingStrategy;
 import tech.kayys.gollek.inference.libtorch.sampling.SamplingStrategyFactory;
 import tech.kayys.gollek.inference.libtorch.util.SafetensorsLoader;
+import tech.kayys.gollek.spi.inference.AdapterSpec;
+import tech.kayys.gollek.spi.inference.AdapterSpecResolver;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.exception.ProviderException;
 import tech.kayys.gollek.spi.model.DeviceType;
@@ -285,6 +287,7 @@ public class LibTorchProvider implements StreamingProvider {
         return Uni.createFrom().item(() -> {
             try {
                 log.debugf("Starting inference for model=%s, tenant=%s", request.getModel(), tenantId);
+                AdapterSpec adapterSpec = resolveAdapterSpec(request);
 
                 LibTorchGenerationParams params = convertToGenerationParams(request);
                 String prompt = renderPrompt(request);
@@ -302,13 +305,13 @@ public class LibTorchProvider implements StreamingProvider {
                 long[] promptTokens = tokenizer.encode(request.getModel(), prompt, true);
 
                 // Use the AutoregressiveGenerator which manages its own session
-                Path modelPath = sessionManager.resolveModelPath(request.getModel(), config);
+                Path modelPath = sessionManager.resolveModelPath(request.getModel(), config, adapterSpec);
                 SamplingStrategy strategy = SamplingStrategyFactory.create(
                         "top_p", params.getTemperature(), params.getTopP(), params.getTopK());
 
                 List<Long> generated = generator.generate(
                         tenantId, request.getModel(), modelPath,
-                        promptTokens, strategy, params.getMaxTokens(), null);
+                        promptTokens, strategy, params.getMaxTokens(), null, adapterSpec);
 
                 // Decode generated tokens back to text
                 String responseText = tokenizer.decode(
@@ -346,6 +349,7 @@ public class LibTorchProvider implements StreamingProvider {
             log.debugf("Starting streaming inference for model=%s, tenant=%s", request.getModel(), tenantId);
 
             try {
+                AdapterSpec adapterSpec = resolveAdapterSpec(request);
                 LibTorchGenerationParams params = convertToGenerationParams(request);
                 String prompt = renderPrompt(request);
 
@@ -356,7 +360,7 @@ public class LibTorchProvider implements StreamingProvider {
                 }
 
                 long[] promptTokens = tokenizer.encode(request.getModel(), prompt, true);
-                Path modelPath = sessionManager.resolveModelPath(request.getModel(), config);
+                Path modelPath = sessionManager.resolveModelPath(request.getModel(), config, adapterSpec);
                 SamplingStrategy strategy = SamplingStrategyFactory.create(
                         "top_p", params.getTemperature(), params.getTopP(), params.getTopK());
 
@@ -373,7 +377,7 @@ public class LibTorchProvider implements StreamingProvider {
                                     request.getRequestId(),
                                     index.getAndIncrement(),
                                     tokenText));
-                        });
+                        }, adapterSpec);
 
                 // Send final chunk
                 emitter.emit(StreamChunk.finalChunk(request.getRequestId(), index.get(), ""));
@@ -523,11 +527,20 @@ public class LibTorchProvider implements StreamingProvider {
                 "tensor-inference", "jit-scripting", "ffm-binding",
                 "safetensors-loading", "streaming-generation",
                 "sampling-strategies",
-                "adapter_spec_v1"));
+                "adapter_spec_v1",
+                "adapter_type_lora",
+                "adapter_precompiled_model_path"));
         if (config.batching().enabled()) {
             features.add("continuous-batching");
         }
         return Set.copyOf(features);
+    }
+
+    private AdapterSpec resolveAdapterSpec(ProviderRequest request) {
+        if (config.adapter() == null || !config.adapter().enabled()) {
+            return null;
+        }
+        return AdapterSpecResolver.fromProviderRequest(request, 1.0f).orElse(null);
     }
 
     /**

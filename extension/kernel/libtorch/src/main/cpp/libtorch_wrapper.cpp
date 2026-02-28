@@ -2,6 +2,7 @@
 #include <torch/script.h>
 #include <iostream>
 #include <vector>
+#include <cmath>
 
 extern "C" {
 
@@ -36,6 +37,49 @@ void* at_jit_module_forward(void* module_ptr, void* input_tensor_ptr) {
 void at_jit_module_free(void* module_ptr) {
     if (module_ptr) {
         delete static_cast<torch::jit::Module*>(module_ptr);
+    }
+}
+
+int at_jit_apply_lora(void* module_ptr, const char* base_name, void* lora_a_ptr, void* lora_b_ptr, float scale) {
+    try {
+        auto module = static_cast<torch::jit::Module*>(module_ptr);
+        auto loraA = *static_cast<at::Tensor*>(lora_a_ptr);
+        auto loraB = *static_cast<at::Tensor*>(lora_b_ptr);
+
+        if (loraA.dim() != 2 || loraB.dim() != 2) {
+            return 4; // invalid tensor rank
+        }
+
+        std::string targetName = std::string(base_name) + ".weight";
+        auto params = module->named_parameters(/*recurse=*/true);
+        for (auto& named : params) {
+            if (named.name != targetName) {
+                continue;
+            }
+
+            torch::NoGradGuard guard;
+            at::Tensor weight = named.value;
+
+            at::Tensor delta = at::matmul(loraB, loraA);
+            if (!delta.sizes().equals(weight.sizes())) {
+                at::Tensor alt = at::matmul(loraA, loraB);
+                if (alt.sizes().equals(weight.sizes())) {
+                    delta = alt;
+                } else {
+                    return 5; // shape mismatch
+                }
+            }
+
+            int64_t rank = loraA.size(0) > 0 ? loraA.size(0) : 1;
+            double factor = static_cast<double>(scale) / static_cast<double>(rank);
+            at::Tensor update = delta.mul(factor).to(weight.device(), weight.scalar_type());
+            weight.add_(update);
+            return 0;
+        }
+        return 2; // target parameter not found
+    } catch (const std::exception& e) {
+        std::cerr << "at_jit_apply_lora error: " << e.what() << std::endl;
+        return -1;
     }
 }
 
