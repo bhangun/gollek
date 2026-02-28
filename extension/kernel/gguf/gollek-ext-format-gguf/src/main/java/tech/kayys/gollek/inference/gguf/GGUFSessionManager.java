@@ -4,6 +4,7 @@ import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
+import tech.kayys.gollek.spi.inference.AdapterSpec;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -49,10 +50,11 @@ public class GGUFSessionManager {
     public record SessionContext(
             String sessionId,
             LlamaCppRunner runner,
+            AdapterSpec adapterSpec,
             Instant createdAt,
             Instant lastUsedAt) {
         public SessionContext touch() {
-            return new SessionContext(sessionId, runner, createdAt, Instant.now());
+            return new SessionContext(sessionId, runner, adapterSpec, createdAt, Instant.now());
         }
 
         public boolean isIdle(Duration timeout) {
@@ -65,14 +67,18 @@ public class GGUFSessionManager {
      */
     private class SessionPool {
         private final String poolKey;
+        private final String requestId;
         private final String modelId;
+        private final AdapterSpec adapterSpec;
         private final GGUFProviderConfig config;
         private final Map<String, SessionContext> sessions = new ConcurrentHashMap<>();
         private final Semaphore permits;
 
-        SessionPool(String poolKey, String modelId, GGUFProviderConfig config) {
+        SessionPool(String poolKey, String requestId, String modelId, AdapterSpec adapterSpec, GGUFProviderConfig config) {
             this.poolKey = poolKey;
+            this.requestId = requestId;
             this.modelId = modelId;
+            this.adapterSpec = adapterSpec;
             this.config = config;
             this.permits = new Semaphore(config.sessionPoolMaxSize(), true);
         }
@@ -120,9 +126,6 @@ public class GGUFSessionManager {
         private SessionContext createSession() {
             String sessionId = java.util.UUID.randomUUID().toString();
 
-            // Extract tenant id from poolKey
-            String requestId = poolKey.split(":")[0];
-
             // Create artifact location
             tech.kayys.gollek.spi.model.ArtifactLocation location = new tech.kayys.gollek.spi.model.ArtifactLocation(
                     resolveModelPath(modelId, config),
@@ -154,6 +157,13 @@ public class GGUFSessionManager {
                     "nBatch", config.batchSize(),
                     "useMmap", config.mmapEnabled(),
                     "useMlock", config.mlockEnabled());
+            if (adapterSpec != null) {
+                runnerConfig = new java.util.HashMap<>(runnerConfig);
+                runnerConfig.put("adapter.type", adapterSpec.type());
+                runnerConfig.put("adapter.id", adapterSpec.adapterId());
+                runnerConfig.put("adapter.path", adapterSpec.adapterPath());
+                runnerConfig.put("adapter.scale", adapterSpec.scale());
+            }
 
             // Create and initialize runner
             LlamaCppRunner runner = new LlamaCppRunner(binding, config, templateService);
@@ -174,6 +184,7 @@ public class GGUFSessionManager {
             return new SessionContext(
                     sessionId,
                     runner,
+                    adapterSpec,
                     Instant.now(),
                     Instant.now());
         }
@@ -254,14 +265,18 @@ public class GGUFSessionManager {
      * @return Session context
      */
     public SessionContext getSession(String requestId, String modelId, GGUFProviderConfig config) {
+        return getSession(requestId, modelId, config, null);
+    }
+
+    public SessionContext getSession(String requestId, String modelId, GGUFProviderConfig config, AdapterSpec adapterSpec) {
         ensureInitialized();
 
-        String poolKey = buildPoolKey(requestId, modelId);
+        String poolKey = buildPoolKey(requestId, modelId, adapterSpec);
 
         // Get or create pool
         SessionPool pool = pools.computeIfAbsent(
                 poolKey,
-                k -> new SessionPool(k, modelId, config));
+                k -> new SessionPool(k, requestId, modelId, adapterSpec, config));
 
         try {
             return pool.acquire();
@@ -275,7 +290,11 @@ public class GGUFSessionManager {
      * Release a session back to the pool
      */
     public void releaseSession(String requestId, String modelId, SessionContext session) {
-        String poolKey = buildPoolKey(requestId, modelId);
+        releaseSession(requestId, modelId, session, session != null ? session.adapterSpec() : null);
+    }
+
+    public void releaseSession(String requestId, String modelId, SessionContext session, AdapterSpec adapterSpec) {
+        String poolKey = buildPoolKey(requestId, modelId, adapterSpec);
         SessionPool pool = pools.get(poolKey);
 
         if (pool != null) {
@@ -321,7 +340,12 @@ public class GGUFSessionManager {
     }
 
     private String buildPoolKey(String requestId, String modelId) {
-        return requestId + ":" + modelId;
+        return buildPoolKey(requestId, modelId, null);
+    }
+
+    private String buildPoolKey(String requestId, String modelId, AdapterSpec adapterSpec) {
+        String adapterKey = adapterSpec == null ? "no-adapter" : adapterSpec.cacheKey();
+        return requestId + ":" + modelId + ":" + adapterKey;
     }
 
     private String resolveModelPath(String modelId, GGUFProviderConfig config) {

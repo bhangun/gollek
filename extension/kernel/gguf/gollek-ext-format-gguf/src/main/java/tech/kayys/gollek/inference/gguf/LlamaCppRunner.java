@@ -43,7 +43,11 @@ public class LlamaCppRunner {
     private final LlamaCppBinding binding;
     private MemorySegment model;
     private MemorySegment context;
+    private MemorySegment activeAdapter;
     private Path modelPath;
+    private String activeAdapterId;
+    private String activeAdapterPath;
+    private float activeAdapterScale = 1.0f;
 
     // Model metadata
     private int eosToken;
@@ -225,6 +229,7 @@ public class LlamaCppRunner {
             this.chatTemplate = binding.getModelMetadata(model, "tokenizer.chat_template");
             log.debugf("Loaded chat template: %s", chatTemplate != null ? "Yes" : "No");
             log.debugf("Model initialized: ctx=%d vocab=%d eos=%d bos=%d", contextSize, vocabSize, eosToken, bosToken);
+            configureAdapter(runnerConfig);
 
             this.initialized = true;
 
@@ -264,6 +269,70 @@ public class LlamaCppRunner {
             return Boolean.parseBoolean(s.trim());
         }
         return defaultValue;
+    }
+
+    private float getFloatConfig(Map<String, Object> config, String key, float defaultValue) {
+        if (config == null || !config.containsKey(key)) {
+            return defaultValue;
+        }
+        Object value = config.get(key);
+        if (value instanceof Number number) {
+            return number.floatValue();
+        }
+        if (value instanceof String s) {
+            try {
+                return Float.parseFloat(s.trim());
+            } catch (NumberFormatException ignored) {
+                return defaultValue;
+            }
+        }
+        return defaultValue;
+    }
+
+    private void configureAdapter(Map<String, Object> runnerConfig) {
+        String adapterType = String.valueOf(runnerConfig.getOrDefault("adapter.type", "lora"));
+        if (!"lora".equalsIgnoreCase(adapterType)) {
+            throw new IllegalArgumentException("GGUF runner only supports adapter.type=lora");
+        }
+        Object rawPath = runnerConfig.get("adapter.path");
+        if (rawPath == null) {
+            return;
+        }
+        String adapterPath = rawPath.toString().trim();
+        if (adapterPath.isBlank()) {
+            return;
+        }
+
+        Path path = Path.of(adapterPath);
+        if (!path.isAbsolute()) {
+            path = path.toAbsolutePath().normalize();
+        }
+        if (!path.toFile().exists()) {
+            throw new RuntimeException("Adapter file not found: " + path);
+        }
+
+        String adapterId = String.valueOf(runnerConfig.getOrDefault("adapter.id", path.getFileName().toString()));
+        float adapterScale = getFloatConfig(runnerConfig, "adapter.scale", 1.0f);
+        MemorySegment handle = null;
+        try {
+            handle = binding.loadLoraAdapter(model, path.toString());
+            binding.setLoraAdapter(context, handle, adapterScale);
+            this.activeAdapter = handle;
+            this.activeAdapterId = adapterId;
+            this.activeAdapterPath = path.toString();
+            this.activeAdapterScale = adapterScale;
+            log.infof("Loaded LoRA adapter %s from %s with scale %.3f",
+                    adapterId, activeAdapterPath, activeAdapterScale);
+        } catch (Exception e) {
+            if (handle != null && !handle.equals(MemorySegment.NULL)) {
+                try {
+                    binding.freeLoraAdapter(handle);
+                } catch (Exception ignored) {
+                    // ignore cleanup failures
+                }
+            }
+            throw new RuntimeException("Failed to load adapter " + adapterId, e);
+        }
     }
 
     private long safeFileSize(Path path) {
@@ -874,6 +943,30 @@ public class LlamaCppRunner {
     }
 
     private void cleanup() {
+        if (context != null && activeAdapter != null && !activeAdapter.equals(MemorySegment.NULL)) {
+            try {
+                binding.removeLoraAdapter(context, activeAdapter);
+            } catch (Exception e) {
+                log.debugf("Failed to remove adapter %s: %s", activeAdapterId, e.getMessage());
+            }
+            try {
+                binding.clearLoraAdapters(context);
+            } catch (Exception e) {
+                log.debugf("Failed to clear adapters from context: %s", e.getMessage());
+            }
+        }
+        if (activeAdapter != null && !activeAdapter.equals(MemorySegment.NULL)) {
+            try {
+                binding.freeLoraAdapter(activeAdapter);
+            } catch (Exception e) {
+                log.debugf("Failed to free adapter %s (%s): %s",
+                        activeAdapterId, activeAdapterPath, e.getMessage());
+            }
+            activeAdapter = null;
+            activeAdapterId = null;
+            activeAdapterPath = null;
+            activeAdapterScale = 1.0f;
+        }
         if (context != null) {
             binding.freeContext(context);
             context = null;

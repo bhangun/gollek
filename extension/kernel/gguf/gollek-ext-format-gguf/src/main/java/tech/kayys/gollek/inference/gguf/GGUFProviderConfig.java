@@ -265,4 +265,32 @@ public interface GGUFProviderConfig {
     @WithName("metrics.enabled")
     @WithDefault("true")
     boolean metricsEnabled();
+
+    /**
+     * Enable LoRA adapter loading.
+     */
+    @WithName("lora.enabled")
+    @WithDefault("true")
+    boolean loraEnabled();
+
+    /**
+     * Base directory for relative LoRA adapter paths.
+     */
+    @WithName("lora.adapter-base-path")
+    @WithDefault("${user.home}/.gollek/models/gguf/adapters")
+    String loraAdapterBasePath();
+
+    /**
+     * Default adapter scale if request does not provide one.
+     */
+    @WithName("lora.default-scale")
+    @WithDefault("1.0")
+    float loraDefaultScale();
+
+    /**
+     * Soft bound for unique active adapters held by the manager cache.
+     */
+    @WithName("lora.max-active-adapters")
+    @WithDefault("128")
+    int loraMaxActiveAdapters();
 }

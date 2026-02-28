@@ -522,7 +522,8 @@ public class LibTorchProvider implements StreamingProvider {
         var features = new java.util.LinkedHashSet<>(List.of(
                 "tensor-inference", "jit-scripting", "ffm-binding",
                 "safetensors-loading", "streaming-generation",
-                "sampling-strategies"));
+                "sampling-strategies",
+                "adapter_spec_v1"));
         if (config.batching().enabled()) {
             features.add("continuous-batching");
         }
