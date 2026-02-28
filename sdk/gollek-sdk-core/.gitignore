@@ -73,6 +73,8 @@ jacoco/
 # Environment specific
 .env
 config/
+!src/main/java/tech/kayys/gollek/sdk/config/
+!src/main/java/tech/kayys/gollek/sdk/config/*.java
 secrets/
 credentials.json
 
