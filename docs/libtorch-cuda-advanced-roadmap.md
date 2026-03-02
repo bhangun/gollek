@@ -25,6 +25,10 @@ Configuration prefix: `libtorch.provider.advanced`
 - `enabled` (`false`): master switch for advanced path.
 - `attention-mode` (`baseline`): `baseline|hybrid_fp8_bf16`.
 - `fp8-rowwise-enabled` (`false`): row-wise quantized weight path.
+- `fp8-rowwise-allowed-tenants` (empty): optional rowwise canary tenant allow-list.
+- `fp8-rowwise-allowed-models` (empty): optional rowwise canary model allow-list.
+- `fp8-rowwise-blocked-tenants` (empty): optional rowwise canary tenant deny-list (takes precedence).
+- `fp8-rowwise-blocked-models` (empty): optional rowwise canary model deny-list (takes precedence).
 - `sage-attention2-enabled` (`false`): experimental SA2-like path.
 - `sage-attention2-allowed-tenants` (empty): optional canary tenant allow-list.
 - `sage-attention2-allowed-models` (empty): optional canary model allow-list.
@@ -67,14 +71,21 @@ Deliverables:
      - Prefill-heavy: 70/30 prefill/decode
      - Balanced: 50/50
      - Decode-heavy: 30/70
+   - Advanced profile segmentation:
+     - `baseline`
+     - `hybrid-fp8-bf16`
+     - `sageattention2-intent` (explicit intent tracking for rollback-only SA2 stage)
 2. Outputs:
    - TTFT p50/p95
    - TPOT p50/p95
    - Throughput (tokens/s, req/s)
    - Adapter switch latency
    - Error rate
-   - GPU utilization + memory bandwidth
+   - Host/GPU telemetry rollups (CPU load, memory usage, GPU utilization/memory when available)
+   - Keep memory bandwidth in external GPU telemetry (Nsight/DCGM)
 3. Reproducible config snapshots (`json`/`yaml`) per run.
+4. Baseline-vs-candidate comparison report via `scripts/bench-compare.sh` (text + JSON deltas).
+5. Matrix gate runner via `scripts/bench-matrix-advanced.sh` (baseline + hybrid + SA2-intent + promotion gates).
 
 Acceptance:
 1. Two consecutive runs differ by <= 5% for primary KPIs.
@@ -165,12 +176,20 @@ A milestone is complete only if:
 Current M2 note:
 - Hybrid path now performs real precision bridging around forward pass: input cast to BF16 (or FP16 fallback), then logits cast back to FP32 for stable sampling. Any runtime failure triggers immediate fallback to baseline via kill-switch.
 - Benchmark harness can optionally capture runtime advanced-mode tags via `--health-url` (`runtime-tags.json`) to correlate run artifacts with effective mode.
+- Benchmark harness now also captures optional host/GPU telemetry (`--telemetry`, `--gpu-telemetry`) into `telemetry.csv` and merges summary rollups into `summary.txt` / `summary.json`.
+- Benchmark harness now supports `--advanced-profile` so baseline/hybrid/SA2-intent runs are explicitly tagged in payloads and artifacts (`advanced_profile`, expected-mode fields).
+- Matrix runner now available: `scripts/bench-matrix-advanced.sh` executes the 3-profile matrix and emits gate pass/fail artifacts for CI.
+- Matrix runner now supports runtime-tag strictness control (`--runtime-tag-gate auto|on|off`) so SA2-intent requested/effective validation can be required when health tags are available.
+- Operations guidance is documented in `docs/benchmark-operations-runbook.md` (workflow policy, thresholds, and gate triage).
 
 Current M3 note (entry):
 - FP8 rowwise activation is now gated by calibration artifact presence (`<model>.fp8.json` / `<model>.fp8calib.json` / `<model>.calibration.json`). Missing calibration forces rowwise off with explicit reason while keeping hybrid/baseline safe.
 - Calibration validation now enforces minimal schema (`version` + non-empty numeric `row_scales`/`scales`) before rowwise mode can activate.
 - Calibration lifecycle now supports load + cache + invalidate semantics with deterministic reload when calibration file content changes.
 - Runtime strictness: hybrid path checks calibration scale count against logits vocab size; mismatch triggers immediate guarded fallback to baseline path.
+- Request-time canary controls now apply to rowwise path with explicit reasons:
+  - allow-list misses: `fp8.rowwise.canary.blocked.tenant|model`
+  - deny-list hits (higher precedence): `fp8.rowwise.canary.denied.tenant|model`
 
 Current M0 note:
 - Effective advanced-mode resolution currently supports explicit SM override via `-Dgollek.libtorch.gpu.sm=<sm>` or `GOLLEK_LIBTORCH_GPU_SM=<sm>` and native symbol probing when available. If SM cannot be resolved, runtime safely falls back to baseline.

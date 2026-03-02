@@ -106,11 +106,6 @@
 
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-opentelemetry</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>io.quarkus</groupId>
             <artifactId>quarkus-smallrye-fault-tolerance</artifactId>
         </dependency>
 
@@ -165,7 +160,8 @@
                 <configuration>
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
-                        <java.util.logging.config.file>${project.basedir}/src/test/resources/jboss-logging.properties</java.util.logging.config.file>
+                        <java.util.logging.config.file>
+                            ${project.basedir}/src/test/resources/jboss-logging.properties</java.util.logging.config.file>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
