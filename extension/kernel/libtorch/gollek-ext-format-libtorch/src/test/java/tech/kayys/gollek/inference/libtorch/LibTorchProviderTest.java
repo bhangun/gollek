@@ -110,6 +110,7 @@ class LibTorchProviderTest {
         Files.writeString(tempDir.resolve("model.pt.fp8.json"), "{\"version\":\"1\",\"row_scales\":[1.0]}");
 
         LibTorchProvider provider = new LibTorchProvider();
+        provider.config = config(true, tempDir, ".pt");
         setEffectiveMode(provider, new LibTorchAdvancedModeResolver.EffectiveAdvancedMode(
                 true,
                 "hybrid_fp8_bf16",

@@ -1,0 +1,220 @@
+name: Benchmark Matrix Strict
+
+on:
+  workflow_dispatch:
+    inputs:
+      endpoint:
+        description: "Inference endpoint URL"
+        required: true
+        type: string
+      health_url:
+        description: "Health endpoint URL (must expose advanced_* runtime tags)"
+        required: true
+        type: string
+      model:
+        description: "Model id"
+        required: false
+        default: "llama-3-8b"
+        type: string
+      requests:
+        description: "Requests per profile"
+        required: false
+        default: "200"
+        type: string
+      concurrency:
+        description: "Concurrency per profile"
+        required: false
+        default: "16"
+        type: string
+      adapters:
+        description: "Adapter cardinality"
+        required: false
+        default: "128"
+        type: string
+      zipf_alpha:
+        description: "Zipf alpha"
+        required: false
+        default: "1.0"
+        type: string
+      mix:
+        description: "Workload mix"
+        required: false
+        default: "balanced"
+        type: choice
+        options:
+          - prefill-heavy
+          - balanced
+          - decode-heavy
+      hybrid_min_throughput_pct:
+        description: "Required hybrid throughput uplift (%)"
+        required: false
+        default: "20"
+        type: string
+      hybrid_max_latency_regress_pct:
+        description: "Max hybrid latency p95 regression (%)"
+        required: false
+        default: "10"
+        type: string
+      hybrid_max_error_regress_abs:
+        description: "Max hybrid absolute error-rate increase"
+        required: false
+        default: "0.005"
+        type: string
+      runtime_tag_gate:
+        description: "Runtime-tag gate mode"
+        required: false
+        default: "on"
+        type: choice
+        options:
+          - on
+          - auto
+          - off
+      artifact_retention_days:
+        description: "Artifact retention in days"
+        required: false
+        default: "30"
+        type: string
+      trend_limit:
+        description: "Trend snapshot lookback run count"
+        required: false
+        default: "100"
+        type: string
+
+jobs:
+  matrix-strict:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate scripts syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/bench-multilora-zipf.sh
+          bash -n scripts/bench-compare.sh
+          bash -n scripts/bench-matrix-advanced.sh
+          bash -n scripts/bench-trend-snapshot.sh
+          bash -n scripts/bench-gate-alert.sh
+
+      - name: Run strict matrix
+        shell: bash
+        env:
+          BENCH_API_KEY: ${{ secrets.GOLEK_BENCH_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          run_name="strict-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          out_root="/tmp/gollek-bench-matrix-strict"
+
+          cmd=(
+            ./scripts/bench-matrix-advanced.sh
+            --endpoint "${{ inputs.endpoint }}"
+            --health-url "${{ inputs.health_url }}"
+            --model "${{ inputs.model }}"
+            --requests "${{ inputs.requests }}"
+            --concurrency "${{ inputs.concurrency }}"
+            --adapters "${{ inputs.adapters }}"
+            --zipf-alpha "${{ inputs.zipf_alpha }}"
+            --mix "${{ inputs.mix }}"
+            --runtime-tag-gate "${{ inputs.runtime_tag_gate }}"
+            --telemetry off
+            --gpu-telemetry auto
+            --hybrid-min-throughput-pct "${{ inputs.hybrid_min_throughput_pct }}"
+            --hybrid-max-latency-regress-pct "${{ inputs.hybrid_max_latency_regress_pct }}"
+            --hybrid-max-error-regress-abs "${{ inputs.hybrid_max_error_regress_abs }}"
+            --out-dir "${out_root}"
+            --name "${run_name}"
+          )
+
+          if [[ -n "${BENCH_API_KEY:-}" ]]; then
+            cmd+=(--api-key "${BENCH_API_KEY}")
+          fi
+
+          set +e
+          "${cmd[@]}"
+          matrix_exit_code="$?"
+          set -e
+
+          echo "RUN_NAME=${run_name}" >> "${GITHUB_ENV}"
+          echo "RUN_DIR=${out_root}/${run_name}" >> "${GITHUB_ENV}"
+          echo "MATRIX_ROOT=${out_root}" >> "${GITHUB_ENV}"
+          echo "MATRIX_EXIT_CODE=${matrix_exit_code}" >> "${GITHUB_ENV}"
+
+      - name: Build trend snapshot
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          trend_dir="${RUN_DIR}/trends"
+          mkdir -p "${trend_dir}"
+          ./scripts/bench-trend-snapshot.sh \
+            --matrix-root "${MATRIX_ROOT}" \
+            --out-csv "${trend_dir}/matrix-gates.csv" \
+            --out-json "${trend_dir}/matrix-gates.json" \
+            --limit "${{ inputs.trend_limit }}"
+
+      - name: Build gate alert summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/bench-gate-alert.sh \
+            --gate-json "${RUN_DIR}/gate-summary.json" \
+            --out-md "${RUN_DIR}/gate-alert.md" | tee "${RUN_DIR}/gate-alert.txt"
+          gate_status="$(grep '^GATE_STATUS=' "${RUN_DIR}/gate-alert.txt" | tail -n1 | cut -d= -f2)"
+          matrix_name="$(grep '^MATRIX_NAME=' "${RUN_DIR}/gate-alert.txt" | tail -n1 | cut -d= -f2)"
+          echo "GATE_STATUS=${gate_status:-UNKNOWN}" >> "${GITHUB_ENV}"
+          echo "ALERT_MATRIX_NAME=${matrix_name:-unknown}" >> "${GITHUB_ENV}"
+
+      - name: Publish run summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "## Strict Matrix Gate Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          sed -n '1,200p' "${RUN_DIR}/gate-summary.txt" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Trend Snapshot (Recent Runs)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          sed -n '1,25p' "${RUN_DIR}/trends/matrix-gates.csv" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Gate Alert" >> "$GITHUB_STEP_SUMMARY"
+          cat "${RUN_DIR}/gate-alert.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Send webhook alert on gate failure
+        if: always() && env.GATE_STATUS == 'FAIL' && secrets.GOLEK_BENCH_ALERT_WEBHOOK != ''
+        shell: bash
+        env:
+          ALERT_WEBHOOK: ${{ secrets.GOLEK_BENCH_ALERT_WEBHOOK }}
+        run: |
+          set -euo pipefail
+          alert_line="$(grep '^Matrix ' "${RUN_DIR}/gate-alert.txt" | head -n1)"
+          payload="$(jq -n \
+            --arg text "Gollek strict benchmark gate failed (${ALERT_MATRIX_NAME}): ${alert_line}" \
+            '{text: $text}')"
+          curl -sS -X POST -H "Content-Type: application/json" -d "${payload}" "${ALERT_WEBHOOK}" >/dev/null
+
+      - name: Upload strict matrix artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-matrix-strict-${{ env.RUN_NAME }}
+          path: ${{ env.RUN_DIR }}
+          if-no-files-found: error
+          retention-days: ${{ inputs.artifact_retention_days }}
+
+      - name: Enforce gate result
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${MATRIX_EXIT_CODE:-1}" != "0" ]]; then
+            echo "Strict matrix gates failed (exit=${MATRIX_EXIT_CODE})."
+            exit "${MATRIX_EXIT_CODE}"
+          fi

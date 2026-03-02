@@ -352,6 +352,26 @@ class LibTorchTokenizerTest {
                     }
 
                     @Override
+                    public Optional<java.util.List<String>> fp8RowwiseAllowedTenants() {
+                        return Optional.empty();
+                    }
+
+                    @Override
+                    public Optional<java.util.List<String>> fp8RowwiseAllowedModels() {
+                        return Optional.empty();
+                    }
+
+                    @Override
+                    public Optional<java.util.List<String>> fp8RowwiseBlockedTenants() {
+                        return Optional.empty();
+                    }
+
+                    @Override
+                    public Optional<java.util.List<String>> fp8RowwiseBlockedModels() {
+                        return Optional.empty();
+                    }
+
+                    @Override
                     public boolean sageAttention2Enabled() {
                         return false;
                     }

@@ -116,12 +116,10 @@
                             <goal>exec</goal>
                         </goals>
                         <configuration>
-                            <executable>cmake</executable>
-                            <workingDirectory>${project.basedir}/../gguf-bridge</workingDirectory>
+                            <executable>bash</executable>
+                            <workingDirectory>${project.basedir}</workingDirectory>
                             <arguments>
-                                <argument>-B</argument>
-                                <argument>build</argument>
-                                <argument>-DCMAKE_BUILD_TYPE=Release</argument>
+                                <argument>${project.basedir}/scripts/configure-gguf-bridge.sh</argument>
                             </arguments>
                         </configuration>
                     </execution>

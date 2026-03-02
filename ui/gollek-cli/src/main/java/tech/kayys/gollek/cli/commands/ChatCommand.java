@@ -72,7 +72,7 @@ public class ChatCommand implements Runnable {
     public String modelId;
 
     @Option(names = {
-            "--provider" }, description = "Provider: litert, gguf, djl, safetensor, libtorch(experimental), ollama, gemini, openai, anthropic, cerebras")
+            "--provider" }, description = "Provider: litert, gguf, djl, safetensor, libtorch(experimental), ollama, gemini, openai, anthropic, cerebras", defaultValue = "gguf")
     public String providerId;
 
     @Option(names = { "--system" }, description = "System prompt")

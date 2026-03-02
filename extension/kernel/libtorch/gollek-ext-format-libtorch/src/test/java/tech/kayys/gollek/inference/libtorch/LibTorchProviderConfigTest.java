@@ -34,6 +34,10 @@ class LibTorchProviderConfigTest {
         assertThat(config.advanced().enabled()).isFalse();
         assertThat(config.advanced().attentionMode()).isEqualTo("baseline");
         assertThat(config.advanced().fp8RowwiseEnabled()).isFalse();
+        assertThat(config.advanced().fp8RowwiseAllowedTenants()).isEmpty();
+        assertThat(config.advanced().fp8RowwiseAllowedModels()).isEmpty();
+        assertThat(config.advanced().fp8RowwiseBlockedTenants()).isEmpty();
+        assertThat(config.advanced().fp8RowwiseBlockedModels()).isEmpty();
         assertThat(config.advanced().sageAttention2Enabled()).isFalse();
         assertThat(config.advanced().sageAttention2AllowedTenants()).isEmpty();
         assertThat(config.advanced().sageAttention2AllowedModels()).isEmpty();

@@ -262,6 +262,7 @@ public class LibTorchProvider implements StreamingProvider {
                         .detail("advanced_detected_gpu_sm",
                                 effectiveAdvancedMode.get().detectedGpuSm().map(Object::toString).orElse("unknown"))
                         .detail("advanced_fp8_rowwise_enabled", effectiveAdvancedMode.get().fp8RowwiseEnabled())
+                        .detail("advanced_fp8_rowwise_requested", effectiveAdvancedMode.get().fp8RowwiseEnabled())
                         .detail("advanced_sage_attention2_requested", effectiveAdvancedMode.get().sageAttention2Requested())
                         .detail("advanced_sage_attention2_enabled", effectiveAdvancedMode.get().sageAttention2Enabled())
                         .detail("advanced_sage_attention2_rollback_reason",

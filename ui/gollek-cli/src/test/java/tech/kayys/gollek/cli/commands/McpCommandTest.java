@@ -5,6 +5,8 @@ import jakarta.json.JsonObject;
 import tech.kayys.gollek.cli.commands.McpCommand;
 
 import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -19,11 +21,47 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class McpCommandTest {
 
     @TempDir
     Path tempHome;
+
+    private String oldRegistryMode;
+    private String oldEnterpriseEnabled;
+    private String oldEdition;
+
+    @BeforeEach
+    void forceLocalRegistryMode() {
+        oldRegistryMode = System.getProperty("gollek.mcp.registry.mode");
+        oldEnterpriseEnabled = System.getProperty("gollek.enterprise.enabled");
+        oldEdition = System.getProperty("gollek.edition");
+
+        // Keep tests deterministic even when CI exports MCP registry env vars.
+        System.setProperty("gollek.mcp.registry.mode", "local");
+        System.setProperty("gollek.enterprise.enabled", "false");
+        System.setProperty("gollek.edition", "community");
+    }
+
+    @AfterEach
+    void restoreRegistryMode() {
+        if (oldRegistryMode == null) {
+            System.clearProperty("gollek.mcp.registry.mode");
+        } else {
+            System.setProperty("gollek.mcp.registry.mode", oldRegistryMode);
+        }
+        if (oldEnterpriseEnabled == null) {
+            System.clearProperty("gollek.enterprise.enabled");
+        } else {
+            System.setProperty("gollek.enterprise.enabled", oldEnterpriseEnabled);
+        }
+        if (oldEdition == null) {
+            System.clearProperty("gollek.edition");
+        } else {
+            System.setProperty("gollek.edition", oldEdition);
+        }
+    }
 
     @Test
     void addCreatesRegistryAndStoresServer() throws Exception {
@@ -414,6 +452,9 @@ class McpCommandTest {
     void addSupportsFromUrl() throws Exception {
         String oldHome = System.getProperty("user.home");
         System.setProperty("user.home", tempHome.toString());
+        PrintStream originalErr = System.err;
+        ByteArrayOutputStream errBuffer = new ByteArrayOutputStream();
+        System.setErr(new PrintStream(errBuffer));
         HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
         server.createContext("/mcp.json", exchange -> {
             String body = "{\"mcpServers\":{\"image-downloader\":{\"command\":\"node\",\"args\":[\"/tmp/index.js\"]}}}";
@@ -433,10 +474,13 @@ class McpCommandTest {
             JsonObject serverObj = McpCommand.loadRegistry()
                     .getJsonObject("mcpServers")
                     .getJsonObject("image-downloader");
+            assertNotNull(serverObj, () -> "Expected image-downloader in local MCP registry. stderr="
+                    + errBuffer.toString(StandardCharsets.UTF_8));
             assertEquals("node", serverObj.getString("command"));
             assertEquals(1, serverObj.getJsonArray("args").size());
         } finally {
             server.stop(0);
+            System.setErr(originalErr);
             if (oldHome == null) {
                 System.clearProperty("user.home");
             } else {

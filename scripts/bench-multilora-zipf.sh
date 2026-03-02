@@ -20,6 +20,10 @@ Options:
   --api-key-header NAME     API key header name (default: X-API-Key)
   --adapter-param-key NAME  Adapter parameter key in request payload (default: adapter_id)
   --health-url URL          Optional runtime health URL to capture advanced mode tags
+  --advanced-profile NAME   benchmark profile: baseline|hybrid-fp8-bf16|sageattention2-intent (default: baseline)
+  --telemetry MODE          Host telemetry mode: auto|on|off (default: auto)
+  --gpu-telemetry MODE      GPU telemetry mode: auto|on|off (default: auto)
+  --sample-interval-sec N   Telemetry sampling interval in seconds (default: 1)
   --out-dir PATH            Output root directory (default: ops/benchmarks)
   --seed N                  Random seed for reproducibility (default: 42)
   --help                    Show this help
@@ -37,6 +41,10 @@ API_KEY=""
 API_KEY_HEADER="X-API-Key"
 ADAPTER_PARAM_KEY="adapter_id"
 HEALTH_URL=""
+ADVANCED_PROFILE="baseline"
+TELEMETRY_MODE="auto"
+GPU_TELEMETRY_MODE="auto"
+SAMPLE_INTERVAL_SEC=1
 OUT_DIR="ops/benchmarks"
 SEED=42
 
@@ -53,6 +61,10 @@ while [[ $# -gt 0 ]]; do
     --api-key-header) API_KEY_HEADER="$2"; shift 2 ;;
     --adapter-param-key) ADAPTER_PARAM_KEY="$2"; shift 2 ;;
     --health-url) HEALTH_URL="$2"; shift 2 ;;
+    --advanced-profile) ADVANCED_PROFILE="$2"; shift 2 ;;
+    --telemetry) TELEMETRY_MODE="$2"; shift 2 ;;
+    --gpu-telemetry) GPU_TELEMETRY_MODE="$2"; shift 2 ;;
+    --sample-interval-sec) SAMPLE_INTERVAL_SEC="$2"; shift 2 ;;
     --out-dir) OUT_DIR="$2"; shift 2 ;;
     --seed) SEED="$2"; shift 2 ;;
     --help) usage; exit 0 ;;
@@ -65,7 +77,27 @@ case "$MIX" in
   *) echo "Invalid --mix: $MIX" >&2; exit 2 ;;
 esac
 
-for cmd in awk sort xargs curl mktemp date; do
+case "$ADVANCED_PROFILE" in
+  baseline|hybrid-fp8-bf16|sageattention2-intent) ;;
+  *) echo "Invalid --advanced-profile: $ADVANCED_PROFILE" >&2; exit 2 ;;
+esac
+
+case "$TELEMETRY_MODE" in
+  auto|on|off) ;;
+  *) echo "Invalid --telemetry: $TELEMETRY_MODE" >&2; exit 2 ;;
+esac
+
+case "$GPU_TELEMETRY_MODE" in
+  auto|on|off) ;;
+  *) echo "Invalid --gpu-telemetry: $GPU_TELEMETRY_MODE" >&2; exit 2 ;;
+esac
+
+if ! [[ "${SAMPLE_INTERVAL_SEC}" =~ ^[0-9]+$ ]] || (( SAMPLE_INTERVAL_SEC <= 0 )); then
+  echo "Invalid --sample-interval-sec: ${SAMPLE_INTERVAL_SEC}" >&2
+  exit 2
+fi
+
+for cmd in awk sed sort xargs curl mktemp date; do
   if ! command -v "${cmd}" >/dev/null 2>&1; then
     echo "Missing required command: ${cmd}" >&2
     exit 127
@@ -77,12 +109,29 @@ if [[ -z "${ADAPTER_PARAM_KEY}" ]]; then
   exit 2
 fi
 
+PROFILE_EXPECTED_MODE="baseline"
+PROFILE_EXPECTED_SAGE_REQUESTED="false"
+PROFILE_EXPECTED_SAGE_ACTIVE="false"
+case "${ADVANCED_PROFILE}" in
+  baseline)
+    PROFILE_EXPECTED_MODE="baseline"
+    ;;
+  hybrid-fp8-bf16)
+    PROFILE_EXPECTED_MODE="hybrid_fp8_bf16"
+    ;;
+  sageattention2-intent)
+    # SA2 is rollback-only today; this profile tracks rollout intent vs effective mode.
+    PROFILE_EXPECTED_MODE="baseline"
+    PROFILE_EXPECTED_SAGE_REQUESTED="true"
+    ;;
+esac
+
 now_iso8601() {
   date -u +"%Y-%m-%dT%H:%M:%SZ"
 }
 
 timestamp="$(date +%Y%m%d-%H%M%S)"
-run_id="zipf-${MIX}-a${ZIPF_ALPHA}-n${REQUESTS}-c${CONCURRENCY}-${timestamp}"
+run_id="zipf-${ADVANCED_PROFILE}-${MIX}-a${ZIPF_ALPHA}-n${REQUESTS}-c${CONCURRENCY}-${timestamp}"
 run_dir="${OUT_DIR}/${run_id}"
 mkdir -p "${run_dir}"
 
@@ -97,7 +146,12 @@ lat_ttft_file="${run_dir}/latency-ttft-ms.txt"
 lat_tpot_file="${run_dir}/latency-tpot-ms.txt"
 status_counts_file="${run_dir}/status-counts.txt"
 adapter_switch_file="${run_dir}/adapter-switch.txt"
+telemetry_csv_file="${run_dir}/telemetry.csv"
+telemetry_summary_file="${run_dir}/telemetry-summary.txt"
 start_epoch="$(date +%s)"
+telemetry_pid=""
+telemetry_enabled="false"
+gpu_telemetry_enabled="false"
 
 cat > "${meta_file}" <<META
 RUN_ID=${run_id}
@@ -112,6 +166,13 @@ SEED=${SEED}
 API_KEY_HEADER=${API_KEY_HEADER}
 ADAPTER_PARAM_KEY=${ADAPTER_PARAM_KEY}
 HEALTH_URL=${HEALTH_URL}
+ADVANCED_PROFILE=${ADVANCED_PROFILE}
+PROFILE_EXPECTED_MODE=${PROFILE_EXPECTED_MODE}
+PROFILE_EXPECTED_SAGE_REQUESTED=${PROFILE_EXPECTED_SAGE_REQUESTED}
+PROFILE_EXPECTED_SAGE_ACTIVE=${PROFILE_EXPECTED_SAGE_ACTIVE}
+TELEMETRY_MODE=${TELEMETRY_MODE}
+GPU_TELEMETRY_MODE=${GPU_TELEMETRY_MODE}
+SAMPLE_INTERVAL_SEC=${SAMPLE_INTERVAL_SEC}
 START_TS=$(now_iso8601)
 META
 
@@ -128,11 +189,18 @@ cat > "${config_json_file}" <<CONFIG
   "seed": ${SEED},
   "api_key_header": "${API_KEY_HEADER}",
   "adapter_param_key": "${ADAPTER_PARAM_KEY}",
-  "health_url": "${HEALTH_URL}"
+  "health_url": "${HEALTH_URL}",
+  "advanced_profile": "${ADVANCED_PROFILE}",
+  "profile_expected_mode": "${PROFILE_EXPECTED_MODE}",
+  "profile_expected_sage_requested": ${PROFILE_EXPECTED_SAGE_REQUESTED},
+  "profile_expected_sage_active": ${PROFILE_EXPECTED_SAGE_ACTIVE},
+  "telemetry_mode": "${TELEMETRY_MODE}",
+  "gpu_telemetry_mode": "${GPU_TELEMETRY_MODE}",
+  "sample_interval_sec": ${SAMPLE_INTERVAL_SEC}
 }
 CONFIG
 
-echo "request_id,phase,adapter_id,http_code,latency_ms,error" > "${result_file}"
+echo "request_id,phase,adapter_id,benchmark_profile,http_code,latency_ms,error" > "${result_file}"
 
 generate_plan() {
   awk -v requests="${REQUESTS}" -v adapters="${ADAPTERS}" -v alpha="${ZIPF_ALPHA}" -v mix="${MIX}" -v seed="${SEED}" '
@@ -183,7 +251,7 @@ build_payload() {
   fi
 
   cat <<PAYLOAD
-{"model":"${MODEL_ID}","requestId":"zipf-${request_id}","messages":[{"role":"user","content":"${prompt}"}],"parameters":{"${ADAPTER_PARAM_KEY}":"${adapter_id}","max_tokens":${max_tokens},"temperature":${temperature},"benchmark_phase":"${phase}"}}
+{"model":"${MODEL_ID}","requestId":"zipf-${ADVANCED_PROFILE}-${request_id}","messages":[{"role":"user","content":"${prompt}"}],"parameters":{"${ADAPTER_PARAM_KEY}":"${adapter_id}","max_tokens":${max_tokens},"temperature":${temperature},"benchmark_phase":"${phase}","benchmark_profile":"${ADVANCED_PROFILE}","benchmark_expected_attention_mode":"${PROFILE_EXPECTED_MODE}","benchmark_expected_sage_attention2_requested":${PROFILE_EXPECTED_SAGE_REQUESTED},"benchmark_expected_sage_attention2_active":${PROFILE_EXPECTED_SAGE_ACTIVE}}}
 PAYLOAD
 }
 
@@ -217,8 +285,8 @@ run_one() {
     error_msg="$(tr '\n' ' ' < "${tmp_out}" | tr ',' ';' | cut -c1-200)"
   fi
 
-  printf "%s,%s,%s,%s,%s,%s\n" \
-    "${request_id}" "${phase}" "${adapter_id}" "${http_code}" "${latency_ms}" "${error_msg}" >> "${result_file}"
+  printf "%s,%s,%s,%s,%s,%s,%s\n" \
+    "${request_id}" "${phase}" "${adapter_id}" "${ADVANCED_PROFILE}" "${http_code}" "${latency_ms}" "${error_msg}" >> "${result_file}"
   rm -f "${tmp_out}"
 }
 
@@ -240,25 +308,235 @@ percentile_from_file() {
   ' "${file}"
 }
 
+detect_telemetry_modes() {
+  if [[ "${TELEMETRY_MODE}" == "on" ]]; then
+    telemetry_enabled="true"
+  elif [[ "${TELEMETRY_MODE}" == "off" ]]; then
+    telemetry_enabled="false"
+  else
+    telemetry_enabled="true"
+  fi
+
+  if [[ "${GPU_TELEMETRY_MODE}" == "on" ]]; then
+    if command -v nvidia-smi >/dev/null 2>&1; then
+      gpu_telemetry_enabled="true"
+    else
+      echo "Warning: --gpu-telemetry=on but nvidia-smi not found; GPU telemetry disabled" >&2
+      gpu_telemetry_enabled="false"
+    fi
+  elif [[ "${GPU_TELEMETRY_MODE}" == "off" ]]; then
+    gpu_telemetry_enabled="false"
+  else
+    if command -v nvidia-smi >/dev/null 2>&1; then
+      gpu_telemetry_enabled="true"
+    else
+      gpu_telemetry_enabled="false"
+    fi
+  fi
+}
+
+read_load_avg() {
+  local uptime_out normalized
+  uptime_out="$(uptime 2>/dev/null || true)"
+  if [[ -z "${uptime_out}" ]]; then
+    echo ",,"
+    return
+  fi
+  normalized="$(echo "${uptime_out}" | sed -E 's/,//g')"
+  awk '
+    {
+      for (i = 1; i <= NF; i++) {
+        if ($i == "average:" || $i == "averages:") {
+          l1 = $(i+1);
+          l5 = $(i+2);
+          l15 = $(i+3);
+          gsub(/[^0-9.]/, "", l1);
+          gsub(/[^0-9.]/, "", l5);
+          gsub(/[^0-9.]/, "", l15);
+          printf("%s,%s,%s\n", l1, l5, l15);
+          exit;
+        }
+      }
+      print ",,";
+    }
+  ' <<< "${normalized}"
+}
+
+read_memory_mb() {
+  local total_mb used_mb
+  if [[ -r /proc/meminfo ]]; then
+    awk '
+      /^MemTotal:/ { total = $2 / 1024.0 }
+      /^MemAvailable:/ { avail = $2 / 1024.0 }
+      END {
+        if (total > 0) {
+          used = total - avail;
+          printf("%.1f,%.1f\n", used, total);
+        } else {
+          print ",";
+        }
+      }
+    ' /proc/meminfo
+    return
+  fi
+
+  if command -v sysctl >/dev/null 2>&1 && command -v vm_stat >/dev/null 2>&1; then
+    total_mb="$(sysctl -n hw.memsize 2>/dev/null | awk '{printf("%.1f", $1/1024.0/1024.0)}')"
+    used_mb="$(vm_stat 2>/dev/null | awk '
+      /page size of/ { gsub(/\./, "", $8); page = $8 + 0; if (page == 0) page = 4096; }
+      /^Pages active:/ { gsub(/\./, "", $3); active = $3 + 0; }
+      /^Pages wired down:/ { gsub(/\./, "", $4); wired = $4 + 0; }
+      /^Pages occupied by compressor:/ { gsub(/\./, "", $5); compressed = $5 + 0; }
+      END {
+        if (page == 0) page = 4096;
+        used_bytes = (active + wired + compressed) * page;
+        printf("%.1f\n", used_bytes/1024.0/1024.0);
+      }
+    ')"
+    if [[ -n "${used_mb}" && -n "${total_mb}" ]]; then
+      echo "${used_mb},${total_mb}"
+      return
+    fi
+  fi
+
+  echo ","
+}
+
+read_gpu_metrics() {
+  if [[ "${gpu_telemetry_enabled}" != "true" ]]; then
+    echo ",,"
+    return
+  fi
+
+  nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null | awk -F',' '
+    {
+      gsub(/ /, "", $1); gsub(/ /, "", $2); gsub(/ /, "", $3);
+      util_sum += $1;
+      mem_used_sum += $2;
+      mem_total_sum += $3;
+      n++;
+    }
+    END {
+      if (n > 0) {
+        printf("%.1f,%.1f,%.1f\n", util_sum / n, mem_used_sum, mem_total_sum);
+      } else {
+        print ",,";
+      }
+    }
+  '
+}
+
+capture_telemetry_sample() {
+  local ts load_vals mem_vals gpu_vals
+  ts="$(date +%s)"
+  load_vals="$(read_load_avg)"
+  mem_vals="$(read_memory_mb)"
+  gpu_vals="$(read_gpu_metrics)"
+  printf "%s,%s,%s,%s\n" "${ts}" "${load_vals}" "${mem_vals}" "${gpu_vals}" >> "${telemetry_csv_file}"
+}
+
+start_telemetry_sampler() {
+  detect_telemetry_modes
+  if [[ "${telemetry_enabled}" != "true" ]]; then
+    return
+  fi
+
+  echo "timestamp_epoch,host_load_1,host_load_5,host_load_15,host_mem_used_mb,host_mem_total_mb,gpu_util_percent,gpu_mem_used_mb,gpu_mem_total_mb" > "${telemetry_csv_file}"
+  (
+    while true; do
+      capture_telemetry_sample || true
+      sleep "${SAMPLE_INTERVAL_SEC}"
+    done
+  ) &
+  telemetry_pid="$!"
+}
+
+stop_telemetry_sampler() {
+  if [[ -n "${telemetry_pid}" ]]; then
+    kill "${telemetry_pid}" >/dev/null 2>&1 || true
+    wait "${telemetry_pid}" 2>/dev/null || true
+  fi
+}
+
+summarize_telemetry() {
+  if [[ ! -f "${telemetry_csv_file}" ]]; then
+    return
+  fi
+
+  awk -F',' '
+    NR == 1 { next }
+    function isnum(v) { return (v ~ /^-?[0-9]+([.][0-9]+)?$/) }
+    {
+      if (isnum($2)) { l1_sum += $2; l1_n++; }
+      if (isnum($5)) {
+        mem_used_sum += $5;
+        mem_used_n++;
+        if ($5 > mem_used_peak) mem_used_peak = $5;
+      }
+      if (isnum($8)) {
+        gpu_used_n++;
+        if ($8 > gpu_used_peak) gpu_used_peak = $8;
+      }
+      if (isnum($7)) {
+        gpu_util[++gpu_n] = $7 + 0.0;
+        gpu_util_sum += $7;
+      }
+    }
+    END {
+      if (l1_n > 0) printf("host_load_1_avg=%.3f\n", l1_sum / l1_n); else print "host_load_1_avg=unknown";
+      if (mem_used_n > 0) {
+        printf("host_mem_used_mb_avg=%.1f\n", mem_used_sum / mem_used_n);
+        printf("host_mem_used_mb_peak=%.1f\n", mem_used_peak);
+      } else {
+        print "host_mem_used_mb_avg=unknown";
+        print "host_mem_used_mb_peak=unknown";
+      }
+      if (gpu_n > 0) {
+        for (i = 1; i <= gpu_n; i++) {
+          for (j = i + 1; j <= gpu_n; j++) {
+            if (gpu_util[i] > gpu_util[j]) {
+              tmp = gpu_util[i];
+              gpu_util[i] = gpu_util[j];
+              gpu_util[j] = tmp;
+            }
+          }
+        }
+        idx = int((0.95 * gpu_n) + 0.999999);
+        if (idx < 1) idx = 1;
+        if (idx > gpu_n) idx = gpu_n;
+        printf("gpu_util_avg=%.1f\n", gpu_util_sum / gpu_n);
+        printf("gpu_util_p95=%.1f\n", gpu_util[idx]);
+      } else {
+        print "gpu_util_avg=unknown";
+        print "gpu_util_p95=unknown";
+      }
+      if (gpu_used_n > 0) printf("gpu_mem_used_mb_peak=%.1f\n", gpu_used_peak);
+      else print "gpu_mem_used_mb_peak=unknown";
+    }
+  ' "${telemetry_csv_file}" > "${telemetry_summary_file}"
+}
+
 summarize_csv() {
   local summary_file="${run_dir}/summary.txt"
   local end_epoch duration_seconds duration_for_rate
   local total ok fail prefill decode
   local p50_all p95_all p50_ttft p95_ttft p50_tpot p95_tpot
   local req_s tokens_s estimated_tokens error_rate adapter_switches adapter_switch_ratio
+  local host_load_1_avg host_mem_used_mb_avg host_mem_used_mb_peak
+  local gpu_util_avg gpu_util_p95 gpu_mem_used_mb_peak
 
   awk -F',' '
     NR==1 { next }
     {
       total++;
-      if ($4 == "200") ok++;
-      if ($4 != "200") fail++;
+      if ($5 == "200") ok++;
+      if ($5 != "200") fail++;
       if ($2 == "prefill") prefill++;
       if ($2 == "decode") decode++;
-      print $5 > "'"${lat_all_file}"'";
-      if ($2 == "prefill") print $5 > "'"${lat_ttft_file}"'";
-      if ($2 == "decode") print $5 > "'"${lat_tpot_file}"'";
-      status[$4]++;
+      print $6 > "'"${lat_all_file}"'";
+      if ($2 == "prefill") print $6 > "'"${lat_ttft_file}"'";
+      if ($2 == "decode") print $6 > "'"${lat_tpot_file}"'";
+      status[$5]++;
     }
     END {
       printf("%d %d %d %d %d\n", total, ok, fail, prefill, decode);
@@ -273,7 +551,7 @@ summarize_csv() {
   : > "${lat_all_file}"
   : > "${lat_ttft_file}"
   : > "${lat_tpot_file}"
-  awk -F',' 'NR>1 { print $5 > "'"${lat_all_file}"'"; if ($2=="prefill") print $5 > "'"${lat_ttft_file}"'"; if ($2=="decode") print $5 > "'"${lat_tpot_file}"'"; }' "${result_file}"
+  awk -F',' 'NR>1 { print $6 > "'"${lat_all_file}"'"; if ($2=="prefill") print $6 > "'"${lat_ttft_file}"'"; if ($2=="decode") print $6 > "'"${lat_tpot_file}"'"; }' "${result_file}"
 
   sort -n "${lat_all_file}" -o "${lat_all_file}" || true
   sort -n "${lat_ttft_file}" -o "${lat_ttft_file}" || true
@@ -312,12 +590,31 @@ summarize_csv() {
   ' "${plan_file}" > "${adapter_switch_file}"
   read -r adapter_switches adapter_switch_ratio < "${adapter_switch_file}"
 
+  host_load_1_avg="unknown"
+  host_mem_used_mb_avg="unknown"
+  host_mem_used_mb_peak="unknown"
+  gpu_util_avg="unknown"
+  gpu_util_p95="unknown"
+  gpu_mem_used_mb_peak="unknown"
+  if [[ -f "${telemetry_summary_file}" ]]; then
+    host_load_1_avg="$(awk -F= '$1=="host_load_1_avg"{print $2}' "${telemetry_summary_file}")"
+    host_mem_used_mb_avg="$(awk -F= '$1=="host_mem_used_mb_avg"{print $2}' "${telemetry_summary_file}")"
+    host_mem_used_mb_peak="$(awk -F= '$1=="host_mem_used_mb_peak"{print $2}' "${telemetry_summary_file}")"
+    gpu_util_avg="$(awk -F= '$1=="gpu_util_avg"{print $2}' "${telemetry_summary_file}")"
+    gpu_util_p95="$(awk -F= '$1=="gpu_util_p95"{print $2}' "${telemetry_summary_file}")"
+    gpu_mem_used_mb_peak="$(awk -F= '$1=="gpu_mem_used_mb_peak"{print $2}' "${telemetry_summary_file}")"
+  fi
+
   cat > "${summary_file}" <<SUMMARY
 
 total=${total}
 ok=${ok}
 fail=${fail}
 error_rate=${error_rate}
+advanced_profile=${ADVANCED_PROFILE}
+profile_expected_mode=${PROFILE_EXPECTED_MODE}
+profile_expected_sage_requested=${PROFILE_EXPECTED_SAGE_REQUESTED}
+profile_expected_sage_active=${PROFILE_EXPECTED_SAGE_ACTIVE}
 prefill=${prefill}
 decode=${decode}
 duration_seconds=${duration_seconds}
@@ -331,12 +628,22 @@ tpot_p50_ms=${p50_tpot}
 tpot_p95_ms=${p95_tpot}
 adapter_switches=${adapter_switches}
 adapter_switch_ratio=${adapter_switch_ratio}
+host_load_1_avg=${host_load_1_avg}
+host_mem_used_mb_avg=${host_mem_used_mb_avg}
+host_mem_used_mb_peak=${host_mem_used_mb_peak}
+gpu_util_avg=${gpu_util_avg}
+gpu_util_p95=${gpu_util_p95}
+gpu_mem_used_mb_peak=${gpu_mem_used_mb_peak}
 SUMMARY
   cat "${summary_file}"
 
   cat > "${summary_json_file}" <<JSON
 {
   "run_id": "${run_id}",
+  "advanced_profile": "${ADVANCED_PROFILE}",
+  "profile_expected_mode": "${PROFILE_EXPECTED_MODE}",
+  "profile_expected_sage_requested": ${PROFILE_EXPECTED_SAGE_REQUESTED},
+  "profile_expected_sage_active": ${PROFILE_EXPECTED_SAGE_ACTIVE},
   "total": ${total},
   "ok": ${ok},
   "fail": ${fail},
@@ -353,7 +660,13 @@ SUMMARY
   "tpot_p50_ms": ${p50_tpot},
   "tpot_p95_ms": ${p95_tpot},
   "adapter_switches": ${adapter_switches},
-  "adapter_switch_ratio": ${adapter_switch_ratio}
+  "adapter_switch_ratio": ${adapter_switch_ratio},
+  "host_load_1_avg": "${host_load_1_avg}",
+  "host_mem_used_mb_avg": "${host_mem_used_mb_avg}",
+  "host_mem_used_mb_peak": "${host_mem_used_mb_peak}",
+  "gpu_util_avg": "${gpu_util_avg}",
+  "gpu_util_p95": "${gpu_util_p95}",
+  "gpu_mem_used_mb_peak": "${gpu_mem_used_mb_peak}"
 }
 JSON
 }
@@ -365,7 +678,7 @@ capture_runtime_tags() {
 
   local tmp_health enabled mode reason detected_sm
   local sage_requested sage_active sage_reason
-  local rowwise_active rowwise_reason rowwise_scale_count rowwise_scale_mean rowwise_calibration_source
+  local rowwise_requested rowwise_active rowwise_reason rowwise_scale_count rowwise_scale_mean rowwise_calibration_source
   tmp_health="$(mktemp)"
   if [[ -n "${API_KEY}" ]]; then
     curl -s -H "${API_KEY_HEADER}: ${API_KEY}" "${HEALTH_URL}" -o "${tmp_health}" 2>/dev/null || true
@@ -387,6 +700,7 @@ capture_runtime_tags() {
     sage_requested="$(jq -r '.. | .advanced_sage_attention2_requested? // empty' "${tmp_health}" | head -n1)"
     sage_active="$(jq -r '.. | .advanced_sage_attention2_active? // empty' "${tmp_health}" | head -n1)"
     sage_reason="$(jq -r '.. | .advanced_sage_attention2_reason? // empty' "${tmp_health}" | head -n1)"
+    rowwise_requested="$(jq -r '.. | .advanced_fp8_rowwise_requested? // empty' "${tmp_health}" | head -n1)"
     rowwise_active="$(jq -r '.. | .advanced_fp8_rowwise_active? // empty' "${tmp_health}" | head -n1)"
     rowwise_reason="$(jq -r '.. | .advanced_fp8_rowwise_reason? // empty' "${tmp_health}" | head -n1)"
     rowwise_scale_count="$(jq -r '.. | .advanced_fp8_rowwise_scale_count? // empty' "${tmp_health}" | head -n1)"
@@ -400,6 +714,7 @@ capture_runtime_tags() {
     sage_requested="$(grep -o '"advanced_sage_attention2_requested"[[:space:]]*:[[:space:]]*[^,}]*' "${tmp_health}" | head -n1 | awk -F: '{gsub(/[\" ]/, "", $2); print $2}')"
     sage_active="$(grep -o '"advanced_sage_attention2_active"[[:space:]]*:[[:space:]]*[^,}]*' "${tmp_health}" | head -n1 | awk -F: '{gsub(/[\" ]/, "", $2); print $2}')"
     sage_reason="$(grep -o '"advanced_sage_attention2_reason"[[:space:]]*:[[:space:]]*"[^"]*"' "${tmp_health}" | head -n1 | cut -d'"' -f4)"
+    rowwise_requested="$(grep -o '"advanced_fp8_rowwise_requested"[[:space:]]*:[[:space:]]*[^,}]*' "${tmp_health}" | head -n1 | awk -F: '{gsub(/[\" ]/, "", $2); print $2}')"
     rowwise_active="$(grep -o '"advanced_fp8_rowwise_active"[[:space:]]*:[[:space:]]*[^,}]*' "${tmp_health}" | head -n1 | awk -F: '{gsub(/[\" ]/, "", $2); print $2}')"
     rowwise_reason="$(grep -o '"advanced_fp8_rowwise_reason"[[:space:]]*:[[:space:]]*"[^"]*"' "${tmp_health}" | head -n1 | cut -d'"' -f4)"
     rowwise_scale_count="$(grep -o '"advanced_fp8_rowwise_scale_count"[[:space:]]*:[[:space:]]*[^,}]*' "${tmp_health}" | head -n1 | awk -F: '{gsub(/[\" ]/, "", $2); print $2}')"
@@ -414,6 +729,12 @@ capture_runtime_tags() {
   sage_requested="${sage_requested:-unknown}"
   sage_active="${sage_active:-unknown}"
   sage_reason="${sage_reason:-unknown}"
+  if [[ -z "${rowwise_requested:-}" ]]; then
+    # Backward compatibility with older health payloads
+    rowwise_requested="$(grep -o '"advanced_fp8_rowwise_enabled"[[:space:]]*:[[:space:]]*[^,}]*' "${tmp_health}" | head -n1 | awk -F: '{gsub(/[\" ]/, "", $2); print $2}')"
+  fi
+
+  rowwise_requested="${rowwise_requested:-unknown}"
   rowwise_active="${rowwise_active:-unknown}"
   rowwise_reason="${rowwise_reason:-unknown}"
   rowwise_scale_count="${rowwise_scale_count:-unknown}"
@@ -430,6 +751,7 @@ capture_runtime_tags() {
   "advanced_sage_attention2_requested": "${sage_requested}",
   "advanced_sage_attention2_active": "${sage_active}",
   "advanced_sage_attention2_reason": "${sage_reason}",
+  "advanced_fp8_rowwise_requested": "${rowwise_requested}",
   "advanced_fp8_rowwise_active": "${rowwise_active}",
   "advanced_fp8_rowwise_reason": "${rowwise_reason}",
   "advanced_fp8_rowwise_scale_count": "${rowwise_scale_count}",
@@ -455,11 +777,17 @@ merge_runtime_tags_into_summary() {
 export -f build_payload
 export -f run_one
 export MODEL_ID ENDPOINT API_KEY API_KEY_HEADER ADAPTER_PARAM_KEY result_file
+export ADVANCED_PROFILE PROFILE_EXPECTED_MODE PROFILE_EXPECTED_SAGE_REQUESTED PROFILE_EXPECTED_SAGE_ACTIVE
 
 generate_plan
+start_telemetry_sampler
+trap 'stop_telemetry_sampler' EXIT
 cat "${plan_file}" | xargs -I{} -P "${CONCURRENCY}" bash -lc 'run_one "$@"' _ "{}"
+stop_telemetry_sampler
+trap - EXIT
 
 echo "END_TS=$(now_iso8601)" >> "${meta_file}"
+summarize_telemetry
 summarize_csv
 capture_runtime_tags
 merge_runtime_tags_into_summary

@@ -196,6 +196,10 @@ libtorch:
       enabled: ${LIBTORCH_ADVANCED_ENABLED:false}
       attention-mode: ${LIBTORCH_ADVANCED_ATTENTION_MODE:baseline}
       fp8-rowwise-enabled: ${LIBTORCH_ADVANCED_FP8_ROWWISE_ENABLED:false}
+      fp8-rowwise-allowed-tenants: ${LIBTORCH_ADVANCED_FP8_ROWWISE_ALLOWED_TENANTS:}
+      fp8-rowwise-allowed-models: ${LIBTORCH_ADVANCED_FP8_ROWWISE_ALLOWED_MODELS:}
+      fp8-rowwise-blocked-tenants: ${LIBTORCH_ADVANCED_FP8_ROWWISE_BLOCKED_TENANTS:}
+      fp8-rowwise-blocked-models: ${LIBTORCH_ADVANCED_FP8_ROWWISE_BLOCKED_MODELS:}
       sage-attention2-enabled: ${LIBTORCH_ADVANCED_SAGE2_ENABLED:false}
       sage-attention2-allowed-tenants: ${LIBTORCH_ADVANCED_SAGE2_ALLOWED_TENANTS:}
       sage-attention2-allowed-models: ${LIBTORCH_ADVANCED_SAGE2_ALLOWED_MODELS:}
