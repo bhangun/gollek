@@ -114,11 +114,15 @@
                 <version>3.13.0</version>
                 <configuration>
                     <release>25</release>
+                    <compilerArgs>
+                    </compilerArgs>
                 </configuration>
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
+                <configuration>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>io.smallrye</groupId>

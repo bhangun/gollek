@@ -7,13 +7,15 @@ import java.lang.foreign.ValueLayout;
 /**
  * Pre-allocated contiguous memory pool for KV-Cache blocks.
  * <p>
- * Manages a large slab of off-heap memory using the Java FFM API ({@link Arena}).
+ * Manages a large slab of off-heap memory using the Java FFM API
+ * ({@link Arena}).
  * Each block stores Keys and Values for {@code blockSize} tokens across all
  * model layers and heads.
  * <p>
  * In production with GPU support, this would allocate GPU VRAM via LibTorch.
  * In CPU mode (default for development), it uses {@link Arena#ofShared()} for
- * off-heap native memory that is thread-safe and can be passed to native kernels.
+ * off-heap native memory that is thread-safe and can be passed to native
+ * kernels.
  * <p>
  * The pool is a flat contiguous memory region. Individual blocks are accessed
  * by computing byte offsets: {@code blockId × bytesPerBlock}.
@@ -110,7 +112,9 @@ public class PhysicalBlockPool implements AutoCloseable {
      * @return a MemorySegment containing the block IDs as native ints
      */
     public MemorySegment packBlockTable(int[] blockIds) {
-        return arena.allocateFrom(ValueLayout.JAVA_INT, blockIds);
+        MemorySegment segment = arena.allocate((long) blockIds.length * ValueLayout.JAVA_INT.byteSize());
+        segment.copyFrom(MemorySegment.ofArray(blockIds));
+        return segment;
     }
 
     /**

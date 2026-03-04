@@ -14,8 +14,8 @@
     <description>Model converter for GGUF format with FFM bindings</description>
 
     <properties>
-        <maven.compiler.release>25</maven.compiler.release>
-        <quarkus.version>3.31.2</quarkus.version>
+        <maven.compiler.release>21</maven.compiler.release>
+        <quarkus.version>${quarkus.platform.version}</quarkus.version>
         <native.library.path>${project.basedir}/../gguf-bridge/build</native.library.path>
     </properties>
 
@@ -97,6 +97,7 @@
                         <maven.home>${maven.home}</maven.home>
                     </systemPropertyVariables>
                     <argLine>
+                        --enable-preview
                         --enable-native-access=ALL-UNNAMED
                         -Djava.library.path=${native.library.path}
                     </argLine>

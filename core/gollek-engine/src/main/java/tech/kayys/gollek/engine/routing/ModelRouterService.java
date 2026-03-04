@@ -83,6 +83,9 @@ public class ModelRouterService {
         @Inject
         RequestConfigRepository requestConfigRepository;
 
+        @Inject
+        tech.kayys.gollek.engine.config.ModelConfig modelConfig;
+
         private final Map<String, RoutingDecision> decisionCache = new ConcurrentHashMap<>();
 
         /**
@@ -92,7 +95,17 @@ public class ModelRouterService {
                         String modelId,
                         InferenceRequest request) {
 
-                return modelRepository.findById(modelId, getTenantId(request))
+                String effectiveModelId = (modelId == null || modelId.isBlank())
+                                ? modelConfig.defaultModel().orElse(modelId)
+                                : modelId;
+
+                if (effectiveModelId == null || effectiveModelId.isBlank()) {
+                        return Uni.createFrom().failure(new ModelException(
+                                        tech.kayys.gollek.spi.error.ErrorCode.MODEL_NOT_FOUND,
+                                        "No model specified and no default-model configured"));
+                }
+
+                return modelRepository.findById(effectiveModelId, getTenantId(request))
                                 .onItem().transform(manifest -> manifest != null ? manifest
                                                 : createDirectPathManifest(modelId, request))
                                 .onItem().transform(manifest -> manifest != null ? manifest
@@ -130,7 +143,17 @@ public class ModelRouterService {
                         String modelId,
                         InferenceRequest request) {
 
-                return modelRepository.findById(modelId, getTenantId(request))
+                String effectiveModelId = (modelId == null || modelId.isBlank())
+                                ? modelConfig.defaultModel().orElse(modelId)
+                                : modelId;
+
+                if (effectiveModelId == null || effectiveModelId.isBlank()) {
+                        return Multi.createFrom().failure(new ModelException(
+                                        tech.kayys.gollek.spi.error.ErrorCode.MODEL_NOT_FOUND,
+                                        "No model specified and no default-model configured"));
+                }
+
+                return modelRepository.findById(effectiveModelId, getTenantId(request))
                                 .onItem().transform(manifest -> manifest != null ? manifest
                                                 : createDirectPathManifest(modelId, request))
                                 .onItem().transform(manifest -> manifest != null ? manifest
@@ -257,7 +280,8 @@ public class ModelRouterService {
                                 .collect(Collectors.toList());
 
                 if (candidates.isEmpty()) {
-                        Optional<ProviderCandidate> ggufFallback = tryGgufFallback(providers, manifest, context, checkRequest);
+                        Optional<ProviderCandidate> ggufFallback = tryGgufFallback(providers, manifest, context,
+                                        checkRequest);
                         if (ggufFallback.isPresent()) {
                                 ProviderCandidate fallback = ggufFallback.get();
                                 LOG.warnf("Using GGUF fallback provider for model %s", manifest.modelId());
@@ -348,7 +372,8 @@ public class ModelRouterService {
                         LOG.debugf("Skipping provider %s for adapter request due to adapter_unsupported capability",
                                         provider.id());
                         if (adapterRoutingMetricsCollector != null) {
-                                String tenantId = String.valueOf(request.getMetadata().getOrDefault("tenantId", "community"));
+                                String tenantId = String
+                                                .valueOf(request.getMetadata().getOrDefault("tenantId", "community"));
                                 adapterRoutingMetricsCollector.recordProviderFiltered(
                                                 "model-router-service",
                                                 provider.id(),
@@ -521,10 +546,13 @@ public class ModelRouterService {
                 String tenantId = getTenantId(request);
                 RequestContext context = RequestContext.forTenant(tenantId, request.getRequestId());
 
+                String preferredProvider = request.getPreferredProvider()
+                                .orElseGet(() -> modelConfig.defaultProvider());
+
                 return RoutingContext.builder()
                                 .request(request)
                                 .requestContext(context)
-                                .preferredProvider(request.getPreferredProvider().orElse(null))
+                                .preferredProvider(preferredProvider)
                                 .deviceHint(extractDeviceHint(request).orElse(null))
                                 .timeout(timeout)
                                 .costSensitive(isCostSensitive(request, context))

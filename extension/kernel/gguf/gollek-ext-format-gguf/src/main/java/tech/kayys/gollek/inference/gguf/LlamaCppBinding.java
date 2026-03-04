@@ -1684,7 +1684,7 @@ public class LlamaCppBinding {
                 return null;
             }
 
-            return buf.getString(0);
+            return buf.getString(0L);
         } catch (Throwable e) {
             log.warnf("Failed to get metadata key %s: %s", key, e.getMessage());
             return null;

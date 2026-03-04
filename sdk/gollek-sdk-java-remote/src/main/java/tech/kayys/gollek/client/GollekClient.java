@@ -607,6 +607,29 @@ public class GollekClient implements GollekSdk {
         }
     }
 
+    // ==================== System Operations ====================
+
+    @Override
+    public tech.kayys.gollek.sdk.model.SystemInfo getSystemInfo() throws SdkException {
+        try {
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/system/info"))
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            return handleResponse(response, tech.kayys.gollek.sdk.model.SystemInfo.class);
+        } catch (GollekClientException e) {
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_SYSTEM_INFO", "Failed to get system info", e);
+        }
+    }
+
     private static String normalizeApiKey(String apiKey) {
         if (apiKey == null || apiKey.isBlank()) {
             return ApiKeyConstants.COMMUNITY_API_KEY;

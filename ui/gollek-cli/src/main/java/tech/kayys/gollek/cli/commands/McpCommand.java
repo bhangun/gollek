@@ -7,7 +7,6 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
-import tech.kayys.gollek.sdk.local.GollekLocalClient;
 import tech.kayys.gollek.sdk.mcp.McpAddRequest;
 import tech.kayys.gollek.sdk.mcp.McpEditRequest;
 import tech.kayys.gollek.sdk.mcp.McpDoctorReport;
@@ -15,16 +14,6 @@ import tech.kayys.gollek.sdk.mcp.McpTestEntry;
 import tech.kayys.gollek.sdk.mcp.McpTestReport;
 import tech.kayys.gollek.sdk.mcp.McpRegistryManager;
 import tech.kayys.gollek.mcp.registry.McpRegistryEngine;
-import tech.kayys.gollek.spi.inference.InferenceRequest;
-import tech.kayys.gollek.spi.inference.InferenceResponse;
-import tech.kayys.gollek.spi.stream.StreamChunk;
-import tech.kayys.gollek.sdk.model.ModelInfo;
-import tech.kayys.gollek.sdk.model.PullProgress;
-import tech.kayys.gollek.spi.inference.AsyncJobStatus;
-import tech.kayys.gollek.spi.inference.BatchInferenceRequest;
-import tech.kayys.gollek.spi.provider.ProviderInfo;
-import io.smallrye.mutiny.Multi;
-import java.util.concurrent.CompletableFuture;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonReader;
@@ -65,100 +54,14 @@ public class McpCommand implements Runnable {
 
     static abstract class McpSubcommand {
         @Inject
-        GollekLocalClient localClient;
+        McpRegistryManager mcpRegistry;
 
-        GollekLocalClient client() {
-            if (localClient == null) {
+        McpRegistryManager registry() {
+            if (mcpRegistry == null) {
                 // Fallback for non-CDI environments (e.g. McpCommandTest)
-                return new GollekLocalClient() {
-                    private final McpRegistryManager registry = new McpRegistryEngine();
-
-                    @Override
-                    public InferenceResponse createCompletion(InferenceRequest request) {
-                        return null;
-                    }
-
-                    @Override
-                    public CompletableFuture<InferenceResponse> createCompletionAsync(InferenceRequest request) {
-                        return null;
-                    }
-
-                    @Override
-                    public Multi<StreamChunk> streamCompletion(InferenceRequest request) {
-                        return null;
-                    }
-
-                    @Override
-                    public String submitAsyncJob(InferenceRequest request) {
-                        return null;
-                    }
-
-                    @Override
-                    public AsyncJobStatus getJobStatus(String jobId) {
-                        return null;
-                    }
-
-                    @Override
-                    public AsyncJobStatus waitForJob(String jobId, java.time.Duration maxWaitTime,
-                            java.time.Duration pollInterval) {
-                        return null;
-                    }
-
-                    @Override
-                    public List<InferenceResponse> batchInference(BatchInferenceRequest batchRequest) {
-                        return null;
-                    }
-
-                    @Override
-                    public List<ProviderInfo> listAvailableProviders() {
-                        return List.of();
-                    }
-
-                    @Override
-                    public ProviderInfo getProviderInfo(String providerId) {
-                        return null;
-                    }
-
-                    @Override
-                    public void setPreferredProvider(String providerId) {
-                    }
-
-                    @Override
-                    public java.util.Optional<String> getPreferredProvider() {
-                        return java.util.Optional.empty();
-                    }
-
-                    @Override
-                    public List<ModelInfo> listModels() {
-                        return List.of();
-                    }
-
-                    @Override
-                    public List<ModelInfo> listModels(int offset, int limit) {
-                        return List.of();
-                    }
-
-                    @Override
-                    public java.util.Optional<ModelInfo> getModelInfo(String modelId) {
-                        return java.util.Optional.empty();
-                    }
-
-                    @Override
-                    public void pullModel(String modelSpec,
-                            java.util.function.Consumer<PullProgress> progressCallback) {
-                    }
-
-                    @Override
-                    public void deleteModel(String modelId) {
-                    }
-
-                    @Override
-                    public McpRegistryManager mcpRegistry() {
-                        return registry;
-                    }
-                };
+                return new McpRegistryEngine();
             }
-            return localClient;
+            return mcpRegistry;
         }
     }
 
@@ -235,7 +138,7 @@ public class McpCommand implements Runnable {
                                 "--list-from-registry cannot be combined with structured add flags.");
                     }
                     String selector = (server != null && !server.isBlank()) ? server.trim() : null;
-                    List<String> discovered = client().mcpRegistry().add(new McpAddRequest(
+                    List<String> discovered = registry().add(new McpAddRequest(
                             inlineJson,
                             filePath,
                             fromUrl,
@@ -258,7 +161,7 @@ public class McpCommand implements Runnable {
 
                 String requestName = (server != null && !server.isBlank()) ? server.trim() : name;
 
-                List<String> upserted = client().mcpRegistry().add(new McpAddRequest(
+                List<String> upserted = registry().add(new McpAddRequest(
                         inlineJson,
                         filePath,
                         fromUrl,
@@ -272,7 +175,7 @@ public class McpCommand implements Runnable {
                         enabled));
 
                 System.out.printf("Saved %d MCP server(s): %s%n", upserted.size(), String.join(", ", upserted));
-                System.out.printf("Registry: %s%n", client().mcpRegistry().registryPath());
+                System.out.printf("Registry: %s%n", registry().registryPath());
             } catch (Exception e) {
                 System.err.println("Failed to add MCP config: " + e.getMessage());
             }
@@ -301,7 +204,7 @@ public class McpCommand implements Runnable {
         @Override
         public void run() {
             try {
-                var server = client().mcpRegistry().show(name);
+                var server = registry().show(name);
 
                 if (json) {
                     System.out.println(server.rawJson());
@@ -339,11 +242,11 @@ public class McpCommand implements Runnable {
                     merge = false;
                 }
 
-                int imported = client().mcpRegistry().importFromFile(filePath, replace);
-                int total = client().mcpRegistry().list().size();
+                int imported = registry().importFromFile(filePath, replace);
+                int total = registry().list().size();
                 System.out.printf("Imported %d server(s) from %s%n", imported, filePath);
                 System.out.printf("Registry now has %d server(s)%n", total);
-                System.out.printf("Registry: %s%n", client().mcpRegistry().registryPath());
+                System.out.printf("Registry: %s%n", registry().registryPath());
             } catch (Exception e) {
                 System.err.println("Failed to import MCP config: " + e.getMessage());
             }
@@ -364,7 +267,7 @@ public class McpCommand implements Runnable {
         @Override
         public void run() {
             try {
-                int exported = client().mcpRegistry().exportToFile(filePath, name);
+                int exported = registry().exportToFile(filePath, name);
                 System.out.printf("Exported %d server(s) to %s%n", exported, filePath);
             } catch (Exception e) {
                 System.err.println("Failed to export MCP config: " + e.getMessage());
@@ -380,9 +283,9 @@ public class McpCommand implements Runnable {
         @Override
         public void run() {
             try {
-                client().mcpRegistry().remove(name);
+                registry().remove(name);
                 System.out.printf("Removed MCP server: %s%n", name);
-                System.out.printf("Registry: %s%n", client().mcpRegistry().registryPath());
+                System.out.printf("Registry: %s%n", registry().registryPath());
             } catch (Exception e) {
                 System.err.println("Failed to remove MCP config: " + e.getMessage());
             }
@@ -400,7 +303,7 @@ public class McpCommand implements Runnable {
         @Override
         public void run() {
             try {
-                client().mcpRegistry().rename(oldName, newName);
+                registry().rename(oldName, newName);
                 System.out.printf("Renamed MCP server '%s' -> '%s'%n", oldName, newName);
             } catch (Exception e) {
                 System.err.println("Failed to rename MCP config: " + e.getMessage());
@@ -447,7 +350,7 @@ public class McpCommand implements Runnable {
                     throw new IllegalArgumentException("Use either --env-json or --clear-env, not both.");
                 }
 
-                client().mcpRegistry().edit(new McpEditRequest(
+                registry().edit(new McpEditRequest(
                         name, transport, command, url, argsJson, clearArgs, envJson, clearEnv, enabled));
 
                 System.out.printf("Updated MCP server: %s%n", name);
@@ -465,7 +368,7 @@ public class McpCommand implements Runnable {
         @Override
         public void run() {
             try {
-                client().mcpRegistry().setEnabled(name, true);
+                registry().setEnabled(name, true);
                 System.out.printf("Enabled MCP server: %s%n", name);
             } catch (Exception e) {
                 System.err.println("Failed to update MCP config: " + e.getMessage());
@@ -481,7 +384,7 @@ public class McpCommand implements Runnable {
         @Override
         public void run() {
             try {
-                client().mcpRegistry().setEnabled(name, false);
+                registry().setEnabled(name, false);
                 System.out.printf("Disabled MCP server: %s%n", name);
             } catch (Exception e) {
                 System.err.println("Failed to update MCP config: " + e.getMessage());
@@ -494,17 +397,17 @@ public class McpCommand implements Runnable {
         @Override
         public void run() {
             try {
-                var servers = client().mcpRegistry().list();
+                var servers = registry().list();
                 if (servers.isEmpty()) {
                     System.out.printf("No MCP servers configured. Registry: %s%n",
-                            client().mcpRegistry().registryPath());
+                            registry().registryPath());
                     return;
                 }
 
                 System.out.println("MCP servers:");
                 servers.forEach(entry -> System.out.printf("- %s (%s)%n", entry.name(),
                         entry.enabled() ? "enabled" : "disabled"));
-                System.out.printf("Registry: %s%n", client().mcpRegistry().registryPath());
+                System.out.printf("Registry: %s%n", registry().registryPath());
             } catch (Exception e) {
                 System.err.println("Failed to list MCP config: " + e.getMessage());
             }
@@ -516,7 +419,7 @@ public class McpCommand implements Runnable {
         @Override
         public void run() {
             try {
-                McpDoctorReport report = client().mcpRegistry().doctor();
+                McpDoctorReport report = registry().doctor();
                 if (report.total() == 0) {
                     System.out.println("No MCP servers configured.");
                     System.out.printf("Registry: %s%n", report.registryPath());
@@ -558,7 +461,7 @@ public class McpCommand implements Runnable {
                     System.err.println("Provide <name> or use --all.");
                     return;
                 }
-                McpTestReport report = client().mcpRegistry().test(name, all, timeoutMs);
+                McpTestReport report = registry().test(name, all, timeoutMs);
                 for (McpTestEntry entry : report.entries()) {
                     if (entry.success()) {
                         System.out.printf("MCP test passed for '%s'%n", entry.name());

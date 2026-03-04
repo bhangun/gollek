@@ -92,37 +92,62 @@ public final class HuggingFaceRepository implements ModelRepository {
         return Uni.createFrom().item(() -> {
             try {
                 String repoId = normalizeRepoId(modelId);
-                Path modelDir = cacheDir.resolve("safetensors").resolve(repoId);
-                Files.createDirectories(modelDir);
 
-                Path preferredArtifact = findBestLocalArtifact(modelDir);
-                if (preferredArtifact == null) {
-                    preferredArtifact = downloadBestArtifact(repoId, modelDir);
-                } else {
-                    ensureLocalSidecars(repoId, modelDir);
+                // Check multiple possible local locations
+                Path safetensorsDir = cacheDir.resolve("safetensors").resolve(repoId);
+                Path ggufDir = cacheDir.resolve("gguf").resolve(repoId);
+
+                Map<ModelFormat, ArtifactLocation> artifacts = new java.util.HashMap<>();
+
+                // Discover local artifacts
+                Path localSafetensors = findBestLocalArtifact(safetensorsDir, ModelFormat.SAFETENSORS);
+                if (localSafetensors != null) {
+                    artifacts.put(ModelFormat.SAFETENSORS, toArtifactLocation(localSafetensors));
                 }
 
-                if (preferredArtifact == null || !Files.exists(preferredArtifact)) {
+                Path localGguf = findBestLocalArtifact(ggufDir, ModelFormat.GGUF);
+                if (localGguf == null) {
+                    // Also check for GGUF in the root repo dir (sometimes downloaded as a single
+                    // file)
+                    localGguf = findBestLocalArtifact(safetensorsDir, ModelFormat.GGUF);
+                }
+                if (localGguf != null) {
+                    artifacts.put(ModelFormat.GGUF, toArtifactLocation(localGguf));
+                }
+
+                // Trigger download if enabled and nothing found locally
+                if (artifacts.isEmpty() && isAutoDownloadEnabled()) {
+                    Path downloaded = downloadBestArtifact(repoId, safetensorsDir); // Default to safetensorsDir for new
+                                                                                    // downloads
+                    if (downloaded != null) {
+                        ModelFormat format = detectFormat(downloaded);
+                        artifacts.put(format, toArtifactLocation(downloaded));
+                    }
+                } else if (!artifacts.isEmpty()) {
+                    ensureLocalSidecars(repoId, safetensorsDir);
+                }
+
+                if (artifacts.isEmpty()) {
                     return null;
                 }
 
-                ModelFormat format = detectFormat(preferredArtifact);
-                long size = Files.size(preferredArtifact);
-                String uri = preferredArtifact.toUri().toString();
+                // Pick a primary path (prefer GGUF if requested/available, else safetensors)
+                Path primaryPath = artifacts.containsKey(ModelFormat.GGUF)
+                        ? Path.of(java.net.URI.create(artifacts.get(ModelFormat.GGUF).uri()))
+                        : Path.of(java.net.URI.create(artifacts.get(ModelFormat.SAFETENSORS).uri()));
 
                 return ModelManifest.builder()
-                        .modelId(preferredArtifact.toString())
+                        .modelId(primaryPath.toString())
                         .name(repoId)
                         .version(DEFAULT_REVISION)
                         .requestId(requestId != null && !requestId.isBlank() ? requestId : "community")
-                        .path(preferredArtifact.toString())
+                        .path(primaryPath.toString())
                         .apiKey(requestId != null && !requestId.isBlank() ? requestId : "community")
-                        .artifacts(Map.of(format, new ArtifactLocation(uri, null, size, "application/octet-stream")))
+                        .artifacts(artifacts)
                         .metadata(Map.of(
                                 "source", "huggingface",
                                 "repo", repoId,
-                                "path", preferredArtifact.toString(),
-                                "format", format.name()))
+                                "primary_format", artifacts.containsKey(ModelFormat.GGUF) ? "GGUF" : "SAFETENSORS"))
                         .build();
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -195,7 +220,25 @@ public final class HuggingFaceRepository implements ModelRepository {
     }
 
     private Path downloadBestArtifact(String repoId, Path targetDir) throws Exception {
+        Files.createDirectories(targetDir);
         List<String> files = client.listFiles(repoId);
+
+        // 1. Try GGUF first if we are in a GGUF-preferred context
+        Optional<String> ggufFile = files.stream()
+                .filter(this::isGgufFile)
+                .findFirst();
+
+        if (ggufFile.isPresent()) {
+            Path target = targetDir.resolve(fileNameOnly(ggufFile.get()));
+            if (!Files.exists(target)) {
+                client.downloadFile(repoId, ggufFile.get(), target, progressPrinter(repoId, ggufFile.get()));
+            }
+            downloadSidecars(repoId, targetDir, files);
+            validateDownloadedArtifact(target);
+            return target;
+        }
+
+        // 2. Fallback to safetensors
         Optional<String> exact = files.stream()
                 .filter(name -> "model.safetensors".equalsIgnoreCase(name) || "model.safetensor".equalsIgnoreCase(name))
                 .findFirst();
@@ -217,7 +260,8 @@ public final class HuggingFaceRepository implements ModelRepository {
         if (genericSafetensors.isPresent()) {
             Path target = targetDir.resolve(fileNameOnly(genericSafetensors.get()));
             if (!Files.exists(target)) {
-                client.downloadFile(repoId, genericSafetensors.get(), target, progressPrinter(repoId, genericSafetensors.get()));
+                client.downloadFile(repoId, genericSafetensors.get(), target,
+                        progressPrinter(repoId, genericSafetensors.get()));
             }
             downloadSidecars(repoId, targetDir, files);
             validateDownloadedArtifact(target);
@@ -225,6 +269,51 @@ public final class HuggingFaceRepository implements ModelRepository {
         }
 
         return null;
+    }
+
+    private boolean isAutoDownloadEnabled() {
+        // Check global flag first, then fallback to HF specific config
+        try {
+            return org.eclipse.microprofile.config.ConfigProvider.getConfig()
+                    .getOptionalValue("gollek.models.auto-download-enabled", Boolean.class)
+                    .orElseGet(() -> config != null && config.autoDownload());
+        } catch (Exception e) {
+            return config != null && config.autoDownload();
+        }
+    }
+
+    private ArtifactLocation toArtifactLocation(Path path) throws java.io.IOException {
+        String uri = path.toUri().toString();
+        long size = Files.size(path);
+        return new ArtifactLocation(uri, null, size, "application/octet-stream");
+    }
+
+    private Path findBestLocalArtifact(Path modelDir, ModelFormat format) {
+        if (modelDir == null || !Files.exists(modelDir)) {
+            return null;
+        }
+        try (var files = Files.list(modelDir)) {
+            return files
+                    .filter(Files::isRegularFile)
+                    .filter(p -> {
+                        String name = p.getFileName().toString();
+                        if (format == ModelFormat.GGUF)
+                            return isGgufFile(name);
+                        if (format == ModelFormat.SAFETENSORS)
+                            return isSafetensorFile(name);
+                        return false;
+                    })
+                    .sorted((a, b) -> Integer.compare(priority(b.getFileName().toString()),
+                            priority(a.getFileName().toString())))
+                    .findFirst()
+                    .orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private boolean isGgufFile(String name) {
+        return name != null && name.toLowerCase(Locale.ROOT).endsWith(".gguf");
     }
 
     private Path findBestLocalArtifact(Path modelDir) {
@@ -274,6 +363,9 @@ public final class HuggingFaceRepository implements ModelRepository {
 
     private ModelFormat detectFormat(Path artifactPath) {
         String name = artifactPath.getFileName().toString().toLowerCase(Locale.ROOT);
+        if (name.endsWith(".gguf")) {
+            return ModelFormat.GGUF;
+        }
         if (name.endsWith(".safetensors") || name.endsWith(".safetensor")) {
             return ModelFormat.SAFETENSORS;
         }

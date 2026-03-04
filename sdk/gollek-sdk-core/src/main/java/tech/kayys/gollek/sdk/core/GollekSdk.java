@@ -2,19 +2,16 @@ package tech.kayys.gollek.sdk.core;
 
 import io.smallrye.mutiny.Multi;
 import tech.kayys.gollek.sdk.exception.SdkException;
+import tech.kayys.gollek.sdk.mcp.McpRegistryManager;
 import tech.kayys.gollek.sdk.model.ModelInfo;
 import tech.kayys.gollek.sdk.model.PullProgress;
+import tech.kayys.gollek.sdk.model.SystemInfo;
 import tech.kayys.gollek.spi.inference.AsyncJobStatus;
 import tech.kayys.gollek.spi.inference.BatchInferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.provider.ProviderInfo;
 import tech.kayys.gollek.spi.stream.StreamChunk;
-/* import tech.kayys.gollek.sdk.core.exception.SdkException;
-import tech.kayys.gollek.sdk.core.model.AsyncJobStatus;
-import tech.kayys.gollek.sdk.core.model.BatchInferenceRequest;
-import tech.kayys.gollek.sdk.core.model.ModelInfo;
-import tech.kayys.gollek.sdk.core.model.PullProgress; */
 
 import java.util.List;
 import java.util.Optional;
@@ -22,7 +19,17 @@ import java.util.function.Consumer;
 
 /**
  * Core interface for the Gollek inference engine SDK.
- * Defines the contract that all implementations must follow.
+ * <p>
+ * This is the <b>single source of truth</b> for all Gollek API operations.
+ * All implementations (local, remote) must fulfill this contract.
+ * <p>
+ * Developers can use implementations directly:
+ * <ul>
+ * <li>{@code gollek-sdk-java-local} for standalone / same-JVM usage</li>
+ * <li>{@code gollek-sdk-java-remote} for distributed / HTTP-based usage</li>
+ * </ul>
+ * Or use the {@code gollek-sdk} facade with {@code GollekSdkFactory} for
+ * ServiceLoader-based discovery.
  */
 public interface GollekSdk {
 
@@ -176,4 +183,33 @@ public interface GollekSdk {
      * @throws SdkException if the deletion fails
      */
     void deleteModel(String modelId) throws SdkException;
+
+    // ==================== MCP Operations ====================
+
+    /**
+     * Returns the MCP Registry Manager for managing MCP servers.
+     *
+     * <p>
+     * Not all implementations support MCP. Implementations that do not
+     * support MCP should throw {@link UnsupportedOperationException}.
+     *
+     * @return the MCP registry manager
+     * @throws UnsupportedOperationException if MCP is not supported by this
+     *                                       implementation
+     */
+    default McpRegistryManager mcpRegistry() {
+        throw new UnsupportedOperationException("MCP registry is not supported by this SDK implementation");
+    }
+
+    // ==================== System Operations ====================
+
+    /**
+     * Gets system information from the inference engine.
+     *
+     * @return system information
+     * @throws SdkException if the request fails
+     */
+    default SystemInfo getSystemInfo() throws SdkException {
+        throw new UnsupportedOperationException("System info is not supported by this SDK implementation");
+    }
 }

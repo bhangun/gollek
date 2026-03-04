@@ -20,7 +20,7 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
     </properties>
-    
+
     <dependencyManagement>
         <dependencies>
             <!-- Import Gollek BOM for internal module versions -->
@@ -33,10 +33,11 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
-    
+
     <modules>
         <module>gollek-sdk-core</module>
         <module>gollek-sdk-java-local</module>
         <module>gollek-sdk-java-remote</module>
+        <module>gollek-sdk</module>
     </modules>
 </project>

@@ -534,7 +534,7 @@ public class GGUFConverter {
         }
 
         ProgressCallback target = (float progress, MemorySegment stagePtr, MemorySegment userDataPtr) -> {
-            String stage = stagePtr.address() != 0 ? stagePtr.reinterpret(Long.MAX_VALUE).getString(0) : "";
+            String stage = stagePtr.address() != 0 ? stagePtr.reinterpret(Long.MAX_VALUE).getString(0L) : "";
 
             ConversionProgress prog = ConversionProgress.builder()
                     .conversionId(conversionId)
@@ -566,7 +566,7 @@ public class GGUFConverter {
             if (messagePtr.address() == 0)
                 return;
 
-            String message = messagePtr.reinterpret(Long.MAX_VALUE).getString(0);
+            String message = messagePtr.reinterpret(Long.MAX_VALUE).getString(0L);
 
             switch (level) {
                 case 0 -> log.debug("[Conversion {}] {}", conversionId, message);

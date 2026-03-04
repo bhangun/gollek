@@ -147,5 +147,7 @@ gh run list -R bhangun/gollek --workflow "Gollek CLI Release" --limit 5
 gh run watch -R bhangun/gollek --exit-status
 gh release view test-latest -R bhangun/gollek
 
+ gh run view  -R gollek-ai/gollek-ai.github.io --log-failed  
+
 
 ```

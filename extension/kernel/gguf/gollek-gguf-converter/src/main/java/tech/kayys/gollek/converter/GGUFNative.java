@@ -389,7 +389,7 @@ public final class GGUFNative {
         try {
             ensureAvailable();
             MemorySegment result = (MemorySegment) getVersionHandle().invoke();
-            return result.reinterpret(Long.MAX_VALUE).getString(0);
+            return result.reinterpret(Long.MAX_VALUE).getString(0L);
         } catch (Throwable t) {
             throw new RuntimeException("Failed to get version", t);
         }
@@ -409,7 +409,7 @@ public final class GGUFNative {
             if (result.address() == 0) {
                 return "";
             }
-            return result.reinterpret(Long.MAX_VALUE).getString(0);
+            return result.reinterpret(Long.MAX_VALUE).getString(0L);
         } catch (Throwable t) {
             return "Failed to get error: " + t.getMessage();
         }
@@ -580,7 +580,7 @@ public final class GGUFNative {
             if (result.address() == 0) {
                 return null;
             }
-            return result.reinterpret(Long.MAX_VALUE).getString(0);
+            return result.reinterpret(Long.MAX_VALUE).getString(0L);
         } catch (Throwable t) {
             return null;
         }
@@ -611,7 +611,7 @@ public final class GGUFNative {
             String[] result = new String[count];
             for (int i = 0; i < count; i++) {
                 MemorySegment ptr = array.getAtIndex(ValueLayout.ADDRESS, i);
-                result[i] = ptr.reinterpret(Long.MAX_VALUE).getString(0);
+                result[i] = ptr.reinterpret(Long.MAX_VALUE).getString(0L);
             }
 
             return result;

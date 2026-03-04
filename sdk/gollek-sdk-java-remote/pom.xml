@@ -22,14 +22,12 @@
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-sdk-core</artifactId>
-
         </dependency>
 
         <!-- Gollek Core API -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-spi</artifactId>
-
         </dependency>
 
         <!-- JSON Processing -->

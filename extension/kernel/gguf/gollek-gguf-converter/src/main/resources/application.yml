@@ -36,7 +36,7 @@ quarkus:
   # OpenAPI / Swagger
   smallrye-openapi:
     path: /openapi
-    info-title: GGUF Converter API
+    info-title: Wayang API
     info-version: 1.0.0
     info-description: Enterprise model conversion service for GGUF format
     info-contact-name: bhangun

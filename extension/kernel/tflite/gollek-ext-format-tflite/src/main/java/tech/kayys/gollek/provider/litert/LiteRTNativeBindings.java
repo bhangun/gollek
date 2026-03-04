@@ -523,7 +523,7 @@ public class LiteRTNativeBindings {
             if (namePtr == null || namePtr.address() == 0) {
                 return null;
             }
-            return namePtr.reinterpret(Long.MAX_VALUE).getString(0);
+            return namePtr.reinterpret(Long.MAX_VALUE).getString(0L);
         } catch (Throwable e) {
             log.warn("Failed to get tensor name", e);
             return null;
