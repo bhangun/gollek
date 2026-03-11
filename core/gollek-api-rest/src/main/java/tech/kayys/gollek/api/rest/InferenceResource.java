@@ -155,6 +155,29 @@ public class InferenceResource {
         }
 
         /**
+         * Generate embeddings.
+         */
+        @POST
+        @Path("/embeddings")
+        @RolesAllowed({ "USER", "ADMIN" })
+        @Operation(summary = "Generate embeddings")
+        @SecurityRequirement(name = "bearer-jwt")
+        public Uni<Response> embed(
+                        @HeaderParam("X-Request-ID") String requestId,
+                        @Valid @NotNull tech.kayys.gollek.spi.inference.EmbeddingRequest request,
+                        @Context SecurityContext securityContext,
+                        @Context ContainerRequestContext containerRequestContext) {
+                final String finalRequestId = requestId != null ? requestId : UUID.randomUUID().toString();
+
+                return platformInferenceService.executeEmbedding(request)
+                                .map(response -> Response.ok(response).build())
+                                .onFailure().recoverWithItem(failure -> {
+                                        LOG.errorf(failure, "Embedding failed: requestId=%s", finalRequestId);
+                                        return buildErrorResponse(failure, finalRequestId);
+                                });
+        }
+
+        /**
          * Stream inference results.
          */
         @POST

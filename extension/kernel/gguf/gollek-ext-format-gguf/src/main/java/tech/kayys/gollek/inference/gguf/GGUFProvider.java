@@ -25,6 +25,8 @@ import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.model.DeviceType;
 import tech.kayys.gollek.spi.model.ModelFormat;
 import tech.kayys.gollek.spi.provider.*;
+import tech.kayys.gollek.spi.inference.EmbeddingRequest;
+import tech.kayys.gollek.spi.inference.EmbeddingResponse;
 import tech.kayys.gollek.spi.Message;
 
 import java.time.Duration;
@@ -156,7 +158,7 @@ public class GGUFProvider implements StreamingProvider {
                     .functionCalling(false)
                     .multimodal(false)
                     .toolCalling(false)
-                    .embeddings(false)
+                    .embeddings(true)
                     .maxContextTokens(config.maxContextTokens())
                     .maxOutputTokens(config.maxContextTokens() / 2)
                     .supportedFormats(Set.of(ModelFormat.GGUF))
@@ -267,6 +269,61 @@ public class GGUFProvider implements StreamingProvider {
             }
         })
                 .runSubscriptionOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
+    }
+
+    @Override
+    public Uni<EmbeddingResponse> embed(
+            EmbeddingRequest request) {
+        ensureInitialized();
+
+        return Uni.createFrom().deferred(() -> {
+            GGUFSessionManager.SessionContext sessionContext = null;
+            String tenantId = resolveTenantId(request.model(), request.parameters(), Optional.empty());
+            try {
+                sessionContext = sessionManager.getSession(
+                        tenantId,
+                        request.model(),
+                        config);
+
+                if (sessionContext == null) {
+                    return Uni.createFrom().failure(new IllegalStateException(
+                            "Failed to acquire session context for model: " + request.model()));
+                }
+
+                // Final context for closure
+                final GGUFSessionManager.SessionContext finalSession = sessionContext;
+
+                return sessionContext.runner().embed(request)
+                        .onTermination().invoke(() -> {
+                            sessionManager.releaseSession(
+                                    tenantId,
+                                    request.model(),
+                                    finalSession,
+                                    null);
+                        });
+
+            } catch (Exception e) {
+                log.errorf(e, "Embedding failed for model=%s", request.model());
+                return Uni.createFrom().failure(new ProviderException(
+                        PROVIDER_ID,
+                        "Embedding failed: " + e.getMessage(),
+                        e,
+                        isRetryable(e)));
+            }
+        });
+    }
+
+    private String resolveTenantId(String model, Map<String, Object> metadata, Optional<String> userId) {
+        // Try metadata "tenantId"
+        Object tenantId = metadata.get("tenantId");
+        if (tenantId instanceof String && !((String) tenantId).isBlank()) {
+            return (String) tenantId;
+        }
+        // Try userId
+        if (userId.isPresent()) {
+            return userId.get();
+        }
+        return "community";
     }
 
     @Override

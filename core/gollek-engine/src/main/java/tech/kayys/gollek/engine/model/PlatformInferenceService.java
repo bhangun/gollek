@@ -127,6 +127,14 @@ public class PlatformInferenceService {
     }
 
     /**
+     * Execute embedding generation
+     */
+    public Uni<tech.kayys.gollek.spi.inference.EmbeddingResponse> executeEmbedding(
+            tech.kayys.gollek.spi.inference.EmbeddingRequest request) {
+        return engine.executeEmbedding(request.model(), request);
+    }
+
+    /**
      * Execute streaming inference
      */
     public Multi<StreamingInferenceChunk> stream(

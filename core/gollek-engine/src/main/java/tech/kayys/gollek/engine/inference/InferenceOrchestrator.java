@@ -13,4 +13,7 @@ public interface InferenceOrchestrator {
     InferenceResponse execute(String modelId, InferenceRequest request);
 
     Multi<StreamChunk> streamExecute(String modelId, InferenceRequest request);
+
+    Uni<tech.kayys.gollek.spi.inference.EmbeddingResponse> executeEmbedding(String modelId,
+            tech.kayys.gollek.spi.inference.EmbeddingRequest request);
 }

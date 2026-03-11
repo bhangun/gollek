@@ -40,6 +40,7 @@ import tech.kayys.gollek.engine.observability.RuntimeMetricsCache;
 import tech.kayys.gollek.engine.observability.AdapterRoutingMetricsCollector;
 import tech.kayys.gollek.model.core.HardwareDetector;
 import tech.kayys.gollek.spi.context.RequestContext;
+import tech.kayys.gollek.spi.error.ErrorCode;
 import tech.kayys.gollek.spi.exception.ModelException;
 import tech.kayys.gollek.engine.module.SystemModule.RequestConfigRepository;
 import tech.kayys.gollek.engine.model.CachedModelRepository;
@@ -101,8 +102,8 @@ public class ModelRouterService {
 
                 if (effectiveModelId == null || effectiveModelId.isBlank()) {
                         return Uni.createFrom().failure(new ModelException(
-                                        tech.kayys.gollek.spi.error.ErrorCode.MODEL_NOT_FOUND,
-                                        "No model specified and no default-model configured"));
+                                        ErrorCode.MODEL_NOT_FOUND,
+                                        "No model specified and no default-model configured", modelId));
                 }
 
                 return modelRepository.findById(effectiveModelId, getTenantId(request))
@@ -111,7 +112,7 @@ public class ModelRouterService {
                                 .onItem().transform(manifest -> manifest != null ? manifest
                                                 : createVirtualProviderManifest(modelId, request))
                                 .onItem().ifNull().failWith(() -> new ModelException(
-                                                tech.kayys.gollek.spi.error.ErrorCode.MODEL_NOT_FOUND,
+                                                ErrorCode.MODEL_NOT_FOUND,
                                                 "Model not found: " + modelId, modelId))
                                 .chain(manifest -> {
                                         // Build routing context
@@ -149,8 +150,8 @@ public class ModelRouterService {
 
                 if (effectiveModelId == null || effectiveModelId.isBlank()) {
                         return Multi.createFrom().failure(new ModelException(
-                                        tech.kayys.gollek.spi.error.ErrorCode.MODEL_NOT_FOUND,
-                                        "No model specified and no default-model configured"));
+                                        ErrorCode.MODEL_NOT_FOUND,
+                                        "No model specified and no default-model configured", modelId));
                 }
 
                 return modelRepository.findById(effectiveModelId, getTenantId(request))
@@ -159,12 +160,51 @@ public class ModelRouterService {
                                 .onItem().transform(manifest -> manifest != null ? manifest
                                                 : createVirtualProviderManifest(modelId, request))
                                 .onItem().ifNull().failWith(() -> new ModelException(
-                                                tech.kayys.gollek.spi.error.ErrorCode.MODEL_NOT_FOUND,
+                                                ErrorCode.MODEL_NOT_FOUND,
                                                 "Model not found: " + modelId, modelId))
                                 .onItem().transformToMulti(manifest -> {
                                         RoutingContext context = buildRoutingContext(request, manifest);
                                         RoutingDecision decision = selectProvider(manifest, context);
                                         return executeStreamWithProvider(decision, request);
+                                });
+        }
+
+        /**
+         * Route embedding request to optimal provider
+         */
+        public Uni<tech.kayys.gollek.spi.inference.EmbeddingResponse> routeEmbedding(
+                        String modelId,
+                        tech.kayys.gollek.spi.inference.EmbeddingRequest request) {
+
+                String effectiveModelId = (modelId == null || modelId.isBlank())
+                                ? modelConfig.defaultModel().orElse(modelId)
+                                : modelId;
+
+                return modelRepository.findById(effectiveModelId, "community") // Default tenant for embedding for now
+                                .onItem().ifNull().failWith(() -> new ModelException(
+                                                ErrorCode.MODEL_NOT_FOUND,
+                                                "Model not found: " + effectiveModelId, effectiveModelId))
+                                .chain(manifest -> {
+                                        // Select provider with embedding capability
+                                        List<LLMProvider> providers = providerRegistry.getAllProviders().stream()
+                                                        .filter(p -> p.capabilities().isEmbeddings())
+                                                        .toList();
+
+                                        if (providers.isEmpty()) {
+                                                throw new NoCompatibleProviderException(
+                                                                "No provider with embedding capability found");
+                                        }
+
+                                        // For now, take first compatible or use simple scoring
+                                        LLMProvider provider = providers.get(0);
+
+                                        tech.kayys.gollek.spi.inference.EmbeddingRequest embeddingRequest = new tech.kayys.gollek.spi.inference.EmbeddingRequest(
+                                                        request.requestId(),
+                                                        manifest.modelId(),
+                                                        request.inputs(),
+                                                        request.parameters());
+
+                                        return provider.embed(embeddingRequest);
                                 });
         }
 

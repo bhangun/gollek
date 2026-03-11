@@ -88,6 +88,12 @@ public class DefaultInferenceEngine implements InferenceEngine {
         }
 
         @Override
+        public Uni<tech.kayys.gollek.spi.inference.EmbeddingResponse> executeEmbedding(String modelId,
+                        tech.kayys.gollek.spi.inference.EmbeddingRequest request) {
+                return orchestrator.executeEmbedding(modelId, request);
+        }
+
+        @Override
         public Uni<String> submitAsyncJob(InferenceRequest request) {
                 return Uni.createFrom().item(() -> {
                         String jobId = UUID.randomUUID().toString();

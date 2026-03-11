@@ -29,4 +29,13 @@ public interface McpRegistryManager {
     McpDoctorReport doctor() throws SdkException;
 
     McpTestReport test(String name, boolean all, long timeoutMs) throws SdkException;
+
+    /**
+     * Lists all tools provided by a specific MCP server.
+     *
+     * @param name Name of the MCP server
+     * @return List of tools
+     * @throws SdkException if the tools could not be listed
+     */
+    List<McpToolModel> listTools(String name) throws SdkException;
 }

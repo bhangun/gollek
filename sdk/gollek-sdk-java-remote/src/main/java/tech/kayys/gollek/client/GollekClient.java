@@ -8,7 +8,6 @@ import tech.kayys.gollek.spi.inference.BatchInferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.provider.ProviderInfo;
-import tech.kayys.gollek.spi.stream.StreamChunk;
 import tech.kayys.gollek.client.exception.*;
 import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.gollek.sdk.exception.SdkException;
@@ -241,7 +240,36 @@ public class GollekClient implements GollekSdk {
      * @return A Multi that emits StreamChunk objects
      */
     @Override
-    public Multi<StreamChunk> streamCompletion(InferenceRequest request) {
+    public tech.kayys.gollek.spi.inference.EmbeddingResponse createEmbedding(
+            tech.kayys.gollek.spi.inference.EmbeddingRequest request) throws SdkException {
+        try {
+            String requestBody = objectMapper.writeValueAsString(request);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/inference/embeddings"))
+                    .header("Content-Type", "application/json")
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .timeout(Duration.ofSeconds(60))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            return handleResponse(response, tech.kayys.gollek.spi.inference.EmbeddingResponse.class);
+        } catch (Exception e) {
+            throw new SdkException("Failed to create embedding", e);
+        }
+    }
+
+    /**
+     * Creates a streaming inference request.
+     *
+     * @param request The inference request
+     * @return A Multi that emits StreamChunk objects
+     */
+    @Override
+    public Multi<tech.kayys.gollek.spi.stream.StreamChunk> streamCompletion(InferenceRequest request) {
         try {
             String requestBody = objectMapper.writeValueAsString(request);
 

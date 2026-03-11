@@ -15,7 +15,7 @@
     <description>Plugin for storing models in Azure Blob Storage</description>
 
     <properties>
-        <maven.compiler.release>21</maven.compiler.release>
+        <maven.compiler.release>25</maven.compiler.release>
     </properties>
 
     <dependencies>

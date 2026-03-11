@@ -1,8 +1,10 @@
 package tech.kayys.gollek.spi.provider;
 
 import io.smallrye.mutiny.Uni;
-import tech.kayys.gollek.spi.inference.InferenceResponse;
 
+import tech.kayys.gollek.spi.inference.EmbeddingRequest;
+import tech.kayys.gollek.spi.inference.EmbeddingResponse;
+import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.exception.ProviderException;
 
 import java.util.Optional;
@@ -63,6 +65,14 @@ public interface LLMProvider {
      * Execute inference request (reactive).
      */
     Uni<InferenceResponse> infer(ProviderRequest request);
+
+    /**
+     * Generate embeddings (reactive).
+     */
+    default Uni<EmbeddingResponse> embed(
+            EmbeddingRequest request) {
+        return Uni.createFrom().failure(new UnsupportedOperationException("Embeddings not supported by this provider"));
+    }
 
     /**
      * Execute inference request (blocking).

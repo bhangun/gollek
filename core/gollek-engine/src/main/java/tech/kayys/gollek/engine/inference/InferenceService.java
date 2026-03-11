@@ -131,6 +131,11 @@ public class InferenceService {
         return submitAsyncJob(request, null);
     }
 
+    public Uni<tech.kayys.gollek.spi.inference.EmbeddingResponse> executeEmbedding(
+            tech.kayys.gollek.spi.inference.EmbeddingRequest request) {
+        return orchestrator.executeEmbedding(request.model(), request);
+    }
+
     public Uni<String> submitAsyncJob(InferenceRequest request, RequestContext requestContext) {
         String jobId = UUID.randomUUID().toString();
         RequestContext effectiveContext = resolveContext(requestContext, request.getRequestId());

@@ -73,6 +73,11 @@ public class LlamaCppBinding {
     private final MethodHandle llama_sampler_sample;
     private final MethodHandle llama_sampler_free;
 
+    // Embedding functions
+    private final MethodHandle llama_n_embd;
+    private final MethodHandle llama_get_embeddings;
+    private final MethodHandle llama_get_embeddings_ith;
+
     // Extended sampler handles
     private final MethodHandle llama_sampler_init_penalties;
     private final MethodHandle llama_sampler_init_mirostat;
@@ -317,6 +322,16 @@ public class LlamaCppBinding {
 
         this.llama_sampler_free = linkFunction(linker, "llama_sampler_free",
                 FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+
+        // Embedding bindings
+        this.llama_n_embd = linkFunction(linker, "llama_n_embd",
+                FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+
+        this.llama_get_embeddings = linkFunction(linker, "llama_get_embeddings",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+
+        this.llama_get_embeddings_ith = linkFunction(linker, "llama_get_embeddings_ith",
+                FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
 
         // Extended samplers
         // llama_sampler_init_penalties(int32_t penalty_last_n, float penalty_repeat,
@@ -1689,6 +1704,18 @@ public class LlamaCppBinding {
             log.warnf("Failed to get metadata key %s: %s", key, e.getMessage());
             return null;
         }
+    }
+
+    public int nEmbd(MemorySegment model) throws Throwable {
+        return (int) llama_n_embd.invoke(model);
+    }
+
+    public MemorySegment getEmbeddings(MemorySegment ctx) throws Throwable {
+        return (MemorySegment) llama_get_embeddings.invoke(ctx);
+    }
+
+    public MemorySegment getEmbeddingsIth(MemorySegment ctx, int i) throws Throwable {
+        return (MemorySegment) llama_get_embeddings_ith.invoke(ctx, i);
     }
 
     public void close() {

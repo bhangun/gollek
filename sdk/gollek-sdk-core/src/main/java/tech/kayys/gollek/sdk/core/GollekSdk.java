@@ -60,6 +60,18 @@ public interface GollekSdk {
      */
     Multi<StreamChunk> streamCompletion(InferenceRequest request);
 
+    // ==================== Embedding Operations ====================
+
+    /**
+     * Creates an embedding request.
+     *
+     * @param request The embedding request
+     * @return The embedding response
+     * @throws SdkException if the request fails
+     */
+    tech.kayys.gollek.spi.inference.EmbeddingResponse createEmbedding(
+            tech.kayys.gollek.spi.inference.EmbeddingRequest request) throws SdkException;
+
     // ==================== Job Operations ====================
 
     /**

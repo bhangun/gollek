@@ -10,8 +10,8 @@ import io.smallrye.mutiny.subscription.MultiEmitter;
 import tech.kayys.gollek.spi.stream.StreamChunk;
 import java.lang.foreign.MemorySegment;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.time.Instant;
+import io.smallrye.mutiny.Uni;
 import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.Comparator;
@@ -23,7 +23,8 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.TimeUnit;
+import java.lang.foreign.ValueLayout;
 import java.util.function.Consumer;
 
 /**
@@ -62,12 +63,6 @@ public class LlamaCppRunner {
     // Threading and concurrency
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private final Semaphore concurrencyLimit;
-
-    // Metrics
-    private final AtomicLong totalInferences = new AtomicLong(0);
-    private final AtomicLong failedInferences = new AtomicLong(0);
-    private final AtomicLong totalTokensGenerated = new AtomicLong(0);
-    private volatile Duration lastInferenceLatency = Duration.ZERO;
 
     private final GGUFProviderConfig providerConfig;
 
@@ -446,7 +441,8 @@ public class LlamaCppRunner {
             Instant inferenceDeadline = Instant.now().plusMillis(timeoutMs);
 
             // 3. Batch Init
-            // Keep capacity aligned with runtime batch size so prompt evaluation can run in chunks.
+            // Keep capacity aligned with runtime batch size so prompt evaluation can run in
+            // chunks.
             MemorySegment batch = binding.batchInit(maxBatch, 0, 1);
 
             StringBuilder result = new StringBuilder();
@@ -621,80 +617,6 @@ public class LlamaCppRunner {
             emitter.emit(StreamChunk.finalChunk(request.getRequestId(), emitted[0], ""));
             emitter.complete();
         }
-    }
-
-    private MemorySegment createSamplerChainFromRequest(InferenceRequest request) {
-        float temperature = ((Number) request.getParameters().getOrDefault("temperature", 0.8f)).floatValue();
-        int topK = ((Number) request.getParameters().getOrDefault("top_k", 40)).intValue();
-        float topP = ((Number) request.getParameters().getOrDefault("top_p", 0.95f)).floatValue();
-        float minP = ((Number) request.getParameters().getOrDefault("min_p", 0.05f)).floatValue();
-        int seed = ((Number) request.getParameters().getOrDefault("seed", -1)).intValue();
-        if (seed == -1) {
-            seed = (int) (Instant.now().toEpochMilli() & 0xFFFFFFFFL);
-        }
-
-        MemorySegment chain = binding.createSamplerChain();
-
-        // 1. Penalties
-        float repeatPenalty = ((Number) request.getParameters().getOrDefault("repeat_penalty", 1.1f)).floatValue();
-        float frequencyPenalty = ((Number) request.getParameters().getOrDefault("frequency_penalty", 0.0f))
-                .floatValue();
-        float presencePenalty = ((Number) request.getParameters().getOrDefault("presence_penalty", 0.0f)).floatValue();
-        int repeatLastN = ((Number) request.getParameters().getOrDefault("repeat_last_n", 64)).intValue();
-
-        if (repeatPenalty != 1.0f || frequencyPenalty != 0.0f || presencePenalty != 0.0f) {
-            binding.addPenaltiesSampler(chain, repeatLastN, repeatPenalty, frequencyPenalty, presencePenalty);
-        }
-
-        // 2. Truncation samplers (top-k, top-p, min-p, typical)
-        if (temperature > 0) {
-            binding.addTopKSampler(chain, topK);
-            binding.addTopPSampler(chain, topP, 1);
-            binding.addMinPSampler(chain, minP, 1);
-
-            float typicalP = ((Number) request.getParameters().getOrDefault("typical_p", 1.0f)).floatValue();
-            if (typicalP < 1.0f) {
-                binding.addTypicalSampler(chain, typicalP, 1);
-            }
-
-            // 3. Grammar / JSON Mode
-            String grammar = (String) request.getParameters().get("grammar");
-            boolean jsonMode = (boolean) request.getParameters().getOrDefault("json_mode", false);
-            if (jsonMode && (grammar == null || grammar.isBlank())) {
-                // Simple JSON grammar if none provided and JSON mode requested
-                grammar = "root ::= object\n" +
-                        "object ::= \"{\" ws ( pair ( \",\" ws pair )* )? \"}\"\n" +
-                        "pair ::= string \":\" ws value\n" +
-                        "string ::= \"\\\"\" ([^\\\"\\\\\\x00-\\x1F] | \"\\\\\" [\\\"\\\\/bfnrt] | \"\\\\u\" [0-9a-fA-F]{4})* \"\\\"\"\n"
-                        +
-                        "value ::= string | number | object | array | \"true\" | \"false\" | \"null\"\n" +
-                        "array ::= \"[\" ws ( value ( \",\" ws value )* )? \"]\"\n" +
-                        "number ::= \"-\"? ([0-9] | [1-9] [0-9]*) (\".\" [0-9]+)? ([eE] [+-]? [0-9]+)?\n" +
-                        "ws ::= [ \\t\\n\\r]*";
-            }
-            if (grammar != null && !grammar.isBlank()) {
-                binding.addGrammarSampler(chain, model, grammar, "root");
-            }
-
-            // 4. Final selection (Mirostat or Dist/Temp)
-            int mirostat = ((Number) request.getParameters().getOrDefault("mirostat", 0)).intValue();
-            if (mirostat == 1) {
-                float tau = ((Number) request.getParameters().getOrDefault("mirostat_tau", 5.0f)).floatValue();
-                float eta = ((Number) request.getParameters().getOrDefault("mirostat_eta", 0.1f)).floatValue();
-                binding.addMirostatSampler(chain, binding.getVocabSize(model), seed, tau, eta, 100);
-            } else if (mirostat == 2) {
-                float tau = ((Number) request.getParameters().getOrDefault("mirostat_tau", 5.0f)).floatValue();
-                float eta = ((Number) request.getParameters().getOrDefault("mirostat_eta", 0.1f)).floatValue();
-                binding.addMirostatV2Sampler(chain, seed, tau, eta);
-            } else {
-                binding.addTempSampler(chain, temperature);
-                binding.addDistSampler(chain, seed);
-            }
-        } else {
-            binding.addGreedySampler(chain);
-        }
-
-        return chain;
     }
 
     private int sampleNextToken(
@@ -984,6 +906,95 @@ public class LlamaCppRunner {
                         .message(tech.kayys.gollek.spi.Message.user("warmup"))
                         .parameter("prompt", "Hello")
                         .build());
+    }
+
+    public Uni<tech.kayys.gollek.spi.inference.EmbeddingResponse> embed(
+            tech.kayys.gollek.spi.inference.EmbeddingRequest request) {
+        if (!initialized) {
+            return Uni.createFrom().failure(new IllegalStateException("Runner not initialized"));
+        }
+
+        return Uni.createFrom().item(() -> {
+            boolean permitAcquired = false;
+            MemorySegment batch = MemorySegment.NULL;
+            try {
+                permitAcquired = concurrencyLimit.tryAcquire(providerConfig.defaultTimeout().toMillis(),
+                        TimeUnit.MILLISECONDS);
+                if (!permitAcquired) {
+                    throw new RuntimeException("Inference concurrency limit reached or timeout");
+                }
+
+                // Tokenize input
+                String input = request.inputs().get(0);
+                int[] tokens = binding.tokenize(model, input, true, true);
+                int nTokens = tokens.length;
+
+                if (nTokens == 0) {
+                    return new tech.kayys.gollek.spi.inference.EmbeddingResponse(
+                            request.requestId(),
+                            manifest.modelId(),
+                            List.of(new float[0]),
+                            0,
+                            java.util.Collections.emptyMap());
+                }
+
+                if (nTokens > providerConfig.maxContextTokens()) {
+                    log.warnf("Input tokens %d exceed context window %d, truncating", nTokens,
+                            providerConfig.maxContextTokens());
+                    int[] truncated = new int[providerConfig.maxContextTokens()];
+                    System.arraycopy(tokens, 0, truncated, 0, providerConfig.maxContextTokens());
+                    tokens = truncated;
+                    nTokens = tokens.length;
+                }
+
+                // Prepare batch
+                batch = binding.batchInit(nTokens, 0, 1);
+                binding.setBatchSize(batch, nTokens);
+
+                for (int i = 0; i < nTokens; i++) {
+                    binding.setBatchToken(batch, i, tokens[i], i, 0, i == nTokens - 1);
+                }
+
+                // Decode
+                if (binding.decode(this.context, batch) != 0) {
+                    throw new RuntimeException("Decode failed during embedding generation");
+                }
+
+                // Extract embeddings
+                int nEmbd = binding.nEmbd(model);
+                MemorySegment embeddingsPtr = binding.getEmbeddings(this.context);
+                if (embeddingsPtr.equals(MemorySegment.NULL)) {
+                    embeddingsPtr = binding.getEmbeddingsIth(this.context, nTokens - 1);
+                }
+
+                if (embeddingsPtr.equals(MemorySegment.NULL)) {
+                    throw new RuntimeException(
+                            "Failed to get embeddings from llama.cpp context. Is embedding mode enabled?");
+                }
+
+                float[] embeddingArray = new float[nEmbd];
+                MemorySegment.copy(embeddingsPtr, ValueLayout.JAVA_FLOAT, 0, embeddingArray, 0, nEmbd);
+
+                return new tech.kayys.gollek.spi.inference.EmbeddingResponse(
+                        request.requestId(),
+                        manifest.modelId(),
+                        List.of(embeddingArray),
+                        nEmbd,
+                        java.util.Collections.emptyMap());
+
+            } catch (Throwable e) {
+                log.errorf(e, "Embedding failed: %s", e.getMessage());
+                throw (e instanceof RuntimeException) ? (RuntimeException) e
+                        : new RuntimeException("Embedding failed", e);
+            } finally {
+                if (!batch.equals(MemorySegment.NULL)) {
+                    binding.batchFree(batch);
+                }
+                if (permitAcquired) {
+                    concurrencyLimit.release();
+                }
+            }
+        });
     }
 
     public void warmup(List<InferenceRequest> requests) {

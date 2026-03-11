@@ -106,6 +106,12 @@ public class DefaultInferenceOrchestrator implements InferenceOrchestrator {
                 return router.routeStream(modelId, stagedRequest);
         }
 
+        @Override
+        public Uni<tech.kayys.gollek.spi.inference.EmbeddingResponse> executeEmbedding(String modelId,
+                        tech.kayys.gollek.spi.inference.EmbeddingRequest request) {
+                return router.routeEmbedding(modelId, request);
+        }
+
         // ---- Stage-aware internals ----
 
         /**

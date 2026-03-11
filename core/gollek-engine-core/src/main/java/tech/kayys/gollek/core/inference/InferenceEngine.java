@@ -58,6 +58,12 @@ public interface InferenceEngine {
         Multi<StreamingInferenceChunk> stream(InferenceRequest request);
 
         /**
+         * Execute embedding generation
+         */
+        Uni<tech.kayys.gollek.spi.inference.EmbeddingResponse> executeEmbedding(String modelId,
+                        tech.kayys.gollek.spi.inference.EmbeddingRequest request);
+
+        /**
          * Submit asynchronous inference job
          */
         Uni<String> submitAsyncJob(InferenceRequest request);

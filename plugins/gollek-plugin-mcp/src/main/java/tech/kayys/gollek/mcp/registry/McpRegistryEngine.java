@@ -19,6 +19,7 @@ import tech.kayys.gollek.sdk.mcp.McpServerSummary;
 import tech.kayys.gollek.sdk.mcp.McpServerView;
 import tech.kayys.gollek.sdk.mcp.McpTestEntry;
 import tech.kayys.gollek.sdk.mcp.McpTestReport;
+import tech.kayys.gollek.sdk.mcp.McpToolModel;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -587,6 +588,150 @@ public class McpRegistryEngine implements McpRegistryManager {
     }
 
     @Override
+    public List<McpToolModel> listTools(String name) throws SdkException {
+        try {
+            if (useRemoteRegistry()) {
+                JsonObject response = getJsonObject(remoteEndpoint("/servers/" + urlEncode(name) + "/tools"));
+                JsonArray tools = response.getJsonArray("tools");
+                List<McpToolModel> list = new ArrayList<>();
+                if (tools != null) {
+                    for (JsonValue value : tools) {
+                        if (value instanceof JsonObject obj) {
+                            list.add(parseMcpTool(obj));
+                        }
+                    }
+                }
+                return list;
+            }
+
+            JsonObject servers = extractServersObject(loadRegistry());
+            JsonObject server = servers.getJsonObject(name);
+            if (server == null) {
+                throw new SdkException("SDK_ERR_MCP_NOT_FOUND", "Server not found: " + name);
+            }
+
+            return listToolsFromLocalServer(name, server, 5000);
+        } catch (SdkException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_MCP_LIST_TOOLS", withCause("Failed to list tools for " + name, e), e);
+        }
+    }
+
+    private List<McpToolModel> listToolsFromLocalServer(String serverName, JsonObject server, long timeoutMs) {
+        Process process = null;
+        try {
+            String transport = resolveTransport(server);
+            if (!"stdio".equals(transport)) {
+                return List.of();
+            }
+            String command = resolveCommand(server);
+            if (command == null || command.isBlank()) {
+                return List.of();
+            }
+            List<String> args = readStringArrayAsList(server.get("args"));
+            List<String> cmd = new ArrayList<>();
+            cmd.add(command);
+            cmd.addAll(args);
+
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            JsonObject envObj = server.getJsonObject("env");
+            if (envObj != null) {
+                envObj.forEach((k, v) -> {
+                    if (v != null && v.getValueType() != JsonValue.ValueType.NULL) {
+                        pb.environment().put(k, jsonScalarToString(v));
+                    }
+                });
+            }
+
+            process = pb.start();
+            try (BufferedWriter writer = new BufferedWriter(
+                    new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8));
+                    BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+
+                long requestId = 1L;
+                JsonObject initParams = Json.createObjectBuilder()
+                        .add("protocolVersion", "2025-11-05")
+                        .add("capabilities", Json.createObjectBuilder())
+                        .add("clientInfo", Json.createObjectBuilder()
+                                .add("name", "gollek-cli")
+                                .add("version", "1.0.0"))
+                        .build();
+
+                JsonObject initialize = sendRequest(reader, writer, requestId++, "initialize", initParams, timeoutMs);
+                if (initialize.containsKey("error")) {
+                    return List.of();
+                }
+                sendNotification(writer, "notifications/initialized", Json.createObjectBuilder().build());
+
+                JsonObject response = sendRequest(reader, writer, requestId++, "tools/list", null, timeoutMs);
+                if (response.containsKey("error")) {
+                    return List.of();
+                }
+                JsonObject result = response.getJsonObject("result");
+                if (result == null) {
+                    return List.of();
+                }
+                JsonArray tools = result.getJsonArray("tools");
+                List<McpToolModel> list = new ArrayList<>();
+                if (tools != null) {
+                    for (JsonValue value : tools) {
+                        if (value instanceof JsonObject obj) {
+                            list.add(parseMcpTool(obj));
+                        }
+                    }
+                }
+                return list;
+            }
+        } catch (Exception e) {
+            return List.of();
+        } finally {
+            if (process != null) {
+                process.destroy();
+            }
+        }
+    }
+
+    private McpToolModel parseMcpTool(JsonObject obj) {
+        String name = obj.getString("name", "");
+        String description = obj.getString("description", "");
+        Map<String, Object> inputSchema = Map.of();
+        if (obj.containsKey("inputSchema") && obj.get("inputSchema") instanceof JsonObject schemaObj) {
+            inputSchema = jsonToMap(schemaObj);
+        }
+        return new McpToolModel(name, description, inputSchema);
+    }
+
+    private Map<String, Object> jsonToMap(JsonObject obj) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        obj.forEach((key, value) -> {
+            map.put(key, jsonValueToObject(value));
+        });
+        return map;
+    }
+
+    private Object jsonValueToObject(JsonValue value) {
+        return switch (value.getValueType()) {
+            case OBJECT -> jsonToMap((JsonObject) value);
+            case ARRAY -> {
+                List<Object> list = new ArrayList<>();
+                for (JsonValue val : (JsonArray) value) {
+                    list.add(jsonValueToObject(val));
+                }
+                yield list;
+            }
+            case STRING -> ((JsonString) value).getString();
+            case NUMBER -> ((jakarta.json.JsonNumber) value).isIntegral()
+                    ? ((jakarta.json.JsonNumber) value).longValue()
+                    : ((jakarta.json.JsonNumber) value).doubleValue();
+            case TRUE -> true;
+            case FALSE -> false;
+            case NULL -> null;
+        };
+    }
+
+    @Override
     public McpTestReport test(String name, boolean all, long timeoutMs) throws SdkException {
         try {
             if (useRemoteRegistry()) {
@@ -1095,6 +1240,27 @@ public class McpRegistryEngine implements McpRegistryManager {
             return prefix;
         }
         return prefix + ": " + e.getMessage();
+    }
+
+    private JsonObject getJsonObject(String url) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+        HttpRequest request = apiRequestBuilder(URI.create(url))
+                .GET()
+                .build();
+        HttpResponse<String> response = client.send(request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        int status = response.statusCode();
+        if (status < 200 || status >= 300) {
+            throw new IllegalArgumentException(
+                    "Registry API GET " + url + " returned HTTP " + status + ": " + response.body());
+        }
+        String body = response.body();
+        if (body == null || body.isBlank()) {
+            return Json.createObjectBuilder().build();
+        }
+        try (JsonReader reader = Json.createReader(new StringReader(body))) {
+            return reader.readObject();
+        }
     }
 
     private JsonObject postJson(String url, JsonObject payload) throws IOException, InterruptedException {
