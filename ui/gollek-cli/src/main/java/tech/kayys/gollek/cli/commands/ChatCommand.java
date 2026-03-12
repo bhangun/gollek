@@ -1644,7 +1644,12 @@ public class ChatCommand implements Runnable {
             return findLocalSafetensorModelPath();
         }
         if ("gguf".equalsIgnoreCase(provider)) {
-            return findLocalModelPathByExtension(".gguf");
+            // Check if there is a local GGUF model, otherwise default to Qwen
+            Optional<String> localGguf = findLocalModelPathByExtension(".gguf");
+            if (localGguf.isPresent()) {
+                return localGguf;
+            }
+            return Optional.of("Qwen/Qwen2.5-0.5B-Instruct");
         }
         if ("libtorch".equalsIgnoreCase(provider)) {
             return findLocalModelPathByExtension(".pt", ".pts", ".jit", ".ts", ".pth");

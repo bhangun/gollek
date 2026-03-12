@@ -79,22 +79,11 @@
             <artifactId>gollek-sdk-java-local</artifactId>
         </dependency>
 
-        <!-- CLI Interface -->
-        <dependency>
-            <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-cli</artifactId>
-        </dependency>
 
-        <!-- Infrastructure -->
+
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-observability</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>io.quarkus</groupId>
-                    <artifactId>quarkus-opentelemetry</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <!-- Quarkus Core -->

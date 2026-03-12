@@ -23,6 +23,7 @@ public interface ModelConfig {
      * Default model to use if none is specified in the request.
      */
     @WithName("default-model")
+    @WithDefault("Qwen/Qwen2.5-0.5B-Instruct")
     Optional<String> defaultModel();
 
     /**

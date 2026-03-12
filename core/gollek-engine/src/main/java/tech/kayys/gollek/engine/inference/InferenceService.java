@@ -385,17 +385,22 @@ public class InferenceService {
     }
 
     private boolean isStreamingUnsupported(Throwable t) {
-        if (t == null) {
-            return false;
+        // Iterative walk with depth guard to prevent StackOverflow from circular cause chains
+        Throwable current = t;
+        int maxDepth = 10;
+        for (int i = 0; i < maxDepth && current != null; i++) {
+            if (current instanceof UnsupportedOperationException) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null && message.toLowerCase().contains("does not support streaming")) {
+                return true;
+            }
+            Throwable next = current.getCause();
+            if (next == current) break; // self-referencing cause chain
+            current = next;
         }
-        if (t instanceof UnsupportedOperationException) {
-            return true;
-        }
-        String message = t.getMessage();
-        if (message != null && message.toLowerCase().contains("does not support streaming")) {
-            return true;
-        }
-        return isStreamingUnsupported(t.getCause());
+        return false;
     }
 
 }

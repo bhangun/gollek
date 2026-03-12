@@ -13,7 +13,7 @@
     <artifactId>gollek-cli</artifactId>
 
     <properties>
-        <quarkus.package.type>uber-jar</quarkus.package.type>
+        <quarkus.package.type>fast-jar</quarkus.package.type>
         <quarkus.package.jar.add-runner-suffix>false</quarkus.package.jar.add-runner-suffix>
     </properties>
 
