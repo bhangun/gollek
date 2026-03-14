@@ -45,9 +45,9 @@ public class GollekProviderRegistry implements ProviderRegistry {
 
                 if (provider.isEnabled()) {
                     register(provider);
-                    LOG.infof("Registered provider: %s v%s", provider.id(), provider.version());
+                    LOG.infof("Registered provider: %s (class: %s)", provider.id(), provider.getClass().getName());
                 } else {
-                    LOG.debugf("Skipping disabled provider: %s", provider.id());
+                    LOG.infof("Skipping disabled provider: %s", provider.id());
                 }
 
             } catch (Exception e) {

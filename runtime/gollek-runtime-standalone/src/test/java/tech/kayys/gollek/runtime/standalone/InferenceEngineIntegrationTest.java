@@ -34,7 +34,7 @@ class InferenceEngineIntegrationTest {
         @Order(1)
         void shouldExecuteValidInferenceRequest() {
                 InferenceRequest request = InferenceRequest.builder()
-                                .model("tinyllama")
+                                .model("test-model")
                                 .messages(List.of(Message.user("Hello, world!")))
                                 .temperature(0.7)
                                 .maxTokens(100)

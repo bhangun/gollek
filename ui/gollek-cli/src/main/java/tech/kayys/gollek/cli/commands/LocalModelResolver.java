@@ -7,7 +7,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -24,50 +23,26 @@ final class LocalModelResolver {
             return Optional.empty();
         }
 
+        // 1. Check SDK/Registry for first-class resolution
         for (String candidate : sdkCandidates(requestedId)) {
             try {
                 Optional<ModelInfo> info = sdk.getModelInfo(candidate);
                 if (info.isPresent()) {
-                    return Optional.of(new ResolvedModel(candidate, info.get(), null, true));
+                    return Optional
+                            .of(new ResolvedModel(candidate, info.get(), extractPath(info.get()).orElse(null), true));
                 }
             } catch (Exception ignored) {
-                // keep trying candidates
             }
         }
 
-        Optional<ModelInfo> local = findLocalModel(requestedId);
-        if (local.isEmpty()) {
-            return Optional.empty();
-        }
-        Path localPath = extractPath(local.get()).orElse(null);
-        String resolvedModelId = localPath != null ? localPath.toString() : requestedId;
-        return Optional.of(new ResolvedModel(resolvedModelId, local.get(), localPath, false));
-    }
-
-    static Optional<ModelInfo> findLocalModel(String id) {
-        if (id == null || id.isBlank()) {
-            return Optional.empty();
-        }
-
-        Path input = Path.of(id);
+        // 2. Direct file check as fallback
+        Path input = Path.of(requestedId);
         if (Files.isRegularFile(input)) {
-            return Optional.of(toModelInfo(id, input.toAbsolutePath(), detectFormat(input, "file")));
+            ModelInfo info = toModelInfo(requestedId, input.toAbsolutePath());
+            return Optional.of(new ResolvedModel(requestedId, info, input.toAbsolutePath(), false));
         }
 
-        Path root = Path.of(System.getProperty("user.home"), ".gollek", "models");
-        if (!Files.isDirectory(root)) {
-            return Optional.empty();
-        }
-
-        Optional<ModelInfo> found = findInBase(root.resolve("gguf"), id, "gguf");
-        if (found.isPresent()) {
-            return found;
-        }
-        found = findInBase(root.resolve("torchscript"), id, "torchscript");
-        if (found.isPresent()) {
-            return found;
-        }
-        return findInBase(root.resolve("djl"), id, "djl");
+        return Optional.empty();
     }
 
     static Optional<Path> extractPath(ModelInfo info) {
@@ -106,119 +81,21 @@ final class LocalModelResolver {
         return java.util.List.copyOf(candidates);
     }
 
-    private static Optional<ModelInfo> findInBase(Path base, String id, String fallbackFormat) {
-        if (!Files.isDirectory(base)) {
-            return Optional.empty();
-        }
-
-        Path direct = base.resolve(id);
-        if (Files.isRegularFile(direct)) {
-            return Optional.of(toModelInfo(id, direct, detectFormat(direct, fallbackFormat)));
-        }
-        if (Files.isDirectory(direct)) {
-            Optional<Path> primary = pickPrimaryModelFile(direct);
-            if (primary.isPresent()) {
-                return Optional.of(toModelInfo(id, primary.get(), detectFormat(primary.get(), fallbackFormat)));
-            }
-        }
-
-        String normalized = id.replace("/", "_");
-        Path normalizedPath = base.resolve(normalized);
-        if (Files.isRegularFile(normalizedPath)) {
-            return Optional.of(toModelInfo(id, normalizedPath, detectFormat(normalizedPath, fallbackFormat)));
-        }
-        if (Files.isDirectory(normalizedPath)) {
-            Optional<Path> primary = pickPrimaryModelFile(normalizedPath);
-            if (primary.isPresent()) {
-                return Optional.of(toModelInfo(id, primary.get(), detectFormat(primary.get(), fallbackFormat)));
-            }
-        }
-
-        String[] exts = { ".gguf", ".safetensors", ".safetensor", ".pt", ".pth", ".bin" };
-        for (String ext : exts) {
-            Path candidate = base.resolve(id + ext);
-            if (Files.isRegularFile(candidate)) {
-                return Optional.of(toModelInfo(id, candidate, detectFormat(candidate, fallbackFormat)));
-            }
-            Path normalizedCandidate = base.resolve(normalized + ext);
-            if (Files.isRegularFile(normalizedCandidate)) {
-                return Optional
-                        .of(toModelInfo(id, normalizedCandidate, detectFormat(normalizedCandidate, fallbackFormat)));
-            }
-        }
-        return Optional.empty();
-    }
-
-    private static Optional<Path> pickPrimaryModelFile(Path dir) {
-        try (var files = Files.walk(dir, 2)) {
-            return files
-                    .filter(Files::isRegularFile)
-                    .filter(p -> {
-                        String name = p.getFileName().toString().toLowerCase(Locale.ROOT);
-                        return name.endsWith(".gguf")
-                                || name.endsWith(".safetensors")
-                                || name.endsWith(".safetensor")
-                                || name.endsWith(".pt")
-                                || name.endsWith(".pth")
-                                || name.endsWith(".bin");
-                    })
-                    .sorted((a, b) -> Long.compare(filePriority(b), filePriority(a)))
-                    .findFirst();
-        } catch (Exception ignored) {
-            return Optional.empty();
-        }
-    }
-
-    private static long filePriority(Path path) {
-        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
-        if (name.endsWith(".gguf")) {
-            return 50;
-        }
-        if (name.endsWith(".safetensors") || name.endsWith(".safetensor")) {
-            return 40;
-        }
-        if (name.endsWith(".pt") || name.endsWith(".pth")) {
-            return 30;
-        }
-        if (name.endsWith(".bin")) {
-            return 20;
-        }
-        return 0;
-    }
-
-    private static ModelInfo toModelInfo(String id, Path file, String format) {
+    private static ModelInfo toModelInfo(String id, Path file) {
         Long size = null;
         Instant updated = null;
         try {
             size = Files.size(file);
             updated = Files.getLastModifiedTime(file).toInstant();
         } catch (Exception ignored) {
-            // best effort
         }
+
         return ModelInfo.builder()
                 .modelId(id)
                 .name(file.getFileName().toString())
-                .format(format)
                 .sizeBytes(size)
                 .updatedAt(updated)
                 .metadata(Map.of("path", file.toAbsolutePath().toString()))
                 .build();
-    }
-
-    private static String detectFormat(Path file, String fallbackFormat) {
-        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
-        if (name.endsWith(".gguf")) {
-            return "gguf";
-        }
-        if (name.endsWith(".safetensors") || name.endsWith(".safetensor")) {
-            return "safetensors";
-        }
-        if (name.endsWith(".pt") || name.endsWith(".pth")) {
-            return "torchscript";
-        }
-        if (name.endsWith(".bin")) {
-            return "bin";
-        }
-        return fallbackFormat;
     }
 }

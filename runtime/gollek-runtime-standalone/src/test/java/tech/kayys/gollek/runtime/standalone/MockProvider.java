@@ -11,8 +11,12 @@ import tech.kayys.gollek.spi.provider.ProviderMetadata;
 import tech.kayys.gollek.spi.provider.ProviderCapabilities;
 import tech.kayys.gollek.spi.exception.ProviderException;
 
+import io.smallrye.mutiny.Multi;
+import tech.kayys.gollek.spi.provider.StreamingProvider;
+import tech.kayys.gollek.spi.stream.StreamChunk;
+
 @ApplicationScoped
-public class MockProvider implements LLMProvider {
+public class MockProvider implements StreamingProvider {
 
     @Override
     public String id() {
@@ -44,7 +48,7 @@ public class MockProvider implements LLMProvider {
 
     @Override
     public boolean supports(String modelId, ProviderRequest request) {
-        return "tinyllama".equals(modelId);
+        return "test-model".equals(modelId);
     }
 
     @Override
@@ -52,7 +56,7 @@ public class MockProvider implements LLMProvider {
         return Uni.createFrom().item(InferenceResponse.builder()
                 .requestId(request.getRequestId() != null ? request.getRequestId() : "test-req")
                 .content("Hello from mock!")
-                .model("tinyllama")
+                .model("test-model")
                 .tokensUsed(10)
                 .build());
     }
@@ -60,6 +64,16 @@ public class MockProvider implements LLMProvider {
     @Override
     public Uni<ProviderHealth> health() {
         return Uni.createFrom().item(ProviderHealth.healthy("mock"));
+    }
+
+    @Override
+    public Multi<StreamChunk> inferStream(ProviderRequest request) {
+        return Multi.createFrom().items(
+                StreamChunk.of(request.getRequestId(), 0, "Hello "),
+                StreamChunk.of(request.getRequestId(), 1, "from "),
+                StreamChunk.of(request.getRequestId(), 2, "mock "),
+                StreamChunk.of(request.getRequestId(), 3, "stream!"),
+                StreamChunk.finalChunk(request.getRequestId(), 4, ""));
     }
 
     @Override

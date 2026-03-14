@@ -1,7 +1,16 @@
-
 # Production-Ready Gollek CLI
 
-Production-ready CLI similar to Ollama CLI, integrating with existing providers and model repository.
+Production-ready CLI similar to modern LLM CLIs, integrating with various providers and model registry.
+
+## v0.1.4 Enhancements: Dual-Format Serving
+
+The Gollek CLI now supports **Dual-Format Serving**, allowing you to run both GGUF and SafeTensors models seamlessly.
+
+### Key Features:
+- **Format-Aware Routing**: The CLI automatically detects the model format (GGUF, SafeTensors, TorchScript) and routes to the appropriate provider.
+- **Unified Model Registry**: All local models are now managed through a central `LocalModelRegistry`, improving discovery and consistency.
+- **Enhanced SafeTensors Support**: Direct inference support for SafeTensors models (requires `gollek-ext-format-safetensor` extension).
+- **GGUF Performance**: Optimized local inference via llama.cpp using Panama FFM API.
 
 ## Install (Release Artifacts)
 
@@ -61,7 +70,7 @@ Assistant: I can help you with coding, writing, and analysis...
 ## Build
 
 ```bash
-cd inference-gollek && mvn clean package -pl ui/gollek-cli -am
+cd inference-gollek && mvn clean package -pl ui/gollek-cli -am -DskipTests
 ```
 
 ## Build Native
@@ -89,7 +98,7 @@ mvn clean package -pl ui/gollek-cli -am -Pnative -DskipTests
 
 Create a fully functional CLI that supports:
 - **Local inference** via GGUF adapter (llama.cpp)
-- **Ollama integration** for local models with external engine
+- **Local Registry integration** for managed model downloads
 - **Cloud providers** (Gemini, etc.)
 - **Model management** (pull, list, show, delete)
 
@@ -97,41 +106,32 @@ Create a fully functional CLI that supports:
 
 ```mermaid
 graph TD
-    CLI[Gollek CLI] --> SDK[LocalGollekSdk]
-    CLI --> ModelRepo[LocalModelRepository]
-    CLI --> OllamaClient[OllamaClient]
+    CLI[Gollek CLI] --> Registry[LocalModelRegistry]
+    Registry --> SDK[LocalGollekSdk]
     
-    SDK --> InferenceService
-    InferenceService --> GGUFProvider
-    InferenceService --> OllamaProvider
-    InferenceService --> GeminiProvider
-    InferenceService --> OpenAIProvider
-    InferenceService --> AnthropicProvider
-    InferenceService --> CerebrasProvider
-    
-    ModelRepo --> HuggingFaceProvider
+    SDK --> Router[FormatAwareProviderRouter]
+    Router --> GGUF[GGUFProvider]
+    Router --> ST[SafetensorProvider]
+    Router --> DJL[DJL/TorchScript Provider]
 ```
 
 ## Supported Providers
 
-| Provider | Description | API Key Required |
-|----------|-------------|------------------|
-| `litert` | Local LiteRT (TFLite) models | No |
-| `gguf` | Local GGUF models via llama.cpp | No |
-| `ollama` | Ollama local server | No |
-| `gemini` | Google Gemini | Yes |
-| `openai` | OpenAI GPT models | Yes |
-| `anthropic` | Claude models | Yes |
-| `cerebras` | Cerebras Inference | Yes |
+| Provider | Format Support | Description |
+|----------|----------------|-------------|
+| `gguf` | `.gguf` | Local GGUF models via llama.cpp |
+| `safetensor` | `.safetensors`, `.bin` | Direct SafeTensors/PyTorch weights |
+| `djl` | `.pt`, `.pth` | TorchScript models |
+| `gemini` | Cloud | Google Gemini |
 
 ## Commands
 
 | Command | Description | Provider/Module |
 |---------|-------------|-----------------|
 | `gollek run` | Run inference with a model | All providers |
-| `gollek pull` | Download model from registry | HuggingFace, Ollama |
+| `gollek pull` | Download model from registry | HuggingFace |
 | `gollek list` | List local models | LocalModelRepository |
-| `gollek show` | Show model details | LocalModelRepository, Ollama |
+| `gollek show` | Show model details | LocalModelRegistry |
 | `gollek serve` | Start API server | All providers |
 | `gollek providers` | List available providers | ProviderRegistry |
 | `gollek chat` | Interactive chat session | All providers |
@@ -139,35 +139,23 @@ graph TD
 ---
 
 
-Production-ready CLI inspired by Ollama CLI with full provider support.
-
-## Supported Providers
-
-| Provider | Description | API Key |
-|----------|-------------|---------|
-| `litert` | Local LiteRT (TFLite) | No |
-| `gguf` | Local GGUF via llama.cpp | No |
-| `ollama` | Ollama server | No |
-| `gemini` | Google Gemini | Yes |
-| `openai` | OpenAI GPT | Yes |
-| `anthropic` | Claude | Yes |
-| `cerebras` | Cerebras | Yes |
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `run` | Run inference |
-| `chat` | Interactive chat |
-| `pull` | Download models |
-| `list` | List local models |
-| `show` | Model details |
-| `providers` | List providers |
-
-
-
+Production-ready CLI with full provider support.
 
 ## Usage Examples
+
+### Auto-Detect and Run
+```bash
+# GGUF model
+gollek run --model qwen2.5-7b-instruct-GGUF --prompt "Hi"
+
+# SafeTensors model
+gollek run --model hf:Qwen/Qwen2.5-0.5B-Instruct --prompt "Describe the moon."
+```
+
+### Interactive Chat
+```bash
+gollek chat --model llama-3.2-1b-instruct
+```
 
 ```bash
 # MCP registry: add server config once, then reuse
@@ -213,37 +201,37 @@ gollek mcp remove image-downloader
 gollek run --provider mcp --model any --prompt "hello"
 
 # Build
-cd inference-gollek && mvn clean package -pl ui/gollek-cli -am
+cd inference-gollek && mvn clean package -pl ui/gollek-cli -am -DskipTests
 
 # List providers
 java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar providers
 
-java -jar target/gollek-cli-1.0.0-SNAPSHOT-runner.jar run --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct --prompt "Hello"
+java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar run --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct --prompt "Hello"
 
-java -jar ui/gollek-cli/target/gollek-cli-1.0.0-SNAPSHOT-runner.jar run --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct --prompt "Explain quantum entanglement in 2 sentences."
+java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar run --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct --prompt "Explain quantum entanglement in 2 sentences."
 
 
 
-java -jar ui/gollek-cli/target/gollek-cli-1.0.0-SNAPSHOT-runner.jar chat --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct 
+java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar chat --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct 
 
 # Minimal output mode (recommended for native GGUF)
-java -jar ui/gollek-cli/target/gollek-cli-1.0.0-SNAPSHOT-runner.jar chat --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct --quiet
+java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar chat --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct --quiet
 
-java -jar ui/gollek-cli/target/gollek-cli-1.0.0-SNAPSHOT-runner.jar chat --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct 
+java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar chat --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct 
 
 
-java -jar ui/gollek-cli/target/gollek-cli-1.0.0-SNAPSHOT-runner.jar chat --model google-t5/t5-small
+java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar chat --model google-t5/t5-small
 
-java -jar ui/gollek-cli/target/gollek-cli-1.0.0-SNAPSHOT-runner.jar chat --model HuggingFaceTB/SmolVLM-256M-Instruct
+java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar chat --model HuggingFaceTB/SmolVLM-256M-Instruct
 
 HuggingFaceTB/SmolLM2-135M
 meta-llama/Llama-3.2-1B
 google/gemma-2b-it
 
 
-GGUF_GPU_ENABLED=true \GGUF_GPU_LAYERS=8 \GGUF_BATCH_SIZE=64 \
+GGUF_GPU_ENABLED=true GGUF_GPU_LAYERS=8 GGUF_BATCH_SIZE=64 \
 GGUF_THREADS=8 \
-java -jar ui/gollek-cli/target/gollek-cli-1.0.0-SNAPSHOT-runner.jar \
+java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar \
 chat --model meta-llama/Llama-3.2-1B-Instruct
 
 # Run with different providers
@@ -258,7 +246,7 @@ java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar run \
 ```
 
 ```bash
-gollek-cli % java -jar target/gollek-cli-1.0.0-SNAPSHOT-runner.jar providers
+gollek-cli % java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar providers
 ID              NAME                 VERSION    STATUS    
 ------------------------------------------------------------
 cerebras        Cerebras             1.0.0      HEALTHY   
@@ -266,14 +254,14 @@ gemini          Google Gemini        1.0.0      HEALTHY
 gguf            GGUF Provider (ll... 1.1.0      HEALTHY   
 libtorch        LibTorch/TorchScript 1.1.0      HEALTHY   
 mistral         Mistral AI           1.0.0      HEALTHY   
-ollama          Ollama               1.0.0      HEALTHY               1.0.0      HEALTHY   
+ 
 
 6 provider(s) available
 ```
 
 ### Run native
 ```bash
-./target/gollek-cli-1.0.0-SNAPSHOT-runner chat --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct  
+./ui/gollek-cli/target/gollek-cli-1.0.0-SNAPSHOT-runner chat --provider gguf --model Qwen/Qwen2.5-0.5B-Instruct  
 ```
 
 ### Native smoke check
@@ -342,6 +330,16 @@ gollek chat --model <tool-model> --session
 # Output: [Tool Call] get_weather({"city": "Jakarta"})
 ```
 
+## Technical Details
+
+The CLI leverages a centralized `tech.kayys.gollek.spi.model.LocalModelRegistry` to scan and index models across multiple root directories:
+- `~/.gollek/models/gguf`
+- `~/.gollek/models/safetensors`
+- `~/.gollek/models/torchscript`
+
+Format detection is performed via magic bytes (ModelFormatDetector) to ensure reliable provider routing regardless of file extension.
+a
+
 ## Proposed Changes
 
 ### Build Configuration
@@ -350,7 +348,6 @@ gollek chat --model <tool-model> --session
 Add dependencies for all providers and model repository:
 - `gollek-sdk-java-local` - Local SDK
 - `gollek-model-repo-core` - Model repository
-- `gollek-ext-cloud-ollama` - Ollama provider
 - `gollek-ext-cloud-gemini` - Gemini provider
 - `gollek-provider-huggingface` - HuggingFace for model downloads
 - `gollek-ext-format-gguf` - Local GGUF inference
@@ -364,7 +361,7 @@ Update to include all subcommands.
 
 #### [MODIFY] [RunCommand.java](ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/RunCommand.java)
 Enhanced run command with:
-- `--provider` option to select provider (litert, gguf, ollama, gemini)
+- `--provider` option to select provider (litert, gguf, gemini)
 - `--stream` flag for streaming output
 - `--temperature`, `--max-tokens` options
 
@@ -373,7 +370,6 @@ Enhanced run command with:
 @Command(name = "pull", description = "Pull a model from registry")
 ```
 - Support HuggingFace: `gollek pull hf:TheBloke/Llama-2-7B-GGUF`
-- Support Ollama: `gollek pull ollama:llama2`
 - Progress bar display
 
 #### [NEW] [ListCommand.java](ui/gollek-cli/src/main/java/tech/kayys/gollek/cli/commands/ListCommand.java)
@@ -418,7 +414,7 @@ Resolve model name to appropriate provider.
    - `providers` list
 
 2. **Phase 2** - Model Management
-   - `pull` from HuggingFace/Ollama
+   - `pull` from HuggingFace
    - Progress bar
 
 3. **Phase 3** - Advanced Features
@@ -444,15 +440,8 @@ java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar providers
 # List local models
 java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar list
 
-# Run with Ollama
-java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar run \
-  --provider ollama --model llama2 --prompt "Hello"
-
 # Run with GGUF
 java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar run \
   --provider gguf --model /path/to/model.gguf --prompt "Hello"
   --provider litert --model /path/to/model.tflite --prompt "Hello"
-
-# Pull model from Ollama
-java -jar ui/gollek-cli/target/quarkus-app/quarkus-run.jar pull ollama:llama2
 ```

@@ -19,6 +19,10 @@ import tech.kayys.gollek.spi.provider.ProviderCapabilities;
 import tech.kayys.gollek.spi.provider.ProviderRegistry;
 import tech.kayys.gollek.spi.provider.ProviderRequest;
 import tech.kayys.gollek.spi.exception.NoCompatibleProviderException;
+import tech.kayys.gollek.provider.core.routing.FormatAwareProviderRouter;
+import tech.kayys.gollek.spi.registry.LocalModelRegistry;
+import tech.kayys.gollek.engine.config.ModelConfig;
+import java.util.Optional;
 
 import java.time.Instant;
 import java.util.List;
@@ -47,6 +51,15 @@ class ModelRouterServiceAdapterRoutingTest {
 
     @Mock
     private RuntimeMetricsCache metricsCache;
+    
+    @Mock
+    private LocalModelRegistry localModelRegistry;
+
+    @Mock
+    private FormatAwareProviderRouter formatRouter;
+
+    @Mock
+    private ModelConfig modelConfig;
 
     private ModelRouterService routerService;
 
@@ -56,6 +69,12 @@ class ModelRouterServiceAdapterRoutingTest {
         routerService.providerRegistry = providerRegistry;
         routerService.modelRepository = modelRepository;
         routerService.metricsCache = metricsCache;
+        routerService.localModelRegistry = localModelRegistry;
+        routerService.formatRouter = formatRouter;
+        routerService.modelConfig = modelConfig;
+
+        lenient().when(localModelRegistry.resolve(anyString())).thenReturn(Optional.empty());
+        lenient().when(formatRouter.resolveFormat(anyString())).thenReturn(Optional.empty());
     }
 
     @Test

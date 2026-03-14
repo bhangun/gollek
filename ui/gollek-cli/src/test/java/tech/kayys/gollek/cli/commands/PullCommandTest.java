@@ -22,24 +22,16 @@ public class PullCommandTest {
     GollekSdk sdk;
 
     @Test
-    public void testPullCommandOllama() throws Exception {
-        pullCommand.modelSpec = "llama2";
+    public void testPullCommandWithSimpleName() throws Exception {
+        pullCommand.modelSpec = "llama3.2";
         pullCommand.insecure = false;
 
         pullCommand.run();
 
-        Mockito.verify(sdk).pullModel(eq("llama2"), any());
+        Mockito.verify(sdk).pullModel(eq("llama3.2"), any());
     }
 
-    @Test
-    public void testPullCommandOllamaWithPrefix() throws Exception {
-        pullCommand.modelSpec = "ollama:mistral";
-        pullCommand.insecure = false;
 
-        pullCommand.run();
-
-        Mockito.verify(sdk).pullModel(eq("ollama:mistral"), any());
-    }
 
     @Test
     public void testPullCommandHuggingFace() throws Exception {

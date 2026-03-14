@@ -29,8 +29,7 @@ public class ExtensionsCommand implements Runnable {
             new ExtensionDef("runtime", "LibTorch", "experimental",
                     "tech.kayys.gollek.inference.libtorch.LibTorchProvider",
                     "libtorch"),
-            new ExtensionDef("cloud", "Ollama", "ext-cloud-ollama", "tech.kayys.gollek.provider.ollama.OllamaProvider",
-                    "ollama"),
+
             new ExtensionDef("cloud", "Gemini", "ext-cloud-gemini", "tech.kayys.gollek.provider.gemini.GeminiProvider",
                     "gemini"),
             new ExtensionDef("cloud", "Cerebras", "ext-cloud-cerebras",
@@ -72,7 +71,7 @@ public class ExtensionsCommand implements Runnable {
         if (!runtimeProviders.isEmpty()) {
             System.out.printf("%nRuntime providers: %s%n", String.join(", ", runtimeProviders));
         }
-        System.out.println("Tip: enable cloud extensions at build time with -Pext-cloud-ollama,ext-cloud-gemini,ext-cloud-cerebras");
+        System.out.println("Tip: enable cloud extensions at build time with -Pext-cloud-gemini,ext-cloud-cerebras");
     }
 
     private Set<String> getRuntimeProviderIds() {

@@ -144,10 +144,6 @@
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-ext-cloud-mistral</artifactId>
         </dependency>
-        <dependency>
-            <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-ext-cloud-ollama</artifactId>
-        </dependency>
 
         <!-- Testing -->
         <dependency>
@@ -204,15 +200,6 @@
     <profiles>
 
         <!-- Optional extension packaging profiles -->
-        <profile>
-            <id>ext-cloud-ollama</id>
-            <dependencies>
-                <dependency>
-                    <groupId>tech.kayys.gollek</groupId>
-                    <artifactId>gollek-ext-cloud-ollama</artifactId>
-                </dependency>
-            </dependencies>
-        </profile>
         <profile>
             <id>ext-cloud-gemini</id>
             <dependencies>

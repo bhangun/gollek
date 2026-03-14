@@ -31,7 +31,7 @@ import java.util.concurrent.CountDownLatch;
 /**
  * Run inference command using GollekSdk.
  * Usage: gollek run --model <model> --prompt <prompt> [--provider
- * ollama|gguf|gemini] [--stream]
+ * litert|gguf|gemini] [--stream]
  */
 @Dependent
 @Unremovable
@@ -55,7 +55,7 @@ public class RunCommand implements Runnable {
     public String prompt;
 
     @Option(names = {
-            "--provider" }, description = "Provider: litert, gguf, djl, safetensor, libtorch(experimental), ollama, gemini, openai, anthropic, cerebras")
+            "--provider" }, description = "Provider: litert, gguf, djl, safetensor, libtorch(experimental), gemini, openai, anthropic, cerebras")
     String providerId;
 
     @Option(names = { "-s", "--stream" }, description = "Stream output", defaultValue = "true")

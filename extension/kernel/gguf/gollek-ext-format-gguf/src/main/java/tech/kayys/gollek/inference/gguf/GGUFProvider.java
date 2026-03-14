@@ -187,6 +187,9 @@ public class GGUFProvider implements StreamingProvider {
 
     @Override
     public boolean supports(String modelId, ProviderRequest request) {
+        if (!config.enabled()) {
+            return false;
+        }
         String modelPath = resolveModelPath(modelId);
         if (modelPath == null)
             return false;

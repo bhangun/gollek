@@ -1,5 +1,7 @@
 package tech.kayys.gollek.sdk.config;
 
+import tech.kayys.gollek.spi.model.ModelFormat;
+
 import java.time.Duration;
 import java.util.Optional;
 
@@ -14,6 +16,10 @@ public final class SdkConfig {
     private final String preferredProvider;
     private final boolean enableMetrics;
     private final RetryConfig retryConfig;
+    private final ModelFormat modelFormat; // v0.1.4
+    private final String ggufBasePath; // v0.1.4
+    private final String safetensorsBasePath; // v0.1.4
+    private final String baseUrl; // v0.1.4
 
     private SdkConfig(Builder builder) {
         this.apiKey = builder.apiKey;
@@ -22,6 +28,10 @@ public final class SdkConfig {
         this.preferredProvider = builder.preferredProvider;
         this.enableMetrics = builder.enableMetrics;
         this.retryConfig = builder.retryConfig;
+        this.modelFormat = builder.modelFormat;
+        this.ggufBasePath = builder.ggufBasePath;
+        this.safetensorsBasePath = builder.safetensorsBasePath;
+        this.baseUrl = builder.baseUrl;
     }
 
     public static Builder builder() {
@@ -52,6 +62,36 @@ public final class SdkConfig {
         return retryConfig;
     }
 
+    // ── v0.1.4 accessors ──────────────────────────────────────────────────
+
+    /** Explicit model format hint — skip magic-byte detection when set. */
+    public Optional<ModelFormat> getModelFormat() {
+        return Optional.ofNullable(modelFormat);
+    }
+
+    /**
+     * Base directory for GGUF models. Defaults to
+     * {@code $HOME/.gollek/models/gguf}.
+     */
+    public String getGgufBasePath() {
+        return ggufBasePath != null ? ggufBasePath
+                : System.getProperty("user.home") + "/.gollek/models/gguf";
+    }
+
+    /**
+     * Base directory for SafeTensors checkpoints. Defaults to
+     * {@code $HOME/.gollek/models/safetensors}.
+     */
+    public String getSafetensorsBasePath() {
+        return safetensorsBasePath != null ? safetensorsBasePath
+                : System.getProperty("user.home") + "/.gollek/models/safetensors";
+    }
+
+    /** Base URL for the remote Gollek engine HTTP API. */
+    public Optional<String> getBaseUrl() {
+        return Optional.ofNullable(baseUrl).filter(s -> !s.isBlank());
+    }
+
     public static final class Builder {
         private String apiKey = "community";
         private Duration requestTimeout = Duration.ofSeconds(60);
@@ -59,6 +99,10 @@ public final class SdkConfig {
         private String preferredProvider;
         private boolean enableMetrics;
         private RetryConfig retryConfig = RetryConfig.builder().build();
+        private ModelFormat modelFormat; // v0.1.4
+        private String ggufBasePath; // v0.1.4
+        private String safetensorsBasePath; // v0.1.4
+        private String baseUrl; // v0.1.4
 
         private Builder() {
         }
@@ -103,6 +147,30 @@ public final class SdkConfig {
 
         public Builder maxRetries(int maxAttempts) {
             this.retryConfig = RetryConfig.builder().maxAttempts(maxAttempts).build();
+            return this;
+        }
+
+        /** Hint the format so the SDK can skip filesystem detection. */
+        public Builder modelFormat(ModelFormat v) {
+            this.modelFormat = v;
+            return this;
+        }
+
+        /** Override GGUF model base directory. */
+        public Builder ggufBasePath(String v) {
+            this.ggufBasePath = v;
+            return this;
+        }
+
+        /** Override SafeTensors base directory. */
+        public Builder safetensorsBasePath(String v) {
+            this.safetensorsBasePath = v;
+            return this;
+        }
+
+        /** Base URL for remote SDK instances. */
+        public Builder baseUrl(String v) {
+            this.baseUrl = v;
             return this;
         }
 

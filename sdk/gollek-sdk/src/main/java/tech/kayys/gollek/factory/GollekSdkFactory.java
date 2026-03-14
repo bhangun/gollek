@@ -4,6 +4,7 @@ import tech.kayys.gollek.sdk.config.SdkConfig;
 import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.gollek.sdk.core.GollekSdkProvider;
 import tech.kayys.gollek.sdk.exception.SdkException;
+import tech.kayys.gollek.spi.model.ModelFormat;
 
 import java.time.Duration;
 import java.util.Comparator;
@@ -59,6 +60,59 @@ public class GollekSdkFactory {
      */
     public static GollekSdk createLocalSdk() throws SdkException {
         return createLocalSdk(null);
+    }
+
+    // ── Format-aware factory methods (v0.1.4) ─────────────────────────────
+
+    /**
+     * Create a local SDK instance pre-configured for GGUF (llama.cpp) inference.
+     * Models are looked up in {@code $HOME/.gollek/models/gguf}.
+     */
+    public static GollekSdk createForGguf() throws SdkException {
+        return createLocalSdk(SdkConfig.builder()
+                .preferredProvider("gguf")
+                .modelFormat(ModelFormat.GGUF)
+                .build());
+    }
+
+    /**
+     * Create a local SDK instance for GGUF with an explicit model directory.
+     *
+     * @param ggufBasePath absolute path to the directory containing {@code .gguf}
+     *                     files
+     */
+    public static GollekSdk createForGguf(String ggufBasePath) throws SdkException {
+        return createLocalSdk(SdkConfig.builder()
+                .preferredProvider("gguf")
+                .modelFormat(ModelFormat.GGUF)
+                .ggufBasePath(ggufBasePath)
+                .build());
+    }
+
+    /**
+     * Create a local SDK instance pre-configured for SafeTensors (LibTorch)
+     * inference.
+     * Models are looked up in {@code $HOME/.gollek/models/safetensors}.
+     */
+    public static GollekSdk createForSafeTensors() throws SdkException {
+        return createLocalSdk(SdkConfig.builder()
+                .preferredProvider("safetensor")
+                .modelFormat(ModelFormat.SAFETENSORS)
+                .build());
+    }
+
+    /**
+     * Create a local SDK instance for SafeTensors with an explicit model directory.
+     *
+     * @param safetensorsBasePath absolute path to the directory containing
+     *                            checkpoints
+     */
+    public static GollekSdk createForSafeTensors(String safetensorsBasePath) throws SdkException {
+        return createLocalSdk(SdkConfig.builder()
+                .preferredProvider("safetensor")
+                .modelFormat(ModelFormat.SAFETENSORS)
+                .safetensorsBasePath(safetensorsBasePath)
+                .build());
     }
 
     /**
@@ -165,6 +219,9 @@ public class GollekSdkFactory {
         private Duration connectTimeout = Duration.ofSeconds(30);
         private int maxRetries = 3;
         private boolean enableMetrics = false;
+        private ModelFormat modelFormat; // v0.1.4
+        private String ggufBasePath; // v0.1.4
+        private String safetensorsBasePath; // v0.1.4
 
         private Builder() {
         }
@@ -215,6 +272,9 @@ public class GollekSdkFactory {
                     .preferredProvider(preferredProvider)
                     .enableMetrics(enableMetrics)
                     .maxRetries(maxRetries)
+                    .modelFormat(modelFormat)
+                    .ggufBasePath(ggufBasePath)
+                    .safetensorsBasePath(safetensorsBasePath)
                     .build();
         }
 

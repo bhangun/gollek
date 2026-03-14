@@ -17,10 +17,10 @@ public class MockModelRepository implements ModelRepository {
 
     @Override
     public Uni<ModelManifest> findById(String modelId, String requestId) {
-        if ("tinyllama".equals(modelId)) {
+        if ("test-model".equals(modelId)) {
             return Uni.createFrom().item(ModelManifest.builder()
-                    .modelId("tinyllama")
-                    .name("tinyllama")
+                    .modelId("test-model")
+                    .name("test-model")
                     .version("1.0")
                     .path("local")
                     .apiKey("test-key")

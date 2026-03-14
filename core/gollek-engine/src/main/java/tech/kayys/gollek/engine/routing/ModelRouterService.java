@@ -48,6 +48,9 @@ import tech.kayys.gollek.spi.provider.ProviderRegistry;
 import tech.kayys.gollek.engine.routing.policy.SelectionPolicy;
 import tech.kayys.gollek.spi.provider.LLMProvider;
 
+import tech.kayys.gollek.provider.core.routing.FormatAwareProviderRouter;
+import tech.kayys.gollek.spi.registry.LocalModelRegistry;
+
 /**
  * Intelligent model router with multi-factor scoring.
  * Selects optimal provider based on:
@@ -87,10 +90,23 @@ public class ModelRouterService {
         @Inject
         tech.kayys.gollek.engine.config.ModelConfig modelConfig;
 
+        @Inject
+        FormatAwareProviderRouter formatRouter;
+
+        @Inject
+        LocalModelRegistry localModelRegistry;
+
         private final Map<String, RoutingDecision> decisionCache = new ConcurrentHashMap<>();
 
         /**
-         * Route inference request to optimal provider
+         * Route inference request to optimal provider.
+         *
+         * <p>
+         * If the model resolves to a known local format (GGUF or SafeTensors)
+         * via the {@link LocalModelRegistry}, the request is dispatched through
+         * {@link FormatAwareProviderRouter} — bypassing manifest lookup and
+         * multi-provider
+         * scoring. Otherwise the existing multi-factor routing pipeline is used.
          */
         public Uni<InferenceResponse> route(
                         String modelId,
@@ -106,6 +122,16 @@ public class ModelRouterService {
                                         "No model specified and no default-model configured", modelId));
                 }
 
+                // v0.1.4 — fast path for locally-served models
+                if (isLocalModel(effectiveModelId)) {
+                        LOG.debugf("ModelRouterService: local route [%s]", effectiveModelId);
+                        ProviderRequest pr = toLocalProviderRequest(effectiveModelId, request);
+                        return formatRouter.route(pr)
+                                        .invoke(resp -> metricsCache.recordSuccess("local", effectiveModelId,
+                                                        resp.getDurationMs()))
+                                        .onFailure().invoke(err -> metricsCache.recordFailure("local", effectiveModelId,
+                                                        err.getClass().getSimpleName()));
+                }
                 return modelRepository.findById(effectiveModelId, getTenantId(request))
                                 .onItem().transform(manifest -> manifest != null ? manifest
                                                 : createDirectPathManifest(modelId, request))
@@ -154,6 +180,15 @@ public class ModelRouterService {
                                         "No model specified and no default-model configured", modelId));
                 }
 
+                // v0.1.4 — fast path for locally-served models
+                if (isLocalModel(effectiveModelId)) {
+                        LOG.debugf("ModelRouterService: local stream route [%s]", effectiveModelId);
+                        ProviderRequest pr = toLocalProviderRequest(effectiveModelId, request);
+                        return formatRouter.routeStream(pr)
+                                        .onFailure().invoke(err -> metricsCache.recordFailure("local", effectiveModelId,
+                                                        err.getClass().getSimpleName()));
+                }
+
                 return modelRepository.findById(effectiveModelId, getTenantId(request))
                                 .onItem().transform(manifest -> manifest != null ? manifest
                                                 : createDirectPathManifest(modelId, request))
@@ -180,6 +215,12 @@ public class ModelRouterService {
                                 ? modelConfig.defaultModel().orElse(modelId)
                                 : modelId;
 
+                // v0.1.4 — local embedding fast path
+                if (isLocalModel(effectiveModelId)) {
+                        // v0.1.4 — local embedding: log the local hit but fall through
+                        // to the existing provider pipeline, which already handles embedding
+                        LOG.debugf("ModelRouterService: local embed detected [%s]", effectiveModelId);
+                }
                 return modelRepository.findById(effectiveModelId, "community") // Default tenant for embedding for now
                                 .onItem().ifNull().failWith(() -> new ModelException(
                                                 ErrorCode.MODEL_NOT_FOUND,
@@ -615,6 +656,56 @@ public class ModelRouterService {
                 // Hook for enterprise configuration. Community defaults to false.
                 return requestConfigRepository != null
                                 && requestConfigRepository.isCostSensitive(context.getRequestId());
+        }
+
+        // ── v0.1.4 — Local model helpers ──────────────────────────────────────
+
+        /**
+         * Determine whether the model should be served by a local provider.
+         *
+         * <p>
+         * A model is considered local when:
+         * <ul>
+         * <li>The {@link LocalModelRegistry} resolves it to a known GGUF or
+         * SafeTensors entry, or</li>
+         * <li>{@link FormatAwareProviderRouter#resolveFormat} returns GGUF or
+         * SAFETENSORS.</li>
+         * </ul>
+         */
+        private boolean isLocalModel(String modelId) {
+                // Fast path: registry hit
+                Optional<LocalModelRegistry.ModelEntry> entry = localModelRegistry.resolve(modelId);
+                if (entry.isPresent()) {
+                        ModelFormat fmt = entry.get().format();
+                        return fmt == ModelFormat.GGUF || fmt == ModelFormat.SAFETENSORS;
+                }
+
+                // Detect by path / extension
+                Optional<ModelFormat> detected = formatRouter.resolveFormat(modelId);
+                return detected.map(f -> f == ModelFormat.GGUF || f == ModelFormat.SAFETENSORS)
+                                .orElse(false);
+        }
+
+        /**
+         * Convert an engine-level {@link InferenceRequest} to a provider-level
+         * {@link ProviderRequest} for local model routing.
+         */
+        private ProviderRequest toLocalProviderRequest(String modelId, InferenceRequest request) {
+                String tenantId = request.getMetadata() != null
+                                ? request.getMetadata().getOrDefault("tenantId", "community").toString()
+                                : "community";
+
+                return ProviderRequest.builder()
+                                .requestId(request.getRequestId())
+                                .model(modelId)
+                                .messages(request.getMessages())
+                                .parameters(request.getParameters())
+                                .tools(request.getTools())
+                                .toolChoice(request.getToolChoice())
+                                .streaming(request.isStreaming())
+                                .timeout(request.getTimeout().orElse(null))
+                                .metadata("tenantId", tenantId)
+                                .build();
         }
 
         /**

@@ -14,9 +14,8 @@ import tech.kayys.gollek.sdk.core.GollekSdk;
  * Pull model using GollekSdk.
  * Usage: gollek pull <model-spec>
  * Model spec examples:
- * - ollama:llama2 -> Pull from Ollama
- * - hf:TheBloke/Llama-2 -> Pull from HuggingFace (future)
- * - llama2 -> Default to Ollama
+ * - hf:TheBloke/Llama-2 -> Pull from HuggingFace
+ * - llama-3.2-1b -> Default to local registry / HF
  */
 @Dependent
 @Unremovable
