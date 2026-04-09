@@ -19,7 +19,11 @@
     <modules>
         <module>gollek-sdk-api</module>
         <module>gollek-sdk-autograd</module>
+        <!-- DISABLED: gollek-sdk-nn has extensive compilation issues with missing dependencies
+             and incomplete implementations. Needs significant refactoring before it can be built.
+             See: Conv2d interface issues, Sequential generic mismatch, missing NLPTokenizer, etc.
         <module>gollek-sdk-nn</module>
+        -->
         <module>gollek-sdk-ml</module>
         <module>gollek-sdk-data</module>
         <module>gollek-sdk-nlp</module>
