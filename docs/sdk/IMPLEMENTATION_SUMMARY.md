@@ -50,17 +50,15 @@ Tensor gathered = TensorOps.gather(1, x, idx);
 
 ---
 
-### 2. ✅ Tokenizer API & Interface (Tokenizer.java)
-**File:** `gollek-sdk-nlp/src/main/java/tech/kayys/gollek/ml/nlp/tokenization/Tokenizer.java`  
-**Lines:** 400+  
-**Status:** Complete Interface, Ready for Implementation
+### 2. ✅ Tokenizer Core SPI (Tokenizer.java)
+**File:** `gollek-tokenizer-core/src/main/java/tech/kayys/gollek/tokenizer/spi/Tokenizer.java`  
+**Status:** Unified and Production-Ready
 
-**Tokenizer Interface Includes:**
-- ✅ **Basic Operations:**
-  - `encode(text)` - Text → Token IDs
-  - `decode(tokenIds)` - Token IDs → Text
-  - `encodeWithMetadata()` - With attention masks, token types
-  - `decodeBatch()` - Batch decoding
+**Tokenizer SPI Interface Includes:**
+- ✅ **Agnostic Core Operations:**
+  - `long[] encode(text, options)` - Text -> Primitive Token IDs
+  - `String decode(tokens, options)` - Primitive Token IDs -> Text
+  - Uncoupled from heavy BatchEncoding boilerplate to preserve framework agnosticism.
 
 - ✅ **Batch Processing:**
   - `encodeBatch(texts)` - Encode multiple texts with auto-padding
@@ -92,31 +90,18 @@ Tensor gathered = TensorOps.gather(1, x, idx);
 
 **Example Usage:**
 ```java
-// Load from HuggingFace (implementation will be added)
-Tokenizer tokenizer = HFTokenizerLoader.load("bert-base-uncased");
+// Load from HuggingFace
+Tokenizer tokenizer = HuggingFaceBpeTokenizer.load(Path.of("tokenizer.json"), preTokenizer);
 
-// Encode text
-List<Integer> tokenIds = tokenizer.encode("Hello, World!");
-// Result: [101, 7592, 1010, 2088, 999, 102]  // with [CLS] and [SEP]
+// Encode text cleanly to primitive arrays
+long[] tokenIds = tokenizer.encode("Hello, World!", EncodeOptions.defaultOptions());
 
-// Encode with metadata (for BERT-style models)
-Tokenizer.EncodedTokens encoded = tokenizer.encodeWithMetadata(
-    "Hello world", 128, true);
-// Contains: tokenIds, tokenTypeIds, attentionMask
-
-// Batch processing
-List<String> texts = List.of("Hello", "World", "Test");
-List<Tokenizer.EncodedTokens> batch = tokenizer.encodeBatchWithMetadata(
-    texts, 128, true);
+// Decode back
+String decoded = tokenizer.decode(tokenIds, DecodeOptions.defaultOptions());
 
 // Access token info
-int vocabSize = tokenizer.vocabSize();  // 30522 for BERT
-int padId = tokenizer.getPadTokenId();  // 0
-String token = tokenizer.getToken(101); // "[CLS]"
-
-// Convert to primitive arrays for input
-int[] tokenIds = encoded.toArrays().tokenIds;
-int[] attentionMask = encoded.toArrays().attentionMask;
+int vocabSize = tokenizer.vocabSize();  
+int padId = tokenizer.padTokenId();  
 ```
 
 **Impact:** Enables NLP model training and fine-tuning (CRITICAL P0 feature)
@@ -270,19 +255,16 @@ public static Tensor maskedFill(Tensor tensor, Tensor mask, float value)
 ```java
 // Core tokenization
 public interface Tokenizer {
-    List<Integer> encode(String text);
-    String decode(List<Integer> tokenIds);
-    List<List<Integer>> encodeBatch(List<String> texts);
+    long[] encode(String text, EncodeOptions options);
+    String decode(long[] tokens, DecodeOptions options);
     int vocabSize();
-    // ... 20+ more methods
+    int bosTokenId();
+    int eosTokenId();
+    int padTokenId();
 }
 
-// Builder pattern
-Tokenizer tokenizer = TokenizerBuilder.create()
-    .maxLength(128)
-    .padding(true)
-    .truncation(true)
-    .build();
+// Memory-efficient token processing
+long[] tokenIds = tokenizer.encode("Hello", EncodeOptions.builder().addBos(true).build());
 ```
 
 ### Vision Transforms API

@@ -35,7 +35,9 @@
     </dependencyManagement>
 
     <modules>
-        <module>runtime</module>
-        <module>lib</module>
+        <module>gollek-sdk-core</module>
+        <module>gollek-sdk-java-local</module>
+        <module>gollek-sdk-java-remote</module>
+        <module>gollek-sdk</module>
     </modules>
 </project>

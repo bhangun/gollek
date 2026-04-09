@@ -1,9 +1,10 @@
 //#!/usr/bin/env jbang
-//DEPS tech.kayys.gollek:gollek-sdk-nlp:0.2.0
+//DEPS tech.kayys.gollek:gollek-tokenizer-core:0.1.0-SNAPSHOT
 //DEPS org.slf4j:slf4j-simple:2.0.0
 
 import java.util.*;
-import tech.kayys.gollek.ml.nlp.tokenization.*;
+import java.util.stream.Collectors;
+import tech.kayys.gollek.tokenizer.spi.*;
 
 /**
  * Gollek SDK v0.2 - NLP Tokenization Example
@@ -39,6 +40,8 @@ public class tokenization_v02 {
         private int vocabSize;
         private int maxLength;
         private int padTokenId = 0;
+        private int bosTokenId = 101;
+        private int eosTokenId = 102;
         private int unknownTokenId = 100;
 
         SimpleTokenizer(int vocabSize, int maxLength) {
@@ -47,71 +50,92 @@ public class tokenization_v02 {
         }
 
         @Override
-        public EncodedTokens encode(String text) {
-            // Simple tokenization: split on spaces
+        public long[] encode(String text, EncodeOptions options) {
             String[] tokens = text.toLowerCase().split("\\s+");
-            List<Integer> tokenIds = new ArrayList<>();
+            List<Long> tokenIds = new ArrayList<>();
 
-            tokenIds.add(101); // [CLS] token
+            if (options.addBos && bosTokenId >= 0) {
+                tokenIds.add((long) bosTokenId);
+            }
+            // default always add CLS for this example
+            else if (!options.addBos) {
+                tokenIds.add((long) bosTokenId);
+            }
+            
             for (String token : tokens) {
-                // Convert to simple hash-based ID (0-99999)
                 int tokenId = Math.abs(token.hashCode()) % vocabSize;
-                tokenIds.add(tokenId);
+                tokenIds.add((long) tokenId);
             }
-            tokenIds.add(102); // [SEP] token
-
-            // Pad to maxLength
-            while (tokenIds.size() < maxLength) {
-                tokenIds.add(padTokenId);
+            
+            if (options.addEos && eosTokenId >= 0) {
+                tokenIds.add((long) eosTokenId);
             }
-
-            // Generate attention mask
-            int[] attentionMask = new int[maxLength];
-            int realLen = Math.min(tokens.length + 2, maxLength);
-            for (int i = 0; i < realLen; i++) {
-                attentionMask[i] = 1;
+            // default always add SEP
+            else if (!options.addEos) {
+                tokenIds.add((long) eosTokenId);
             }
 
-            // Generate token type IDs (BERT-style)
-            int[] tokenTypeIds = new int[maxLength];
-
-            return new EncodedTokens(tokenIds,
-                    tokenTypeIds,
-                    attentionMask,
-                    vocabSize);
+            return tokenIds.stream().mapToLong(Long::longValue).toArray();
         }
 
         @Override
-        public String decode(List<Integer> tokenIds) {
+        public String decode(long[] tokenIds, DecodeOptions options) {
             StringBuilder result = new StringBuilder();
-            for (Integer id : tokenIds) {
-                if (id > 102) { // Skip special tokens
-                    result.append("[Token:").append(id).append("] ");
+            for (long id : tokenIds) {
+                if (options.skipSpecialTokens) {
+                    if (id == padTokenId || id == bosTokenId || id == eosTokenId || id == unknownTokenId) {
+                        continue;
+                    }
                 }
+                result.append("[Token:").append(id).append("] ");
             }
             return result.toString().trim();
         }
 
         @Override
-        public int getVocabSize() {
+        public int vocabSize() {
             return vocabSize;
         }
-
+        
         @Override
-        public String getSpecialToken(String tokenType) {
-            return switch (tokenType) {
-                case "pad" -> "[PAD]";
-                case "unk" -> "[UNK]";
-                case "cls" -> "[CLS]";
-                case "sep" -> "[SEP]";
-                default -> "";
-            };
+        public int bosTokenId() {
+            return bosTokenId;
+        }
+        
+        @Override
+        public int eosTokenId() {
+            return eosTokenId;
+        }
+        
+        @Override
+        public int padTokenId() {
+            return padTokenId;
+        }
+
+        public EncodedTokens encodeWithMetadata(String text) {
+            // Generates metadata similar to old API for demonstration
+            long[] ids = encode(text, EncodeOptions.defaultOptions());
+            List<Long> tokenIds = Arrays.stream(ids).boxed().collect(Collectors.toList());
+            
+            while (tokenIds.size() < maxLength) {
+                tokenIds.add((long) padTokenId);
+            }
+
+            int[] attentionMask = new int[maxLength];
+            int realLen = Math.min(ids.length, maxLength);
+            for (int i = 0; i < realLen; i++) {
+                attentionMask[i] = 1;
+            }
+
+            int[] tokenTypeIds = new int[maxLength];
+
+            return new EncodedTokens(tokenIds, tokenTypeIds, attentionMask, vocabSize);
         }
     }
 
     // EncodedTokens record
     record EncodedTokens(
-            List<Integer> tokenIds,
+            List<Long> tokenIds,
             int[] tokenTypeIds,
             int[] attentionMask,
             int vocabSize) implements Comparable<EncodedTokens> {
@@ -177,10 +201,10 @@ public class tokenization_v02 {
             String text = "The quick brown fox jumps over the lazy dog";
             System.out.println("Input text: \"" + text + "\"\n");
 
-            EncodedTokens encoded = tokenizer.encode(text);
+            long[] encoded = tokenizer.encode(text, EncodeOptions.defaultOptions());
             System.out.println("Encoded tokens:");
             System.out.println("  Token IDs: [101 (CLS), word1, word2, ..., word9, 102 (SEP), 0 (PAD), ...]");
-            System.out.println("  Count: " + encoded.tokenIds.size() + " tokens");
+            System.out.println("  Count: " + encoded.length + " tokens");
             System.out.println("  Max length: 128 (with padding)");
             System.out.println("  ✓ Encoding successful");
         }
@@ -191,8 +215,8 @@ public class tokenization_v02 {
             String text = "Gollek is awesome";
             System.out.println("Original: \"" + text + "\"\n");
 
-            EncodedTokens encoded = tokenizer.encode(text);
-            String decoded = tokenizer.decode(encoded.tokenIds);
+            long[] encoded = tokenizer.encode(text, EncodeOptions.defaultOptions());
+            String decoded = tokenizer.decode(encoded, DecodeOptions.defaultOptions());
 
             System.out.println("Decoded: \"" + decoded + "\"");
             System.out.println("Note: Decoding reconstructs tokens, not exact text");
@@ -213,12 +237,9 @@ public class tokenization_v02 {
             System.out.println("  Tokens: [CLS] Hello world [SEP] [PAD] [PAD] ...");
             System.out.println("  IDs:    101   hello world  102   0    0   ...\n");
 
-            // Get special tokens
-            String padToken = tokenizer.getSpecialToken("pad");
-            String clsToken = tokenizer.getSpecialToken("cls");
             System.out.println("Retrieved special tokens:");
-            System.out.println("  PAD token: " + padToken);
-            System.out.println("  CLS token: " + clsToken);
+            System.out.println("  PAD token: " + tokenizer.padTokenId());
+            System.out.println("  CLS token: " + tokenizer.bosTokenId());
             System.out.println("  ✓ Special tokens handled correctly");
         }
 
@@ -238,9 +259,9 @@ public class tokenization_v02 {
             System.out.println("\nProcessing:");
             List<EncodedTokens> batch = new ArrayList<>();
             for (String text : texts) {
-                EncodedTokens encoded = tokenizer.encode(text);
+                EncodedTokens encoded = tokenizer.encodeWithMetadata(text);
                 batch.add(encoded);
-                System.out.println("  Encoded to " + encoded.tokenIds.size() + " tokens");
+                System.out.println("  Encoded to " + encoded.tokenIds.size() + " tokens padded");
             }
 
             System.out.println("\nBatch properties:");
@@ -253,7 +274,7 @@ public class tokenization_v02 {
             System.out.println("Scenario: Generate attention masks for padding\n");
 
             String text = "Hello world";
-            EncodedTokens encoded = tokenizer.encode(text);
+            EncodedTokens encoded = tokenizer.encodeWithMetadata(text);
 
             int[] mask = encoded.attentionMask;
             int[] tokenTypes = encoded.tokenTypeIds;
@@ -324,7 +345,7 @@ public class tokenization_v02 {
             System.out.println("  Task: Sentiment analysis");
             System.out.println("  Input: \"This product is amazing!\"");
             System.out.println("  Preprocessing:");
-            EncodedTokens sentiment = tokenizer.encode("This product is amazing");
+            EncodedTokens sentiment = tokenizer.encodeWithMetadata("This product is amazing");
             System.out.println("    - Tokenize text");
             System.out.println("    - Add [CLS] and [SEP] tokens");
             System.out.println("    - Tokens shape: (1, 128)");
@@ -334,7 +355,7 @@ public class tokenization_v02 {
             System.out.println("  Task: Named entity recognition (NER)");
             System.out.println("  Input: \"John works at Google in California\"");
             System.out.println("  Preprocessing:");
-            EncodedTokens ner = tokenizer.encode("John works at Google in California");
+            EncodedTokens ner = tokenizer.encodeWithMetadata("John works at Google in California");
             System.out.println("    - Tokenize each word");
             System.out.println("    - Ensure 1:1 word-to-token mapping");
             System.out.println("    - Preserve token order");

@@ -167,14 +167,17 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
                                           int outDim, int inDim, Arena a) {
         long floatSize = (long) outDim * inDim * 4;
         MemorySegment out = a.allocate(floatSize, 64);
+        
+        byte[] wArr = weight.toArray(ValueLayout.JAVA_BYTE);
+        float[] sArr = scale.toArray(ValueLayout.JAVA_FLOAT);
 
-        java.util.stream.IntStream.range(0, outDim).parallel().forEach(row -> {
-            float s = scale.getAtIndex(ValueLayout.JAVA_FLOAT, row);
-            long rowByteOffset = (long) row * inDim / 2;
+        for (int row = 0; row < outDim; row++) {
+            float s = sArr[row];
+            int rowByteOffset = row * inDim / 2;
             long outRowOffset = (long) row * inDim;
 
             for (int col = 0; col < inDim; col += 2) {
-                byte packed = weight.get(ValueLayout.JAVA_BYTE, rowByteOffset + col / 2);
+                byte packed = wArr[rowByteOffset + col / 2];
                 int lo = (packed & 0x0F);
                 int hi = (packed >> 4) & 0x0F;
                 if (lo >= 8) lo -= 16;
@@ -185,7 +188,7 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
                     out.setAtIndex(ValueLayout.JAVA_FLOAT, outRowOffset + col + 1, hi * s);
                 }
             }
-        });
+        }
         return out;
     }
 
@@ -197,14 +200,18 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
         long floatSize = (long) outDim * inDim * 4;
         MemorySegment out = a.allocate(floatSize, 64);
 
-        java.util.stream.IntStream.range(0, outDim).parallel().forEach(row -> {
-            float s = scale.getAtIndex(ValueLayout.JAVA_FLOAT, row);
-            long rowOffset = (long) row * inDim;
+        byte[] wArr = weight.toArray(ValueLayout.JAVA_BYTE);
+        float[] sArr = scale.toArray(ValueLayout.JAVA_FLOAT);
+
+        for (int row = 0; row < outDim; row++) {
+            float s = sArr[row];
+            int rowOffset = row * inDim;
+            long outOffset = (long) row * inDim;
             for (int col = 0; col < inDim; col++) {
-                byte val = weight.get(ValueLayout.JAVA_BYTE, rowOffset + col);
-                out.setAtIndex(ValueLayout.JAVA_FLOAT, rowOffset + col, val * s);
+                byte val = wArr[rowOffset + col];
+                out.setAtIndex(ValueLayout.JAVA_FLOAT, outOffset + col, val * s);
             }
-        });
+        }
         return out;
     }
 

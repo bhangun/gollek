@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>tech.kayys.gollek</groupId>
+        <artifactId>gollek-sdk-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>gollek-sdk</artifactId>
+
+    <name>gollek-sdk</name>
+    <description>
+        Facade / entry point for the Gollek SDK.
+        Discovers SDK implementations (local or remote) at runtime via ServiceLoader.
+        Add gollek-sdk-java-local or gollek-sdk-java-remote to your classpath to
+        select an implementation.
+    </description>
+
+    <properties>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.quarkus.platform</groupId>
+                <artifactId>quarkus-bom</artifactId>
+                <version>3.32.2</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys.gollek</groupId>
+            <artifactId>gollek-sdk-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- Embedded Engine Support (Optional/Provided) -->
+        <dependency>
+            <groupId>tech.kayys.gollek</groupId>
+            <artifactId>gollek-engine</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>
