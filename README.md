@@ -17,7 +17,6 @@
 See more for complete documentation: [https://gollek-ai.github.io]
 
 
-
 ### ✅ What This Architecture Delivers
 
 1. **True Plugin System**

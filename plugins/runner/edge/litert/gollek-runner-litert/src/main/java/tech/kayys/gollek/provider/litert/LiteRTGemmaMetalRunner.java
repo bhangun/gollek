@@ -12,6 +12,7 @@ import java.util.function.Consumer;
 import java.util.Map;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Multiplatform Gemma-4 inference engine using Gollek's compute backend.
@@ -167,17 +168,15 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
         long floatSize = (long) outDim * inDim * 4;
         MemorySegment out = a.allocate(floatSize, 64);
 
-        for (int row = 0; row < outDim; row++) {
+        java.util.stream.IntStream.range(0, outDim).parallel().forEach(row -> {
             float s = scale.getAtIndex(ValueLayout.JAVA_FLOAT, row);
             long rowByteOffset = (long) row * inDim / 2;
             long outRowOffset = (long) row * inDim;
 
             for (int col = 0; col < inDim; col += 2) {
                 byte packed = weight.get(ValueLayout.JAVA_BYTE, rowByteOffset + col / 2);
-                // Low nibble = first element, high nibble = second
                 int lo = (packed & 0x0F);
                 int hi = (packed >> 4) & 0x0F;
-                // Sign-extend from 4 bits
                 if (lo >= 8) lo -= 16;
                 if (hi >= 8) hi -= 16;
 
@@ -186,7 +185,7 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
                     out.setAtIndex(ValueLayout.JAVA_FLOAT, outRowOffset + col + 1, hi * s);
                 }
             }
-        }
+        });
         return out;
     }
 
@@ -198,14 +197,14 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
         long floatSize = (long) outDim * inDim * 4;
         MemorySegment out = a.allocate(floatSize, 64);
 
-        for (int row = 0; row < outDim; row++) {
+        java.util.stream.IntStream.range(0, outDim).parallel().forEach(row -> {
             float s = scale.getAtIndex(ValueLayout.JAVA_FLOAT, row);
             long rowOffset = (long) row * inDim;
             for (int col = 0; col < inDim; col++) {
                 byte val = weight.get(ValueLayout.JAVA_BYTE, rowOffset + col);
                 out.setAtIndex(ValueLayout.JAVA_FLOAT, rowOffset + col, val * s);
             }
-        }
+        });
         return out;
     }
 
