@@ -67,7 +67,6 @@
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
                 <version>${quarkus.platform.version}</version>
-                <extensions>true</extensions>
                 <executions>
                     <execution>
                         <goals>
@@ -81,7 +80,6 @@
             <plugin>
                 <groupId>io.smallrye</groupId>
                 <artifactId>jandex-maven-plugin</artifactId>
-                <version>3.1.6</version>
                 <executions>
                     <execution>
                         <id>make-index</id>

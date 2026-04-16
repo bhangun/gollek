@@ -1,6 +1,9 @@
 package tech.kayys.gollek.ml.export;
 
 import org.junit.jupiter.api.Test;
+import tech.kayys.gollek.ml.export.onnx.OnnxExporter;
+import tech.kayys.gollek.ml.export.gguf.GgufExporter;
+import tech.kayys.gollek.ml.export.litert.LiteRTExporter;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -20,9 +23,9 @@ class ExportTest {
     }
 
     @Test
-    void testGGUFExporterCreation() {
-        // GGUFExporter requires constructor args
-        assertNotNull(GGUFExporter.class);
+    void testGgufExporterCreation() {
+        // GgufExporter requires constructor args
+        assertNotNull(GgufExporter.class);
     }
 
     @Test

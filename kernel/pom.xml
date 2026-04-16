@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>tech.kayys.gollek</groupId>
+        <artifactId>gollek-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>gollek-kernel-plugin-parent</artifactId>
+    <packaging>pom</packaging>
+
+    <name>Gollek Kernel Plugin Parent</name>
+    <description>Parent POM for Gollek platform-specific kernel plugins</description>
+
+    <properties>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <gollek.version>0.1.0</gollek.version>
+    </properties>
+
+    <modules>
+        <module>cuda</module>
+        <module>rocm</module>
+        <module>metal</module>
+        <module>blackwell</module>
+        <module>directml</module>
+    </modules>
+
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Import Gollek BOM for internal module versions -->
+            <dependency>
+                <groupId>tech.kayys.gollek</groupId>
+                <artifactId>gollek-bom</artifactId>
+                <version>${project.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>tech.kayys.gollek</groupId>
+                <artifactId>gollek-plugin-kernel-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jboss.logging</groupId>
+                <artifactId>jboss-logging</artifactId>
+                <version>3.6.1.Final</version>
+                <scope>provided</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

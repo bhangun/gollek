@@ -56,5 +56,8 @@
 
         <!-- Runtime SPI (ExecutionProvider, RuntimeSession, Capability) -->
         <module>gollek-spi-runtime</module>
+
+        <!-- Tensor SPI -->
+        <module>gollek-spi-tensor</module>
     </modules>
 </project>

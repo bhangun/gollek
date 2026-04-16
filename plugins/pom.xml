@@ -42,11 +42,15 @@
     </dependencies>
 
     <modules>
-        <module>cloud</module>
-        <module>common</module>
-        <module>kernel</module>
-        <module>optimization</module>
-        <module>provider</module>
-        <module>runner</module>
+        <module>gollek-plugin-content-safety</module>
+        <module>gollek-plugin-pii-redaction</module>
+        <module>gollek-plugin-semantic-cache</module>
+        <module>gollek-plugin-rag</module>
+        <!-- <module>gollek-plugin-model-router</module> Needs additional fixes -->
+        <!-- <module>gollek-plugin-prompt</module> Needs additional fixes -->
+        <!-- <module>gollek-plugin-reasoning</module> Needs additional fixes -->
+        <!-- <module>gollek-plugin-sampling</module> Needs additional fixes -->
+        <module>gollek-plugin-mcp</module>
+        <module>log-parser</module>
     </modules>
 </project>

@@ -46,6 +46,8 @@
     <modules>
         <module>bom</module>
         <module>core</module>
+        <module>kernel</module>
+        <module>runner</module>
         <module>plugins</module>
         <module>sdk</module>
         <module>inference</module>

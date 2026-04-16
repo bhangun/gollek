@@ -35,29 +35,8 @@
     </dependencyManagement>
 
     <modules>
-        <!-- SPI interfaces (must be built first) -->
-        <module>spi</module>
-
         <!-- Error codes (no deps on other core modules) -->
         <module>gollek-error-code</module>
-
-        <!-- Plugin modules: plugin/pom.xml (gollek-core-plugin-parent) declares all plugin children -->
-        <module>plugin</module>
-
-        <module>quantizer</module>
-
-        <!-- Runtime primitives (Tensor SPI, Backend, Pool) -->
-        <module>gollek-spi-tensor</module>
-
-        <module>gollek-observability</module>
-        <module>gollek-multimodal-core</module>
-
-        <!-- Model modules -->
-        <module>model/gollek-model-repo-core</module>
-        <module>model/gollek-models-family</module>
-        <module>model/gollek-model-registry</module>
-        <module>model/gollek-model-routing</module>
-        <!-- <module>model/gollek-model-runner</module> Module not yet implemented -->
 
         <!-- Provider modules -->
         <module>gollek-provider-core</module>
@@ -67,6 +46,27 @@
         <module>gollek-tool-core</module>
         <module>gollek-tokenizer-core</module>
         <module>gollek-embedding-core</module>
+
+
+        <module>gollek-observability</module>
+        <module>gollek-multimodal-core</module>
+
+        <!-- Model modules -->
+        <module>model/gollek-model-repo-core</module>
+        <module>model/gollek-models-family</module>
+        <module>model/gollek-model-registry</module>
+        <module>model/gollek-model-routing</module>
+        <module>model/gollek-model-runner</module>
+
+        <module>optimization</module>
+
+        <!-- Plugin modules: plugin/pom.xml (gollek-core-plugin-parent) declares all plugin children -->
+        <module>plugin</module>
+
+        <module>quantizer</module>
+
+        <!-- SPI interfaces (must be built first) -->
+        <module>spi</module>
 
     </modules>
 </project>

@@ -64,6 +64,10 @@
       <scope>test</scope>
       <exclusions>
         <exclusion>
+          <artifactId>gollek-tokenizer-core</artifactId>
+          <groupId>tech.kayys.gollek</groupId>
+        </exclusion>
+        <exclusion>
           <artifactId>onnxruntime</artifactId>
           <groupId>com.microsoft.onnxruntime</groupId>
         </exclusion>
