@@ -3,7 +3,6 @@ package tech.kayys.gollek.inference.libtorch.core;
 import tech.kayys.gollek.inference.libtorch.binding.LibTorchBinding;
 import tech.kayys.gollek.runtime.tensor.BackendType;
 import tech.kayys.gollek.runtime.tensor.DType;
-import tech.kayys.gollek.inference.libtorch.core.Device;
 import tech.kayys.gollek.runtime.tensor.ExecutionContext;
 import tech.kayys.gollek.runtime.tensor.Tensor;
 
@@ -219,7 +218,7 @@ public class TorchTensor implements Tensor {
             MemorySegment result = (MemorySegment) fn.invoke(dataSegment, shapeSegment, (long) shape.length,
                     ScalarType.FLOAT.code());
             TorchTensor tensor = new TorchTensor(result, arena);
-            
+
             if (device != null && device != Device.CPU) {
                 tensor = tensor.to(device);
             }
@@ -262,13 +261,14 @@ public class TorchTensor implements Tensor {
      * @return a new tensor containing the data
      */
     public static TorchTensor fromLongArray(long[] data, long[] shape) {
-        return fromLongArray(data, shape, null);  // Default to current device
+        return fromLongArray(data, shape, null); // Default to current device
     }
 
     /**
      * Create a long tensor with optional device placement.
-     * @param data the data array
-     * @param shape the tensor shape
+     * 
+     * @param data   the data array
+     * @param shape  the tensor shape
      * @param device the device to place tensor on (null = default)
      */
     public static TorchTensor fromLongArray(long[] data, long[] shape, Device device) {
@@ -282,7 +282,7 @@ public class TorchTensor implements Tensor {
             MemorySegment result = (MemorySegment) fn.invoke(dataSegment, shapeSegment, (long) shape.length,
                     ScalarType.LONG.code());
             TorchTensor tensor = new TorchTensor(result, arena);
-            
+
             // Move to specified device if not null
             if (device != null && device != Device.CPU) {
                 tensor = tensor.to(device);
@@ -1071,15 +1071,17 @@ public class TorchTensor implements Tensor {
 
     /**
      * Get the device this tensor is allocated on.
-     * Returns CPU by default since device detection from LibTorch may not be exposed.
+     * Returns CPU by default since device detection from LibTorch may not be
+     * exposed.
      * 
      * @return the Device this tensor is on
      */
     public Device getDevice() {
-        // TODO: Implement native LibTorch device detection if available
-        // For now, return CPU as fallback - the tensor may actually be on GPU
-        // but we can't reliably detect it without native support
-        return Device.CPU;
+        Device.Type type = deviceType();
+        if (type == Device.Type.CPU) {
+            return Device.CPU;
+        }
+        return new Device(type, 0);
     }
 
     /**

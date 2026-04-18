@@ -270,51 +270,21 @@ public class DirectInferenceEngine implements SafetensorEngine {
      * @return generated text response
      */
     public Uni<InferenceResponse> generate(String prompt, Path modelPath, GenerationConfig cfg) {
-        System.out.println("[DirectInferenceEngine.generate] Starting inference for: " + modelPath);
-        return Uni.createFrom().item((Supplier<InferenceResponse>) () -> {
-            Instant t0 = Instant.now();
-            StringBuilder out = new StringBuilder();
-            int inputLen = 0;
-
-            try {
-                System.out.println("[DirectInferenceEngine.generate] Loading model from: " + modelPath);
-                LoadedModel model = getLoadedModel(modelPath);
-                if (model == null) {
-                    System.out.println("[DirectInferenceEngine.generate] Model not cached, loading...");
-                    loadModel(modelPath);
-                    model = getLoadedModel(modelPath);
-                    System.out.println("[DirectInferenceEngine.generate] Model loaded");
-                } else {
-                    System.out.println("[DirectInferenceEngine.generate] Using cached model");
-                }
-                
-                if (model == null) {
-                    System.err.println("[ERROR] Model is still null after loading!");
-                    throw new RuntimeException("Model failed to load");
-                }
-                
-                System.out.println("[DirectInferenceEngine.generate] Model has " + model.weights().size() + " weights");
+                log.debugf("DirectInferenceEngine: Model loaded with %d weights", model.weights().size());
                 
                 Tokenizer tokenizer = model.tokenizer();
                 ModelConfig config = model.config();
                 ModelArchitecture arch = archRegistry.resolve(config);
 
-                // LOG DEVICE INFORMATION FOR DEBUGGING
                 if (!model.weights().isEmpty()) {
                     try {
                         TorchTensor firstWeight = model.weights().values().iterator().next();
                         tech.kayys.gollek.inference.libtorch.core.Device device = firstWeight.getDevice();
-                        String deviceStr = device != null ? device.toString() : "UNKNOWN";
-                        System.out.println("[DirectInferenceEngine] Model device: " + deviceStr + ", weights: " + model.weights().size());
                         log.infof("DirectInferenceEngine: model=%s, device=%s, weights=%d",
-                            model.key(), deviceStr, model.weights().size());
+                            model.key(), device, model.weights().size());
                     } catch (Exception e) {
-                        System.err.println("[DirectInferenceEngine] Device detection failed: " + e.getMessage());
-                        e.printStackTrace();
                         log.warnf("Could not log device info: %s", e.getMessage());
                     }
-                } else {
-                    System.err.println("[ERROR] Model weights are EMPTY!");
                 }
 
                 long[] inputIds = tokenizer.encode(prompt, EncodeOptions.defaultOptions());
@@ -387,49 +357,15 @@ public class DirectInferenceEngine implements SafetensorEngine {
      * Generate text as a stream of responses.
      */
     public Multi<InferenceResponse> generateStream(String prompt, Path modelPath, GenerationConfig cfg) {
-        System.out.println("[generateStream] Starting streaming inference for: " + modelPath);
-        SubmissionPublisher<InferenceResponse> publisher = new SubmissionPublisher<>(Executors.newVirtualThreadPerTaskExecutor(), 256);
-        
-        Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
-            Instant t0 = Instant.now();
-            String requestId = UUID.randomUUID().toString();
-            int inputLen = 0;
-
-            try {
-                System.out.println("[generateStream] Loading model from: " + modelPath);
-                LoadedModel model = getLoadedModel(modelPath);
-                if (model == null) {
-                    System.out.println("[generateStream] Model not cached, loading...");
-                    loadModel(modelPath);
-                    model = getLoadedModel(modelPath);
-                    System.out.println("[generateStream] Model loaded");
-                } else {
-                    System.out.println("[generateStream] Using cached model");
-                }
-                
-                if (model == null) {
-                    System.err.println("[ERROR] Model is still null after loading!");
-                    throw new RuntimeException("Model failed to load");
-                }
-                
-                System.out.println("[generateStream] Model has " + model.weights().size() + " weights");
-                
-                // LOG DEVICE INFORMATION FOR DEBUGGING
                 if (!model.weights().isEmpty()) {
                     try {
                         TorchTensor firstWeight = model.weights().values().iterator().next();
                         tech.kayys.gollek.inference.libtorch.core.Device device = firstWeight.getDevice();
-                        String deviceStr = device != null ? device.toString() : "UNKNOWN";
-                        System.out.println("[generateStream] Model device: " + deviceStr + ", weights: " + model.weights().size());
                         log.infof("generateStream: model=%s, device=%s, weights=%d",
-                            model.key(), deviceStr, model.weights().size());
+                            model.key(), device, model.weights().size());
                     } catch (Exception e) {
-                        System.err.println("[generateStream] Device detection failed: " + e.getMessage());
-                        e.printStackTrace();
                         log.warnf("Could not log device info: %s", e.getMessage());
                     }
-                } else {
-                    System.err.println("[ERROR] Model weights are EMPTY!");
                 }
                 
                 Tokenizer tokenizer = model.tokenizer();
@@ -589,13 +525,15 @@ public class DirectInferenceEngine implements SafetensorEngine {
                 // Move tensor to target device (Metal if available, otherwise CPU)
                 if (!targetDevice.isCpu()) {
                     try {
-                        t = t.to(targetDevice);
+                        TorchTensor moved = t.to(targetDevice);
+                        t.close(); // Close the CPU-bound bridged tensor
+                        t = moved;
                         log.debugf("Moved tensor %s to device %s", name, targetDevice);
                         movedCount++;
                     } catch (Exception e) {
                         failedCount++;
                         log.warnf("Failed to move tensor %s to device %s, keeping on CPU: %s", name, targetDevice, e.getMessage());
-                        // Keep tensor on CPU if device move fails
+                        // Keep tensor 't' on CPU if device move fails
                     }
                 }
                 weights.put(name, t);

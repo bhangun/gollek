@@ -406,7 +406,7 @@ public class DirectForwardPass {
         for (int i = 0; i < len; i++) {
             indices[i] = start + i;
         }
-        try (TorchTensor idx = TorchTensor.fromLongArray(indices, new long[] { len })) {
+        try (TorchTensor idx = TorchTensor.fromLongArray(indices, new long[] { len }, tensor.getDevice())) {
             return tensor.indexSelect(2, idx);
         }
     }
@@ -436,7 +436,7 @@ public class DirectForwardPass {
 
         // rms = 1 / sqrt(mean + eps)
         float epsFlt = (float) eps;
-        TorchTensor epsT = TorchTensor.fromFloatArray(new float[] { epsFlt }, new long[] { 1 });
+        TorchTensor epsT = TorchTensor.fromFloatArray(new float[] { epsFlt }, new long[] { 1 }, x.getDevice());
         TorchTensor denom = mean.add(epsT);
         epsT.close();
         mean.close();
@@ -497,7 +497,7 @@ public class DirectForwardPass {
         TorchTensor expN = neg.exp();
         neg.close();
 
-        TorchTensor one = TorchTensor.fromFloatArray(new float[] { 1.0f }, new long[] { 1 });
+        TorchTensor one = TorchTensor.fromFloatArray(new float[] { 1.0f }, new long[] { 1 }, x.getDevice());
         TorchTensor denom = one.add(expN);
         one.close();
         expN.close();
@@ -631,7 +631,7 @@ public class DirectForwardPass {
     private TorchTensor selectLastToken(TorchTensor hidden, int seqLen) {
         // [1, seqLen, hiddenSize] → take seqLen-1 position
         // Use indexSelect on dim=1 with a single-element index tensor
-        try (TorchTensor idx = TorchTensor.fromLongArray(new long[] { seqLen - 1L }, new long[] { 1 })) {
+        try (TorchTensor idx = TorchTensor.fromLongArray(new long[] { seqLen - 1L }, new long[] { 1 }, hidden.getDevice())) {
             TorchTensor selected = hidden.indexSelect(1, idx); // [1, 1, hiddenSize]
             long hiddenSize = selected.shape()[2];
             TorchTensor squeezed = selected.reshape(1L, hiddenSize); // [1, hiddenSize]
@@ -787,7 +787,7 @@ public class DirectForwardPass {
         long[] shape = x.shape();
         long hiddenSize = shape[shape.length - 1];
         TorchTensor sum = sumLastDim(x);
-        TorchTensor countT = TorchTensor.fromFloatArray(new float[] { hiddenSize }, new long[] { 1 });
+        TorchTensor countT = TorchTensor.fromFloatArray(new float[] { (float) hiddenSize }, new long[] { 1 }, sum.getDevice());
         try (countT) {
             TorchTensor mean = sum.div(countT);
             sum.close();
@@ -815,7 +815,7 @@ public class DirectForwardPass {
         float[] ones = new float[(int) hiddenSize];
         java.util.Arrays.fill(ones, 1.0f);
 
-         TorchTensor onesT = TorchTensor.fromFloatArray(ones, new long[] { hiddenSize, 1L });
+         TorchTensor onesT = TorchTensor.fromFloatArray(ones, new long[] { hiddenSize, 1L }, flat.getDevice());
          
          try (onesT) {
              TorchTensor sums = flat.matmul(onesT); // [outer, 1]
