@@ -21,8 +21,12 @@ import java.io.IOException;
 public final class GGUFLoader {
 
     public static GGUFModel loadModel(Path path) throws IOException {
-        try (GGUFReader reader = new GGUFReader(path)) {
-            return new GGUFParser().parse(reader.segment());
+        Arena arena = Arena.ofShared();
+        try (GGUFReader reader = new GGUFReader(path, arena)) {
+            return new GGUFParser().parse(reader.segment(), arena);
+        } catch (Throwable t) {
+            arena.close();
+            throw t;
         }
     }
 
@@ -30,23 +34,27 @@ public final class GGUFLoader {
         Map<String, Object> meta = model.metadata();
         String arch = (String) meta.getOrDefault("general.architecture", "llama");
         
-        int nLayer = getMetadataInt(meta, arch + ".block_count", "llama.block_count");
-        int hidden = getMetadataInt(meta, arch + ".embedding_length", "llama.embedding_length");
-        int nHeads = getMetadataInt(meta, arch + ".attention.head_count", "llama.attention.head_count");
+        int nLayer = getMetadataInt(meta, arch + ".block_count", "llama.block_count", "general.block_count");
+        int hidden = getMetadataInt(meta, arch + ".embedding_length", "llama.embedding_length", "general.embedding_length");
+        int nHeads = getMetadataInt(meta, arch + ".attention.head_count", "llama.attention.head_count", "general.attention.head_count");
         
         // Very robust lookup for KV heads
         int nHeadsKv = getMetadataIntOptional(meta, 
             arch + ".attention.head_count_kv", 
             "llama.attention.head_count_kv", 
             "general.attention.head_count_kv",
-            "attention.head_count_kv");
+            "attention.head_count_kv",
+            "head_count_kv");
         
         if (nHeadsKv == 0) {
-            // Try suffix match
+            // Try suffix match for head_count_kv
             for (String key : meta.keySet()) {
-                if (key.endsWith(".attention.head_count_kv")) {
-                    nHeadsKv = ((Number) meta.get(key)).intValue();
-                    break;
+                if (key.endsWith(".attention.head_count_kv") || key.endsWith(".head_count_kv")) {
+                    Object v = meta.get(key);
+                    if (v instanceof Number n) {
+                        nHeadsKv = n.intValue();
+                        break;
+                    }
                 }
             }
         }
@@ -55,9 +63,6 @@ public final class GGUFLoader {
         int headDim = hidden / nHeads;
         
         System.out.println("Loading " + nLayer + " layers: arch=" + arch + ", hidden=" + hidden + ", nHeads=" + nHeads + ", nHeadsKv=" + nHeadsKv);
-        if (nHeadsKv == nHeads) {
-            System.out.println("Warning: nHeadsKv falling back to nHeads (MHA). All keys: " + meta.keySet());
-        }
 
         List<TransformerLayerWeights> layers = new ArrayList<>(nLayer);
 
@@ -70,24 +75,25 @@ public final class GGUFLoader {
             MemorySegment q = findAndPrepareTensorOptional(model, prefix + "attn_q.weight", arena);
             MemorySegment k = findAndPrepareTensorOptional(model, prefix + "attn_k.weight", arena);
             MemorySegment v = findAndPrepareTensorOptional(model, prefix + "attn_v.weight", arena);
+            
+            // Bias handling: Qwen2 and others use biases.
             MemorySegment bq = findAndPrepareTensorOptional(model, prefix + "attn_q.bias", arena);
             MemorySegment bk = findAndPrepareTensorOptional(model, prefix + "attn_k.bias", arena);
             MemorySegment bv = findAndPrepareTensorOptional(model, prefix + "attn_v.bias", arena);
 
             MemorySegment bqkv = null;
-            if (bq != null && bk != null && bv != null) {
-                bqkv = combineQKV(bq, bk, bv, 1, nHeads, nHeadsKv, headDim, arena);
+            if (bq != null || bk != null || bv != null) {
+                // If any bias exists, we combine them. missing ones are treated as zero.
+                // We pass hidden=1 to combineQKV for bias vectors.
+                bqkv = combineQKVBias(bq, bk, bv, nHeads, nHeadsKv, headDim, arena);
             } else {
                 bqkv = findAndPrepareTensorOptional(model, prefix + "attn_qkv.bias", arena);
             }
 
             MemorySegment wqkv;
             if (q == null) {
-                // Try fused QKV
-                MemorySegment qkv = findAndPrepareTensor(model, prefix + "attn_qkv.weight", arena);
-                // Qwen2-style: Q, K, V are fused. We need to preserve them or split.
-                // Our prepacker expects them combined anyway, but we must ensure we have the right size.
-                wqkv = qkv; 
+                // Try fused QKV weight
+                wqkv = findAndPrepareTensor(model, prefix + "attn_qkv.weight", arena);
             } else {
                 wqkv = combineQKV(q, k, v, hidden, nHeads, nHeadsKv, headDim, arena);
             }
@@ -126,6 +132,21 @@ public final class GGUFLoader {
 
         return layers;
     }
+
+    private static MemorySegment combineQKVBias(MemorySegment bq, MemorySegment bk, MemorySegment bv, int nHeads, int nHeadsKv, int headDim, Arena arena) {
+        long qLen = (long) nHeads * headDim;
+        long kLen = (long) nHeadsKv * headDim;
+        long vLen = (long) nHeadsKv * headDim;
+        
+        MemorySegment combined = arena.allocate((qLen + kLen + vLen) * Float.BYTES, 64);
+        
+        if (bq != null) MemorySegment.copy(bq, 0, combined, 0, qLen * Float.BYTES);
+        if (bk != null) MemorySegment.copy(bk, 0, combined, qLen * Float.BYTES, kLen * Float.BYTES);
+        if (bv != null) MemorySegment.copy(bv, 0, combined, (qLen + kLen) * Float.BYTES, vLen * Float.BYTES);
+        
+        return combined;
+    }
+
 
     private static MemorySegment findAndPrepareTensor(GGUFModel model, String name, Arena arena) {
         GGUFTensorInfo info = model.tensors().stream()

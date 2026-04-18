@@ -52,7 +52,7 @@
         <!-- llama.cpp FFM bindings for quantization -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-ext-runner-gguf</artifactId>
+            <artifactId>gollek-runner-llamacpp</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -170,7 +170,7 @@
                 </configuration>
             </plugin>
 
-            <!-- Native Library Builder and Installer -->
+<!--
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
@@ -200,9 +200,9 @@
                             <executable>cmake</executable>
                             <workingDirectory>${project.basedir}/../gguf-bridge</workingDirectory>
                             <arguments>
-                                <argument>--build</argument>
+                                <argument>__build</argument>
                                 <argument>build</argument>
-                                <argument>--config</argument>
+                                <argument>__config</argument>
                                 <argument>Release</argument>
                             </arguments>
                         </configuration>
@@ -225,8 +225,8 @@
                     </execution>
                 </executions>
             </plugin>
-
-            <!-- Copy Native Library -->
+-->
+<!--
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
@@ -254,6 +254,7 @@
                     </execution>
                 </executions>
             </plugin>
+-->
 
             <plugin>
                 <groupId>io.smallrye</groupId>

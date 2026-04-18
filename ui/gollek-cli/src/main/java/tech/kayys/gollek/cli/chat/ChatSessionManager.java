@@ -500,7 +500,7 @@ public class ChatSessionManager {
         if (delta == null || delta.isEmpty()) {
             return "";
         }
-        String cleaned = SPECIAL_TOKEN_PATTERN.matcher(delta).replaceAll("").strip();
+        String cleaned = SPECIAL_TOKEN_PATTERN.matcher(delta).replaceAll("");
         return sanitizeResponse(cleaned);
     }
 
@@ -532,7 +532,7 @@ public class ChatSessionManager {
                 }
             }
         }
-        return cleaned.toString().strip();
+        return cleaned.toString();
     }
 
     /**

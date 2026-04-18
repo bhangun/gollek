@@ -177,6 +177,18 @@ public final class ProviderRequest {
                 .orElse(1.0);
     }
 
+    public int getTopK() {
+        return getParameter("top_k", Number.class)
+                .map(Number::intValue)
+                .orElse(40);
+    }
+
+    public double getRepeatPenalty() {
+        return getParameter("repetition_penalty", Number.class)
+                .map(Number::doubleValue)
+                .orElse(1.1);
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -234,6 +246,31 @@ public final class ProviderRequest {
 
         public Builder parameter(String key, Object value) {
             this.parameters.put(key, value);
+            return this;
+        }
+
+        public Builder temperature(double temperature) {
+            this.parameters.put("temperature", temperature);
+            return this;
+        }
+
+        public Builder topP(double topP) {
+            this.parameters.put("top_p", topP);
+            return this;
+        }
+
+        public Builder topK(int topK) {
+            this.parameters.put("top_k", topK);
+            return this;
+        }
+
+        public Builder maxTokens(int maxTokens) {
+            this.parameters.put("max_tokens", maxTokens);
+            return this;
+        }
+
+        public Builder repeatPenalty(double repeatPenalty) {
+            this.parameters.put("repetition_penalty", repeatPenalty);
             return this;
         }
 

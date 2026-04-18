@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class GGUFTokenizerDetectionTest {
 
     private static GGUFModel makeModel(Map<String,Object> meta, List<String> tokens) {
-        return new GGUFModel(1, meta, Collections.emptyList(), 0L, (MemorySegment) null);
+        return new GGUFModel(1, meta, Collections.emptyList(), 0L, (MemorySegment) null, (java.lang.foreign.Arena) null);
     }
 
     @Test

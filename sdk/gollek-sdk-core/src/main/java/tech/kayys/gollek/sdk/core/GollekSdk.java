@@ -168,6 +168,14 @@ public interface GollekSdk {
     }
 
     /**
+     * Explicitly convert a model (checkpoint/tensor) to GGUF format.
+     * NEW in v1.2.3.
+     */
+    default ModelResolution convertToGguf(ModelResolution source, String quantization, Consumer<PullProgress> progressCallback) throws SdkException {
+        throw new UnsupportedOperationException("GGUF conversion not supported by this SDK implementation.");
+    }
+
+    /**
      * Automatically select a provider for a model based on its format. NEW in
      * v1.2.1.
      */

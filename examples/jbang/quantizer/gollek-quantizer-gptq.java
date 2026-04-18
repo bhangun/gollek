@@ -21,7 +21,7 @@
 
 import tech.kayys.gollek.quantizer.gptq.GPTQQuantizerService;
 import tech.kayys.gollek.quantizer.gptq.GPTQConfig;
-import tech.kayys.gollek.quantizer.gptq.GPTQConfig.GPTQBuilder;
+import tech.kayys.gollek.quantizer.gptq.QuantizationResult;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -34,7 +34,7 @@ import java.util.concurrent.Callable;
         description = "GPTQ 4-bit Quantization Example - Hessian-based per-layer optimization")
 public class gollek_quantizer_gptq implements Callable<Integer> {
 
-    @Parameters(index = "0", description = "Path to FP16/FP32 model directory", arity = "0..1")
+    @Option(names = {"-m", "--model"}, description = "Path to FP16/FP32 model directory")
     private Path modelPath;
 
     @Option(names = {"-o", "--output"}, description = "Output path for quantized model")
@@ -86,16 +86,15 @@ public class gollek_quantizer_gptq implements Callable<Integer> {
         }
 
         // Build GPTQ configuration
-        GPTQBuilder builder = GPTQConfig.builder()
+        GPTQConfig config = GPTQConfig.builder()
                 .bits(bits)
                 .groupSize(groupSize)
                 .dampPercent(dampPercent)
                 .actOrder(actOrder)
                 .symmetric(symmetric)
                 .numSamples(numSamples)
-                .seqLen(seqLen);
-
-        GPTQConfig config = builder.build();
+                .seqLen(seqLen)
+                .build();
 
         System.out.println("Configuration:");
         System.out.println("  Model:         " + modelPath);
@@ -110,34 +109,34 @@ public class gollek_quantizer_gptq implements Callable<Integer> {
         System.out.println();
 
         // Run quantization
-        GPTQQuantizerService service = new GPTQQuantizerService();
+        try (GPTQQuantizerService service = new GPTQQuantizerService()) {
+            System.out.println("Starting GPTQ quantization...");
+            long startTime = System.currentTimeMillis();
 
-        System.out.println("Starting GPTQ quantization...");
-        long startTime = System.currentTimeMillis();
+            try {
+                QuantizationResult result = service.quantize(modelPath, outputPath, config);
 
-        try {
-            GPTQQuantizerService.QuantizationResult result = service.quantize(modelPath, outputPath, config);
+                long elapsed = System.currentTimeMillis() - startTime;
 
-            long elapsed = System.currentTimeMillis() - startTime;
+                System.out.println();
+                System.out.println("✓ Quantization completed successfully!");
+                System.out.println();
+                System.out.println("Results:");
+                System.out.println("  Input Tensors:     " + result.inputTensors());
+                System.out.println("  Output Tensors:    " + result.outputTensors());
+                System.out.println("  Input Size:        " + formatBytes(result.inputSizeBytes()));
+                System.out.println("  Output Size:       " + formatBytes(result.outputSizeBytes()));
+                System.out.println("  Compression Ratio: " + String.format("%.2f", result.compressionRatio()) + "x");
+                System.out.println("  Throughput:        " + String.format("%.1f", result.throughputMBps()) + " MB/s");
+                System.out.println("  Elapsed Time:      " + elapsed + "ms");
+                System.out.println();
+                System.out.println("Quantized model saved to: " + outputPath);
 
-            System.out.println();
-            System.out.println("✓ Quantization completed successfully!");
-            System.out.println();
-            System.out.println("Results:");
-            System.out.println("  Input Tensors:     " + result.inputTensors());
-            System.out.println("  Output Tensors:    " + result.outputTensors());
-            System.out.println("  Input Size:        " + formatBytes(result.inputSizeBytes()));
-            System.out.println("  Output Size:       " + formatBytes(result.outputSizeBytes()));
-            System.out.println("  Compression Ratio: " + String.format("%.2f", result.compressionRatio()) + "x");
-            System.out.println("  Throughput:        " + String.format("%.1f", result.throughputMBps()) + " MB/s");
-            System.out.println("  Elapsed Time:      " + elapsed + "ms");
-            System.out.println();
-            System.out.println("Quantized model saved to: " + outputPath);
-
-        } catch (Exception e) {
-            System.err.println("❌ Quantization failed: " + e.getMessage());
-            e.printStackTrace();
-            return 1;
+            } catch (Exception e) {
+                System.err.println("❌ Quantization failed: " + e.getMessage());
+                e.printStackTrace();
+                return 1;
+            }
         }
 
         return 0;
@@ -164,7 +163,7 @@ public class gollek_quantizer_gptq implements Callable<Integer> {
         System.out.println();
 
         // Example 2: High quality (group size 64)
-        GPTQConfig configHQ = GPTQConfig.gptq4bitGroup64();
+        GPTQConfig configHQ = GPTQConfig.builder().bits(4).groupSize(64).build();
         System.out.println("2. High Quality 4-bit (group size 64):");
         System.out.println("   Bits:       " + configHQ.bits());
         System.out.println("   Group Size: " + configHQ.groupSize());

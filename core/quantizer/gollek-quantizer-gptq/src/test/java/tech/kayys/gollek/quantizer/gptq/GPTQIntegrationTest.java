@@ -152,7 +152,7 @@ class GPTQIntegrationTest {
         GPTQConfig config = GPTQConfig.gptq4bit();
 
         // This will fail due to missing input model, but tests the async infrastructure
-        CompletableFuture<GPTQQuantizerService.QuantizationResult> future =
+        CompletableFuture<QuantizationResult> future =
                 quantizerService.quantizeAsync(inputPath, outputPath, config);
 
         assertNotNull(future, "Async quantization should return a non-null future");
@@ -216,7 +216,7 @@ class GPTQIntegrationTest {
     @DisplayName("Test quantization result calculations")
     void testQuantizationResultCalculations() {
         GPTQConfig config = GPTQConfig.gptq4bit();
-        GPTQQuantizerService.QuantizationResult result = new GPTQQuantizerService.QuantizationResult(
+        QuantizationResult result = new QuantizationResult(
                 100, 100, 14_000_000_000L, 3_500_000_000L, 10000, config, tempDir.resolve("quantized"));
 
         assertEquals(100, result.inputTensors());
@@ -252,7 +252,7 @@ class GPTQIntegrationTest {
     @DisplayName("Test model inspection result toString")
     void testModelInspectionResultToString() {
         GPTQConfig config = GPTQConfig.gptq4bit();
-        GPTQQuantizerService.ModelInspectionResult result = new GPTQQuantizerService.ModelInspectionResult(
+        ModelInspectionResult result = new ModelInspectionResult(
                 config, 32, 4_000_000_000L, 
                 java.util.List.of("layer.0", "layer.1"),
                 Map.of("model_type", "llama"));
@@ -315,7 +315,7 @@ class GPTQIntegrationTest {
     @DisplayName("Test quantization result with zero values")
     void testQuantizationResultWithZeroValues() {
         GPTQConfig config = GPTQConfig.gptq4bit();
-        GPTQQuantizerService.QuantizationResult result = new GPTQQuantizerService.QuantizationResult(
+        QuantizationResult result = new QuantizationResult(
                 0, 0, 0, 0, 0, config, tempDir.resolve("output"));
 
         assertEquals(0, result.inputTensors());

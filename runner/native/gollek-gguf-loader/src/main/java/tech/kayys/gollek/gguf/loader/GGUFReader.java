@@ -17,9 +17,20 @@ public final class GGUFReader implements AutoCloseable {
     private final Arena arena;
     private final MemorySegment segment;
 
+    private final boolean ownArena;
+
     public GGUFReader(Path path) throws IOException {
+        this(path, Arena.ofShared(), true);
+    }
+
+    public GGUFReader(Path path, Arena arena) throws IOException {
+        this(path, arena, false);
+    }
+
+    private GGUFReader(Path path, Arena arena, boolean ownArena) throws IOException {
         this.channel = FileChannel.open(path, StandardOpenOption.READ);
-        this.arena = Arena.ofShared();
+        this.arena = arena;
+        this.ownArena = ownArena;
         
         long size = channel.size();
         this.segment = channel.map(FileChannel.MapMode.READ_ONLY, 0, size, arena);
@@ -29,10 +40,16 @@ public final class GGUFReader implements AutoCloseable {
         return segment;
     }
 
+    public Arena arena() {
+        return arena;
+    }
+
     @Override
     public void close() throws IOException {
         try {
-            arena.close();
+            if (ownArena) {
+                arena.close();
+            }
         } finally {
             channel.close();
         }

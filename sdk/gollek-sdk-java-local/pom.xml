@@ -63,7 +63,7 @@
         <!-- GGUF Inference (for conversion service) -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-ext-runner-gguf</artifactId>
+            <artifactId>gollek-runner-llamacpp</artifactId>
         </dependency>
         <dependency>
             <groupId>tech.kayys.gollek</groupId>

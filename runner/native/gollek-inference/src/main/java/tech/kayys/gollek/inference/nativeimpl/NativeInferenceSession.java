@@ -6,6 +6,7 @@ import java.lang.foreign.ValueLayout;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import tech.kayys.gollek.gguf.loader.TransformerLayerWeights;
 
 /**
  * Manages request-scoped state for the native inference runtime.

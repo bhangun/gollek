@@ -28,6 +28,8 @@ import org.jboss.logging.Logger;
 import tech.kayys.gollek.plugin.runner.*;
 import tech.kayys.gollek.quantizer.gptq.GPTQConfig;
 import tech.kayys.gollek.quantizer.gptq.GPTQQuantizerService;
+import tech.kayys.gollek.quantizer.gptq.QuantizationResult;
+import tech.kayys.gollek.quantizer.gptq.ModelInspectionResult;
 import tech.kayys.gollek.quantizer.gptq.GPTQSafetensorConverter;
 import tech.kayys.gollek.safetensor.SafetensorProviderConfig;
 import tech.kayys.gollek.safetensor.engine.warmup.DirectSafetensorBackend;
@@ -359,8 +361,10 @@ public class SafetensorRunnerPlugin implements RunnerPlugin {
      * @param config     GPTQ quantization configuration
      * @return CompletableFuture with quantization result
      */
-    public CompletableFuture<GPTQQuantizerService.QuantizationResult> quantizeModel(
-            Path inputPath, Path outputPath, GPTQConfig config) {
+    public CompletableFuture<QuantizationResult> quantizeModel(
+            Path inputPath,
+            Path outputPath,
+            GPTQConfig config) {
         LOG.infof("Starting model quantization: %s → %s", inputPath, outputPath);
         
         return quantizerService.quantizeAsync(inputPath, outputPath, config)
@@ -406,7 +410,7 @@ public class SafetensorRunnerPlugin implements RunnerPlugin {
      * @param modelPath Path to quantized model
      * @return Model inspection result
      */
-    public GPTQQuantizerService.ModelInspectionResult inspectModel(Path modelPath) {
+    public ModelInspectionResult inspectModel(Path modelPath) {
         LOG.infof("Inspecting quantized model: %s", modelPath);
         
         try {

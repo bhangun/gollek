@@ -48,6 +48,7 @@
         <module>core</module>
         <module>kernel</module>
         <module>runner</module>
+        <module>provider</module>
         <module>plugins</module>
         <module>sdk</module>
         <module>inference</module>
@@ -55,11 +56,7 @@
         <module>repository/gollek-model-repo-hf</module>
         <module>repository/gollek-model-repo-kaggle</module>
         <module>repository/gollek-model-repo-local</module>
-        <module>runtime/gollek-runtime-cloud</module>
-        <module>runtime/gollek-runtime-standalone</module>
-        <module>runtime/gollek-runtime-unified</module>
         <module>ui/gollek-cli</module>
-        <module>ui/gollek-server-runtime</module>
     </modules>
 
 
@@ -239,7 +236,7 @@
                         <configuration>
                             <rules>
                                 <requireJavaVersion>
-                                    <version>25</version>
+                                    <version>[25,27)</version>
                                 </requireJavaVersion>
                             </rules>
                             <fail>true</fail>

@@ -205,10 +205,14 @@ public class SafetensorProvider implements StreamingProvider {
 
     @Override
     public Uni<InferenceResponse> infer(ProviderRequest request) {
-        Path resolved = resolveModelPath(request.getModel());
+        String modelRef = request.getParameter("model_path", String.class)
+                .or(() -> Optional.ofNullable((String) request.getMetadata().get("model_path")))
+                .orElse(request.getModel());
+
+        Path resolved = resolveModelPath(modelRef);
         if (resolved == null || (!Files.exists(resolved) && !Files.isDirectory(resolved))) {
             return Uni.createFrom().failure(new ProviderException(
-                    "Model not found: " + friendlyModelName(request.getModel())));
+                    "Model not found: " + friendlyModelName(modelRef)));
         }
 
         return directBackend.infer(request);
@@ -218,10 +222,14 @@ public class SafetensorProvider implements StreamingProvider {
 
     @Override
     public Multi<StreamingInferenceChunk> inferStream(ProviderRequest request) {
-        Path resolved = resolveModelPath(request.getModel());
+        String modelRef = request.getParameter("model_path", String.class)
+                .or(() -> Optional.ofNullable((String) request.getMetadata().get("model_path")))
+                .orElse(request.getModel());
+
+        Path resolved = resolveModelPath(modelRef);
         if (resolved == null || (!Files.exists(resolved) && !Files.isDirectory(resolved))) {
             return Multi.createFrom().failure(new ProviderException(
-                    "Model not found: " + friendlyModelName(request.getModel())));
+                    "Model not found: " + friendlyModelName(modelRef)));
         }
 
         return directBackend.inferStream(request);

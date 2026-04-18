@@ -91,10 +91,10 @@
             <artifactId>commons-io</artifactId>
             <version>2.18.0</version>
         </dependency>
-<!--
+        <!--
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-ext-runner-gguf</artifactId>
+            <artifactId>gollek-runner-llamacpp</artifactId>
         </dependency>
 -->
         <dependency>
@@ -116,7 +116,7 @@
             <exclusions>
                 <exclusion>
                     <groupId>tech.kayys.gollek</groupId>
-                    <artifactId>gollek-inference-gguf</artifactId>
+                    <artifactId>gollek-runner-llamacpp</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -150,27 +150,12 @@
             <artifactId>gollek-plugin-mcp</artifactId>
         </dependency>
 
-        <!-- LiteRT SDK Integration -->
-        <dependency>
-            <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-sdk-litert</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-runner-litert</artifactId>
-            <version>${project.version}</version>
-        </dependency>
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-inference</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-runner-onnx</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+
 
         <!-- Logging & Log Parser -->
         <dependency>

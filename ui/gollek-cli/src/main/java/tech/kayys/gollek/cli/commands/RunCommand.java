@@ -10,6 +10,7 @@ import picocli.CommandLine.ParentCommand;
 import tech.kayys.gollek.cli.GollekCommand;
 import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.gollek.sdk.model.ModelInfo;
+import tech.kayys.gollek.sdk.exception.SdkException;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.Message;
@@ -35,7 +36,7 @@ import tech.kayys.gollek.plugin.kernel.KernelPlatformDetector;
 /**
  * Run inference command using GollekSdk.
  * Usage: gollek run --model <model> --prompt <prompt> [--provider
- * litert|gguf|gemini] [--stream]
+ * litert|llamacpp|gemini] [--stream]
  */
 @Dependent
 @Unremovable
@@ -55,16 +56,32 @@ public class RunCommand implements Runnable {
     PluginAvailabilityChecker pluginChecker;
     @Inject
     ChatUIRenderer uiRenderer;
+    @Inject
+    tech.kayys.gollek.cli.util.ModelImporter modelImporter;
 
-    @Option(names = { "-m", "--model" }, description = "Model ID or path", required = true)
+    @Option(names = { "-m", "--model" }, description = "Model ID for repository resolution (e.g., huggingface ID)")
     public String modelId;
+
+    @Option(names = { "--modelFile" }, description = "Path to a local model file (.gguf, .tflite, .task, .litertlm)")
+    public String modelFile;
+
+    @Option(names = { "--modelDir" }, description = "Path to a local model directory (Safetensors)")
+    public String modelDir;
 
     @Option(names = { "-p", "--prompt" }, description = "Input prompt", required = true)
     public String prompt;
 
     @Option(names = {
-            "--provider" }, description = "Provider: native (pure Java), litert, gguf, safetensor, libtorch(experimental), gemini, openai, anthropic, cerebras")
+            "--provider" }, description = "Provider: native, litert, llamacpp, safetensor, libtorch(experimental), gemini, openai, anthropic, cerebras. Omit for auto-detection.", arity = "0..1", fallbackValue = "")
     String providerId;
+
+    @Option(names = {
+            "--import" }, description = "Import (move) the model file/dir into the gollek model repository (~/.gollek/models/)")
+    boolean importModel;
+
+    @Option(names = {
+            "--copy" }, description = "Copy the model file/dir into the gollek model repository (~/.gollek/models/)")
+    boolean copyModel;
 
     @Option(names = { "-s", "--stream" }, description = "Stream output", defaultValue = "true")
     boolean stream;
@@ -107,7 +124,8 @@ public class RunCommand implements Runnable {
             "--local" }, description = "Force using existing models without checking for updates/downloads")
     boolean offline;
 
-    @Option(names = { "--model-path" }, description = "Path to a custom model file (bypasses repository lookup)")
+    @Option(names = {
+            "--model-path" }, description = "Path to a custom model file (bypasses repository lookup, prefer --modelFile)")
     String modelPath;
 
     @Option(names = {
@@ -122,6 +140,15 @@ public class RunCommand implements Runnable {
 
     @Option(names = { "--force" }, description = "Force re-download and replace existing files", defaultValue = "false")
     boolean force;
+
+    @Option(names = { "--direct" }, description = "Force use of native Safetensor direct engine", defaultValue = "false")
+    boolean direct;
+
+    @Option(names = { "--gguf-quant" }, description = "Specify quantization for GGUF conversion (e.g. Q4_K_M)")
+    String ggufQuant;
+
+    @Option(names = { "--gguf" }, description = "Force GGUF conversion and usage", defaultValue = "false")
+    boolean forceGguf;
 
     // Stable Diffusion specific parameters
     @Option(names = { "--seed" }, description = "Random seed for image generation (default: random)")
@@ -139,31 +166,42 @@ public class RunCommand implements Runnable {
     @Option(names = { "--width" }, description = "Output image width in pixels (default: 512, must be multiple of 64)")
     Integer width;
 
-    @Option(names = { "--height" }, description = "Output image height in pixels (default: 512, must be multiple of 64)")
+    @Option(names = {
+            "--height" }, description = "Output image height in pixels (default: 512, must be multiple of 64)")
     Integer height;
-
-
 
     @Override
     public void run() {
-        // Check plugin availability first
-        if (!pluginChecker.hasProviders() && !pluginChecker.hasRunnerPlugins()) {
-            System.err.println(pluginChecker.getNoPluginsError());
-            System.exit(1);
-            return;
-        }
-
-        // Auto-detect and display kernel platform
-        KernelPlatform detectedPlatform = KernelPlatformDetector.detect();
-        if (parentCommand == null || !parentCommand.verbose) {
-            System.out.println(ChatUIRenderer.CYAN + "Platform: " + detectedPlatform.getDisplayName() + ChatUIRenderer.RESET);
-            if (detectedPlatform.isCpu()) {
-                System.out.println(ChatUIRenderer.YELLOW + "⚠️  Running on CPU (GPU acceleration not available)" + ChatUIRenderer.RESET);
-            } else {
-                System.out.println(ChatUIRenderer.GREEN + "✓ GPU acceleration enabled" + ChatUIRenderer.RESET);
+        try {
+            // Check plugin availability first
+            if (!pluginChecker.hasProviders() && !pluginChecker.hasRunnerPlugins()) {
+                System.err.println(pluginChecker.getNoPluginsError());
+                System.exit(1);
+                return;
             }
-            System.out.println();
-        }
+
+            // Auto-detect and display kernel platform
+            if (parentCommand != null && parentCommand.verbose) System.out.println("Starting platform detection...");
+            KernelPlatform detectedPlatform;
+            try {
+                detectedPlatform = KernelPlatformDetector.detect();
+            } catch (Throwable t) {
+                System.err.println("CRITICAL: Platform detection failed: " + t.getMessage());
+                t.printStackTrace();
+                System.exit(1);
+                return;
+            }
+
+            if (parentCommand == null || !parentCommand.verbose) {
+                System.out.println(ChatUIRenderer.CYAN + "Platform: " + detectedPlatform.getDisplayName() + ChatUIRenderer.RESET);
+                if (detectedPlatform.isCpu()) {
+                    System.out.println(ChatUIRenderer.YELLOW + "⚠️  Running on CPU (GPU acceleration not available)" + ChatUIRenderer.RESET);
+                } else {
+                    System.out.println(ChatUIRenderer.GREEN + "✓ GPU acceleration enabled" + ChatUIRenderer.RESET);
+                }
+                System.out.println();
+            }
+
 
         long startTime = System.currentTimeMillis();
 
@@ -176,18 +214,65 @@ public class RunCommand implements Runnable {
             }
         }
 
-        try {
-            if (parentCommand != null) {
-                parentCommand.applyRuntimeOverrides();
-            }
+        if (parentCommand != null) {
+            parentCommand.applyRuntimeOverrides();
+        }
             configureCheckpointConversionPreference();
 
             boolean customModelPathUsed = false;
+            String finalLocalPath = null;
             uiRenderer.setJsonMode(enableJsonSse);
             uiRenderer.printBanner();
 
             if (isMcpProvider()) {
                 System.out.println("MCP provider selected; skipping local model lookup.");
+            } else if (modelFile != null && !modelFile.isBlank()) {
+                // --- Resolve from --modelFile ---
+                Path filePath = Paths.get(modelFile);
+                if (!Files.exists(filePath)) {
+                    System.err.println("Error: Model file not found: " + modelFile);
+                    return;
+                }
+
+                // Handle --import or --copy
+                if (importModel || copyModel) {
+                    filePath = modelImporter.importModel(filePath, importModel, false);
+                    System.out.println((importModel ? "Imported" : "Copied") + " model to: " + filePath.toAbsolutePath());
+                }
+
+                modelId = filePath.toAbsolutePath().toString();
+                finalLocalPath = modelId;
+                customModelPathUsed = true;
+
+                // Auto-detect provider from extension
+                if ("native".equals(providerId)) {
+                    if (modelFile.endsWith(".gguf")) {
+                        providerId = "native";
+                    } else if (modelFile.endsWith(".litertlm") || modelFile.endsWith(".tflite") || modelFile.endsWith(".task")) {
+                        providerId = "litert";
+                    }
+                }
+                System.out.println("Model path: " + filePath.toAbsolutePath());
+
+            } else if (modelDir != null && !modelDir.isBlank()) {
+                // --- Resolve from --modelDir ---
+                Path dirPath = Paths.get(modelDir);
+                if (!Files.isDirectory(dirPath)) {
+                    System.err.println("Error: Model directory not found: " + modelDir);
+                    return;
+                }
+
+                // Handle --import or --copy
+                if (importModel || copyModel) {
+                    dirPath = modelImporter.importModel(dirPath, importModel, true);
+                    System.out.println((importModel ? "Imported" : "Copied") + " model to: " + dirPath.toAbsolutePath());
+                }
+
+                modelId = dirPath.toAbsolutePath().toString();
+                customModelPathUsed = true;
+                providerId = "safetensor";
+                System.out.println("Model dir: " + dirPath.toAbsolutePath());
+
             } else if (modelPath != null && !modelPath.isEmpty()) {
                 Path customModelPath = Paths.get(modelPath);
                 if (!Files.exists(customModelPath)) {
@@ -198,112 +283,59 @@ public class RunCommand implements Runnable {
                 modelId = customModelPath.toAbsolutePath().toString();
                 customModelPathUsed = true;
             } else {
-                // Check if model exists locally
-                System.out.printf("Checking model: %s... ", modelId);
-                var resolvedModel = LocalModelResolver.resolve(sdk, modelId, branch);
-                var modelInfoOpt = resolvedModel.map(LocalModelResolver.ResolvedModel::info);
-                boolean exists = resolvedModel.isPresent();
-
-                if (!exists || force) {
-                    System.out.println("not found locally.");
-
-                    if (offline) {
-                        System.err.println("Error: Model not found locally and --offline mode is active.");
-                        return;
-                    }
-
-                    if (modelId.contains("/") || modelId.startsWith("hf:")) {
-                        System.out.println(ChatUIRenderer.CYAN + "Checking model: " + modelId + (branch != null ? " (branch: " + branch + ")" : "") + "..." + ChatUIRenderer.RESET);
-                        boolean pulled = false;
-                        Exception lastPullError = null;
-                        for (String pullSpec : buildPullSpecs(modelId)) {
-                            try {
-                                sdk.pullModel(pullSpec, branch, force, progress -> {
-                                    if (progress.getTotal() > 0) {
-                                        System.out.printf("\rDownloading: %s %d%% (%d/%d MB)",
-                                                progress.getProgressBar(20),
-                                                progress.getPercentComplete(),
-                                                progress.getCompleted() / 1024 / 1024,
-                                                progress.getTotal() / 1024 / 1024);
-                                    } else {
-                                        System.out.print("\rDownloading: " + progress.getStatus());
-                                    }
-                                });
-                                pulled = true;
-                                break;
-                            } catch (Exception e) {
-                                lastPullError = e;
-                                if (isFatalPullError(e)) {
-                                    break;
-                                }
-                            }
-                        }
-                        if (!pulled) {
-                            String reason = lastPullError != null ? describeError(lastPullError) : "unknown error";
-                            if (HuggingFaceCheckpointStore.shouldStoreOnPullFailure(reason)) {
-                                var stored = HuggingFaceCheckpointStore.storeCheckpointArtifacts(
-                                        hfClientInstance,
-                                        modelId,
-                                        progress -> System.out.print("\r" + progress.getStatus()));
-                                if (stored.isPresent() && stored.get().hasWeights()) {
-                                    System.out.println();
-                                    System.out.println(
-                                            "Checkpoint artifacts saved to: "
-                                                    + stored.get().rootDir().toAbsolutePath());
-                                    System.err.println(
-                                            "Model was downloaded in origin checkpoint format (.safetensors/.bin) and is not runnable yet in local Java runtime.");
-                                    System.err.println(
-                                            "Use conversion (GGUF/TorchScript) when you want to run this model.");
-                                    return;
-                                }
-                            }
-                            System.err.println("Error: Failed to download from Hugging Face. " + reason);
-                            return;
-                        }
-                        System.out.println("\nDownload complete!");
-
-                        resolvedModel = LocalModelResolver.resolve(sdk, modelId, branch);
-                        modelInfoOpt = resolvedModel.map(LocalModelResolver.ResolvedModel::info);
-                        if (resolvedModel.isPresent()) {
-                            modelId = resolvedModel.get().modelId();
-                        }
-                        if (modelInfoOpt.isEmpty()) {
-                            System.err.println(
-                                    "Error: Download completed but model is still not available locally: " + modelId);
-                            return;
-                        }
-
-                    } else {
-                        System.err.println(
-                                "Error: Model not found locally and does not appear to be a remote repository specification.");
-                        return;
-                    }
-                } else {
-                    if (resolvedModel.get().fromSdk()) {
-                        System.out.println("found locally.");
-                    } else {
-                        Path localPath = resolvedModel.get().localPath();
-                        if (localPath != null) {
-                            modelId = localPath.toString();
-                            customModelPathUsed = true;
-                            System.out.println("found local file.");
+                // Prepare model using SDK (this handles pulling, registration, and conversion)
+                try {
+                    // 1. Initial preparation (pulls and registers if missing)
+                    String quant = ggufQuant != null ? ggufQuant : (ggufOutType != null ? ggufOutType : "Q8_0");
+                    var resolution = sdk.prepareModel(modelId, false, quant, progress -> {
+                        if (progress.getTotal() > 0) {
+                            System.out.printf("\r%s %s %d%% (%d/%d MB)",
+                                    ChatUIRenderer.CYAN + progress.getStatus() + ChatUIRenderer.RESET,
+                                    progress.getProgressBar(20),
+                                    progress.getPercentComplete(),
+                                    progress.getCompleted() / 1024 / 1024,
+                                    progress.getTotal() / 1024 / 1024);
                         } else {
-                            System.out.println("found locally.");
+                            System.out.print("\r" + ChatUIRenderer.CYAN + progress.getStatus() + ChatUIRenderer.RESET);
                         }
+                    });
+                    System.out.println();
+
+                    // 2. Handle explicit GGUF conversion quest if requested
+                    if (forceGguf && !"GGUF".equalsIgnoreCase(resolution.getInfo().getFormat())) {
+                        System.out.println("Processing GGUF conversion request (Quantization: " + quant + ")...");
+                        resolution = sdk.convertToGguf(resolution, quant, progress -> {
+                            System.out.print("\r" + ChatUIRenderer.CYAN + progress.getStatus() + " " + progress.getPercentComplete() + "%" + ChatUIRenderer.RESET);
+                        });
+                        System.out.println();
                     }
+                    
+                    modelId = resolution.getModelId();
+                    if (resolution.getLocalPath() != null) {
+                        finalLocalPath = resolution.getLocalPath();
+                        System.out.println("Model ready at: " + finalLocalPath);
+                        customModelPathUsed = true; // Signals that we have a local path for metadata
+                    }
+                    
+                    // Auto-select provider based on final format
+                    String resolvedFormat = resolution.getInfo().getFormat();
+                    maybeAutoSelectProviderByFormat(resolvedFormat);
 
+                } catch (Exception e) {
+                    System.err.println("\nError: Failed to prepare model: " + e.getMessage());
+                    if (parentCommand != null && parentCommand.verbose) {
+                        e.printStackTrace();
+                    }
+                    return;
                 }
-
-                // Print model path if available
-                modelInfoOpt.flatMap(LocalModelResolver::extractPath)
-                        .ifPresent(path -> System.out.println("Model path: " + path.toAbsolutePath()));
             }
 
             // Set preferred provider if specified
-            if (providerId != null && !providerId.isEmpty()) {
+            if (direct) {
+                providerId = "safetensor";
+                sdk.setPreferredProvider("safetensor");
+            } else if (providerId != null && !providerId.isEmpty()) {
                 sdk.setPreferredProvider(providerId);
-            } else {
-                maybeAutoSelectProvider();
             }
             if (!ensureProviderReady()) {
                 return;
@@ -330,14 +362,15 @@ public class RunCommand implements Runnable {
                     .maxTokens(maxTokens)
                     .streaming(stream);
 
+            if (customModelPathUsed && finalLocalPath != null) {
+                requestBuilder.parameter("model_path", finalLocalPath);
+            }
+
             if (mirostat > 0) {
                 requestBuilder.mirostat(mirostat);
             }
             if (grammar != null && !grammar.isEmpty()) {
                 requestBuilder.grammar(grammar);
-            }
-            if (customModelPathUsed) {
-                requestBuilder.parameter("model_path", modelId);
             }
 
             // Stable Diffusion parameters
@@ -370,6 +403,9 @@ public class RunCommand implements Runnable {
 
             if (systemPrompt != null && !systemPrompt.isEmpty()) {
                 requestBuilder.message(Message.system(systemPrompt));
+            } else {
+                // Default system prompt to establish identity and language without triggering negative prompting hallucinations
+                requestBuilder.message(Message.system("I'm gollek, and you are using model " + modelId + " to serve you."));
             }
             requestBuilder.message(Message.user(prompt));
 
@@ -499,12 +535,10 @@ public class RunCommand implements Runnable {
                 printResponse(response, startTime);
             }
 
-        } catch (Exception e) {
-            System.err.println("\nInference failed: " + e.getMessage());
-            if (e.getCause() != null && !e.getMessage().contains(e.getCause().getMessage())) {
-                System.err.println("Detail: " + e.getCause().getMessage());
-            }
-            printProviderHintFromError(e);
+        } catch (Throwable e) {
+            System.err.println("\n[FATAL] RunCommand failed with unhandled error: " + e.getMessage());
+            e.printStackTrace();
+            System.exit(1);
         }
     }
 
@@ -658,23 +692,27 @@ public class RunCommand implements Runnable {
 
     private void maybeAutoSelectProvider() {
         try {
-            var modelInfoOpt = LocalModelResolver.resolve(sdk, modelId, branch).map(LocalModelResolver.ResolvedModel::info);
+            var modelInfoOpt = LocalModelResolver.resolve(sdk, modelId, branch)
+                    .map(LocalModelResolver.ResolvedModel::info);
             if (modelInfoOpt.isEmpty()) {
                 return;
             }
-            String format = modelInfoOpt.get().getFormat();
-            String inferredProvider = providerForFormat(format);
-            if (inferredProvider == null || inferredProvider.isBlank()) {
-                return;
-            }
-            if (!isProviderHealthy(inferredProvider)) {
-                return;
-            }
-            sdk.setPreferredProvider(inferredProvider);
-            providerId = inferredProvider;
+            maybeAutoSelectProviderByFormat(modelInfoOpt.get().getFormat());
         } catch (Exception ignored) {
             // Keep default router behavior when format/provider probing is not available.
         }
+    }
+
+    private void maybeAutoSelectProviderByFormat(String format) throws SdkException {
+        String inferredProvider = providerForFormat(format);
+        if (inferredProvider == null || inferredProvider.isBlank()) {
+            return;
+        }
+        if (!isProviderHealthy(inferredProvider)) {
+            return;
+        }
+        sdk.setPreferredProvider(inferredProvider);
+        providerId = inferredProvider;
     }
 
     private String providerForFormat(String format) {
@@ -683,10 +721,11 @@ public class RunCommand implements Runnable {
         }
         String normalized = format.trim().toUpperCase();
         return switch (normalized) {
-            case "GGUF" -> "gguf";
+            case "GGUF" -> "native";
             case "TORCHSCRIPT" -> "libtorch";
             case "PYTORCH" -> "libtorch";
-            case "SAFETENSORS" -> "safetensor";
+            case "SAFETENSOR" -> "native";
+            case "SAFETENSORS" -> "native";
             case "ONNX" -> "onnx";
             default -> null;
         };
@@ -709,7 +748,8 @@ public class RunCommand implements Runnable {
             if (providerId != null && !providerId.isBlank()) {
                 return ensureProviderHealthy(providerId);
             }
-            var modelInfoOpt = LocalModelResolver.resolve(sdk, modelId, branch).map(LocalModelResolver.ResolvedModel::info);
+            var modelInfoOpt = LocalModelResolver.resolve(sdk, modelId, branch)
+                    .map(LocalModelResolver.ResolvedModel::info);
             if (modelInfoOpt.isEmpty()) {
                 return true;
             }
@@ -731,7 +771,8 @@ public class RunCommand implements Runnable {
                     return false;
                 }
                 if (tryRefreshCompatibleModel()) {
-                    modelInfoOpt = LocalModelResolver.resolve(sdk, modelId, branch).map(LocalModelResolver.ResolvedModel::info);
+                    modelInfoOpt = LocalModelResolver.resolve(sdk, modelId, branch)
+                            .map(LocalModelResolver.ResolvedModel::info);
                     if (modelInfoOpt.isPresent()) {
                         format = modelInfoOpt.get().getFormat();
                     }
@@ -840,7 +881,7 @@ public class RunCommand implements Runnable {
         } else if ("onnx".equalsIgnoreCase(providerId)) {
             System.err.println(
                     "ONNX Runtime is not available or enabled. Run 'brew install onnxruntime' (macOS) and ensure gollek-runner-onnx is active.");
-        } else if ("gguf".equalsIgnoreCase(providerId)) {
+        } else if ("llamacpp".equalsIgnoreCase(providerId)) {
             System.err.println(
                     "GGUF runtime is not loaded. Set GOLLEK_LLAMA_LIB_DIR/GOLLEK_LLAMA_LIB_PATH and include gollek-ext-runner-gguf.");
         }
@@ -868,8 +909,8 @@ public class RunCommand implements Runnable {
             return;
         }
 
-        if ("gguf".equals(provider) && !(model.endsWith(".gguf") || model.contains("/models/gguf/"))) {
-            System.err.println("Hint: provider 'gguf' works best with GGUF models (.gguf).");
+        if ("llamacpp".equals(provider) && !(model.endsWith(".gguf") || model.contains("/models/gguf/"))) {
+            System.err.println("Hint: provider 'llamacpp' works best with GGUF models (.gguf).");
         }
     }
 
@@ -886,8 +927,8 @@ public class RunCommand implements Runnable {
         String detail = describeError(throwable).toLowerCase();
         if (detail.contains("provider not available: libtorch")) {
             printGenericProviderSetupHint("libtorch");
-        } else if (detail.contains("provider not available: gguf")) {
-            printGenericProviderSetupHint("gguf");
+        } else if (detail.contains("provider not available: llamacpp")) {
+            printGenericProviderSetupHint("llamacpp");
         } else if (detail.contains("429") || detail.contains("resource_exhausted") || detail.contains("quota")) {
             System.err.println(
                     "Hint: Provider quota/rate limit reached. Wait for retry window, or switch provider/model.");
@@ -929,7 +970,7 @@ public class RunCommand implements Runnable {
         if ("libtorch".equalsIgnoreCase(id)) {
             System.err.println(
                     "Set GOLLEK_LIBTORCH_LIB_PATH (or LIBTORCH_PATH) to your libtorch native library directory.");
-        } else if ("gguf".equalsIgnoreCase(id)) {
+        } else if ("llamacpp".equalsIgnoreCase(id)) {
             System.err.println("Set GOLLEK_LLAMA_LIB_DIR or GOLLEK_LLAMA_LIB_PATH to llama.cpp native libraries.");
         }
     }
@@ -982,7 +1023,7 @@ public class RunCommand implements Runnable {
         try {
             String os = System.getProperty("os.name").toLowerCase();
             ProcessBuilder pb = null;
-            
+
             if (os.contains("mac")) {
                 pb = new ProcessBuilder("open", imagePath.toAbsolutePath().toString());
             } else if (os.contains("linux")) {
@@ -990,7 +1031,7 @@ public class RunCommand implements Runnable {
             } else if (os.contains("windows")) {
                 pb = new ProcessBuilder("cmd", "/c", "start", imagePath.toAbsolutePath().toString());
             }
-            
+
             if (pb != null) {
                 pb.inheritIO();
                 Process process = pb.start();

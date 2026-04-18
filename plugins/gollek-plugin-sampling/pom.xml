@@ -6,11 +6,11 @@
     <parent>
         <groupId>tech.kayys.gollek</groupId>
         <artifactId>gollek-plugin-parent</artifactId>
-        <version>0.1.0</version>
+        <version>0.1.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>gollek-plugin-sampling</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.0-SNAPSHOT</version>
 
     <name>Gollek Plugin - Sampling &amp; Decoding Control</name>
     <description>Plugin for sampling parameter policy (temperature, top-k, top-p, repetition penalty, stop tokens, grammar mode)</description>

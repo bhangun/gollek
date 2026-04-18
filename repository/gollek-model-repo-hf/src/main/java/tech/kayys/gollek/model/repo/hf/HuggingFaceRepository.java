@@ -13,6 +13,8 @@ import java.util.Optional;
 import org.jboss.logging.Logger;
 import tech.kayys.gollek.model.download.DownloadProgressListener;
 
+import tech.kayys.gollek.model.repo.local.ManifestStore;
+import tech.kayys.gollek.model.repo.local.GollekManifest;
 import tech.kayys.gollek.model.core.ModelRepository;
 import tech.kayys.gollek.spi.model.ArtifactLocation;
 import tech.kayys.gollek.spi.model.ModelArtifact;
@@ -28,6 +30,7 @@ public final class HuggingFaceRepository implements ModelRepository {
     private static final Logger LOG = Logger.getLogger(HuggingFaceRepository.class);
     private static final String DEFAULT_REVISION = "main";
 
+    private final ManifestStore manifestStore;
     private final HuggingFaceConfig config;
     private final HuggingFaceClient client;
     private final HuggingFaceArtifactResolver resolver;
@@ -35,18 +38,19 @@ public final class HuggingFaceRepository implements ModelRepository {
     private final Path cacheDir;
 
     @Inject
-    public HuggingFaceRepository(HuggingFaceClient client, HuggingFaceConfig config) {
-        this(resolveDefaultCacheDir(), client, config);
+    public HuggingFaceRepository(HuggingFaceClient client, HuggingFaceConfig config, ManifestStore manifestStore) {
+        this(resolveDefaultCacheDir(), client, config, manifestStore);
     }
 
-    public HuggingFaceRepository(Path cacheDir, HuggingFaceClient client) {
-        this(cacheDir, client, null);
+    public HuggingFaceRepository(Path cacheDir, HuggingFaceClient client, ManifestStore manifestStore) {
+        this(cacheDir, client, null, manifestStore);
     }
 
-    public HuggingFaceRepository(Path cacheDir, HuggingFaceClient client, HuggingFaceConfig config) {
+    public HuggingFaceRepository(Path cacheDir, HuggingFaceClient client, HuggingFaceConfig config, ManifestStore manifestStore) {
         this.cacheDir = cacheDir;
         this.client = client;
         this.config = config;
+        this.manifestStore = manifestStore;
         this.resolver = new HuggingFaceArtifactResolver(client);
         this.downloader = new HuggingFaceDownloader(client);
     }
@@ -86,25 +90,10 @@ public final class HuggingFaceRepository implements ModelRepository {
      * - Default: ~/.gollek/models/{format}/{model_id}[-revision]/
      */
     private Path resolveFormatSpecificCacheDir(ModelDescriptor descriptor) {
-        String format = descriptor.format().toLowerCase();
-        String revision = descriptor.metadata().get("revision");
-        String suffix = (revision == null || "main".equalsIgnoreCase(revision)) ? "" : "-" + revision;
-        
         String repoId = descriptor.id();
-        String suffixedId = repoId + suffix;
-        
-        Path targetDir = switch (format) {
-            case "safetensors", "safetensor" -> 
-                cacheDir.resolve("safetensors").resolve(suffixedId);
-            case "gguf" -> 
-                cacheDir.resolve("gguf").resolve(suffixedId + ".gguf");
-            case "pytorch", "torchscript", "pt", "pth" -> 
-                cacheDir.resolve("torchscript").resolve(suffixedId);
-            default -> 
-                cacheDir.resolve(format).resolve(suffixedId);
-        };
-        
-        return targetDir;
+        String revision = descriptor.metadata().get("revision");
+        String manifestName = GollekManifest.computeName(repoId, revision);
+        return ManifestStore.resolveBlobDir(manifestName);
     }
 
     @Override
@@ -112,152 +101,72 @@ public final class HuggingFaceRepository implements ModelRepository {
         if (!isHuggingFaceModelId(modelId)) {
             return Uni.createFrom().nullItem();
         }
-        if (config != null && !config.autoDownload()) {
-            return Uni.createFrom().nullItem();
-        }
-
+        
         return Uni.createFrom().item(() -> {
             try {
                 String repoId = normalizeRepoId(modelId);
-
-                // Check multiple possible local locations with format-specific paths
-                Path safetensorsDir = cacheDir.resolve("safetensors").resolve(repoId);
-                Path ggufDir = cacheDir.resolve("gguf");
-                Path torchscriptDir = cacheDir.resolve("torchscript").resolve(repoId);
-
-                Map<ModelFormat, ArtifactLocation> artifacts = new java.util.HashMap<>();
-
-                // Discover local artifacts from format-specific directories
-                Path localSafetensors = findBestLocalArtifact(safetensorsDir, ModelFormat.SAFETENSORS);
-                if (localSafetensors != null) {
-                    artifacts.put(ModelFormat.SAFETENSORS, toArtifactLocation(localSafetensors));
+                String revision = config != null ? config.revision() : DEFAULT_REVISION;
+                
+                // 1. Check ManifestStore first
+                Optional<GollekManifest> gm = manifestStore.findByModelId(repoId, revision);
+                if (gm.isPresent()) {
+                    return toModelManifest(gm.get(), requestId);
                 }
 
-                // Check for GGUF in dedicated gguf directory (as single file or subdirectory)
-                Path localGguf = findBestLocalArtifact(ggufDir.resolve(repoId + ".gguf"), ModelFormat.GGUF);
-                if (localGguf == null) {
-                    localGguf = findBestLocalArtifact(ggufDir.resolve(repoId), ModelFormat.GGUF);
-                }
-                if (localGguf != null) {
-                    artifacts.put(ModelFormat.GGUF, toArtifactLocation(localGguf));
-                }
-
-                // Also check torchscript for PyTorch models
-                Path localTorchscript = findBestLocalArtifact(torchscriptDir, ModelFormat.TORCHSCRIPT);
-                if (localTorchscript != null) {
-                    artifacts.put(ModelFormat.TORCHSCRIPT, toArtifactLocation(localTorchscript));
-                }
-
-                Path litertDir = cacheDir.resolve("litert").resolve(repoId);
-                Path localLitert = findBestLocalArtifact(litertDir, ModelFormat.LITERT);
-                if (localLitert != null) {
-                    artifacts.put(ModelFormat.LITERT, toArtifactLocation(localLitert));
-                }
-
-                Path onnxDir = cacheDir.resolve("onnx").resolve(repoId);
-                Path localOnnx = findBestLocalArtifact(onnxDir, ModelFormat.ONNX);
-                if (localOnnx != null) {
-                    artifacts.put(ModelFormat.ONNX, toArtifactLocation(localOnnx));
-                }
-
-                // Check for suffixed (branch) local directories
-                if (artifacts.isEmpty() && repoId.contains("-")) {
-                    Path bSafetensors = cacheDir.resolve("safetensors").resolve(repoId);
-                    Path bTorch = cacheDir.resolve("torchscript").resolve(repoId);
-                    Path bLitert = cacheDir.resolve("litert").resolve(repoId);
-                    Path bOnnx = cacheDir.resolve("onnx").resolve(repoId);
-
-                    Path lbSafetensors = findBestLocalArtifact(bSafetensors, ModelFormat.SAFETENSORS);
-                    if (lbSafetensors != null) artifacts.put(ModelFormat.SAFETENSORS, toArtifactLocation(lbSafetensors));
-
-                    Path lbTorch = findBestLocalArtifact(bTorch, ModelFormat.TORCHSCRIPT);
-                    if (lbTorch != null) artifacts.put(ModelFormat.TORCHSCRIPT, toArtifactLocation(lbTorch));
-
-                    Path lbLitert = findBestLocalArtifact(bLitert, ModelFormat.LITERT);
-                    if (lbLitert != null) artifacts.put(ModelFormat.LITERT, toArtifactLocation(lbLitert));
-
-                    Path lbOnnx = findBestLocalArtifact(bOnnx, ModelFormat.ONNX);
-                    if (lbOnnx != null) artifacts.put(ModelFormat.ONNX, toArtifactLocation(lbOnnx));
-                }
-
-                // Trigger download if enabled and nothing found locally
-                // Discovery calls (requestId="community") should NOT trigger auto-downloads
-                if (artifacts.isEmpty() && isAutoDownloadEnabled() && !"community".equals(requestId)) {
-                    List<String> files = client.listFiles(repoId);
-                    boolean hasGguf = files.stream().anyMatch(this::isGgufFile);
-                    boolean hasSafetensors = files.stream().anyMatch(this::isSafetensorFile);
-                    boolean hasLitert = files.stream().anyMatch(this::isLitertFile);
+                // 2. Trigger auto-download if enabled
+                if (isAutoDownloadEnabled() && !"community".equals(requestId)) {
+                    String manifestName = GollekManifest.computeName(repoId, revision);
+                    Path targetFolder = ManifestStore.resolveBlobDir(manifestName);
                     
-                    Path targetFolder;
-                    String revision = config != null ? config.revision() : DEFAULT_REVISION;
-                    String suffix = (revision == null || "main".equalsIgnoreCase(revision)) ? "" : "-" + revision;
-                    String suffixedRepoId = repoId + suffix;
-
-                    if (hasGguf) {
-                        targetFolder = ggufDir.resolve(suffixedRepoId + ".gguf");
-                    } else if (hasSafetensors) {
-                        targetFolder = safetensorsDir.getParent().resolve(suffixedRepoId);
-                    } else if (hasLitert) {
-                        targetFolder = cacheDir.resolve("litert").resolve(suffixedRepoId);
-                    } else {
-                        targetFolder = torchscriptDir.getParent().resolve(suffixedRepoId);
-                    }
-
                     Path downloaded = downloadBestArtifact(repoId, targetFolder, tech.kayys.gollek.spi.model.PullOptions.DEFAULT);
                     if (downloaded != null) {
                         ModelFormat format = detectFormat(downloaded);
-                        artifacts.put(format, toArtifactLocation(downloaded));
+                        GollekManifest manifest = new GollekManifest();
+                        manifest.setId(manifestName); // Use name as ID for HF consistency
+                        manifest.setModelId(repoId);
+                        manifest.setName(manifestName);
+                        manifest.setFormat(format.name());
+                        manifest.setSource("huggingface");
+                        manifest.setBlobPath(downloaded.toAbsolutePath().toString());
+                        manifest.setFiles(ManifestStore.listBlobFiles(Files.isRegularFile(downloaded) ? downloaded.getParent() : downloaded));
+                        manifest.setCreatedAt(java.time.Instant.now());
+                        manifest.setSizeBytes(Files.isRegularFile(downloaded) ? Files.size(downloaded) : 0);
+                        
+                        manifestStore.save(manifest);
+                        return toModelManifest(manifest, requestId);
                     }
-                } else if (!artifacts.isEmpty()) {
-                    // Ensure sidecars are downloaded for the primary format directory
-                    Path primaryDir = artifacts.containsKey(ModelFormat.GGUF) ? ggufDir.resolve(repoId + ".gguf").getParent() : 
-                                     artifacts.containsKey(ModelFormat.SAFETENSORS) ? safetensorsDir : 
-                                     artifacts.containsKey(ModelFormat.LITERT) ? cacheDir.resolve("litert").resolve(repoId) : torchscriptDir;
-                    ensureLocalSidecars(repoId, primaryDir);
                 }
-
-                if (artifacts.isEmpty()) {
-                    return null;
-                }
-
-                // Pick a primary path (prefer GGUF if available, else safetensors, else torchscript)
-                Path primaryPath;
-                String primaryFormat;
-                if (artifacts.containsKey(ModelFormat.GGUF)) {
-                    primaryPath = Path.of(java.net.URI.create(artifacts.get(ModelFormat.GGUF).uri()));
-                    primaryFormat = "GGUF";
-                } else if (artifacts.containsKey(ModelFormat.SAFETENSORS)) {
-                    primaryPath = Path.of(java.net.URI.create(artifacts.get(ModelFormat.SAFETENSORS).uri()));
-                    primaryFormat = "SAFETENSORS";
-                } else if (artifacts.containsKey(ModelFormat.LITERT)) {
-                    primaryPath = Path.of(java.net.URI.create(artifacts.get(ModelFormat.LITERT).uri()));
-                    primaryFormat = "LITERT";
-                } else if (artifacts.containsKey(ModelFormat.ONNX)) {
-                    primaryPath = Path.of(java.net.URI.create(artifacts.get(ModelFormat.ONNX).uri()));
-                    primaryFormat = "ONNX";
-                } else {
-                    primaryPath = Path.of(java.net.URI.create(artifacts.get(ModelFormat.TORCHSCRIPT).uri()));
-                    primaryFormat = "TORCHSCRIPT";
-                }
-
-                return ModelManifest.builder()
-                        .modelId(primaryPath.toString())
-                        .name(repoId)
-                        .version(DEFAULT_REVISION)
-                        .requestId(requestId != null && !requestId.isBlank() ? requestId : "community")
-                        .path(primaryPath.toString())
-                        .apiKey(requestId != null && !requestId.isBlank() ? requestId : "community")
-                        .artifacts(artifacts)
-                        .metadata(Map.of(
-                                "source", "huggingface",
-                                "repo", repoId,
-                                "primary_format", primaryFormat))
-                        .build();
+                
+                return null;
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         }).onFailure().invoke(e -> LOG.warnf("HF auto-download failed for %s: %s", modelId, e.getMessage()))
                 .onFailure().recoverWithNull();
+    }
+
+    private ModelManifest toModelManifest(GollekManifest gm, String requestId) {
+         ModelFormat format = ModelFormat.fromId(gm.getFormat());
+         String path = gm.getBlobPath();
+         
+         tech.kayys.gollek.spi.model.ArtifactLocation artifact = new tech.kayys.gollek.spi.model.ArtifactLocation(
+                 path != null ? Path.of(path).toUri().toString() : "", 
+                 null, gm.getSizeBytes(), "application/octet-stream");
+
+         return ModelManifest.builder()
+                 .modelId(gm.getModelId())
+                 .name(gm.getName())
+                 .version("1.0.0")
+                 .requestId(requestId != null ? requestId : "local")
+                 .path(path != null ? path : "")
+                 .apiKey("community")
+                 .artifacts(Map.of(format, artifact))
+                 .metadata(Map.of(
+                         "source", "huggingface",
+                         "repo", gm.getModelId(),
+                         "format", format.name(),
+                         "manifestId", gm.getId()))
+                 .build();
     }
 
     @Override
@@ -294,21 +203,28 @@ public final class HuggingFaceRepository implements ModelRepository {
             try {
                 String repoId = normalizeRepoId(modelId);
                 String revision = options.getRevision() != null ? options.getRevision() : (config != null ? config.revision() : DEFAULT_REVISION);
-                String suffix = (revision == null || "main".equalsIgnoreCase(revision)) ? "" : "-" + revision;
-                String suffixedRepoId = repoId + suffix;
+                String manifestName = GollekManifest.computeName(repoId, revision);
                 
-                Path targetFolder = cacheDir.resolve("safetensors").resolve(suffixedRepoId);
+                Path targetFolder = ManifestStore.resolveBlobDir(manifestName);
                 
                 Path downloaded = downloadBestArtifact(repoId, targetFolder, options);
                 ModelFormat format = detectFormat(downloaded);
                 
-                return ModelManifest.builder()
-                        .modelId(downloaded.toString())
-                        .name(repoId)
-                        .version(options.getRevision() != null ? options.getRevision() : DEFAULT_REVISION)
-                        .path(downloaded.toString())
-                        .metadata(Map.of("source", "huggingface", "repo", repoId, "format", format.name()))
-                        .build();
+                GollekManifest manifest = new GollekManifest();
+                manifest.setId(manifestName);
+                manifest.setModelId(repoId);
+                manifest.setName(manifestName);
+                manifest.setFormat(format.name());
+                manifest.setSource("huggingface");
+                manifest.setBlobPath(downloaded.toAbsolutePath().toString());
+                manifest.setFiles(ManifestStore.listBlobFiles(Files.isRegularFile(downloaded) ? downloaded.getParent() : downloaded));
+                manifest.setCreatedAt(java.time.Instant.now());
+                if (Files.isRegularFile(downloaded)) {
+                    manifest.setSizeBytes(Files.size(downloaded));
+                }
+
+                manifestStore.save(manifest);
+                return toModelManifest(manifest, "pull");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

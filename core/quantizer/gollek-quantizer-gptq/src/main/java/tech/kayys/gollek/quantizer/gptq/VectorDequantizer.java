@@ -70,6 +70,15 @@ public class VectorDequantizer {
                 F_LANES, FLOAT_SPECIES.toString());
     }
 
+    /**
+     * Returns the bit-width this dequantizer is configured for.
+     *
+     * @return bit-width (e.g. 4)
+     */
+    public int getBits() {
+        return config.bits();
+    }
+
     // ── Main Dequantization Entry Point ───────────────────────────────────────
 
     /**

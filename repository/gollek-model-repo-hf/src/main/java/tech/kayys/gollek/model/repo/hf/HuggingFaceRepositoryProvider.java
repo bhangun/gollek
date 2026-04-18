@@ -13,13 +13,18 @@ public final class HuggingFaceRepositoryProvider implements ModelRepositoryProvi
     @Inject
     HuggingFaceClient client;
 
+    @Inject
+    HuggingFaceConfig config;
+
+    @Inject
+    tech.kayys.gollek.model.repo.local.ManifestStore manifestStore;
+
     @Override
     public String scheme() {
         return "hf";
     }
 
-    @Override
     public ModelRepository create(RepositoryContext context) {
-        return new HuggingFaceRepository(context.cacheDir(), client);
+        return new HuggingFaceRepository(context.cacheDir(), client, config, manifestStore);
     }
 }

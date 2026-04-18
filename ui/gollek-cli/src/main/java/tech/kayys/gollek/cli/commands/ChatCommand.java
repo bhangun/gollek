@@ -48,6 +48,8 @@ public class ChatCommand implements Runnable {
     GollekSdk sdk;
     @Inject
     PluginAvailabilityChecker pluginChecker;
+    @Inject
+    tech.kayys.gollek.cli.util.ModelImporter modelImporter;
 
     @Option(names = { "-m", "--model" }, description = "Model ID for repository resolution (e.g., huggingface ID)")
     public String modelId;
@@ -58,8 +60,14 @@ public class ChatCommand implements Runnable {
     @Option(names = { "--modelDir" }, description = "Path to a local model directory (Safetensors)")
     public String modelDir;
 
-    @Option(names = { "-p", "--provider" }, description = "Provider ID (e.g. gguf, cerebras, mistral, openai, gemini)")
+    @Option(names = { "-p", "--provider" }, description = "Provider ID (default: native). Options: native, gguf, cerebras, mistral, openai, gemini", defaultValue = "native")
     public String providerId;
+
+    @Option(names = { "--import" }, description = "Import (move) the model file/dir into the gollek model repository (~/.gollek/models/)")
+    public boolean importModel;
+
+    @Option(names = { "--copy" }, description = "Copy the model file/dir into the gollek model repository (~/.gollek/models/)")
+    public boolean copyModel;
 
     @Option(names = { "-s", "--system" }, description = "System prompt")
     public String systemPrompt;
@@ -138,37 +146,47 @@ public class ChatCommand implements Runnable {
 
     @Override
     public void run() {
-        if (noColor) ChatUIRenderer.disableColor();
+        try {
+            if (noColor) ChatUIRenderer.disableColor();
 
-        // Check plugin availability first
-        if (!pluginChecker.hasProviders() && !pluginChecker.hasRunnerPlugins()) {
-            System.err.println(pluginChecker.getNoPluginsError());
-            System.exit(1);
-            return;
-        }
-
-        // Auto-detect and display kernel platform
-        KernelPlatform detectedPlatform = KernelPlatformDetector.detect();
-        if (!quiet) {
-            System.out.println("Platform: " + detectedPlatform.getDisplayName());
-            if (detectedPlatform.isCpu()) {
-                System.out.println("⚠️  Running on CPU (GPU acceleration not available)");
-            } else {
-                System.out.println("✓ GPU acceleration enabled");
-            }
-            System.out.println();
-        }
-
-        // Check if specific provider is requested but not available
-        if (providerId != null && !providerId.trim().isEmpty()) {
-            if (!pluginChecker.hasProvider(providerId)) {
-                System.err.println(pluginChecker.getProviderNotFoundError(providerId));
+            // Check plugin availability first
+            if (!pluginChecker.hasProviders() && !pluginChecker.hasRunnerPlugins()) {
+                System.err.println(pluginChecker.getNoPluginsError());
                 System.exit(1);
                 return;
             }
-        }
 
-        try {
+            // Auto-detect and display kernel platform
+            if (verbose) System.out.println("Starting platform detection...");
+            KernelPlatform detectedPlatform;
+            try {
+                detectedPlatform = KernelPlatformDetector.detect();
+            } catch (Throwable t) {
+                System.err.println("CRITICAL: Platform detection failed: " + t.getMessage());
+                t.printStackTrace();
+                System.exit(1);
+                return;
+            }
+
+            if (!quiet) {
+                System.out.println("Platform: " + detectedPlatform.getDisplayName());
+                if (detectedPlatform.isCpu()) {
+                    System.out.println("⚠️  Running on CPU (GPU acceleration not available)");
+                } else {
+                    System.out.println("✓ GPU acceleration enabled");
+                }
+                System.out.println();
+            }
+
+            // Check if specific provider is requested but not available
+            if (providerId != null && !providerId.trim().isEmpty()) {
+                if (!pluginChecker.hasProvider(providerId)) {
+                    System.err.println(pluginChecker.getProviderNotFoundError(providerId));
+                    System.exit(1);
+                    return;
+                }
+            }
+
             if (parentCommand != null) {
                 parentCommand.applyRuntimeOverrides();
             }
@@ -181,20 +199,40 @@ public class ChatCommand implements Runnable {
             // --- Model Resolution Strategy ---
             boolean isLocal = false;
             if (modelFile != null && !modelFile.isBlank()) {
-                modelPathOverride = modelFile;
+                java.nio.file.Path filePath = java.nio.file.Paths.get(modelFile);
+                if (!java.nio.file.Files.exists(filePath)) {
+                    System.err.println("Error: Model file not found: " + modelFile);
+                    return;
+                }
+                // Handle --import or --copy
+                if (importModel || copyModel) {
+                    filePath = modelImporter.importModel(filePath, importModel, false);
+                    System.out.println((importModel ? "Imported" : "Copied") + " model to: " + filePath.toAbsolutePath());
+                }
+                modelPathOverride = filePath.toAbsolutePath().toString();
                 isLocal = true;
                 // Auto-detect provider from extension
-                if (modelFile.endsWith(".litertlm") || modelFile.endsWith(".tflite") || modelFile.endsWith(".task")) {
-                    providerId = "litert";
-                } else if (modelFile.endsWith(".gguf")) {
-                    providerId = "gguf";
+                if ("native".equals(providerId)) {
+                    if (modelFile.endsWith(".litertlm") || modelFile.endsWith(".tflite") || modelFile.endsWith(".task")) {
+                        providerId = "litert";
+                    }
                 }
-                if (modelId == null) modelId = java.nio.file.Paths.get(modelFile).getFileName().toString();
+                if (modelId == null) modelId = filePath.getFileName().toString();
             } else if (modelDir != null && !modelDir.isBlank()) {
-                modelPathOverride = modelDir;
+                java.nio.file.Path dirPath = java.nio.file.Paths.get(modelDir);
+                if (!java.nio.file.Files.isDirectory(dirPath)) {
+                    System.err.println("Error: Model directory not found: " + modelDir);
+                    return;
+                }
+                // Handle --import or --copy
+                if (importModel || copyModel) {
+                    dirPath = modelImporter.importModel(dirPath, importModel, true);
+                    System.out.println((importModel ? "Imported" : "Copied") + " model to: " + dirPath.toAbsolutePath());
+                }
+                modelPathOverride = dirPath.toAbsolutePath().toString();
                 isLocal = true;
                 providerId = "safetensor";
-                if (modelId == null) modelId = java.nio.file.Paths.get(modelDir).getFileName().toString();
+                if (modelId == null) modelId = dirPath.getFileName().toString();
             }
 
             if (!isLocal && !sdk.isMcpProvider(providerId) && !sdk.isCloudProvider(providerId)) {
@@ -207,7 +245,7 @@ public class ChatCommand implements Runnable {
                     }
                 }
 
-                System.out.println("[ChatCommand] forceGguf=" + forceGguf + ", quantization=" + quantization + ", modelId=" + modelId);
+                if (verbose) System.out.println("[ChatCommand] forceGguf=" + forceGguf + ", quantization=" + quantization + ", modelId=" + modelId);
                 var resolution = sdk.ensureModelAvailable(modelId, forceGguf, quantization, progress -> {
                     if (!quiet)
                         System.out.print(
@@ -220,7 +258,7 @@ public class ChatCommand implements Runnable {
 
                 modelId = resolution.getModelId();
                 modelPathOverride = resolution.getLocalPath();
-                System.out.println("[ChatCommand] resolution: localPath=" + modelPathOverride + ", format=" + resolution.getInfo().getFormat());
+                if (verbose) System.out.println("[ChatCommand] resolution: localPath=" + modelPathOverride + ", format=" + resolution.getInfo().getFormat());
 
                 // Auto-select provider for downloaded models if not forced
                 if (providerId == null) {
@@ -245,12 +283,13 @@ public class ChatCommand implements Runnable {
             setupSession();
             startChatLoop();
 
-        } catch (Exception e) {
-            uiRenderer.printError("Chat session error: " + e.getMessage(), quiet);
-            if (verbose)
-                e.printStackTrace();
+        } catch (Throwable e) {
+            System.err.println("\n[FATAL] ChatCommand failed with unhandled error: " + e.getMessage());
+            e.printStackTrace();
+            System.exit(1);
         }
     }
+
 
     private void configureLogging() {
         if (verbose) {
@@ -284,6 +323,8 @@ public class ChatCommand implements Runnable {
             sessionManager.addMessage(tech.kayys.gollek.spi.Message.system(systemPrompt));
         } else if (concise) {
             sessionManager.addMessage(tech.kayys.gollek.spi.Message.system(DEFAULT_CONCISE_SYSTEM_PROMPT));
+        } else {
+            sessionManager.addMessage(tech.kayys.gollek.spi.Message.system("I'm gollek, and you are using model " + modelId + " to serve you."));
         }
 
         if (!quiet) {

@@ -215,20 +215,51 @@ public final class BpeTokenizer implements Tokenizer {
 
     @Override
     public String decode(long[] tokens, DecodeOptions options) {
-        StringBuilder sb = new StringBuilder();
+        if (tokens == null || tokens.length == 0) return "";
+        
+        // Accumulate all bytes first to correctly handle multi-token UTF-8 characters
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
         for (long id : tokens) {
             String tok = idToToken.get((int) id);
-            if (tok != null) sb.append(tok);
+            if (tok != null) {
+                decodeToStream(tok, baos);
+            }
         }
-        return decodeBytes(sb.toString());
+        return baos.toString(StandardCharsets.UTF_8);
     }
 
-    private String decodeBytes(String text) {
-        byte[] bytes = new byte[text.length()];
+    private void decodeToStream(String text, java.io.ByteArrayOutputStream baos) {
+        if (text == null || text.isEmpty()) return;
+        
         for (int i = 0; i < text.length(); i++) {
-            bytes[i] = byteDecoder.getOrDefault(String.valueOf(text.charAt(i)), (byte) text.charAt(i));
+            char c = text.charAt(i);
+            
+            // 1. Handle common remapping markers (GPT-2, SentencePiece, Tiktoken)
+            if (c == '\u0120' || c == '\u00A0' || c == '\u2581') {
+                baos.write(32); // Space
+                continue;
+            }
+            if (c == '\u010A') {
+                baos.write(10); // Newline
+                continue;
+            }
+
+            // 2. Try byte decoder for GPT-2 style byte-level mappings
+            Byte b = byteDecoder.get(String.valueOf(c));
+            if (b != null) {
+                baos.write(b & 0xFF);
+                continue;
+            } 
+            
+            // 3. Fallback: if it's ASCII/Extended ASCII part of a raw vocab
+            if (c < 256) {
+                baos.write(c & 0xFF);
+            } else {
+                // 4. Multi-byte character in rawUtf8Vocab mode
+                byte[] literal = String.valueOf(c).getBytes(StandardCharsets.UTF_8);
+                baos.writeBytes(literal);
+            }
         }
-        return new String(bytes, StandardCharsets.UTF_8);
     }
 
     @Override

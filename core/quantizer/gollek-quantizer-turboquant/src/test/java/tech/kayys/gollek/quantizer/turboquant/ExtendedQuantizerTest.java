@@ -3,6 +3,7 @@ package tech.kayys.gollek.quantizer.turboquant;
 import org.junit.jupiter.api.*;
 
 import static org.junit.jupiter.api.Assertions.*;
+import tech.kayys.gollek.gguf.loader.GGUFDequantizer;
 
 /**
  * Tests covering GGUF, BnB NF4, HQQ, SqueezeLLM, Registry, and infrastructure.

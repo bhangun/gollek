@@ -1,5 +1,6 @@
 package tech.kayys.gollek.gguf.loader;
 
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,7 +12,7 @@ import java.util.Map;
  */
 public final class GGUFParser {
 
-    public GGUFModel parse(MemorySegment seg) {
+    public GGUFModel parse(MemorySegment seg, Arena arena) {
         GGUFReader.Cursor c = new GGUFReader.Cursor(seg);
 
         // 1. Header
@@ -57,7 +58,7 @@ public final class GGUFParser {
         long padding = (alignment - (pos % alignment)) % alignment;
         long dataStart = pos + padding;
 
-        return new GGUFModel(version, metadata, tensors, dataStart, seg);
+        return new GGUFModel(version, metadata, tensors, dataStart, seg, arena);
     }
 
     private Object readValue(GGUFReader.Cursor c, int typeId) {

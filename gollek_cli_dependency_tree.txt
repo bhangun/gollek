@@ -1,0 +1,518 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] --------------------< tech.kayys.gollek:gollek-cli >--------------------
+[INFO] Building gollek-cli 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- dependency:3.7.0:tree (default-cli) @ gollek-cli ---
+[INFO] tech.kayys.gollek:gollek-cli:jar:0.1.0-SNAPSHOT
+[INFO] +- io.quarkus:quarkus-picocli:jar:3.32.2:compile
+[INFO] |  +- io.quarkus:quarkus-core:jar:3.32.2:compile
+[INFO] |  |  +- io.smallrye.common:smallrye-common-os:jar:2.16.0:compile
+[INFO] |  |  +- io.quarkus:quarkus-ide-launcher:jar:3.32.2:compile
+[INFO] |  |  +- io.quarkus:quarkus-development-mode-spi:jar:3.32.2:compile
+[INFO] |  |  +- io.smallrye.config:smallrye-config:jar:3.16.0:compile
+[INFO] |  |  |  \- io.smallrye.config:smallrye-config-core:jar:3.16.0:compile
+[INFO] |  |  |     \- io.smallrye.common:smallrye-common-classloader:jar:2.16.0:compile
+[INFO] |  |  +- org.jboss.threads:jboss-threads:jar:3.9.2:compile
+[INFO] |  |  |  \- io.smallrye.common:smallrye-common-function:jar:2.16.0:compile
+[INFO] |  |  +- org.jboss.slf4j:slf4j-jboss-logmanager:jar:2.0.2.Final:compile
+[INFO] |  |  +- org.wildfly.common:wildfly-common:jar:2.0.1:compile
+[INFO] |  |  +- io.quarkus:quarkus-value-registry:jar:3.32.2:compile
+[INFO] |  |  +- io.quarkus:quarkus-bootstrap-runner:jar:3.32.2:compile
+[INFO] |  |  |  \- org.crac:crac:jar:1.5.0:compile
+[INFO] |  |  \- io.quarkus:quarkus-fs-util:jar:1.3.0:compile
+[INFO] |  \- info.picocli:picocli:jar:4.7.7:compile
+[INFO] +- io.quarkus:quarkus-arc:jar:3.32.2:compile
+[INFO] |  +- io.quarkus.arc:arc:jar:3.32.2:compile
+[INFO] |  |  \- jakarta.transaction:jakarta.transaction-api:jar:2.0.1:compile
+[INFO] |  \- org.eclipse.microprofile.context-propagation:microprofile-context-propagation-api:jar:1.3:compile
+[INFO] +- io.quarkus:quarkus-jackson:jar:3.32.2:compile
+[INFO] |  +- com.fasterxml.jackson.core:jackson-databind:jar:2.15.2:compile
+[INFO] |  +- com.fasterxml.jackson.datatype:jackson-datatype-jdk8:jar:2.21.1:compile
+[INFO] |  \- com.fasterxml.jackson.module:jackson-module-parameter-names:jar:2.21.1:compile
+[INFO] +- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:jar:2.21.1:compile
+[INFO] |  +- com.fasterxml.jackson.core:jackson-annotations:jar:2.21:compile
+[INFO] |  \- com.fasterxml.jackson.core:jackson-core:jar:2.21.1:compile
+[INFO] +- jakarta.enterprise:jakarta.enterprise.cdi-api:jar:4.1.0:compile
+[INFO] |  +- jakarta.enterprise:jakarta.enterprise.lang-model:jar:4.1.0:compile
+[INFO] |  +- jakarta.annotation:jakarta.annotation-api:jar:3.0.0:compile
+[INFO] |  +- jakarta.el:jakarta.el-api:jar:6.0.1:compile
+[INFO] |  +- jakarta.interceptor:jakarta.interceptor-api:jar:2.2.0:compile
+[INFO] |  \- jakarta.inject:jakarta.inject-api:jar:2.0.1:compile
+[INFO] +- tech.kayys.gollek:gollek-spi-inference:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-spi-model:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- io.smallrye.reactive:mutiny:jar:3.1.1:compile
+[INFO] |  |  +- io.smallrye.common:smallrye-common-annotation:jar:2.16.0:compile
+[INFO] |  |  \- org.jctools:jctools-core:jar:4.0.5:compile
+[INFO] |  +- org.reactivestreams:reactive-streams:jar:1.0.4:compile
+[INFO] |  +- jakarta.validation:jakarta.validation-api:jar:3.0.2:compile
+[INFO] |  \- org.jetbrains:annotations:jar:26.0.2:compile
+[INFO] +- tech.kayys.gollek:gollek-spi:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-error-code:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  \- commons-codec:commons-codec:jar:1.15:compile
+[INFO] +- tech.kayys.gollek:gollek-spi-multimodal:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  \- org.jboss.logging:jboss-logging:jar:3.6.2.Final:compile
+[INFO] +- tech.kayys.gollek:gollek-engine:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- org.slf4j:slf4j-api:jar:2.0.17:compile
+[INFO] |  +- tech.kayys.gollek:gollek-spi-provider:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  |  +- tech.kayys.gollek:gollek-spi-plugin:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  |  \- tech.kayys.gollek:gollek-spi-runtime:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-provider-routing:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  |  +- com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:jar:2.21.1:compile
+[INFO] |  |  |  \- org.yaml:snakeyaml:jar:2.5:compile
+[INFO] |  |  \- org.apache.commons:commons-collections4:jar:4.4:compile
+[INFO] |  +- tech.kayys.gollek:gollek-provider-core:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-plugin-core:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  |  +- org.apache.maven:maven-model:jar:3.9.12:compile
+[INFO] |  |  |  \- org.codehaus.plexus:plexus-utils:jar:3.5.1:compile
+[INFO] |  |  +- org.apache.maven:maven-model-builder:jar:3.9.12:compile
+[INFO] |  |  |  +- org.codehaus.plexus:plexus-interpolation:jar:1.26:compile
+[INFO] |  |  |  +- org.apache.maven:maven-artifact:jar:3.9.12:compile
+[INFO] |  |  |  \- org.apache.maven:maven-builder-support:jar:3.9.12:compile
+[INFO] |  |  +- org.apache.maven.resolver:maven-resolver-api:jar:1.9.25:compile
+[INFO] |  |  +- org.apache.maven.resolver:maven-resolver-spi:jar:1.9.25:compile
+[INFO] |  |  +- org.apache.maven.resolver:maven-resolver-util:jar:1.9.25:compile
+[INFO] |  |  +- org.apache.maven.resolver:maven-resolver-impl:jar:1.9.25:compile
+[INFO] |  |  |  \- org.apache.maven.resolver:maven-resolver-named-locks:jar:1.9.25:compile
+[INFO] |  |  +- org.apache.maven.resolver:maven-resolver-connector-basic:jar:1.9.25:compile
+[INFO] |  |  +- org.apache.maven.resolver:maven-resolver-transport-file:jar:1.9.25:compile
+[INFO] |  |  \- org.apache.maven.resolver:maven-resolver-transport-http:jar:1.9.25:compile
+[INFO] |  |     +- org.apache.httpcomponents:httpclient:jar:4.5.14:compile
+[INFO] |  |     +- org.apache.httpcomponents:httpcore:jar:4.4.16:compile
+[INFO] |  |     \- org.slf4j:jcl-over-slf4j:jar:1.7.36:runtime
+[INFO] |  +- tech.kayys.gollek:gollek-plugin-runner-core:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-plugin-optimization-core:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-model-registry:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- io.github.resilience4j:resilience4j-all:jar:2.2.0:compile
+[INFO] |  |  +- io.github.resilience4j:resilience4j-ratelimiter:jar:2.2.0:compile
+[INFO] |  |  |  \- io.github.resilience4j:resilience4j-core:jar:2.2.0:compile
+[INFO] |  |  +- io.github.resilience4j:resilience4j-circuitbreaker:jar:2.2.0:compile
+[INFO] |  |  +- io.github.resilience4j:resilience4j-bulkhead:jar:2.2.0:compile
+[INFO] |  |  +- io.github.resilience4j:resilience4j-retry:jar:2.2.0:compile
+[INFO] |  |  +- io.github.resilience4j:resilience4j-cache:jar:2.2.0:compile
+[INFO] |  |  |  \- javax.cache:cache-api:jar:1.1.0:compile
+[INFO] |  |  +- io.github.resilience4j:resilience4j-timelimiter:jar:2.2.0:compile
+[INFO] |  |  \- io.github.resilience4j:resilience4j-micrometer:jar:2.2.0:compile
+[INFO] |  |     \- io.micrometer:micrometer-observation:jar:1.16.3:compile
+[INFO] |  +- io.github.resilience4j:resilience4j-reactor:jar:2.2.0:compile
+[INFO] |  |  \- io.projectreactor:reactor-core:jar:3.4.24:compile
+[INFO] |  +- tech.kayys.gollek:gollek-model-runner:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-observability:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-plugin-fa3:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-paged-attention:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- io.quarkus:quarkus-hibernate-reactive-panache:jar:3.32.2:compile
+[INFO] |  |  +- io.quarkus:quarkus-hibernate-reactive:jar:3.32.2:compile
+[INFO] |  |  |  +- io.quarkus:quarkus-hibernate-orm:jar:3.32.2:compile
+[INFO] |  |  |  |  +- org.hibernate.orm:hibernate-core:jar:7.2.6.Final:compile
+[INFO] |  |  |  |  |  +- org.hibernate.models:hibernate-models:jar:1.0.1:runtime
+[INFO] |  |  |  |  |  \- com.fasterxml:classmate:jar:1.7.1:runtime
+[INFO] |  |  |  |  +- org.hibernate.orm:hibernate-graalvm:jar:7.2.6.Final:compile
+[INFO] |  |  |  |  +- org.glassfish.jaxb:jaxb-runtime:jar:4.0.6:compile
+[INFO] |  |  |  |  |  \- org.glassfish.jaxb:jaxb-core:jar:4.0.6:compile
+[INFO] |  |  |  |  |     +- org.eclipse.angus:angus-activation:jar:2.0.3:runtime
+[INFO] |  |  |  |  |     +- org.glassfish.jaxb:txw2:jar:4.0.6:compile
+[INFO] |  |  |  |  |     \- com.sun.istack:istack-commons-runtime:jar:4.1.2:compile
+[INFO] |  |  |  |  +- jakarta.persistence:jakarta.persistence-api:jar:3.2.0:compile
+[INFO] |  |  |  |  \- org.hibernate.local-cache:quarkus-local-cache:jar:0.5.0:compile
+[INFO] |  |  |  +- io.quarkus:quarkus-reactive-datasource:jar:3.32.2:compile
+[INFO] |  |  |  |  +- io.quarkus:quarkus-datasource:jar:3.32.2:compile
+[INFO] |  |  |  |  \- io.vertx:vertx-sql-client:jar:4.5.25:compile
+[INFO] |  |  |  \- org.hibernate.reactive:hibernate-reactive-core:jar:3.2.5.Final:compile
+[INFO] |  |  \- io.quarkus:quarkus-hibernate-reactive-panache-common:jar:3.32.2:compile
+[INFO] |  |     +- io.quarkus:quarkus-panache-common:jar:3.32.2:compile
+[INFO] |  |     \- io.quarkus:quarkus-panache-hibernate-common:jar:3.32.2:compile
+[INFO] |  |        \- org.antlr:antlr4-runtime:jar:4.13.2:compile
+[INFO] |  +- io.quarkus:quarkus-rest:jar:3.32.2:compile
+[INFO] |  |  +- io.quarkus:quarkus-rest-common:jar:3.32.2:compile
+[INFO] |  |  |  \- io.quarkus.resteasy.reactive:resteasy-reactive-common:jar:3.32.2:compile
+[INFO] |  |  |     \- io.quarkus.resteasy.reactive:resteasy-reactive-common-types:jar:3.32.2:compile
+[INFO] |  |  +- io.quarkus.resteasy.reactive:resteasy-reactive-vertx:jar:3.32.2:compile
+[INFO] |  |  |  +- io.vertx:vertx-web:jar:4.5.25:compile
+[INFO] |  |  |  |  \- io.vertx:vertx-bridge-common:jar:4.5.25:compile
+[INFO] |  |  |  +- io.quarkus.resteasy.reactive:resteasy-reactive:jar:3.32.2:compile
+[INFO] |  |  |  +- io.quarkus.vertx.utils:quarkus-vertx-utils:jar:3.32.2:compile
+[INFO] |  |  |  \- jakarta.ws.rs:jakarta.ws.rs-api:jar:3.1.0:compile
+[INFO] |  |  +- io.quarkus:quarkus-vertx-http:jar:3.32.2:compile
+[INFO] |  |  |  +- io.quarkus:quarkus-credentials:jar:3.32.2:compile
+[INFO] |  |  |  +- io.smallrye.reactive:smallrye-mutiny-vertx-web:jar:3.21.5:compile
+[INFO] |  |  |  |  \- io.smallrye.reactive:smallrye-mutiny-vertx-bridge-common:jar:3.21.5:compile
+[INFO] |  |  |  \- com.aayushatharva.brotli4j:brotli4j:jar:1.16.0:compile
+[INFO] |  |  |     +- com.aayushatharva.brotli4j:service:jar:1.16.0:compile
+[INFO] |  |  |     \- com.aayushatharva.brotli4j:native-osx-aarch64:jar:1.16.0:compile
+[INFO] |  |  \- io.quarkus:quarkus-virtual-threads:jar:3.32.2:compile
+[INFO] |  +- io.quarkus:quarkus-rest-jackson:jar:3.32.2:compile
+[INFO] |  |  \- io.quarkus:quarkus-rest-jackson-common:jar:3.32.2:compile
+[INFO] |  +- io.quarkus:quarkus-narayana-jta:jar:3.32.2:compile
+[INFO] |  |  +- io.quarkus:quarkus-transaction-annotations:jar:3.32.2:compile
+[INFO] |  |  +- io.quarkus:quarkus-datasource-common:jar:3.32.2:compile
+[INFO] |  |  +- io.smallrye:smallrye-context-propagation-jta:jar:2.3.0:compile
+[INFO] |  |  +- io.smallrye.reactive:smallrye-reactive-converter-api:jar:3.0.3:compile
+[INFO] |  |  +- io.smallrye.reactive:smallrye-reactive-converter-mutiny:jar:3.0.3:compile
+[INFO] |  |  +- io.smallrye.reactive:mutiny-zero-flow-adapters:jar:1.1.1:compile
+[INFO] |  |  +- org.jboss.narayana.jta:narayana-jta:jar:7.3.3.Final:compile
+[INFO] |  |  |  +- org.jboss:jboss-transaction-spi:jar:8.0.0.Final:compile
+[INFO] |  |  |  +- jakarta.resource:jakarta.resource-api:jar:2.1.0:compile
+[INFO] |  |  |  +- org.jboss.invocation:jboss-invocation:jar:2.0.0.Final:compile
+[INFO] |  |  |  \- org.eclipse.microprofile.reactive-streams-operators:microprofile-reactive-streams-operators-api:jar:3.0.1:compile
+[INFO] |  |  \- org.jboss.narayana.jts:narayana-jts-integration:jar:7.3.3.Final:compile
+[INFO] |  +- io.quarkus:quarkus-micrometer:jar:3.32.2:compile
+[INFO] |  |  \- io.micrometer:micrometer-core:jar:1.16.3:compile
+[INFO] |  |     +- org.jspecify:jspecify:jar:1.0.0:compile
+[INFO] |  |     +- io.micrometer:micrometer-commons:jar:1.16.3:compile
+[INFO] |  |     +- org.hdrhistogram:HdrHistogram:jar:2.2.2:runtime
+[INFO] |  |     \- org.latencyutils:LatencyUtils:jar:2.0.3:runtime
+[INFO] |  +- io.quarkus:quarkus-micrometer-registry-prometheus:jar:3.32.2:compile
+[INFO] |  |  \- io.micrometer:micrometer-registry-prometheus-simpleclient:jar:1.16.3:compile
+[INFO] |  |     \- io.prometheus:simpleclient_common:jar:0.16.0:compile
+[INFO] |  |        \- io.prometheus:simpleclient:jar:0.16.0:compile
+[INFO] |  |           +- io.prometheus:simpleclient_tracer_otel:jar:0.16.0:compile
+[INFO] |  |           |  \- io.prometheus:simpleclient_tracer_common:jar:0.16.0:compile
+[INFO] |  |           \- io.prometheus:simpleclient_tracer_otel_agent:jar:0.16.0:compile
+[INFO] |  +- io.quarkus:quarkus-opentelemetry:jar:3.32.2:compile
+[INFO] |  |  +- io.quarkus:quarkus-tls-registry:jar:3.32.2:compile
+[INFO] |  |  |  +- io.quarkus:quarkus-tls-registry-spi:jar:3.32.2:compile
+[INFO] |  |  |  \- io.smallrye.certs:smallrye-private-key-pem-parser:jar:0.9.2:compile
+[INFO] |  |  +- io.quarkus:quarkus-security-runtime-spi:jar:3.32.2:compile
+[INFO] |  |  +- io.quarkus:quarkus-grpc-common:jar:3.32.2:compile
+[INFO] |  |  |  +- io.vertx:vertx-grpc:jar:4.5.25:compile
+[INFO] |  |  |  |  +- io.grpc:grpc-netty:jar:1.79.0:compile
+[INFO] |  |  |  |  |  \- io.grpc:grpc-util:jar:1.79.0:runtime
+[INFO] |  |  |  |  \- io.grpc:grpc-protobuf:jar:1.79.0:compile
+[INFO] |  |  |  |     +- com.google.protobuf:protobuf-java:jar:4.33.2:compile
+[INFO] |  |  |  |     +- com.google.api.grpc:proto-google-common-protos:jar:2.65.1:compile
+[INFO] |  |  |  |     \- io.grpc:grpc-protobuf-lite:jar:1.79.0:runtime
+[INFO] |  |  |  +- io.vertx:vertx-grpc-server:jar:4.5.25:compile
+[INFO] |  |  |  \- io.grpc:grpc-core:jar:1.79.0:compile
+[INFO] |  |  |     +- io.perfmark:perfmark-api:jar:0.27.0:runtime
+[INFO] |  |  |     \- io.grpc:grpc-context:jar:1.79.0:runtime
+[INFO] |  |  +- io.smallrye.common:smallrye-common-vertx-context:jar:2.16.0:compile
+[INFO] |  |  +- io.quarkus:quarkus-websockets-next-spi:jar:3.32.2:compile
+[INFO] |  |  +- io.opentelemetry:opentelemetry-sdk-extension-autoconfigure:jar:1.57.0:compile
+[INFO] |  |  +- io.opentelemetry:opentelemetry-sdk:jar:1.57.0:compile
+[INFO] |  |  |  +- io.opentelemetry:opentelemetry-api:jar:1.57.0:compile
+[INFO] |  |  |  |  \- io.opentelemetry:opentelemetry-context:jar:1.57.0:compile
+[INFO] |  |  |  |     \- io.opentelemetry:opentelemetry-common:jar:1.57.0:compile
+[INFO] |  |  |  +- io.opentelemetry:opentelemetry-sdk-common:jar:1.57.0:compile
+[INFO] |  |  |  +- io.opentelemetry:opentelemetry-sdk-trace:jar:1.57.0:compile
+[INFO] |  |  |  +- io.opentelemetry:opentelemetry-sdk-metrics:jar:1.57.0:compile
+[INFO] |  |  |  \- io.opentelemetry:opentelemetry-sdk-logs:jar:1.57.0:compile
+[INFO] |  |  +- io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:jar:1.57.0:compile
+[INFO] |  |  +- io.opentelemetry.semconv:opentelemetry-semconv:jar:1.37.0:compile
+[INFO] |  |  +- io.opentelemetry.semconv:opentelemetry-semconv-incubating:jar:1.37.0-alpha:compile
+[INFO] |  |  +- io.opentelemetry:opentelemetry-api-incubator:jar:1.57.0-alpha:compile
+[INFO] |  |  +- io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:jar:2.23.0:compile
+[INFO] |  |  +- io.opentelemetry.instrumentation:opentelemetry-instrumentation-annotations:jar:2.23.0:compile
+[INFO] |  |  +- io.opentelemetry.instrumentation:opentelemetry-instrumentation-annotations-support:jar:2.23.0-alpha:compile
+[INFO] |  |  +- io.opentelemetry.instrumentation:opentelemetry-instrumentation-api-incubator:jar:2.23.0-alpha:compile
+[INFO] |  |  +- io.opentelemetry:opentelemetry-exporter-otlp-common:jar:1.57.0:compile
+[INFO] |  |  |  \- io.opentelemetry:opentelemetry-exporter-common:jar:1.57.0:compile
+[INFO] |  |  +- io.opentelemetry:opentelemetry-exporter-otlp:jar:1.57.0:compile
+[INFO] |  |  +- io.opentelemetry.instrumentation:opentelemetry-runtime-telemetry-java17:jar:2.23.0-alpha:compile
+[INFO] |  |  |  \- io.opentelemetry.instrumentation:opentelemetry-runtime-telemetry-java8:jar:2.23.0-alpha:runtime
+[INFO] |  |  +- io.vertx:vertx-grpc-client:jar:4.5.25:compile
+[INFO] |  |  |  +- io.vertx:vertx-grpc-common:jar:4.5.25:compile
+[INFO] |  |  |  +- io.grpc:grpc-stub:jar:1.79.0:compile
+[INFO] |  |  |  \- io.grpc:grpc-api:jar:1.79.0:compile
+[INFO] |  |  \- io.opentelemetry.instrumentation:opentelemetry-jdbc:jar:2.23.0-alpha:compile
+[INFO] |  +- io.quarkus:quarkus-smallrye-fault-tolerance:jar:3.32.2:compile
+[INFO] |  |  +- io.smallrye:smallrye-fault-tolerance:jar:6.10.0:compile
+[INFO] |  |  |  +- org.eclipse.microprofile.fault-tolerance:microprofile-fault-tolerance-api:jar:4.1.2:compile
+[INFO] |  |  |  +- io.smallrye:smallrye-fault-tolerance-api:jar:6.10.0:compile
+[INFO] |  |  |  +- io.smallrye:smallrye-fault-tolerance-core:jar:6.10.0:compile
+[INFO] |  |  |  +- io.smallrye:smallrye-fault-tolerance-autoconfig-core:jar:6.10.0:compile
+[INFO] |  |  |  \- io.smallrye:smallrye-fault-tolerance-apiimpl:jar:6.10.0:compile
+[INFO] |  |  +- org.jboss.logging:commons-logging-jboss-logging:jar:2.0.0.Final:compile
+[INFO] |  |  +- io.smallrye:smallrye-fault-tolerance-context-propagation:jar:6.10.0:compile
+[INFO] |  |  \- io.smallrye:smallrye-fault-tolerance-mutiny:jar:6.10.0:compile
+[INFO] |  +- io.quarkus:quarkus-scheduler:jar:3.32.2:compile
+[INFO] |  |  +- io.quarkus:quarkus-scheduler-kotlin:jar:3.32.2:compile
+[INFO] |  |  |  \- io.quarkus:quarkus-scheduler-common:jar:3.32.2:compile
+[INFO] |  |  |     +- io.quarkus:quarkus-scheduler-api:jar:3.32.2:compile
+[INFO] |  |  |     +- io.quarkus:quarkus-scheduler-spi:jar:3.32.2:compile
+[INFO] |  |  |     \- com.cronutils:cron-utils:jar:9.2.1:compile
+[INFO] |  |  \- org.glassfish.expressly:expressly:jar:6.0.0:compile
+[INFO] |  \- io.quarkus:quarkus-redis-cache:jar:3.32.2:compile
+[INFO] |     \- io.quarkus:quarkus-redis-client:jar:3.32.2:compile
+[INFO] |        +- io.smallrye.reactive:smallrye-mutiny-vertx-redis-client:jar:3.21.5:compile
+[INFO] |        |  \- io.vertx:vertx-redis-client:jar:4.5.25:compile
+[INFO] |        \- io.quarkus:quarkus-devservices:jar:3.32.2:compile
+[INFO] +- tech.kayys.gollek:gollek-sdk-core:jar:0.1.0-SNAPSHOT:compile
+[INFO] +- io.quarkus:quarkus-cache:jar:3.32.2:compile
+[INFO] |  +- io.quarkus:quarkus-caffeine:jar:3.32.2:compile
+[INFO] |  +- io.quarkus:quarkus-mutiny:jar:3.32.2:compile
+[INFO] |  |  \- io.smallrye.reactive:mutiny-smallrye-context-propagation:jar:3.1.1:compile
+[INFO] |  \- io.quarkus:quarkus-vertx:jar:3.32.2:compile
+[INFO] |     +- io.quarkus:quarkus-netty:jar:3.32.2:compile
+[INFO] |     |  +- io.netty:netty-codec:jar:4.1.130.Final:compile
+[INFO] |     |  +- io.netty:netty-codec-http:jar:4.1.130.Final:compile
+[INFO] |     |  +- io.netty:netty-codec-http2:jar:4.1.130.Final:compile
+[INFO] |     |  \- io.netty:netty-handler:jar:4.1.130.Final:compile
+[INFO] |     |     \- io.netty:netty-transport-native-unix-common:jar:4.1.130.Final:compile
+[INFO] |     +- io.netty:netty-codec-haproxy:jar:4.1.130.Final:compile
+[INFO] |     |  +- io.netty:netty-buffer:jar:4.1.130.Final:compile
+[INFO] |     |  \- io.netty:netty-transport:jar:4.1.130.Final:compile
+[INFO] |     +- io.quarkus:quarkus-vertx-latebound-mdc-provider:jar:3.32.2:compile
+[INFO] |     +- io.smallrye.reactive:smallrye-mutiny-vertx-core:jar:3.21.5:compile
+[INFO] |     |  +- io.smallrye.reactive:smallrye-mutiny-vertx-runtime:jar:3.21.5:compile
+[INFO] |     |  \- io.smallrye.reactive:vertx-mutiny-generator:jar:3.21.5:compile
+[INFO] |     |     \- io.vertx:vertx-codegen:jar:4.5.25:compile
+[INFO] |     \- io.smallrye:smallrye-fault-tolerance-vertx:jar:6.10.0:compile
+[INFO] +- org.apache.commons:commons-lang3:jar:3.14.0:compile
+[INFO] +- commons-io:commons-io:jar:2.18.0:compile
+[INFO] +- tech.kayys.gollek:gollek-runner-libtorch:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-runtime-tensor:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-runtime-graph:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-runtime-inference:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  |  \- tech.kayys.gollek:gollek-kernel-cuda:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  |     \- tech.kayys.gollek:gollek-plugin-fa4:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-tokenizer-core:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-embedding-core:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- io.quarkus:quarkus-config-yaml:jar:3.32.2:compile
+[INFO] |  |  +- io.smallrye.config:smallrye-config-source-yaml:jar:3.16.0:compile
+[INFO] |  |  |  \- io.smallrye.config:smallrye-config-common:jar:3.16.0:compile
+[INFO] |  |  \- org.eclipse.microprofile.config:microprofile-config-api:jar:3.1:compile
+[INFO] |  +- io.quarkus:quarkus-smallrye-context-propagation:jar:3.32.2:compile
+[INFO] |  |  \- io.smallrye:smallrye-context-propagation:jar:2.3.0:compile
+[INFO] |  |     +- io.smallrye:smallrye-context-propagation-api:jar:2.3.0:compile
+[INFO] |  |     \- io.smallrye:smallrye-context-propagation-storage:jar:2.3.0:compile
+[INFO] |  +- jakarta.json:jakarta.json-api:jar:2.1.3:compile
+[INFO] |  \- io.quarkus:quarkus-smallrye-health:jar:3.32.2:compile
+[INFO] |     +- io.smallrye:smallrye-health:jar:4.3.0:compile
+[INFO] |     |  +- org.eclipse.microprofile.health:microprofile-health-api:jar:4.0.1:compile
+[INFO] |     |  \- io.smallrye:smallrye-health-api:jar:4.3.0:compile
+[INFO] |     \- io.smallrye:smallrye-health-provided-checks:jar:4.3.0:compile
+[INFO] +- tech.kayys.gollek:gollek-plugin-runner-safetensor:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  \- tech.kayys.gollek:gollek-safetensor-engine:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     +- tech.kayys.gollek:gollek-safetensor-tokenizer:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     |  +- com.knuddels:jtokkit:jar:1.1.0:compile
+[INFO] |     |  \- ai.djl.huggingface:tokenizers:jar:0.28.0:compile
+[INFO] |     |     \- ai.djl:api:jar:0.28.0:compile
+[INFO] |     +- tech.kayys.gollek:gollek-safetensor-core:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     |  \- tech.kayys.gollek:gollek-safetensor-api:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     |     \- org.eclipse.microprofile.openapi:microprofile-openapi-api:jar:4.1.1:compile
+[INFO] |     +- tech.kayys.gollek:gollek-safetensor-loader:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     +- tech.kayys.gollek:gollek-safetensor-text:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     +- tech.kayys.gollek:gollek-safetensor-quantization:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     |  +- tech.kayys.gollek:gollek-quantizer-gptq:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     |  +- tech.kayys.gollek:gollek-quantizer-awq:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     |  +- tech.kayys.gollek:gollek-quantizer-autoround:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     |  \- tech.kayys.gollek:gollek-quantizer-turboquant:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     +- tech.kayys.gollek:gollek-safetensor-audio:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     |  +- tech.kayys:suling:jar:0.1.0:compile
+[INFO] |     |  +- com.googlecode.soundlibs:jlayer:jar:1.0.1.4:compile
+[INFO] |     |  |  \- junit:junit:jar:3.8.2:compile
+[INFO] |     |  \- com.googlecode.soundlibs:jorbis:jar:0.0.17.4:compile
+[INFO] |     +- tech.kayys.gollek:gollek-safetensor-spi:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     \- tech.kayys.gollek:gollek-models-family:jar:0.1.0-SNAPSHOT:compile
+[INFO] +- tech.kayys.gollek:gollek-sdk-java-local:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  \- tech.kayys.gollek:gollek-gguf-converter:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     \- com.google.code.gson:gson:jar:2.13.2:compile
+[INFO] +- tech.kayys.gollek:gollek-plugin-kernel-core:jar:0.1.0-SNAPSHOT:compile
+[INFO] +- tech.kayys.gollek:gollek-model-repo-core:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- io.quarkus:quarkus-rest-client:jar:3.32.2:compile
+[INFO] |  |  +- io.quarkus:quarkus-rest-client-jaxrs:jar:3.32.2:compile
+[INFO] |  |  |  \- io.quarkus.resteasy.reactive:resteasy-reactive-client:jar:3.32.2:compile
+[INFO] |  |  |     \- io.smallrye.stork:stork-api:jar:2.7.7:compile
+[INFO] |  |  +- io.quarkus:quarkus-rest-client-config:jar:3.32.2:compile
+[INFO] |  |  +- io.quarkus:quarkus-proxy-registry:jar:3.32.2:compile
+[INFO] |  |  \- org.eclipse.microprofile.rest.client:microprofile-rest-client-api:jar:4.0:compile
+[INFO] |  +- io.quarkus:quarkus-rest-client-jackson:jar:3.32.2:compile
+[INFO] |  |  \- io.quarkus.resteasy.reactive:resteasy-reactive-jackson:jar:3.32.2:compile
+[INFO] |  +- com.github.ben-manes.caffeine:caffeine:jar:3.1.8:compile
+[INFO] |  |  +- org.checkerframework:checker-qual:jar:3.53.1:compile
+[INFO] |  |  \- com.google.errorprone:error_prone_annotations:jar:2.47.0:compile
+[INFO] |  +- io.vertx:vertx-web-client:jar:4.5.24:compile
+[INFO] |  |  +- io.vertx:vertx-uri-template:jar:4.5.25:compile
+[INFO] |  |  +- io.vertx:vertx-web-common:jar:4.5.25:compile
+[INFO] |  |  +- io.vertx:vertx-auth-common:jar:4.5.25:compile
+[INFO] |  |  \- io.vertx:vertx-core:jar:4.5.25:compile
+[INFO] |  |     +- io.netty:netty-common:jar:4.1.130.Final:compile
+[INFO] |  |     +- io.netty:netty-handler-proxy:jar:4.1.130.Final:compile
+[INFO] |  |     |  \- io.netty:netty-codec-socks:jar:4.1.130.Final:compile
+[INFO] |  |     +- io.netty:netty-resolver:jar:4.1.130.Final:compile
+[INFO] |  |     \- io.netty:netty-resolver-dns:jar:4.1.130.Final:compile
+[INFO] |  |        \- io.netty:netty-codec-dns:jar:4.1.130.Final:compile
+[INFO] |  +- software.amazon.awssdk:s3:jar:2.20.26:compile
+[INFO] |  |  +- software.amazon.awssdk:aws-xml-protocol:jar:2.25.25:compile
+[INFO] |  |  |  \- software.amazon.awssdk:aws-query-protocol:jar:2.25.25:compile
+[INFO] |  |  +- software.amazon.awssdk:protocol-core:jar:2.25.25:compile
+[INFO] |  |  +- software.amazon.awssdk:arns:jar:2.25.25:compile
+[INFO] |  |  +- software.amazon.awssdk:profiles:jar:2.25.25:compile
+[INFO] |  |  +- software.amazon.awssdk:sdk-core:jar:2.25.25:compile
+[INFO] |  |  |  +- software.amazon.awssdk:http-auth-spi:jar:2.25.25:compile
+[INFO] |  |  |  +- software.amazon.awssdk:http-auth-aws:jar:2.25.25:compile
+[INFO] |  |  |  +- software.amazon.awssdk:checksums-spi:jar:2.25.25:compile
+[INFO] |  |  |  +- software.amazon.awssdk:checksums:jar:2.25.25:compile
+[INFO] |  |  |  \- software.amazon.awssdk:identity-spi:jar:2.25.25:compile
+[INFO] |  |  +- software.amazon.awssdk:auth:jar:2.25.25:compile
+[INFO] |  |  |  +- software.amazon.awssdk:http-auth:jar:2.25.25:compile
+[INFO] |  |  |  \- software.amazon.eventstream:eventstream:jar:1.0.1:compile
+[INFO] |  |  +- software.amazon.awssdk:http-client-spi:jar:2.25.25:compile
+[INFO] |  |  +- software.amazon.awssdk:regions:jar:2.25.25:compile
+[INFO] |  |  +- software.amazon.awssdk:annotations:jar:2.25.25:compile
+[INFO] |  |  +- software.amazon.awssdk:utils:jar:2.25.25:compile
+[INFO] |  |  +- software.amazon.awssdk:aws-core:jar:2.25.25:compile
+[INFO] |  |  +- software.amazon.awssdk:metrics-spi:jar:2.25.25:compile
+[INFO] |  |  +- software.amazon.awssdk:json-utils:jar:2.25.25:compile
+[INFO] |  |  |  \- software.amazon.awssdk:third-party-jackson-core:jar:2.25.25:compile
+[INFO] |  |  +- software.amazon.awssdk:endpoints-spi:jar:2.20.26:compile
+[INFO] |  |  +- software.amazon.awssdk:apache-client:jar:2.25.25:runtime
+[INFO] |  |  \- software.amazon.awssdk:netty-nio-client:jar:2.25.25:runtime
+[INFO] |  |     \- io.netty:netty-transport-classes-epoll:jar:4.1.130.Final:runtime
+[INFO] |  +- software.amazon.awssdk:s3-transfer-manager:jar:2.20.26:compile
+[INFO] |  \- io.hypersistence:hypersistence-utils-hibernate-63:jar:3.9.0:compile
+[INFO] |     +- jakarta.xml.bind:jakarta.xml.bind-api:jar:4.0.5:compile
+[INFO] |     |  \- jakarta.activation:jakarta.activation-api:jar:2.1.4:compile
+[INFO] |     \- io.hypersistence:hypersistence-tsid:jar:2.1.1:compile
+[INFO] +- tech.kayys.gollek:gollek-model-repo-local:jar:0.1.0-SNAPSHOT:compile
+[INFO] +- tech.kayys.gollek:gollek-model-repo-hf:jar:0.1.0-SNAPSHOT:compile
+[INFO] +- tech.kayys.gollek:gollek-model-repo-kaggle:jar:0.1.0-SNAPSHOT:compile
+[INFO] +- tech.kayys.gollek:gollek-plugin-mcp:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- io.quarkus:quarkus-reactive-routes:jar:3.32.2:compile
+[INFO] |  |  \- io.quarkus.security:quarkus-security:jar:2.3.2:compile
+[INFO] |  +- io.quarkus:quarkus-websockets-client:jar:3.32.2:compile
+[INFO] |  |  +- jakarta.websocket:jakarta.websocket-api:jar:2.1.1:compile
+[INFO] |  |  \- io.quarkus.http:quarkus-http-websocket-core:jar:5.4.0:compile
+[INFO] |  |     \- jakarta.websocket:jakarta.websocket-client-api:jar:2.1.0:compile
+[INFO] |  +- io.smallrye.reactive:smallrye-mutiny-vertx-web-client:jar:3.12.0:compile
+[INFO] |  |  +- io.smallrye.reactive:smallrye-mutiny-vertx-auth-common:jar:3.21.5:compile
+[INFO] |  |  +- io.smallrye.reactive:smallrye-mutiny-vertx-web-common:jar:3.21.5:compile
+[INFO] |  |  \- io.smallrye.reactive:smallrye-mutiny-vertx-uri-template:jar:3.21.5:compile
+[INFO] |  +- com.networknt:json-schema-validator:jar:1.0.87:compile
+[INFO] |  |  \- com.ethlo.time:itu:jar:1.7.0:compile
+[INFO] |  \- org.zeroturnaround:zt-exec:jar:1.12:compile
+[INFO] +- tech.kayys.gollek:gollek-inference:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-spi-tensor:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-gguf-loader:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  \- tech.kayys.gollek:gollek-gguf-tokenizer:jar:0.1.0-SNAPSHOT:compile
+[INFO] |     \- com.hubspot.jinjava:jinjava:jar:2.7.1:compile
+[INFO] |        +- com.google.guava:guava:jar:33.5.0-jre:compile
+[INFO] |        |  +- com.google.guava:failureaccess:jar:1.0.1:compile
+[INFO] |        |  \- com.google.j2objc:j2objc-annotations:jar:2.8:compile
+[INFO] |        +- org.javassist:javassist:jar:3.24.1-GA:compile
+[INFO] |        +- com.google.re2j:re2j:jar:1.2:compile
+[INFO] |        +- commons-net:commons-net:jar:3.9.0:compile
+[INFO] |        +- com.googlecode.java-ipv6:java-ipv6:jar:0.17:compile
+[INFO] |        +- com.google.code.findbugs:annotations:jar:3.0.1:compile
+[INFO] |        \- ch.obermuhlner:big-math:jar:2.0.0:compile
+[INFO] +- tech.kayys.gollek:gollek-runner-onnx:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  +- tech.kayys.gollek:gollek-plugin-kv-cache:jar:0.1.0-SNAPSHOT:compile
+[INFO] |  \- com.microsoft.onnxruntime:onnxruntime:jar:1.17.1:compile
+[INFO] +- io.quarkus:quarkus-logging-json:jar:3.32.2:compile
+[INFO] |  +- io.quarkus:quarkus-jsonp:jar:3.32.2:compile
+[INFO] |  |  \- org.eclipse.parsson:parsson:jar:1.1.7:compile
+[INFO] |  \- org.jboss.logmanager:jboss-logmanager:jar:3.2.1.Final:compile
+[INFO] |     +- io.smallrye.common:smallrye-common-constraint:jar:2.16.0:compile
+[INFO] |     +- io.smallrye.common:smallrye-common-cpu:jar:2.16.0:compile
+[INFO] |     +- io.smallrye.common:smallrye-common-expression:jar:2.16.0:compile
+[INFO] |     +- io.smallrye.common:smallrye-common-net:jar:2.16.0:compile
+[INFO] |     \- io.smallrye.common:smallrye-common-ref:jar:2.16.0:compile
+[INFO] +- tech.kayys.gollek:log-parser:jar:0.1.0-SNAPSHOT:compile
+[INFO] +- org.jline:jline-reader:jar:3.26.3:compile
+[INFO] +- org.jline:jline-terminal:jar:3.26.3:compile
+[INFO] |  \- org.jline:jline-native:jar:3.26.3:compile
+[INFO] +- org.jline:jline-terminal-jna:jar:3.26.3:compile
+[INFO] |  \- net.java.dev.jna:jna:jar:5.8.0:compile
+[INFO] +- org.jline:jline-console:jar:3.26.3:compile
+[INFO] |  +- org.jline:jline-builtins:jar:3.26.3:compile
+[INFO] |  \- org.jline:jline-style:jar:3.26.3:compile
+[INFO] +- com.github.albfernandez:juniversalchardet:jar:2.4.0:compile
+[INFO] +- tech.kayys.gollek:gollek-ext-cloud-cerebras:jar:0.1.0-SNAPSHOT:compile
+[INFO] +- tech.kayys.gollek:gollek-ext-cloud-gemini:jar:0.1.0-SNAPSHOT:compile
+[INFO] +- tech.kayys.gollek:gollek-ext-cloud-mistral:jar:0.1.0-SNAPSHOT:compile
+[INFO] +- io.quarkus:quarkus-junit:jar:3.32.2:test
+[INFO] |  +- io.quarkus:quarkus-bootstrap-core:jar:3.32.2:test
+[INFO] |  |  +- io.quarkus:quarkus-classloader-commons:jar:3.32.2:compile
+[INFO] |  |  +- io.quarkus:quarkus-bootstrap-app-model:jar:3.32.2:test
+[INFO] |  |  +- io.quarkus:quarkus-bootstrap-json:jar:3.32.2:test
+[INFO] |  |  \- io.smallrye.common:smallrye-common-io:jar:2.16.0:compile
+[INFO] |  +- org.eclipse.sisu:org.eclipse.sisu.inject:jar:0.9.0.M4:compile
+[INFO] |  |  \- org.ow2.asm:asm:jar:9.9.1:compile
+[INFO] |  +- io.quarkus:quarkus-test-common:jar:3.32.2:test
+[INFO] |  |  +- io.quarkus:quarkus-core-deployment:jar:3.32.2:test
+[INFO] |  |  |  +- org.aesh:readline:jar:2.6:test
+[INFO] |  |  |  |  \- org.fusesource.jansi:jansi:jar:2.4.0:test
+[INFO] |  |  |  +- org.aesh:aesh:jar:2.8.2:test
+[INFO] |  |  |  +- org.apache.commons:commons-compress:jar:1.28.0:compile
+[INFO] |  |  |  +- io.quarkus.gizmo:gizmo:jar:1.10.1:test
+[INFO] |  |  |  |  \- org.ow2.asm:asm-util:jar:9.9.1:test
+[INFO] |  |  |  |     \- org.ow2.asm:asm-analysis:jar:9.9.1:test
+[INFO] |  |  |  +- io.quarkus.gizmo:gizmo2:jar:2.1.1:test
+[INFO] |  |  |  |  +- io.smallrye.classfile:jdk-classfile-backport:jar:26:test
+[INFO] |  |  |  |  \- io.smallrye.common:smallrye-common-resource:jar:2.16.0:test
+[INFO] |  |  |  +- io.smallrye:jandex-gizmo2:jar:3.5.3:test
+[INFO] |  |  |  +- io.smallrye.common:smallrye-common-process:jar:2.16.0:test
+[INFO] |  |  |  +- org.ow2.asm:asm-commons:jar:9.9.1:test
+[INFO] |  |  |  |  \- org.ow2.asm:asm-tree:jar:9.9.1:test
+[INFO] |  |  |  +- io.quarkus:quarkus-hibernate-validator-spi:jar:3.32.2:test
+[INFO] |  |  |  +- io.quarkus:quarkus-class-change-agent:jar:3.32.2:test
+[INFO] |  |  |  +- io.quarkus:quarkus-builder:jar:3.32.2:test
+[INFO] |  |  |  +- org.graalvm.sdk:nativeimage:jar:23.1.2:test
+[INFO] |  |  |  |  \- org.graalvm.sdk:word:jar:23.1.2:test
+[INFO] |  |  |  \- org.junit.platform:junit-platform-launcher:jar:6.0.3:test
+[INFO] |  |  +- io.quarkus:quarkus-bootstrap-maven-resolver:jar:3.32.2:test
+[INFO] |  |  |  +- io.smallrye.beanbag:smallrye-beanbag-maven:jar:1.6.1:test
+[INFO] |  |  |  |  +- io.smallrye.beanbag:smallrye-beanbag-sisu:jar:1.6.1:test
+[INFO] |  |  |  |  |  \- io.smallrye.beanbag:smallrye-beanbag:jar:1.6.1:test
+[INFO] |  |  |  |  +- javax.inject:javax.inject:jar:1:test
+[INFO] |  |  |  |  +- org.apache.maven:maven-repository-metadata:jar:3.9.12:test
+[INFO] |  |  |  |  +- org.apache.maven:maven-settings:jar:3.9.12:test
+[INFO] |  |  |  |  +- org.apache.maven.wagon:wagon-provider-api:jar:3.5.3:test
+[INFO] |  |  |  |  +- org.apache.maven.wagon:wagon-http-shared:jar:3.5.3:test
+[INFO] |  |  |  |  +- org.codehaus.plexus:plexus-xml:jar:4.0.2:test
+[INFO] |  |  |  |  |  \- org.apache.maven:maven-xml-impl:jar:4.0.0-alpha-7:test
+[INFO] |  |  |  |  |     \- org.apache.maven:maven-api-xml:jar:4.0.0-alpha-7:test
+[INFO] |  |  |  |  |        \- org.apache.maven:maven-api-meta:jar:4.0.0-alpha-7:test
+[INFO] |  |  |  |  +- org.codehaus.plexus:plexus-cipher:jar:2.0:test
+[INFO] |  |  |  |  \- org.codehaus.plexus:plexus-sec-dispatcher:jar:2.0:test
+[INFO] |  |  |  +- io.quarkus:quarkus-bootstrap-maven4-resolver:jar:3.32.2:test
+[INFO] |  |  |  +- org.apache.maven:maven-embedder:jar:3.9.12:test
+[INFO] |  |  |  |  +- org.apache.maven:maven-core:jar:3.9.12:test
+[INFO] |  |  |  |  |  \- org.codehaus.plexus:plexus-component-annotations:jar:2.1.0:test
+[INFO] |  |  |  |  +- org.apache.maven:maven-plugin-api:jar:3.9.12:test
+[INFO] |  |  |  |  +- org.apache.maven.shared:maven-shared-utils:jar:3.4.2:test
+[INFO] |  |  |  |  +- com.google.inject:guice:jar:classes:5.1.0:test
+[INFO] |  |  |  |  |  \- aopalliance:aopalliance:jar:1.0:test
+[INFO] |  |  |  |  +- javax.annotation:javax.annotation-api:jar:1.3.2:test
+[INFO] |  |  |  |  +- org.codehaus.plexus:plexus-classworlds:jar:2.6.0:test
+[INFO] |  |  |  |  \- commons-cli:commons-cli:jar:1.11.0:test
+[INFO] |  |  |  +- org.eclipse.sisu:org.eclipse.sisu.plexus:jar:0.9.0.M4:test
+[INFO] |  |  |  +- org.apache.maven:maven-settings-builder:jar:3.9.12:test
+[INFO] |  |  |  +- org.apache.maven:maven-resolver-provider:jar:3.9.12:test
+[INFO] |  |  |  +- org.apache.maven.resolver:maven-resolver-transport-wagon:jar:1.9.25:test
+[INFO] |  |  |  +- org.apache.maven.wagon:wagon-http:jar:3.5.3:test
+[INFO] |  |  |  \- org.apache.maven.wagon:wagon-file:jar:3.5.3:test
+[INFO] |  |  +- io.quarkus:quarkus-bootstrap-gradle-resolver:jar:3.32.2:test
+[INFO] |  |  \- io.smallrye:jandex:jar:3.5.3:compile
+[INFO] |  +- io.quarkus:quarkus-junit-config:jar:3.32.2:test
+[INFO] |  |  \- org.junit.jupiter:junit-jupiter-api:jar:6.0.3:test
+[INFO] |  |     +- org.opentest4j:opentest4j:jar:1.3.0:test
+[INFO] |  |     +- org.junit.platform:junit-platform-commons:jar:6.0.3:test
+[INFO] |  |     \- org.apiguardian:apiguardian-api:jar:1.1.2:test
+[INFO] |  +- io.quarkus:quarkus-junit-common:jar:3.32.2:test
+[INFO] |  |  +- org.junit.jupiter:junit-jupiter-params:jar:6.0.3:test
+[INFO] |  |  \- org.junit.jupiter:junit-jupiter-engine:jar:6.0.3:test
+[INFO] |  |     \- org.junit.platform:junit-platform-engine:jar:6.0.3:test
+[INFO] |  \- org.junit.jupiter:junit-jupiter:jar:6.0.3:test
+[INFO] \- io.quarkus:quarkus-junit-mockito:jar:3.32.2:test
+[INFO]    +- org.mockito:mockito-junit-jupiter:jar:5.21.0:test
+[INFO]    +- io.quarkus:quarkus-junit-mockito-config:jar:3.32.2:test
+[INFO]    +- io.quarkus:quarkus-arc-deployment:jar:3.32.2:test
+[INFO]    |  +- io.quarkus:quarkus-smallrye-context-propagation-spi:jar:3.32.2:test
+[INFO]    |  +- io.quarkus:quarkus-devui-deployment-spi:jar:3.32.2:test
+[INFO]    |  +- io.quarkus:quarkus-arc-dev:jar:3.32.2:test
+[INFO]    |  +- io.quarkus.arc:arc-processor:jar:3.32.2:test
+[INFO]    |  +- io.quarkus:quarkus-arc-test-supplement:jar:3.32.2:test
+[INFO]    |  \- io.quarkus:quarkus-arc-test-supplement-decorator:jar:3.32.2:test
+[INFO]    \- org.mockito:mockito-core:jar:5.3.1:test
+[INFO]       +- net.bytebuddy:byte-buddy:jar:1.17.5:compile
+[INFO]       +- net.bytebuddy:byte-buddy-agent:jar:1.17.5:test
+[INFO]       \- org.objenesis:objenesis:jar:3.3:test
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  41.060 s
+[INFO] Finished at: 2026-04-18T19:59:49+07:00
+[INFO] ------------------------------------------------------------------------

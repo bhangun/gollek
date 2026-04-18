@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# ──────────────────────────────────────────────────────────────────
+# gollek – launcher script for the Gollek Inference CLI
+#
+# Automatically adds --add-modules jdk.incubator.vector and
+# --enable-native-access=ALL-UNNAMED so users don't have to.
+#
+# Usage:
+#   ./gollek run --modelFile path/to/model.gguf --prompt "hello"
+#   ./gollek chat --modelFile path/to/model.gguf
+# ──────────────────────────────────────────────────────────────────
+set -euo pipefail
+
+# Resolve the directory this script lives in
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Locate the JAR — check common locations
+JAR=""
+for candidate in \
+    "$SCRIPT_DIR/target/gollek.jar" \
+    "$SCRIPT_DIR/gollek.jar" \
+    "$HOME/.gollek/bin/gollek.jar"; do
+    if [[ -f "$candidate" ]]; then
+        JAR="$candidate"
+        break
+    fi
+done
+
+if [[ -z "$JAR" ]]; then
+    echo "Error: gollek.jar not found. Searched:" >&2
+    echo "  $SCRIPT_DIR/target/gollek.jar" >&2
+    echo "  $SCRIPT_DIR/gollek.jar" >&2
+    echo "  $HOME/.gollek/bin/gollek.jar" >&2
+    echo "Run 'mvn clean package -DskipTests' in the gollek-cli module first." >&2
+    exit 1
+fi
+
+# JVM flags for the Vector API incubator module and native access
+JVM_FLAGS=(
+    --add-modules jdk.incubator.vector
+    --enable-native-access=ALL-UNNAMED
+)
+
+exec java "${JVM_FLAGS[@]}" -jar "$JAR" "$@"

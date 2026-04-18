@@ -40,6 +40,10 @@
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-model-repo-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>tech.kayys.gollek</groupId>
+            <artifactId>gollek-model-repo-local</artifactId>
+        </dependency>
 
         <!-- Quarkus -->
         <dependency>

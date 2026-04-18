@@ -97,16 +97,39 @@ public class Qwen2Family implements ModelArchitecture {
             return "model.layers.%d.mlp.down_proj.weight".formatted(i);
         }
 
-        // Qwen-2 Q/K bias terms
+        // Qwen-2 Q/K/V bias terms
+        @Override
         public String layerQueryBias(int i) {
             return "model.layers.%d.self_attn.q_proj.bias".formatted(i);
         }
 
+        @Override
         public String layerKeyBias(int i) {
             return "model.layers.%d.self_attn.k_proj.bias".formatted(i);
         }
-  
 
+        @Override
+        public String layerValueBias(int i) {
+            return "model.layers.%d.self_attn.v_proj.bias".formatted(i);
+        }
 
+        @Override
+        public String layerOutputBias(int i) {
+            return "model.layers.%d.self_attn.o_proj.bias".formatted(i);
+        }
 
+        @Override
+        public String layerFfnGateBias(int i) {
+            return "model.layers.%d.mlp.gate_proj.bias".formatted(i);
+        }
+
+        @Override
+        public String layerFfnUpBias(int i) {
+            return "model.layers.%d.mlp.up_proj.bias".formatted(i);
+        }
+
+        @Override
+        public String layerFfnDownBias(int i) {
+            return "model.layers.%d.mlp.down_proj.bias".formatted(i);
+        }
 }

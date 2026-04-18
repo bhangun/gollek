@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.*;
+import tech.kayys.gollek.gguf.loader.GGUFDequantizer;
 
 /**
  * Comprehensive tests for TurboQuant multi-format quantizer.

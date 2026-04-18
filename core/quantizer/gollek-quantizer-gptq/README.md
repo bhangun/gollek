@@ -2,7 +2,21 @@
 
 GPTQ implementation for Gollek — Hessian-based one-shot weight quantization for LLMs at 2/3/4/8 bits.
 
-## Citation
+This module provides a production-grade GPTQ quantization and dequantization engine for Java, utilizing the **JDK 25 Vector API** for high-performance SIMD-accelerated inference.
+
+## Features
+
+- **Hessian-based Quantization**: Implements the full GPTQ algorithm for minimal accuracy loss during 4-bit compression.
+- **SIMD Acceleration**: Leverages Java's Vector API (AVX2, AVX-512, NEON) for ultra-fast weight dequantization and matrix-vector operations.
+- **Auto-detection**: Automatically detects GPTQ configurations from HuggingFace/AutoGPTQ safetensor metadata.
+- **Memory Efficiency**: Uses off-heap memory (Foreign Function & Memory API) for loading multi-gigabyte models without GC overhead.
+- **Format Compatibility**: Fully compatible with standard `.safetensors` models from AutoGPTQ and HuggingFace.
+
+## Algorithm
+
+GPTQ quantizes each weight matrix W layer-by-layer using second-order information from the Hessian of the layer's input activations.
+
+### Citation
 
 ```bibtex
 @article{frantar2022gptq,
@@ -14,63 +28,63 @@ GPTQ implementation for Gollek — Hessian-based one-shot weight quantization fo
 }
 ```
 
-## Algorithm
+### Dequantization Formula
 
-GPTQ quantizes each weight matrix W layer-by-layer using second-order information from the Hessian of the layer's input activations.
-
-### Core Algorithm (§3)
-
-For each weight matrix W of shape `[d_out × d_in]`, GPTQ solves:
-
-```
-min_{Q}  ‖WX − QX‖²_F
-```
-
-where X is the calibration input and Q is the quantized weight matrix.
-
-**Key insight:** quantize columns of W one at a time, updating remaining columns to compensate for the error introduced:
-
-```
-for each column j = 0..d_in:
-  q_j ← quantize(w_j)                          # round to nearest grid point
-  e_j ← (w_j − q_j) / [H^{-1}]_{jj}           # quantization error
-  W_{j+1:} ← W_{j+1:} − e_j · [H^{-1}]_{j, j+1:}  # error compensation
-```
-
-where `H = 2 X Xᵀ` is the Hessian and `H^{-1}` is computed once via Cholesky decomposition.
-
-**Dampening** for numerical stability: `H ← H + λI`, `λ = dampPercent · mean(diag(H))`.
-
-### Group Quantization (§4.1)
-
-Weights are quantized in groups of `groupSize` (default 128). Each group has its own scale and zero-point:
-
-```
-q = clamp(round(w / scale) + zero, 0, 2^bits − 1)
-w̃ = (q − zero) · scale
-```
-
-Tensor naming convention (compatible with AutoGPTQ / HuggingFace):
-
-| Tensor | Shape | Dtype | Description |
-|--------|-------|-------|-------------|
-| `layer.qweight` | `[d_in/8 × d_out]` | INT32 | Packed quantized weights (8 INT4 per INT32) |
-| `layer.scales`  | `[d_in/groupSize × d_out]` | FP16 | Per-group scale factors |
-| `layer.qzeros`  | `[d_in/groupSize × d_out/8]` | INT32 | Packed per-group zero points |
-| `layer.g_idx`   | `[d_in]` | INT32 | Group index per column (act-order only) |
-| `layer.bias`    | `[d_out]` | FP16 | Optional bias |
-
-### Activation Order (§4.2)
-
-With `actOrder=true`, columns are quantized in decreasing order of Hessian diagonal magnitude (most important weights first). Requires `g_idx` for correct dequantization.
-
-### Dequantization
-
+For each element `w[i,j]` in a group `g`:
 ```
 w̃ = (unpack(qweight) − unpack(qzeros)) · scales
 ```
 
-For act-order: reorder columns using `g_idx` before applying scales.
+## Performance & Vector API
+
+This module requires **Java 25+** to utilize the **JDK Vector API**. The dequantization engine (`VectorDequantizer`) uses SIMD instructions to process multiple output features in parallel:
+
+- **AVX-512**: Processes 16 floats per iteration (512-bit).
+- **AVX2**: Processes 8 floats per iteration (256-bit).
+- **NEON**: Processes 4 floats per iteration (128-bit).
+
+### Enabling Vector API
+
+When running with this module, ensure you add the following JVM flags:
+```bash
+--add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED
+```
+
+## Usage
+
+### Java API
+
+```java
+try (GPTQQuantizerService service = new GPTQQuantizerService()) {
+    // Quantize FP32 model → GPTQ INT4
+    QuantizationResult result = service.quantize(
+        Path.of("model/"),
+        Path.of("model-gptq/"),
+        GPTQConfig.gptq4bit()
+    );
+
+    // Load and dequantize
+    GPTQLoader loader = service.loadQuantized(Path.of("model-gptq/"));
+    
+    // Inspect model
+    ModelInspectionResult info = service.inspect(Path.of("model-gptq/"));
+    System.out.println("Layers: " + info.layerCount());
+}
+```
+
+### JBang Example
+
+A ready-to-run example is available in the `examples/jbang` directory:
+
+```bash
+# Run with synthetic demo data
+jbang gollek/examples/jbang/quantizer/gollek-quantizer-gptq.java --demo
+
+# Quantize a real model
+jbang gollek/examples/jbang/quantizer/gollek-quantizer-gptq.java \
+  --model /path/to/model/dir \
+  --bits 4 --group-size 128
+```
 
 ## Compression
 
@@ -81,32 +95,6 @@ For act-order: reorder columns using `g_idx` before applying scales.
 | 4    | 8                 | 8×                |
 | 8    | 4                 | 4×                |
 
-## Usage
-
-```java
-GPTQQuantizerService service = new GPTQQuantizerService();
-
-// Quantize FP32 model → GPTQ INT4
-QuantizationResult result = service.quantize(
-    Path.of("model/"),
-    Path.of("model-gptq/"),
-    GPTQConfig.gptq4bit()
-);
-
-// Load and dequantize
-GPTQLoader loader = service.loadQuantized(Path.of("model-gptq/"));
-
-// Custom config
-GPTQConfig cfg = GPTQConfig.builder()
-    .bits(4)
-    .groupSize(128)
-    .actOrder(true)
-    .dampPercent(0.01)
-    .numSamples(128)
-    .seqLen(2048)
-    .build();
-```
-
 ## Module Structure
 
 | Class | Role |
@@ -114,21 +102,13 @@ GPTQConfig cfg = GPTQConfig.builder()
 | `GPTQConfig` | Configuration record — bits, groupSize, actOrder, symmetric, exllamaV2 |
 | `GPTQQuantizerService` | High-level quantize / dequantize / inspect service |
 | `GPTQLoader` | Load GPTQ safetensors, auto-detect config |
-| `GPTQSafetensorFileLoader` | Low-level safetensor shard loading |
-| `GPTQSafetensorShard` | Single shard metadata and tensor access |
-| `GPTQSafetensorHeader` | Safetensor header parsing |
 | `GPTQSafetensorConverter` | GPTQ → FP32/FP16 dequantization converter |
-| `GPTQQuantizerService.QuantizationResult` | Result record with compression stats |
+| `VectorDequantizer` | JDK Vector API dequantization engine |
+| `MemoryAllocator` | Off-heap memory management via FFM API |
 | `QuantizedLayer` | Per-layer quantized weight container |
-| `VectorDequantizer` | JDK Vector API dequantization (INT4 unpack + scale) |
-| `MemoryAllocator` | Off-heap memory management for large models |
 
 ## Related Quantizers
 
-| Module | Algorithm | Paper |
-|--------|-----------|-------|
-| **`gollek-quantizer-gptq`** | **GPTQ (Hessian one-shot)** | [arxiv 2210.17323](https://arxiv.org/abs/2210.17323) |
-| `gollek-quantizer-awq` | AWQ (activation-aware) | [arxiv 2306.00978](https://arxiv.org/abs/2306.00978) |
-| `gollek-quantizer-autoround` | AutoRound (sign-SGD) | [arxiv 2309.05516](https://arxiv.org/abs/2309.05516) |
-| `gollek-quantizer-quip` | QuIP# (E8 lattice, 2-bit) | [arxiv 2406.11235](https://arxiv.org/abs/2406.11235) |
-| `gollek-quantizer-turboquant` | TurboQuant (rotation + Lloyd-Max) | [arxiv 2504.19874](https://arxiv.org/abs/2504.19874) |
+- **`gollek-quantizer-awq`**: Activation-aware Weight Quantization.
+- **`gollek-quantizer-autoround`**: Advanced sign-SGD based optimization.
+- **`gollek-quantizer-quip`**: High-compression 2-bit lattice quantization.

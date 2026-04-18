@@ -1,22 +1,29 @@
 package tech.kayys.gollek.inference.nativeimpl;
 
 import tech.kayys.gollek.gguf.loader.GGUFModel;
+import tech.kayys.gollek.gguf.loader.TransformerLayerWeights;
 import tech.kayys.gollek.gguf.loader.GGUFTensorInfo;
+import tech.kayys.gollek.gguf.loader.GGUFDequantizer;
+import tech.kayys.gollek.gguf.loader.GGUFLoader;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The high-level orchestrator for the native inference runtime.
  * Maintains the model weights and oversees the execution of the transformer layers.
  */
 public final class NativeInferenceEngine implements AutoCloseable {
+    private static final Logger LOG = LoggerFactory.getLogger(NativeInferenceEngine.class);
 
     private final GGUFModel model;
     private final Arena weightArena;
     private final List<TransformerLayerWeights> layers;
+    private final int vocabSize;
     
     private final MemorySegment tokenEmbeddings;
     private final MemorySegment outputNorm;
@@ -51,6 +58,23 @@ public final class NativeInferenceEngine implements AutoCloseable {
         this.tokenEmbeddings = findAndPrepareTensor("token_embd.weight", arch + ".token_embd.weight");
         this.outputNorm = findAndPrepareTensor("output_norm.weight", arch + ".output_norm.weight");
         this.outputWeight = findAndPrepareTensor("output.weight", "lm_head.weight", arch + ".output.weight", "token_embd.weight");
+
+        // Determine vocab size robustly
+        int vs = 0;
+        Object vsObj = model.metadata().get("general.vocab_size");
+        if (vsObj == null) vsObj = model.metadata().get(arch + ".vocab_size");
+        if (vsObj == null) vsObj = model.metadata().get("llama.vocab_size");
+        if (vsObj instanceof Number n) {
+            vs = n.intValue();
+        } else {
+            // Fallback: use outputWeight shape if possible (via GGUFModel tensors)
+            vs = model.tensors().stream()
+                    .filter(t -> t.name().equals("output.weight") || t.name().equals("lm_head.weight"))
+                    .findFirst()
+                    .map(t -> (int) t.shape()[0])
+                    .orElse(32000); // Absolute fallback
+        }
+        this.vocabSize = vs;
         
         float defaultFreq = (arch.contains("qwen")) ? 1000000.0f : 10000.0f;
         float ropeFreqBase = getMetaFloat(defaultFreq, 
@@ -60,7 +84,7 @@ public final class NativeInferenceEngine implements AutoCloseable {
         
         this.eps = getMetaFloat(1e-5f, arch + ".attention.layer_norm_rms_epsilon", "llama.attention.layer_norm_rms_epsilon", "general.attention.layer_norm_rms_epsilon");
         
-        System.out.println("Engine Config: arch=" + arch + ", eps=" + eps + ", rope_freq_base=" + ropeFreqBase + ", isNeox=" + isNeox);
+        LOG.debug("Engine Config: arch={}, eps={}, rope_freq_base={}, isNeox={}", arch, eps, ropeFreqBase, isNeox);
         this.ropeCache = RoPECache.build(weightArena, 4096, headDim, ropeFreqBase);
     }
 
@@ -114,6 +138,7 @@ public final class NativeInferenceEngine implements AutoCloseable {
     }
 
     public int getHidden() { return hidden; }
+    public int getVocabSize() { return vocabSize; }
     public int getNHeads() { return nHeads; }
     public int getNHeadsKv() { return nHeadsKv; }
     public int getHeadDim() { return headDim; }
@@ -162,7 +187,7 @@ public final class NativeInferenceEngine implements AutoCloseable {
                 // type 2 = explicit NeoX (also split-half)
                 // type -1 = none
                 boolean neox = (ropeType == 0 || ropeType == 2);
-                System.out.println("RoPE: type=" + ropeType + " from key=" + key + " → isNeox=" + neox);
+                LOG.debug("RoPE: type={} from key={} → isNeox={}", ropeType, key, neox);
                 return neox;
             }
         }
@@ -174,7 +199,7 @@ public final class NativeInferenceEngine implements AutoCloseable {
             case "gptj" -> false; // GPT-J uses interleaved
             default -> true; // Default to Neox for modern architectures
         };
-        System.out.println("RoPE: no metadata, arch=" + arch + " → isNeox=" + neox);
+        LOG.debug("RoPE: no metadata, arch={} → isNeox={}", arch, neox);
         return neox;
     }
 
@@ -188,7 +213,9 @@ public final class NativeInferenceEngine implements AutoCloseable {
 
     @Override
     public void close() {
+        if (model != null) {
+            model.close();
+        }
         weightArena.close();
-        // GGUFModel is AutoCloseable (via its segments/arena)
     }
 }

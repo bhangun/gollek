@@ -3,6 +3,7 @@ package tech.kayys.gollek.inference.nativeimpl;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.util.concurrent.ExecutorService;
+import tech.kayys.gollek.gguf.loader.TransformerLayerWeights;
 
 /**
  * Executes a single transformer layer end-to-end with zero intermediary allocations.

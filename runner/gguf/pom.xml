@@ -20,9 +20,6 @@
         <maven.compiler.target>25</maven.compiler.target>
     </properties>
     <modules>
-        <module>gollek-ext-runner-gguf</module>
         <module>gollek-gguf-converter</module>
-        <module>gollek-plugin-runner-gguf</module>
-        <module>gollek-plugin-feature-text</module>
     </modules>
 </project>

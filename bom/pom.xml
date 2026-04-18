@@ -239,7 +239,32 @@
             -->
             <dependency>
                 <groupId>tech.kayys.gollek</groupId>
-                <artifactId>gollek-ext-runner-gguf</artifactId>
+                <artifactId>gollek-runner-llamacpp</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>tech.kayys.gollek</groupId>
+                <artifactId>gollek-plugin-runner-llamacpp</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>tech.kayys.gollek</groupId>
+                <artifactId>gollek-plugin-feature-text</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>tech.kayys.gollek</groupId>
+                <artifactId>gollek-gguf-loader</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>tech.kayys.gollek</groupId>
+                <artifactId>gollek-gguf-tokenizer</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>tech.kayys.gollek</groupId>
+                <artifactId>gollek-safetensor-gguf</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
