@@ -289,6 +289,13 @@ public final class AccelOps {
      * → output: [batch, seq, out_features]
      */
     public static AccelTensor linear(AccelTensor input, AccelTensor weight) {
+        // Just-in-time dequantization if weight is quantized
+        if (weight.isQuantized()) {
+            try (AccelTensor dequantizedWeight = dequantize(weight)) {
+                return linear(input, dequantizedWeight);
+            }
+        }
+
         // We no longer call input.contiguous() here! Stride awareness is handled below.
         
         if (input.rank() == 3 && weight.rank() == 2) {
@@ -798,6 +805,21 @@ public final class AccelOps {
             result[i] = (float) (0.5 * v * (1.0 + Math.tanh(inner)));
         }
         return AccelTensor.fromFloatArray(result, x.shape());
+    }
+
+    private static AccelTensor dequantize(AccelTensor qWeight) {
+        long[] shape = qWeight.shape();
+        AccelTensor f32 = AccelTensor.zeros(shape);
+        
+        switch (qWeight.quantType()) {
+            case INT8 -> DequantizationKernel.dequantizeInt8(
+                    qWeight.dataSegment(), f32.dataSegment(), qWeight.scales(), qWeight.numel());
+            case INT4 -> DequantizationKernel.dequantizeInt4(
+                    qWeight.dataSegment(), f32.dataSegment(), qWeight.scales(), qWeight.zeros(), qWeight.numel(), qWeight.groupSize());
+            default -> throw new UnsupportedOperationException("Unsupported quantization type: " + qWeight.quantType());
+        }
+        
+        return f32;
     }
 
     /**

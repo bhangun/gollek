@@ -53,6 +53,11 @@ public class AccelWeightBridge {
             // Zero-copy: wrap the mmap'd segment directly
             log.tracef("Bridge zero-copy: '%s' F32 shape=%s", name, java.util.Arrays.toString(shape));
             t = AccelTensor.wrapSegment(st.segment(), shape);
+        } else if (dtype == SafetensorDType.I8 || name.endsWith(".qweight")) {
+             // Handle as Quantized INT8 or INT4
+             log.debugf("Bridge quantized: '%s' %s shape=%s", name, dtype, java.util.Arrays.toString(shape));
+             t = AccelTensor.wrapSegment(st.segment(), shape);
+             // We'll set the quantization metadata in bridgeAll where we have the full session
         } else if (dtype == SafetensorDType.BF16 || dtype == SafetensorDType.F16) {
             log.debugf("Bridge upcast: '%s' %s → F32 shape=%s", name, dtype, java.util.Arrays.toString(shape));
             t = upcastToF32(st, dtype);
@@ -77,8 +82,17 @@ public class AccelWeightBridge {
         Map<String, AccelTensor> result = new HashMap<>(names.size() * 2);
         try {
             for (String name : names) {
+                if (isMetadataTensor(name)) continue; // skip scales/zeros for now, they are picked up by weights
+
                 SafetensorTensor st = session.tensor(name);
-                result.put(name, bridge(st));
+                AccelTensor t = bridge(st);
+                
+                // If it's a weight that might be quantized, look for metadata
+                if (isWeightTensor(name)) {
+                    attachQuantizationMetadata(t, name, session);
+                }
+                
+                result.put(name, t);
             }
         } catch (Exception e) {
             // Clean up on failure
@@ -145,6 +159,40 @@ public class AccelWeightBridge {
             sb.append(String.format("%02x", seg.get(ValueLayout.JAVA_BYTE, i)));
         }
         return sb.toString();
+    }
+
+    private boolean isWeightTensor(String name) {
+        return name.endsWith(".weight") || name.endsWith(".qweight");
+    }
+
+    private boolean isMetadataTensor(String name) {
+        return name.endsWith(".scales") || name.endsWith(".qzeros") || name.endsWith(".g_idx");
+    }
+
+    private void attachQuantizationMetadata(AccelTensor t, String weightName, SafetensorShardSession session) {
+        String baseName = weightName.substring(0, weightName.lastIndexOf("."));
+        
+        // Search for scales
+        String scalesName = baseName + ".scales";
+        if (session.findTensor(scalesName).isPresent()) {
+            SafetensorTensor scalesSt = session.tensor(scalesName);
+            MemorySegment scalesSeg = scalesSt.segment();
+            
+            AccelTensor.QuantType type = (weightName.endsWith(".qweight")) ? 
+                    AccelTensor.QuantType.INT4 : AccelTensor.QuantType.INT8;
+            
+            // Look for zeros
+            String zerosName = baseName + ".qzeros";
+            MemorySegment zerosSeg = session.findTensor(zerosName).isPresent() 
+                    ? session.tensor(zerosName).segment() : null;
+            
+            // Assume default group size for now
+            int groupSize = 128; 
+            
+            t.withQuantization(type, scalesSeg, zerosSeg, groupSize);
+            log.infof("Attached %s quantization to '%s' (scales=%s, zeros=%b)", 
+                    type, weightName, scalesName, zerosSeg != null);
+        }
     }
 
     private String getFirstValues(AccelTensor t, int count) {

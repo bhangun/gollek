@@ -13,6 +13,9 @@ import org.jboss.logging.Logger;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.quantization.QuantConfig;
 
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+
 /**
  * INT8 quantizer with per-channel or per-tensor scaling.
  * <p>
@@ -208,32 +211,46 @@ public class INT8Quantizer implements Quantizer {
     // ─────────────────────────────────────────────────────────────────────────
 
     private float[] getTensorData(AccelTensor tensor) {
-        // TODO: Implement based on actual AccelTensor API
-        return new float[1024]; // Placeholder
+        return tensor.toFloatArray();
     }
 
     private int[] getTensorShape(AccelTensor tensor) {
-        // TODO: Implement based on actual AccelTensor API
-        return new int[] { 1, 1024 }; // Placeholder
+        long[] shape = tensor.shape();
+        int[] res = new int[shape.length];
+        for (int i = 0; i < shape.length; i++) res[i] = (int) shape[i];
+        return res;
     }
 
     private byte[] getQuantizedData(AccelTensor tensor) {
-        // TODO: Extract quantized data from tensor
-        return new byte[1024]; // Placeholder
+        MemorySegment seg = tensor.dataSegment();
+        byte[] data = new byte[(int) seg.byteSize()];
+        MemorySegment.copy(seg, ValueLayout.JAVA_BYTE, 0, data, 0, data.length);
+        return data;
     }
 
     private float[] getScales(AccelTensor tensor) {
-        // TODO: Extract scales from tensor metadata
-        return new float[] { 1.0f }; // Placeholder
+        MemorySegment scalesSeg = tensor.scales();
+        float[] scales = new float[(int) (scalesSeg.byteSize() / 4)];
+        MemorySegment.copy(scalesSeg, ValueLayout.JAVA_FLOAT, 0, scales, 0, scales.length);
+        return scales;
     }
 
     private AccelTensor createQuantizedTensor(byte[] data, float[] scales, int[] shape, QuantConfig config) {
-        // TODO: Create tensor with quantized data and metadata
-        return null; // Placeholder
+        long[] lShape = new long[shape.length];
+        for (int i = 0; i < shape.length; i++) lShape[i] = shape[i];
+        
+        // Allocate arena for quantized data
+        java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofShared();
+        MemorySegment dataSeg = arena.allocateFrom(ValueLayout.JAVA_BYTE, data);
+        MemorySegment scalesSeg = arena.allocateFrom(ValueLayout.JAVA_FLOAT, scales);
+        
+        AccelTensor t = AccelTensor.wrapSegment(dataSeg, lShape);
+        return t.withQuantization(AccelTensor.QuantType.INT8, scalesSeg, null, -1);
     }
 
     private AccelTensor createDequantizedTensor(float[] data, int[] shape) {
-        // TODO: Create tensor with dequantized data
-        return null; // Placeholder
+        long[] lShape = new long[shape.length];
+        for (int i = 0; i < shape.length; i++) lShape[i] = shape[i];
+        return AccelTensor.fromFloatArray(data, lShape);
     }
 }

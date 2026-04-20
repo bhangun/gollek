@@ -12,6 +12,7 @@ import tech.kayys.gollek.spi.model.ModalityType;
 
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -24,101 +25,103 @@ import jakarta.enterprise.context.ApplicationScoped;
 @ApplicationScoped
 public class KVCacheManager {
 
+    @jakarta.inject.Inject
+    BlockManager globalBlockManager;
+
     public KVCacheSession createSession(int maxSeqLen) {
-        return new KVCacheSession(maxSeqLen);
+        return new KVCacheSession(maxSeqLen, globalBlockManager);
     }
 
     public static class KVCacheSession implements AutoCloseable {
         private final int maxSeqLen;
-        private final Map<Integer, AccelTensor> keyCaches = new ConcurrentHashMap<>();
-        private final Map<Integer, AccelTensor> valueCaches = new ConcurrentHashMap<>();
+        private final BlockManager blockManager;
+        
+        // Layer -> List of physical block indices
+        private final Map<Integer, List<Integer>> blockTables = new java.util.concurrent.ConcurrentHashMap<>();
+        
         private int currentPos = 0;
-        private final Map<ModalityType, Integer> modalityOffsets = new EnumMap<>(ModalityType.class);
+        private int tokensPerBlock = 16;
+        private int numLayers;
+        private int numKVHeads;
+        private int headDim;
 
-        public KVCacheSession(int maxSeqLen) {
+        public KVCacheSession(int maxSeqLen, BlockManager blockManager) {
             this.maxSeqLen = maxSeqLen;
+            this.blockManager = blockManager;
         }
 
-        /**
-         * Allocates KV cache buffers for all layers.
-         */
         public void allocate(ModelConfig config) {
-            allocate(config, null, null);
-        }
+            this.numLayers = config.numHiddenLayers();
+            this.numKVHeads = config.resolvedNumKvHeads();
+            this.headDim = config.resolvedHeadDim();
+            this.tokensPerBlock = 16; // Default block size
 
-        /**
-         * Allocates KV cache buffers, optionally inferring head dim from weights.
-         */
-        public void allocate(ModelConfig config, Map<String, AccelTensor> weights, ModelArchitecture arch) {
-            int numLayers = config.numHiddenLayers();
-            int numKVHeads = config.resolvedNumKvHeads();
-            int fallbackHeadDim = config.resolvedHeadDim();
+            // Ensure BlockManager is initialized for this model's dimensions
+            // (In a real system, we'd have a central pool, but here we init on first session)
+            blockManager.init(tokensPerBlock, numKVHeads, headDim, (maxSeqLen / tokensPerBlock) * numLayers + 100);
 
             for (int i = 0; i < numLayers; i++) {
-                int headDim = fallbackHeadDim;
-                if (weights != null && arch != null) {
-                    AccelTensor kWeight = weights.get(arch.layerKeyWeight(i));
-                    if (kWeight == null) {
-                        kWeight = weights.get(arch.layerValueWeight(i));
-                    }
-                    headDim = inferHeadDim(kWeight, numKVHeads, fallbackHeadDim);
-                }
-                // Shape: [maxSeqLen, numKVHeads, headDim]
-                keyCaches.put(i, AccelTensor.zeros(maxSeqLen, numKVHeads, headDim));
-                valueCaches.put(i, AccelTensor.zeros(maxSeqLen, numKVHeads, headDim));
+                blockTables.put(i, new java.util.ArrayList<>());
+                // Allocate first block
+                appendBlock(i);
             }
         }
 
-        private int inferHeadDim(AccelTensor weight, int numHeads, int fallback) {
-            if (weight == null || numHeads <= 0) return fallback;
-            long[] shape = weight.shape();
-            if (shape.length != 2) return fallback;
-            
-            // Check both dimensions: weights might be [out, in] or pre-transposed [in, out]
-            long dim0 = shape[0];
-            long dim1 = shape[1];
-            
-            if (dim0 % numHeads == 0 && dim0 / numHeads < dim1) {
-                return (int) (dim0 / numHeads);
+        private void appendBlock(int layerIdx) {
+            int block = blockManager.allocateBlock();
+            if (block != -1) {
+                blockTables.get(layerIdx).add(block);
+            } else {
+                throw new RuntimeException("KVCache: Out of physical blocks!");
             }
-            if (dim1 % numHeads == 0) {
-                return (int) (dim1 / numHeads);
-            }
-            
-            return fallback;
         }
 
-        public AccelTensor keyCache(int layerIdx) {
-            return keyCaches.get(layerIdx);
-        }
-
-        public AccelTensor valueCache(int layerIdx) {
-            return valueCaches.get(layerIdx);
+        public List<Integer> getBlockTable(int layerIdx) {
+            return blockTables.get(layerIdx);
         }
 
         public void advance(int seqLen) {
-            this.currentPos += seqLen;
-        }
+            int prevBlockCount = (currentPos + tokensPerBlock - 1) / tokensPerBlock;
+            if (currentPos == 0) prevBlockCount = 0;
 
-        public void advance(int seqLen, ModalityType modality) {
             this.currentPos += seqLen;
-            modalityOffsets.merge(modality, seqLen, Integer::sum);
+            
+            int newBlockCount = (currentPos + tokensPerBlock - 1) / tokensPerBlock;
+            
+            // Allocate new blocks if we crossed a boundary
+            if (newBlockCount > prevBlockCount) {
+                for (int i = 0; i < numLayers; i++) {
+                    for (int b = prevBlockCount; b < newBlockCount; b++) {
+                        if (b >= blockTables.get(i).size()) {
+                            appendBlock(i);
+                        }
+                    }
+                }
+            }
         }
 
         public int currentPos() {
             return currentPos;
         }
 
-        public int modalityOffset(ModalityType modality) {
-            return modalityOffsets.getOrDefault(modality, 0);
+        public int tokensPerBlock() {
+            return tokensPerBlock;
         }
 
         @Override
         public void close() {
-            keyCaches.values().forEach(t -> { if (t != null && !t.isClosed()) t.close(); });
-            valueCaches.values().forEach(t -> { if (t != null && !t.isClosed()) t.close(); });
-            keyCaches.clear();
-            valueCaches.clear();
+            blockTables.values().forEach(list -> {
+                list.forEach(blockManager::freeBlock);
+            });
+            blockTables.clear();
+        }
+
+        // Legacy compatibility - will be replaced by PagedAttention
+        public AccelTensor keyCache(int layerIdx) { 
+            throw new UnsupportedOperationException("KVCache is now paged. Use getBlockTable().");
+        }
+        public AccelTensor valueCache(int layerIdx) {
+            throw new UnsupportedOperationException("KVCache is now paged. Use getBlockTable().");
         }
     }
 }

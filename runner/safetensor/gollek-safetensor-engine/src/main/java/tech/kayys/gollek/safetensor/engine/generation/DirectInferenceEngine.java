@@ -81,9 +81,11 @@ public class DirectInferenceEngine implements SafetensorEngine {
     @Inject
     ModelArchitectureRegistry archRegistry;
 
+    @Inject
+    KVCacheManager kvCacheManager;
+
     private final Map<Path, LoadedModel> modelsByPath = new ConcurrentHashMap<>();
     private final Map<String, LoadedModel> modelsByKey = new ConcurrentHashMap<>();
-    private final KVCacheManager kvCacheManager = new KVCacheManager();
 
     // ─────────────────────────────────────────────────────────────────────────
     // LoadedModel
@@ -196,7 +198,7 @@ public class DirectInferenceEngine implements SafetensorEngine {
                 inputLen = inputIds.length;
 
                 try (KVCacheManager.KVCacheSession session = kvCacheManager.createSession(cfg.maxKvCacheTokens())) {
-                    session.allocate(config, model.weights(), arch);
+                    session.allocate(config);
 
                     float[] logits = forwardPass.prefill(inputIds, model.weights(), config, arch, session);
                     applyLogitSoftcap(logits, config);
@@ -287,7 +289,7 @@ public class DirectInferenceEngine implements SafetensorEngine {
                     inputLen = inputIds.length;
 
                     try (KVCacheManager.KVCacheSession session = kvCacheManager.createSession(cfg.maxKvCacheTokens())) {
-                        session.allocate(config, model.weights(), arch);
+                        session.allocate(config);
 
                         float[] logits = forwardPass.prefill(inputIds, model.weights(), config, arch, session);
                         applyLogitSoftcap(logits, config);

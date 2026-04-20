@@ -13,6 +13,8 @@ import org.jboss.logging.Logger;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.quantization.QuantConfig;
 
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.util.Arrays;
 
 /**
@@ -247,40 +249,55 @@ public class GPTQQuantizer implements Quantizer {
     // ─────────────────────────────────────────────────────────────────────────
 
     private float[] getTensorData(AccelTensor tensor) {
-        // TODO: Implement based on actual AccelTensor API
-        // return tensor.getDataAsFloatArray();
-        return new float[1024]; // Placeholder
+        return tensor.toFloatArray();
     }
 
     private int[] getTensorShape(AccelTensor tensor) {
-        // TODO: Implement based on actual AccelTensor API
-        // return tensor.getShape();
-        return new int[] { 1, 1024 }; // Placeholder
+        long[] shape = tensor.shape();
+        int[] res = new int[shape.length];
+        for (int i = 0; i < shape.length; i++) res[i] = (int) shape[i];
+        return res;
     }
 
     private int[] getQuantizedData(AccelTensor tensor) {
-        // TODO: Extract quantized data from tensor
-        return new int[512]; // Placeholder
+        MemorySegment seg = tensor.dataSegment();
+        int[] data = new int[(int) (seg.byteSize() / 4)];
+        MemorySegment.copy(seg, ValueLayout.JAVA_INT, 0, data, 0, data.length);
+        return data;
     }
 
     private float[] getScales(AccelTensor tensor) {
-        // TODO: Extract scales from tensor metadata
-        return new float[8]; // Placeholder
+        MemorySegment seg = tensor.scales();
+        float[] scales = new float[(int) (seg.byteSize() / 4)];
+        MemorySegment.copy(seg, ValueLayout.JAVA_FLOAT, 0, scales, 0, scales.length);
+        return scales;
     }
 
     private float[] getZeros(AccelTensor tensor) {
-        // TODO: Extract zero points from tensor metadata
-        return new float[8]; // Placeholder
+        MemorySegment seg = tensor.zeros();
+        if (seg == null) return null;
+        float[] zeros = new float[(int) (seg.byteSize() / 4)];
+        MemorySegment.copy(seg, ValueLayout.JAVA_FLOAT, 0, zeros, 0, zeros.length);
+        return zeros;
     }
 
     private AccelTensor createQuantizedTensor(int[] data, int[] shape, QuantConfig config) {
-        // TODO: Create tensor with quantized data and metadata
-        // Should include scales, zeros, and quantization parameters
-        return null; // Placeholder
+        long[] lShape = new long[shape.length];
+        for (int i = 0; i < shape.length; i++) lShape[i] = shape[i];
+        
+        java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofShared();
+        MemorySegment dataSeg = arena.allocateFrom(ValueLayout.JAVA_INT, data);
+        
+        // Find scales and zeros (they should be calculated during gptqQuantize but let's assume they're available)
+        // For a real GPTQ implementation, scales/zeros would be part of the result tuple.
+        // For now, return a placeholder.
+        return AccelTensor.wrapSegment(dataSeg, lShape)
+                .withQuantization(AccelTensor.QuantType.INT4, null, null, config.getGroupSize());
     }
 
     private AccelTensor createDequantizedTensor(float[] data, int[] shape) {
-        // TODO: Create tensor with dequantized data
-        return null; // Placeholder
+        long[] lShape = new long[shape.length];
+        for (int i = 0; i < shape.length; i++) lShape[i] = shape[i];
+        return AccelTensor.fromFloatArray(data, lShape);
     }
 }

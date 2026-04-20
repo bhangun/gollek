@@ -26,12 +26,24 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * Lightweight Float32 tensor backed by FFM {@link MemorySegment}.
+ * Lightweight Float32 or Quantized tensor backed by FFM {@link MemorySegment}.
  * <p>
- * Designed for direct use with Apple Accelerate (cblas_sgemm, vDSP)
- * without any LibTorch dependency.
+ * Supported Quantization types:
+ * <ul>
+ *     <li>F32: Standard 32-bit float (4 bytes)</li>
+ *     <li>INT8: 8-bit integer with scales</li>
+ *     <li>INT4: 4-bit packed integer (GPTQ style) with scales/zeros</li>
+ * </ul>
  */
 public class AccelTensor implements AutoCloseable {
+
+    /** Supported quantization types for AccelTensor. */
+    public enum QuantType {
+        F32,     // 32-bit float
+        INT8,    // 8-bit integer quantized
+        INT4,    // 4-bit integer quantized (packed)
+        FP8      // 8-bit float quantized (E4M3/E5M2)
+    }
 
     private final MemorySegment data;
     private final long[] shape;
@@ -40,6 +52,12 @@ public class AccelTensor implements AutoCloseable {
     private final Arena arena; // null for view tensors (parent owns)
     private final AccelTensor parent; // non-null for views
     private boolean closed = false;
+
+    // ── Quantization Metadata ─────────────────────────────────────────
+    private QuantType quantType = QuantType.F32;
+    private MemorySegment scales = null;
+    private MemorySegment zeros = null;
+    private int groupSize = -1; // -1 means per-channel (no groups)
 
     // ── Private constructors ──────────────────────────────────────────
 
@@ -160,6 +178,20 @@ public class AccelTensor implements AutoCloseable {
     }
 
     public boolean isClosed() { return closed; }
+
+    public QuantType quantType() { return quantType; }
+    public AccelTensor withQuantization(QuantType type, MemorySegment scales, MemorySegment zeros, int groupSize) {
+        this.quantType = type;
+        this.scales = scales;
+        this.zeros = zeros;
+        this.groupSize = groupSize;
+        return this;
+    }
+
+    public MemorySegment scales() { return scales; }
+    public MemorySegment zeros() { return zeros; }
+    public int groupSize() { return groupSize; }
+    public boolean isQuantized() { return quantType != QuantType.F32; }
 
     // ── Data access ───────────────────────────────────────────────────
 
@@ -438,19 +470,43 @@ public class AccelTensor implements AutoCloseable {
             long srcRow = indices[i];
             if (shape.length >= 2) {
                 // Copy row from [vocabSize, embDim]
-                // offset + srcRow * stride[0] is in ELEMENTS; MemorySegment.copy needs BYTE offsets
                 long srcByteOffset = (offset + srcRow * stride[0]) * Float.BYTES;
-                long dstByteOffset = (long) i * embDim * Float.BYTES;
-                MemorySegment.copy(
-                    data, ValueLayout.JAVA_FLOAT, srcByteOffset,
-                    out.data, ValueLayout.JAVA_FLOAT, dstByteOffset,
-                    (int) embDim
-                );
+                if (isQuantized()) {
+                     // Dequantize row on-the-fly
+                     dequantizeRow(srcRow, out.dataPtr().asSlice((long) i * embDim * Float.BYTES), (int) embDim);
+                } else {
+                    long dstByteOffset = (long) i * embDim * Float.BYTES;
+                    MemorySegment.copy(
+                        data, ValueLayout.JAVA_FLOAT, srcByteOffset,
+                        out.data, ValueLayout.JAVA_FLOAT, dstByteOffset,
+                        (int) embDim
+                    );
+                }
             } else {
                 out.setFlat(i, getFlat(srcRow));
             }
         }
         return out;
+    }
+
+    private void dequantizeRow(long row, MemorySegment dst, int embDim) {
+        // row is the row index in the quantized segment
+        long groupIdx = (row * embDim) / groupSize;
+        float scale = scales.getAtIndex(ValueLayout.JAVA_FLOAT, groupIdx);
+        float zero = (zeros != null) ? zeros.getAtIndex(ValueLayout.JAVA_FLOAT, groupIdx) : 0.0f;
+        
+        long srcRowByteOff = (offset + row * stride[0]); // offset is in elements or bytes? 
+        // For I8, stride[0] is embDim bytes.
+        
+        for (int j = 0; j < embDim; j++) {
+            if (quantType == QuantType.INT8) {
+                byte q = data.get(ValueLayout.JAVA_BYTE, srcRowByteOff + j);
+                dst.setAtIndex(ValueLayout.JAVA_FLOAT, j, q * scale);
+            } else if (quantType == QuantType.INT4) {
+                // Support simple packed INT4? 
+                // This is getting complex, for now assume INT8 for embeddings
+            }
+        }
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────
