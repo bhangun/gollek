@@ -16,9 +16,11 @@ import tech.kayys.gollek.safetensor.SafetensorProviderConfig;
 import tech.kayys.gollek.safetensor.engine.generation.DirectInferenceEngine;
 import tech.kayys.gollek.safetensor.engine.generation.TextInferenceEngine;
 import tech.kayys.gollek.safetensor.generation.GenerationConfig;
+import tech.kayys.gollek.safetensor.text.ChatTemplateFormatter;
 import tech.kayys.gollek.spi.Message;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
+import tech.kayys.gollek.spi.model.ModelConfig;
 import tech.kayys.gollek.spi.provider.ProviderConfig;
 import tech.kayys.gollek.spi.provider.ProviderHealth;
 import tech.kayys.gollek.spi.provider.ProviderRequest;
@@ -27,6 +29,8 @@ import tech.kayys.gollek.spi.provider.ProviderResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Flow;
 
 /**
@@ -66,19 +70,34 @@ public class DirectSafetensorBackend {
                 .collect().asList()
                 .map(chunks -> {
                     StringBuilder fullText = new StringBuilder();
+                    int totalInputTokens = 0;
+                    int totalOutputTokens = 0;
+                    long totalDurationMs = 0;
+                    String finalRequestId = null;
+
                     for (ProviderResponse r : chunks) {
+                        if (finalRequestId == null) finalRequestId = r.getRequestId();
                         String delta = r.getContent();
-                        if (delta != null)
-                            fullText.append(delta);
+                        if (delta != null) fullText.append(delta);
+                        
+                        // Pick metrics from chunks (usually the last chunk has total, but we'll sum or max them)
+                        totalInputTokens = Math.max(totalInputTokens, r.getPromptTokens());
+                        totalOutputTokens = Math.max(totalOutputTokens, r.getCompletionTokens());
+                        totalDurationMs = Math.max(totalDurationMs, r.getDurationMs());
                     }
+                    
+                    if (totalOutputTokens == 0 && fullText.length() > 0) {
+                        totalOutputTokens = fullText.length() / 4; // fallback estimate
+                    }
+
                     return InferenceResponse.builder()
-                            .requestId("chatcmpl-" + request.getRequestId())
+                            .requestId(finalRequestId != null ? finalRequestId : "chatcmpl-" + request.getRequestId())
                             .model(request.getModel())
                             .content(fullText.toString())
-                            .tokensUsed(0)
-                            .inputTokens(0)
-                            .outputTokens(0)
-                            .durationMs(0L)
+                            .tokensUsed(totalInputTokens + totalOutputTokens)
+                            .inputTokens(totalInputTokens)
+                            .outputTokens(totalOutputTokens)
+                            .durationMs(totalDurationMs)
                             .build();
                 });
     }
@@ -101,17 +120,30 @@ public class DirectSafetensorBackend {
         Path modelPath = resolveModelPath(request.getModel());
         try {
             // Load the model zero-copy into native memory Arena
+            System.out.println("[REVEAL-BACKEND] streamToPublisher entry model=" + request.getModel());
             String loadedKey = engine.loadModel(modelPath);
 
-            // Extract prompt from messages
-            String prompt = request.getMessages().stream()
-                    .filter(m -> m.getRole() == Message.Role.USER)
-                    .map(Message::getContent)
-                    .reduce((first, second) -> second)
-                    .orElse("");
+            // Resolve model type for chat template selection
+            var loadedModel = engine.getLoadedModel(modelPath);
+            String modelType = (loadedModel != null && loadedModel.config() != null)
+                    ? loadedModel.config().modelType()
+                    : "";
+
+            // Build messages list — inject a default system message if none provided
+            List<Message> messages = new ArrayList<>(request.getMessages());
+            boolean hasSystem = messages.stream().anyMatch(m -> m.getRole() == Message.Role.SYSTEM);
+            if (!hasSystem) {
+                messages.add(0, Message.system("You are a helpful assistant."));
+            }
+
+            // Apply the chat template appropriate for this model architecture
+            String prompt = ChatTemplateFormatter.format(messages, modelType);
+            System.out.println("[DIAG-BACKEND] Chat template applied (modelType=" + modelType + "), prompt length=" + prompt.length());
+
+            int maxTokens = request.getMaxTokens() > 0 ? request.getMaxTokens() : 256;
 
             GenerationConfig genCfg = GenerationConfig.builder()
-                    .maxNewTokens(request.getMaxTokens())
+                    .maxNewTokens(maxTokens)
                     .temperature((float) request.getTemperature())
                     .topP((float) request.getTopP())
                     .build();
@@ -129,6 +161,8 @@ public class DirectSafetensorBackend {
                             .durationMs(infResp.getDurationMs())
                             .build());
         } catch (Exception e) {
+            System.out.println("[REVEAL-BACKEND] FATAL in streamToPublisher: " + e.getMessage());
+            e.printStackTrace(System.out);
             log.errorf(e, "Direct inference failed for model %s (resolved path: %s)",
                     request.getModel(), modelPath);
             throw new ProviderException("Direct inference failed for model "

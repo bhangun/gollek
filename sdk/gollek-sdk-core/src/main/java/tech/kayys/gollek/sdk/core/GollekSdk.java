@@ -164,6 +164,14 @@ public interface GollekSdk {
      * @return Model resolution
      */
     default ModelResolution prepareModel(String modelId, boolean forceGguf, String quantization, Consumer<PullProgress> progressCallback) throws SdkException {
+        return prepareModel(modelId, null, forceGguf, quantization, progressCallback);
+    }
+
+    /**
+     * Resolve and pull a model if necessary with explicit format and quantization.
+     * NEW in v1.2.4.
+     */
+    default ModelResolution prepareModel(String modelId, String format, boolean forceGguf, String quantization, Consumer<PullProgress> progressCallback) throws SdkException {
         return new ModelResolution(modelId, null, getModelInfo(modelId).orElse(null));
     }
 
@@ -203,7 +211,16 @@ public interface GollekSdk {
      */
     default ModelResolution ensureModelAvailable(String modelId, boolean forceGguf, String quantization, Consumer<PullProgress> progressCallback)
             throws SdkException {
-        ModelResolution resolution = prepareModel(modelId, forceGguf, quantization, progressCallback);
+        return ensureModelAvailable(modelId, null, forceGguf, quantization, progressCallback);
+    }
+
+    /**
+     * Resolve, pull, and auto-select provider for a model with explicit format and quantization.
+     * NEW in v1.2.4.
+     */
+    default ModelResolution ensureModelAvailable(String modelId, String format, boolean forceGguf, String quantization, Consumer<PullProgress> progressCallback)
+            throws SdkException {
+        ModelResolution resolution = prepareModel(modelId, format, forceGguf, quantization, progressCallback);
         if (getPreferredProvider().isEmpty()) {
             Optional<String> autoProvider = autoSelectProvider(resolution.getModelId(), forceGguf, quantization);
             if (autoProvider.isPresent()) {
@@ -266,13 +283,19 @@ public interface GollekSdk {
      * @param progressCallback progress updates
      */
     default void pullModel(String modelSpec, String revision, boolean force, Consumer<PullProgress> progressCallback) throws SdkException {
+        pullModel(modelSpec, revision, null, force, progressCallback);
+    }
+
+    /**
+     * Pull a model with explicit format, revision and force options. NEW in v1.2.4.
+     */
+    default void pullModel(String modelSpec, String revision, String format, boolean force, Consumer<PullProgress> progressCallback) throws SdkException {
         // Default implementation for backward compatibility or implementations that don't support revision/force yet.
-        // It's better to log a warning or just delegate if revision is null and force is false.
-        if (revision == null && !force) {
+        if (revision == null && format == null && !force) {
             pullModel(modelSpec, progressCallback);
         } else {
             throw new SdkException("SDK_ERR_NOT_SUPPORTED", 
-                "This SDK implementation does not support explicit revision or force pull.");
+                "This SDK implementation does not support explicit revision, format or force pull.");
         }
     }
 

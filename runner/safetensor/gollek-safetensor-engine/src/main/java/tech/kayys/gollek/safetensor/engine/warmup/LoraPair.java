@@ -1,6 +1,6 @@
 package tech.kayys.gollek.safetensor.engine.warmup;
 
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 
 /**
  * A pair of LoRA matrices (A, B) for a single module.
@@ -8,5 +8,5 @@ import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
  * @param a the down-projection matrix (r × d)
  * @param b the up-projection matrix (k × r)
  */
-public record LoraPair(TorchTensor a, TorchTensor b) {
+public record LoraPair(AccelTensor a, AccelTensor b) {
 }

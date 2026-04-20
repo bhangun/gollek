@@ -35,6 +35,7 @@
     </dependencyManagement>
 
     <modules>
+        <module>gollek-sdk-api</module>
         <module>gollek-sdk-core</module>
         <module>gollek-sdk-java-local</module>
         <module>gollek-sdk-java-remote</module>

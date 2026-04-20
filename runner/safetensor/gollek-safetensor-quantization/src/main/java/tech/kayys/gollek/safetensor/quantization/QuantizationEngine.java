@@ -13,7 +13,7 @@ import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.quantization.quantizer.FP8Quantizer;
 import tech.kayys.gollek.safetensor.quantization.quantizer.GPTQQuantizer;
 import tech.kayys.gollek.safetensor.quantization.quantizer.INT8Quantizer;
@@ -156,20 +156,20 @@ public class QuantizationEngine {
 
                 // Load model weights
                 em.emit(new QuantProgress("", 0, 0, 0.0, "LOADING", "Loading model weights..."));
-                Map<String, TorchTensor> weights = loadWeights(modelPath);
+                Map<String, AccelTensor> weights = loadWeights(modelPath);
                 long originalSize = calculateTotalSize(weights);
 
                 em.emit(new QuantProgress("", 0, weights.size(), 0.0, "PREPARING",
                         "Preparing for quantization..."));
 
                 // Perform quantization with progress
-                Map<String, TorchTensor> quantizedWeights = new HashMap<>();
+                Map<String, AccelTensor> quantizedWeights = new HashMap<>();
                 int totalTensors = weights.size();
                 int currentTensor = 0;
 
-                for (Map.Entry<String, TorchTensor> entry : weights.entrySet()) {
+                for (Map.Entry<String, AccelTensor> entry : weights.entrySet()) {
                     String tensorName = entry.getKey();
-                    TorchTensor tensor = entry.getValue();
+                    AccelTensor tensor = entry.getValue();
 
                     em.emit(new QuantProgress(
                             tensorName,
@@ -179,7 +179,7 @@ public class QuantizationEngine {
                             "QUANTIZING",
                             String.format("Quantizing tensor %d/%d: %s", currentTensor + 1, totalTensors, tensorName)));
 
-                    TorchTensor quantizedTensor = quantizer.quantizeTensor(tensor, config);
+                    AccelTensor quantizedTensor = quantizer.quantizeTensor(tensor, config);
                     quantizedWeights.put(tensorName, quantizedTensor);
 
                     currentTensor++;
@@ -256,26 +256,26 @@ public class QuantizationEngine {
 
             // Load model weights
             log.infof("Loading model weights from: %s", modelPath);
-            Map<String, TorchTensor> weights = loadWeights(modelPath);
+            Map<String, AccelTensor> weights = loadWeights(modelPath);
             long originalSize = calculateTotalSize(weights);
             log.infof("Loaded %d tensors (%s)", weights.size(), QuantStats.formatSize(originalSize));
 
             // Perform quantization
             log.infof("Quantizing with strategy: %s", strategy);
-            Map<String, TorchTensor> quantizedWeights = new HashMap<>();
+            Map<String, AccelTensor> quantizedWeights = new HashMap<>();
             int totalTensors = weights.size();
             int currentTensor = 0;
 
-            for (Map.Entry<String, TorchTensor> entry : weights.entrySet()) {
+            for (Map.Entry<String, AccelTensor> entry : weights.entrySet()) {
                 String tensorName = entry.getKey();
-                TorchTensor tensor = entry.getValue();
+                AccelTensor tensor = entry.getValue();
 
                 if (currentTensor % 10 == 0) {
                     log.infof("Progress: %d/%d tensors (%.1f%%)", currentTensor, totalTensors,
                             (double) currentTensor / totalTensors * 100.0);
                 }
 
-                TorchTensor quantizedTensor = quantizer.quantizeTensor(tensor, config);
+                AccelTensor quantizedTensor = quantizer.quantizeTensor(tensor, config);
                 quantizedWeights.put(tensorName, quantizedTensor);
                 tensor.close(); // Free original tensor memory
 
@@ -326,11 +326,11 @@ public class QuantizationEngine {
      * @param strategy           quantization strategy
      * @return dequantized weights map
      */
-    public Map<String, TorchTensor> loadQuantizedModel(Path quantizedModelPath, QuantStrategy strategy) {
+    public Map<String, AccelTensor> loadQuantizedModel(Path quantizedModelPath, QuantStrategy strategy) {
         log.infof("Loading quantized model: %s (strategy=%s)", quantizedModelPath, strategy);
 
         try {
-            Map<String, TorchTensor> quantizedWeights = loadWeights(quantizedModelPath);
+            Map<String, AccelTensor> quantizedWeights = loadWeights(quantizedModelPath);
             Quantizer quantizer = getQuantizer(strategy);
 
             if (quantizer == null) {
@@ -338,9 +338,9 @@ public class QuantizationEngine {
             }
 
             // Dequantize weights
-            Map<String, TorchTensor> dequantizedWeights = new HashMap<>();
-            for (Map.Entry<String, TorchTensor> entry : quantizedWeights.entrySet()) {
-                TorchTensor dequantized = quantizer.dequantizeTensor(entry.getValue(), createDefaultConfig(strategy));
+            Map<String, AccelTensor> dequantizedWeights = new HashMap<>();
+            for (Map.Entry<String, AccelTensor> entry : quantizedWeights.entrySet()) {
+                AccelTensor dequantized = quantizer.dequantizeTensor(entry.getValue(), createDefaultConfig(strategy));
                 dequantizedWeights.put(entry.getKey(), dequantized);
             }
 
@@ -387,38 +387,38 @@ public class QuantizationEngine {
         }
     }
 
-    private Map<String, TorchTensor> loadWeights(Path modelPath) throws IOException {
+    private Map<String, AccelTensor> loadWeights(Path modelPath) throws IOException {
         // TODO: Implement SafeTensor reader
         // For now, return empty map - actual implementation would use SafeTensor reader
         log.warnf("SafeTensor reader not yet implemented - returning empty weights");
         return new HashMap<>();
     }
 
-    private void saveWeights(Path outputPath, Map<String, TorchTensor> weights) throws IOException {
+    private void saveWeights(Path outputPath, Map<String, AccelTensor> weights) throws IOException {
         // TODO: Implement SafeTensor writer
         // For now, no-op - actual implementation would use SafeTensor writer
         log.warnf("SafeTensor writer not yet implemented - weights not saved");
     }
 
-    private long calculateTotalSize(Map<String, TorchTensor> weights) {
+    private long calculateTotalSize(Map<String, AccelTensor> weights) {
         return weights.values().stream()
                 .mapToLong(this::estimateTensorSize)
                 .sum();
     }
 
-    private long estimateTensorSize(TorchTensor tensor) {
+    private long estimateTensorSize(AccelTensor tensor) {
         // Estimate tensor size in bytes
         // Actual implementation would get dtype and shape from tensor
         return tensor != null ? 1024L : 0L; // Placeholder
     }
 
-    private long countParameters(Map<String, TorchTensor> weights) {
+    private long countParameters(Map<String, AccelTensor> weights) {
         return weights.values().stream()
                 .mapToLong(this::estimateParamCount)
                 .sum();
     }
 
-    private long estimateParamCount(TorchTensor tensor) {
+    private long estimateParamCount(AccelTensor tensor) {
         // Estimate parameter count
         // Actual implementation would get shape from tensor
         return tensor != null ? 256L : 0L; // Placeholder

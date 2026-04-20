@@ -48,6 +48,11 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
+            <artifactId>gollek-ml-optimize</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-ml-data</artifactId>
             <version>${project.version}</version>
         </dependency>

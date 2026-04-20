@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.loader.SafetensorLoaderFacade;
 import tech.kayys.gollek.safetensor.loader.SafetensorShardLoader.SafetensorShardSession;
 import tech.kayys.gollek.safetensor.loader.SafetensorTensor;
@@ -20,7 +20,7 @@ import static tech.kayys.gollek.safetensor.engine.warmup.SafetensorJsonUtil.*;
 
 /**
  * LoRA adapter loader and manager service.
- * Refactored from LoraAdapter to resolve build stabilization issues.
+ * Uses AccelTensor — no LibTorch dependency.
  */
 @ApplicationScoped
 public class LoraAdapterService {
@@ -33,6 +33,9 @@ public class LoraAdapterService {
 
     @Inject
     SafetensorLoaderFacade safetensorLoader;
+
+    @Inject
+    AccelWeightBridge bridge;
 
     @Inject
     ObjectMapper objectMapper;
@@ -57,7 +60,7 @@ public class LoraAdapterService {
                 throw new IllegalArgumentException("Adapter file not found at " + adapterFile);
             }
 
-            Map<String, TorchTensor> weights = loadAdapterWeights(adapterFile);
+            Map<String, AccelTensor> weights = loadAdapterWeights(adapterFile);
             if (weights.isEmpty()) {
                 throw new IllegalArgumentException("No LoRA weights found in " + adapterFile);
             }
@@ -142,13 +145,13 @@ public class LoraAdapterService {
         throw new IllegalArgumentException("Invalid adapter path: " + adapterPath);
     }
 
-    private Map<String, TorchTensor> loadAdapterWeights(Path adapterFile) throws IOException {
-        Map<String, TorchTensor> weights = new HashMap<>();
+    private Map<String, AccelTensor> loadAdapterWeights(Path adapterFile) throws IOException {
+        Map<String, AccelTensor> weights = new HashMap<>();
         try (SafetensorShardSession session = safetensorLoader.open(adapterFile)) {
             for (String name : session.tensorNames()) {
                 if (isLoraTensor(name)) {
                     SafetensorTensor st = session.tensor(name);
-                    weights.put(name, bridgeToLibTorch(st));
+                    weights.put(name, bridge.bridge(st));
                 }
             }
         } catch (Exception e) {
@@ -160,12 +163,6 @@ public class LoraAdapterService {
     private boolean isLoraTensor(String name) {
         return name.endsWith(".lora_A.weight") || name.endsWith(".lora_A")
                 || name.endsWith(".lora_B.weight") || name.endsWith(".lora_B");
-    }
-
-    private TorchTensor bridgeToLibTorch(SafetensorTensor st) {
-        float[] data = st.toFloatArray();
-        long[] shape = st.shape();
-        return TorchTensor.fromFloatArray(data, shape);
     }
 
     private AdapterConfig loadAdapterConfig(Path adapterDir) throws IOException {
@@ -197,8 +194,8 @@ public class LoraAdapterService {
         return new AdapterConfig(16, 16.0f, 0.0f, "none", List.of(), null, true, null, Map.of());
     }
 
-    private void validateRankConsistency(Map<String, TorchTensor> weights, int expectedRank) {
-        for (Map.Entry<String, TorchTensor> entry : weights.entrySet()) {
+    private void validateRankConsistency(Map<String, AccelTensor> weights, int expectedRank) {
+        for (Map.Entry<String, AccelTensor> entry : weights.entrySet()) {
             String name = entry.getKey();
             long[] shape = entry.getValue().shape();
             if (name.contains(".lora_A")) {

@@ -58,7 +58,7 @@ public final class SafetensorTensor implements AutoCloseable {
 
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** TorchTensor metadata (name, dtype, shape, offsets). */
+    /** AccelTensor metadata (name, dtype, shape, offsets). */
     private final SafetensorTensorInfo info;
 
     /**
@@ -86,7 +86,7 @@ public final class SafetensorTensor implements AutoCloseable {
 
     // ── Metadata accessors ────────────────────────────────────────────────────
 
-    /** TorchTensor name as in the file header. */
+    /** AccelTensor name as in the file header. */
     public String name() {
         return info.name();
     }
@@ -96,7 +96,7 @@ public final class SafetensorTensor implements AutoCloseable {
         return info.dtype();
     }
 
-    /** TorchTensor dimensions (defensive copy). */
+    /** AccelTensor dimensions (defensive copy). */
     public long[] shape() {
         return info.shape();
     }
@@ -164,7 +164,7 @@ public final class SafetensorTensor implements AutoCloseable {
         long len = segment.byteSize();
         if (len > Integer.MAX_VALUE) {
             throw new UnsupportedOperationException(
-                    "TorchTensor '" + name() + "' is too large to fit in a Java array ("
+                    "AccelTensor '" + name() + "' is too large to fit in a Java array ("
                             + len + " bytes). Use segment() for direct memory access.");
         }
         return segment.toArray(ValueLayout.JAVA_BYTE);
@@ -179,9 +179,25 @@ public final class SafetensorTensor implements AutoCloseable {
      */
     public float[] toFloatArray() {
         checkOpen();
-        requireDtype(SafetensorDType.F32);
         checkArrayFit();
-        return segment.toArray(FLOAT_LE);
+        long n = numElements();
+        if (dtype() == SafetensorDType.F32) {
+            return segment.toArray(FLOAT_LE);
+        } else if (dtype() == SafetensorDType.BF16) {
+            float[] result = new float[(int) n];
+            for (long i = 0; i < n; i++) {
+                result[(int) i] = getBF16AsFloat(i);
+            }
+            return result;
+        } else if (dtype() == SafetensorDType.F16) {
+            float[] result = new float[(int) n];
+            for (long i = 0; i < n; i++) {
+                result[(int) i] = getF16AsFloat(i);
+            }
+            return result;
+        }
+        requireDtype(SafetensorDType.F32, SafetensorDType.BF16, SafetensorDType.F16);
+        return null;
     }
 
     /**
@@ -386,7 +402,7 @@ public final class SafetensorTensor implements AutoCloseable {
     private void checkOpen() {
         if (closed) {
             throw new IllegalStateException(
-                    "TorchTensor '" + name() + "' has been closed. "
+                    "AccelTensor '" + name() + "' has been closed. "
                             + "Ensure the parent SafetensorLoadResult is still open.");
         }
     }
@@ -404,7 +420,7 @@ public final class SafetensorTensor implements AutoCloseable {
     private void checkArrayFit() {
         if (numElements() > Integer.MAX_VALUE) {
             throw new UnsupportedOperationException(
-                    "TorchTensor '" + name() + "' has " + numElements()
+                    "AccelTensor '" + name() + "' has " + numElements()
                             + " elements — too large to copy into a Java array. "
                             + "Use segment() for zero-copy access.");
         }

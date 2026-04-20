@@ -59,7 +59,7 @@
                     <archive>
                         <manifestEntries>
                             <Plugin-Id>text-feature</Plugin-Id>
-                            <Plugin-Class>tech.kayys.gollek.plugin.runner.gguf.feature.text.TextFeaturePlugin</Plugin-Class>
+                            <Plugin-Class>tech.kayys.gollek.plugin.runner.llamacpp.feature.text.TextFeaturePlugin</Plugin-Class>
                             <Plugin-Type>gguf-feature</Plugin-Type>
                             <Parent-Plugin>gguf-runner</Parent-Plugin>
                             <Feature-Type>text</Feature-Type>

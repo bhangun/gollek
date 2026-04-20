@@ -6,8 +6,8 @@ import tech.kayys.gollek.ml.data.Dataset;
 import tech.kayys.gollek.ml.metrics.MetricsTracker;
 import tech.kayys.gollek.ml.nn.NNModule;
 import tech.kayys.gollek.ml.nn.loss.CrossEntropyLoss;
-import tech.kayys.gollek.ml.nn.optim.Optimizer;
-import tech.kayys.gollek.ml.nn.optim.WarmupCosineScheduler;
+import tech.kayys.gollek.ml.optim.Optimizer;
+import tech.kayys.gollek.ml.optim.WarmupCosineScheduler;
 import tech.kayys.gollek.tokenizer.spi.Tokenizer;
 import tech.kayys.gollek.tokenizer.spi.EncodeOptions;
 

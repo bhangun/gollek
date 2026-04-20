@@ -21,12 +21,12 @@ import java.util.Objects;
 public class QuantizedTensorInfo {
 
     /**
-     * TorchTensor name.
+     * AccelTensor name.
      */
     private final String name;
 
     /**
-     * TorchTensor shape.
+     * AccelTensor shape.
      */
     private final int[] shape;
 

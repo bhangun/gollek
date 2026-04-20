@@ -42,14 +42,14 @@ import java.util.Objects;
  */
 public final class SafetensorTensorInfo {
 
-    /** TorchTensor name as-is from the JSON header key. */
+    /** AccelTensor name as-is from the JSON header key. */
     private final String name;
 
     /** Element data type. */
     private final SafetensorDType dtype;
 
     /**
-     * TorchTensor dimensions, e.g. {@code [4096, 4096]} for a 2-D weight matrix.
+     * AccelTensor dimensions, e.g. {@code [4096, 4096]} for a 2-D weight matrix.
      * Scalars are represented as an empty array {@code []}.
      */
     private final long[] shape;
@@ -148,7 +148,7 @@ public final class SafetensorTensorInfo {
 
     // ── Accessors ─────────────────────────────────────────────────────────────
 
-    /** TorchTensor name as it appears in the JSON header key. */
+    /** AccelTensor name as it appears in the JSON header key. */
     public String name() {
         return name;
     }
@@ -159,7 +159,7 @@ public final class SafetensorTensorInfo {
     }
 
     /**
-     * TorchTensor shape — a defensive copy is returned on every call.
+     * AccelTensor shape — a defensive copy is returned on every call.
      * Use {@link #rank()} + {@link #dim(int)} for hot-path access.
      */
     public long[] shape() {

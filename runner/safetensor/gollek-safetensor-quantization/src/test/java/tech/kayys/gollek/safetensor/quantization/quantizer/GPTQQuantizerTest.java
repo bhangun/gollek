@@ -75,13 +75,13 @@ class GPTQQuantizerTest {
 
     @Test
     void testQuantizeDequantizeRoundtrip() {
-        // Note: This test would require actual TorchTensor implementation
+        // Note: This test would require actual AccelTensor implementation
         // For now, it verifies the methods exist and handle null gracefully
         QuantConfig config = QuantConfig.int4Gptq();
 
-        // In a real test with actual TorchTensor implementation:
-        // TorchTensor quantized = quantizer.quantizeTensor(tensor, config);
-        // TorchTensor dequantized = quantizer.dequantizeTensor(quantized, config);
+        // In a real test with actual AccelTensor implementation:
+        // AccelTensor quantized = quantizer.quantizeTensor(tensor, config);
+        // AccelTensor dequantized = quantizer.dequantizeTensor(quantized, config);
         // Verify dequantized values are close to original
     }
 }

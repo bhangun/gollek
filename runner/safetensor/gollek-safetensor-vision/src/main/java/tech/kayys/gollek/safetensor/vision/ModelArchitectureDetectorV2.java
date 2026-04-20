@@ -12,7 +12,7 @@
  * Detection order (highest to lowest confidence):
  *   1. Exact model_type match (definitive)
  *   2. Architecture class name match (definitive)
- *   3. TorchTensor name signature patterns (heuristic)
+ *   3. AccelTensor name signature patterns (heuristic)
  *   4. File-level heuristics (model card, README, tokenizer)
  *
  * Covers all 30+ families registered in the system.
@@ -45,7 +45,7 @@ public class ModelArchitectureDetectorV2 {
     // Detection rules — ordered by specificity
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** TorchTensor name prefix → architecture ID (most specific first). */
+    /** AccelTensor name prefix → architecture ID (most specific first). */
     private static final List<DetectionRule> TENSOR_RULES = List.of(
             // Multimodal
             new DetectionRule("vision_model.encoder.layers.0.attn.qkv", "internvl2"),
@@ -166,7 +166,7 @@ public class ModelArchitectureDetectorV2 {
         if (fromClass.isPresent())
             return fromClass.get();
 
-        // 3. TorchTensor name heuristics
+        // 3. AccelTensor name heuristics
         return detectFromTensorNames(tensorNames);
     }
 

@@ -919,6 +919,26 @@ public class TorchTensor implements Tensor {
     }
 
     /**
+     * Returns a contiguous tensor containing the same data as this tensor.
+     * If the tensor is already contiguous, this returns the same tensor (or a shallow copy).
+     *
+     * @return a contiguous tensor
+     */
+    public TorchTensor contiguous() {
+        checkClosed();
+        Arena opArena = Arena.ofConfined();
+        try {
+            MethodHandle fn = LibTorchBinding.getInstance().bind(LibTorchBinding.TENSOR_CONTIGUOUS,
+                    LibTorchBinding.TENSOR_CONTIGUOUS_DESC);
+            MemorySegment result = (MemorySegment) fn.invoke(nativeHandle);
+            return new TorchTensor(result, opArena);
+        } catch (Throwable t) {
+            opArena.close();
+            throw new RuntimeException("Failed to make tensor contiguous", t);
+        }
+    }
+
+    /**
      * Squeezes all dimensions of size 1.
      *
      * @return a new tensor with singleton dimensions removed

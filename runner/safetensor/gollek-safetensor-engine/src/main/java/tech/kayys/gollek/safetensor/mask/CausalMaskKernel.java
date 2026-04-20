@@ -5,50 +5,38 @@
  */
 package tech.kayys.gollek.safetensor.mask;
 
-import java.util.Arrays;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 
 /**
  * Causal mask kernel for attention.
- *
- * <p>
- * Generates a lower-triangular mask (1s on and below diagonal, 0s above)
- * and provides utility to apply it to attention scores as -inf.
  */
 public class CausalMaskKernel {
 
     /**
-     * Build a causal mask for a score matrix of shape [sq, sk].
+     * Apply a causal mask to scores in-place on a MemorySegment.
      *
+     * @param seg the scores segment [batch, heads, sq, sk]
+     * @param batch number of batches
+     * @param heads number of heads
      * @param sq seqLen query
-     * @param sk seqLen key (context)
+     * @param sk seqLen key
      * @param offset starting position in context
-     * @return float array of size sq*sk containing 0 for kept, -1e10 for masked
      */
-    public static float[] buildCausalMask(int sq, int sk, int offset) {
-        float[] mask = new float[sq * sk];
-        Arrays.fill(mask, -1e10f); // Default to masked (-inf)
-
-        for (int i = 0; i < sq; i++) {
-            // Context index must be <= absolute position of current token
-            // Absolute position = offset + i
-            int maxJ = offset + i;
-            for (int j = 0; j <= maxJ && j < sk; j++) {
-                mask[i * sk + j] = 0f; // Kept
-            }
-        }
-        return mask;
-    }
-
-    /**
-     * Apply a mask to scores in-place.
-     */
-    public static void addMask(float[] scores, float[] mask, int batch, int heads, int sq, int sk) {
-        int matrixSize = sq * sk;
+    public static void applyCausalMask(MemorySegment seg, int batch, int heads, int rows, int cols, int startPos) {
+        // Use a much larger penalty for zero-softmasking (-1e18 is safer than -1e10 for large scores)
+        final float MASK_VALUE = -1e18f;
+        
+        // Loop order optimized for segment layout: [batch, heads, rows, cols]
         for (int b = 0; b < batch; b++) {
             for (int h = 0; h < heads; h++) {
-                int base = (b * heads + h) * matrixSize;
-                for (int i = 0; i < matrixSize; i++) {
-                    scores[base + i] += mask[i];
+                for (int row = 0; row < rows; row++) {
+                    int queryPos = startPos + row;
+                    // Future tokens in the cache (col > queryPos) must be masked.
+                    for (int col = queryPos + 1; col < cols; col++) {
+                        long index = (((long)b * heads + h) * rows + row) * cols + col;
+                        seg.setAtIndex(ValueLayout.JAVA_FLOAT, index, MASK_VALUE);
+                    }
                 }
             }
         }

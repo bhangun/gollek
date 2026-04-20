@@ -9,7 +9,7 @@
  */
 package tech.kayys.gollek.safetensor.quantization.quantizer;
 
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.quantization.QuantConfig;
 import tech.kayys.gollek.safetensor.quantization.QuantizationEngine;
 import tech.kayys.gollek.quantizer.gptq.GPTQQuantizerService;
@@ -36,30 +36,31 @@ public class GPTQQuantizerAdapter implements Quantizer {
     private VectorDequantizer dequantizer;
 
     @Override
-    public TorchTensor quantizeTensor(TorchTensor tensor, QuantConfig config) {
+    public AccelTensor quantizeTensor(AccelTensor tensor, QuantConfig config) {
         if (tensor == null) {
-            throw new IllegalArgumentException("TorchTensor cannot be null");
+            throw new IllegalArgumentException("AccelTensor cannot be null");
         }
 
         log.debugf("GPTQ quantizing tensor with bits=%d, groupSize=%d", config.getBits(), config.getGroupSize());
 
         try {
             // GPTQ usually requires a calibration dataset for optimal results.
-            // For single-tensor quantization without dataset, we fall back to 
+            // For single-tensor quantization without dataset, we fall back to
             // group-wise min-max quantization which is a component of GPTQ.
-            
+
             float[] data = tensor.toFloatArray();
             long[] shape = tensor.shape();
-            
+
             // Map configuration to GPTQ record
             GPTQConfig gptqConfig = mapToGPTQConfig(config);
-            
+
             // Core GPTQ logic works best at model level due to Hessian calculation.
-            // Single tensor-level quantization is supported via min-max fallback 
+            // Single tensor-level quantization is supported via min-max fallback
             // for compatibility with generic quantization pipelines.
             log.warn("GPTQ is model-oriented. Applying group-wise quantization to single tensor without Hessian data.");
-            
-            // For now, return the tensor as GPTQ packing is specialized for the model loader.
+
+            // For now, return the tensor as GPTQ packing is specialized for the model
+            // loader.
             // Full integration would involve packing the results into a unified format.
             return tensor;
 
@@ -70,32 +71,38 @@ public class GPTQQuantizerAdapter implements Quantizer {
     }
 
     @Override
-    public TorchTensor dequantizeTensor(TorchTensor quantizedTensor, QuantConfig config) {
+    public AccelTensor dequantizeTensor(AccelTensor quantizedTensor, QuantConfig config) {
         if (quantizedTensor == null) {
-            throw new IllegalArgumentException("TorchTensor cannot be null");
+            throw new IllegalArgumentException("AccelTensor cannot be null");
         }
 
         log.debug("Dequantizing GPTQ tensor using SIMD-accelerated VectorDequantizer");
 
         try {
             GPTQConfig gptqConfig = mapToGPTQConfig(config);
-            
+
             // Lazy initialization of dequantizer engine
             if (dequantizer == null) {
                 dequantizer = new VectorDequantizer(gptqConfig);
             }
 
-            // If the tensor is already floating point, it might be already dequantized or bias
-            if (quantizedTensor.dtype().isFloatingPoint()) {
-                return quantizedTensor;
-            }
+            // If the tensor is already floating point, it might be already dequantized or
+            // bias
+            /*
+             * if (quantizedTensor.dtype().isFloatingPoint()) {
+             * return quantizedTensor;
+             * }
+             */
 
-            // GPTQ dequantization requires multiple components (qweight, scales, zeros, g_idx).
-            // This adapter bridge attempts to dequantize using stored metadata if available.
-            // In the unified safetensor runner, dequantization is typically handled at the 
+            // GPTQ dequantization requires multiple components (qweight, scales, zeros,
+            // g_idx).
+            // This adapter bridge attempts to dequantize using stored metadata if
+            // available.
+            // In the unified safetensor runner, dequantization is typically handled at the
             // model level during loading via GPTQLoader for performance reasons.
-            
-            log.warn("Direct tensor-level GPTQ dequantization is experimental. Model-level dequantization is recommended.");
+
+            log.warn(
+                    "Direct tensor-level GPTQ dequantization is experimental. Model-level dequantization is recommended.");
             return quantizedTensor;
 
         } catch (Exception e) {
@@ -112,8 +119,8 @@ public class GPTQQuantizerAdapter implements Quantizer {
     @Override
     public boolean supports(QuantConfig config) {
         Objects.requireNonNull(config, "QuantConfig cannot be null");
-        return config.getStrategy() == QuantizationEngine.QuantStrategy.INT4 || 
-               config.getStrategy() == QuantizationEngine.QuantStrategy.INT8;
+        return config.getStrategy() == QuantizationEngine.QuantStrategy.INT4 ||
+                config.getStrategy() == QuantizationEngine.QuantStrategy.INT8;
     }
 
     /**
@@ -134,7 +141,7 @@ public class GPTQQuantizerAdapter implements Quantizer {
     /**
      * Quantize a full model using GPTQ.
      * <p>
-     * This is the preferred way to use GPTQ as it performs layer-wise 
+     * This is the preferred way to use GPTQ as it performs layer-wise
      * quantization with Hessian calculation for optimal quality.
      *
      * @param modelPath  path to FP32 model

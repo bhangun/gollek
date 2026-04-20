@@ -1,8 +1,5 @@
 package tech.kayys.gollek.sdk.session;
 
-import tech.kayys.gollek.ml.autograd.GradTensor;
-import tech.kayys.gollek.ml.nn.NNModule;
-import tech.kayys.gollek.ml.nn.optim.Optimizer;
 import tech.kayys.gollek.sdk.GollekClient;
 
 import java.util.List;

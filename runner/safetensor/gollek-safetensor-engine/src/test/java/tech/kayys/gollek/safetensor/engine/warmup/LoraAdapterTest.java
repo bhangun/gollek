@@ -137,13 +137,13 @@ class LoraAdapterTest {
     @Test
     void testLoadedAdapter_GetLoraPair() {
         // Create a mock LoadedAdapter
-        java.util.Map<String, tech.kayys.gollek.inference.libtorch.core.TorchTensor> weights = new java.util.HashMap<>();
+        java.util.Map<String, tech.kayys.gollek.safetensor.core.tensor.AccelTensor> weights = new java.util.HashMap<>();
 
         // Mock tensors (using zeros for testing)
-        tech.kayys.gollek.inference.libtorch.core.TorchTensor mockA =
-                tech.kayys.gollek.inference.libtorch.core.TorchTensor.zeros(16, 4096);
-        tech.kayys.gollek.inference.libtorch.core.TorchTensor mockB =
-                tech.kayys.gollek.inference.libtorch.core.TorchTensor.zeros(4096, 16);
+        tech.kayys.gollek.safetensor.core.tensor.AccelTensor mockA =
+                tech.kayys.gollek.safetensor.core.tensor.AccelTensor.zeros(16, 4096);
+        tech.kayys.gollek.safetensor.core.tensor.AccelTensor mockB =
+                tech.kayys.gollek.safetensor.core.tensor.AccelTensor.zeros(4096, 16);
 
         weights.put("model.layers.0.self_attn.q_proj.lora_A.weight", mockA);
         weights.put("model.layers.0.self_attn.q_proj.lora_B.weight", mockB);
@@ -173,25 +173,25 @@ class LoraAdapterTest {
 
     @Test
     void testLoadedAdapter_GetModuleNames() {
-        java.util.Map<String, tech.kayys.gollek.inference.libtorch.core.TorchTensor> weights = new java.util.HashMap<>();
+        java.util.Map<String, tech.kayys.gollek.safetensor.core.tensor.AccelTensor> weights = new java.util.HashMap<>();
 
         // Add multiple LoRA modules
         weights.put("model.layers.0.self_attn.q_proj.lora_A.weight",
-                tech.kayys.gollek.inference.libtorch.core.TorchTensor.zeros(16, 4096));
+                tech.kayys.gollek.safetensor.core.tensor.AccelTensor.zeros(16, 4096));
         weights.put("model.layers.0.self_attn.q_proj.lora_B.weight",
-                tech.kayys.gollek.inference.libtorch.core.TorchTensor.zeros(4096, 16));
+                tech.kayys.gollek.safetensor.core.tensor.AccelTensor.zeros(4096, 16));
         weights.put("model.layers.0.self_attn.v_proj.lora_A.weight",
-                tech.kayys.gollek.inference.libtorch.core.TorchTensor.zeros(16, 4096));
+                tech.kayys.gollek.safetensor.core.tensor.AccelTensor.zeros(16, 4096));
         weights.put("model.layers.0.self_attn.v_proj.lora_B.weight",
-                tech.kayys.gollek.inference.libtorch.core.TorchTensor.zeros(4096, 16));
+                tech.kayys.gollek.safetensor.core.tensor.AccelTensor.zeros(4096, 16));
         weights.put("model.layers.0.mlp.gate_proj.lora_A.weight",
-                tech.kayys.gollek.inference.libtorch.core.TorchTensor.zeros(16, 4096));
+                tech.kayys.gollek.safetensor.core.tensor.AccelTensor.zeros(16, 4096));
         weights.put("model.layers.0.mlp.gate_proj.lora_B.weight",
-                tech.kayys.gollek.inference.libtorch.core.TorchTensor.zeros(4096, 16));
+                tech.kayys.gollek.safetensor.core.tensor.AccelTensor.zeros(4096, 16));
 
         // Add non-LoRA tensor (should be ignored)
         weights.put("model.layers.0.self_attn.q_proj.weight",
-                tech.kayys.gollek.inference.libtorch.core.TorchTensor.zeros(4096, 4096));
+                tech.kayys.gollek.safetensor.core.tensor.AccelTensor.zeros(4096, 4096));
 
         AdapterConfig config = new AdapterConfig(
                 16, 16.0f, 0.0f, "none",
@@ -215,11 +215,11 @@ class LoraAdapterTest {
 
     @Test
     void testLoadedAdapter_HasModule() {
-        java.util.Map<String, tech.kayys.gollek.inference.libtorch.core.TorchTensor> weights = new java.util.HashMap<>();
+        java.util.Map<String, tech.kayys.gollek.safetensor.core.tensor.AccelTensor> weights = new java.util.HashMap<>();
         weights.put("model.layers.0.self_attn.q_proj.lora_A.weight",
-                tech.kayys.gollek.inference.libtorch.core.TorchTensor.zeros(16, 4096));
+                tech.kayys.gollek.safetensor.core.tensor.AccelTensor.zeros(16, 4096));
         weights.put("model.layers.0.self_attn.q_proj.lora_B.weight",
-                tech.kayys.gollek.inference.libtorch.core.TorchTensor.zeros(4096, 16));
+                tech.kayys.gollek.safetensor.core.tensor.AccelTensor.zeros(4096, 16));
 
         AdapterConfig config = new AdapterConfig(
                 16, 16.0f, 0.0f, "none",

@@ -145,7 +145,7 @@ public class SafetensorException extends RuntimeException {
          * @param path       file path
          */
         public TensorNotFoundException(String tensorName, Path path) {
-            super("TorchTensor '" + tensorName + "' not found in SafeTensors file", path);
+            super("AccelTensor '" + tensorName + "' not found in SafeTensors file", path);
             this.tensorName = tensorName;
         }
 
@@ -256,7 +256,7 @@ public class SafetensorException extends RuntimeException {
          */
         public DTypeMismatchException(String tensorName, String actualDType,
                 String expectedDType, Path path) {
-            super("TorchTensor '" + tensorName + "' has dtype=" + actualDType
+            super("AccelTensor '" + tensorName + "' has dtype=" + actualDType
                     + " but operation requires " + expectedDType, path);
             this.tensorName = tensorName;
             this.actualDType = actualDType;

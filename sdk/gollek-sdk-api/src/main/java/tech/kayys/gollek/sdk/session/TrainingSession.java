@@ -1,6 +1,5 @@
 package tech.kayys.gollek.sdk.session;
 
-import tech.kayys.gollek.ml.autograd.GradTensor;
 
 import java.util.function.BiFunction;
 

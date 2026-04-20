@@ -10,7 +10,7 @@
 package tech.kayys.gollek.safetensor.quantization.quantizer;
 
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.quantization.QuantConfig;
 
 import java.util.Arrays;
@@ -47,9 +47,9 @@ public class GPTQQuantizer implements Quantizer {
      * @return quantized tensor
      */
     @Override
-    public TorchTensor quantizeTensor(TorchTensor tensor, QuantConfig config) {
+    public AccelTensor quantizeTensor(AccelTensor tensor, QuantConfig config) {
         if (tensor == null) {
-            throw new IllegalArgumentException("TorchTensor cannot be null");
+            throw new IllegalArgumentException("AccelTensor cannot be null");
         }
 
         log.debugf("GPTQ quantizing tensor with bits=%d, groupSize=%d", config.getBits(), config.getGroupSize());
@@ -83,9 +83,9 @@ public class GPTQQuantizer implements Quantizer {
      * @return dequantized tensor
      */
     @Override
-    public TorchTensor dequantizeTensor(TorchTensor quantizedTensor, QuantConfig config) {
+    public AccelTensor dequantizeTensor(AccelTensor quantizedTensor, QuantConfig config) {
         if (quantizedTensor == null) {
-            throw new IllegalArgumentException("TorchTensor cannot be null");
+            throw new IllegalArgumentException("AccelTensor cannot be null");
         }
 
         log.debugf("Dequantizing GPTQ tensor");
@@ -243,43 +243,43 @@ public class GPTQQuantizer implements Quantizer {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // TorchTensor manipulation helpers (placeholders - actual implementation depends on TorchTensor API)
+    // AccelTensor manipulation helpers (placeholders - actual implementation depends on AccelTensor API)
     // ─────────────────────────────────────────────────────────────────────────
 
-    private float[] getTensorData(TorchTensor tensor) {
-        // TODO: Implement based on actual TorchTensor API
+    private float[] getTensorData(AccelTensor tensor) {
+        // TODO: Implement based on actual AccelTensor API
         // return tensor.getDataAsFloatArray();
         return new float[1024]; // Placeholder
     }
 
-    private int[] getTensorShape(TorchTensor tensor) {
-        // TODO: Implement based on actual TorchTensor API
+    private int[] getTensorShape(AccelTensor tensor) {
+        // TODO: Implement based on actual AccelTensor API
         // return tensor.getShape();
         return new int[] { 1, 1024 }; // Placeholder
     }
 
-    private int[] getQuantizedData(TorchTensor tensor) {
+    private int[] getQuantizedData(AccelTensor tensor) {
         // TODO: Extract quantized data from tensor
         return new int[512]; // Placeholder
     }
 
-    private float[] getScales(TorchTensor tensor) {
+    private float[] getScales(AccelTensor tensor) {
         // TODO: Extract scales from tensor metadata
         return new float[8]; // Placeholder
     }
 
-    private float[] getZeros(TorchTensor tensor) {
+    private float[] getZeros(AccelTensor tensor) {
         // TODO: Extract zero points from tensor metadata
         return new float[8]; // Placeholder
     }
 
-    private TorchTensor createQuantizedTensor(int[] data, int[] shape, QuantConfig config) {
+    private AccelTensor createQuantizedTensor(int[] data, int[] shape, QuantConfig config) {
         // TODO: Create tensor with quantized data and metadata
         // Should include scales, zeros, and quantization parameters
         return null; // Placeholder
     }
 
-    private TorchTensor createDequantizedTensor(float[] data, int[] shape) {
+    private AccelTensor createDequantizedTensor(float[] data, int[] shape) {
         // TODO: Create tensor with dequantized data
         return null; // Placeholder
     }

@@ -329,7 +329,7 @@ public class ChatCommand implements Runnable {
 
         if (!quiet) {
             uiRenderer.printBanner();
-            uiRenderer.printModelInfo(modelId, providerId, outputFile != null ? outputFile.getAbsolutePath() : null, true);
+            uiRenderer.printModelInfo(modelId, providerId, null, outputFile != null ? outputFile.getAbsolutePath() : null, true);
         }
     }
 

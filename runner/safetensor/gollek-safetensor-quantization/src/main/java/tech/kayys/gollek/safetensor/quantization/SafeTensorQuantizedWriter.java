@@ -10,7 +10,7 @@
 package tech.kayys.gollek.safetensor.quantization;
 
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

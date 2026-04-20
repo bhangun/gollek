@@ -62,7 +62,8 @@ public class CachedModelRepository {
                 @SuppressWarnings("unchecked")
                 List<ModelManifest> list = (List<ModelManifest>) result;
                 for (ModelManifest m : list) {
-                    if (seenIds.add(m.modelId())) {
+                    String uniqueKey = m.modelId() + (m.artifacts() != null ? m.artifacts().keySet().toString() : "");
+                    if (seenIds.add(uniqueKey)) {
                         all.add(m);
                     }
                 }

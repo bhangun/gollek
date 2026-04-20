@@ -114,7 +114,7 @@ public class SafetensorValidator {
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
 
-        // TorchTensor-level checks
+        // AccelTensor-level checks
         for (SafetensorTensorInfo info : header.tensors().values()) {
             checkTensorInfo(info, header, filePath, errors, warnings);
         }
@@ -168,19 +168,19 @@ public class SafetensorValidator {
 
         // Empty tensor warning
         if (config.validation().warnOnEmptyTensors() && info.byteLength() == 0) {
-            warnings.add("TorchTensor '" + info.name() + "' has zero byte length");
+            warnings.add("AccelTensor '" + info.name() + "' has zero byte length");
         }
 
         // Shape element count
         for (int i = 0; i < info.rank(); i++) {
             if (info.dim(i) < 0) {
-                errors.add("TorchTensor '" + info.name() + "' has negative dimension at index " + i);
+                errors.add("AccelTensor '" + info.name() + "' has negative dimension at index " + i);
             }
         }
 
         // Offset ordering
         if (info.dataBegin() > info.dataEnd()) {
-            errors.add("TorchTensor '" + info.name() + "': dataBegin (" + info.dataBegin()
+            errors.add("AccelTensor '" + info.name() + "': dataBegin (" + info.dataBegin()
                     + ") > dataEnd (" + info.dataEnd() + ")");
         }
     }

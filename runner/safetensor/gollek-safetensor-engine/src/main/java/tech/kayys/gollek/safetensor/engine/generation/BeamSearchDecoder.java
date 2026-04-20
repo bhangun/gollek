@@ -50,7 +50,7 @@ package tech.kayys.gollek.safetensor.engine.generation;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.spi.model.ModelArchitecture;
 import tech.kayys.gollek.spi.model.ModelConfig;
 import tech.kayys.gollek.safetensor.generation.GenerationConfig;
@@ -97,7 +97,7 @@ public class BeamSearchDecoder {
      */
     public int[] decode(int[] prefixIds,
             float[] prefixLogits,
-            Map<String, TorchTensor> weights,
+            Map<String, AccelTensor> weights,
             ModelConfig config,
             ModelArchitecture arch,
             GenerationConfig genCfg,
@@ -171,7 +171,7 @@ public class BeamSearchDecoder {
     // ─────────────────────────────────────────────────────────────────────────
 
     private float[] runDecodeStep(int tokenId, int pos,
-            Map<String, TorchTensor> weights,
+            Map<String, AccelTensor> weights,
             ModelConfig config, ModelArchitecture arch,
             KVCacheManager.KVCacheSession kv) {
         try {

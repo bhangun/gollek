@@ -57,7 +57,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelOps;
+
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -114,7 +116,7 @@ public class VisionEncoder {
      * @return patch embeddings [numPatches, lmmDim] ready for LLM input
      */
     public ImageEmbedding encode(byte[] imageBytes, String format,
-            Map<String, TorchTensor> weights,
+            Map<String, AccelTensor> weights,
             VisionConfig cfg) {
         log.debugf("VisionEncoder: encoding %d-byte %s image", imageBytes.length, format);
 
@@ -131,22 +133,22 @@ public class VisionEncoder {
         // patches: [numPatches, patchDim]
 
         // Project patches via patch_embedding.weight (conv projection)
-        TorchTensor patchTensor = TorchTensor.fromFloatArray(patches, new long[] { numPatches, patchDim });
+        AccelTensor patchTensor = AccelTensor.fromFloatArray(patches, new long[] { numPatches, patchDim });
 
-        TorchTensor patchEmbedding = applyPatchProjection(patchTensor, weights, cfg);
+        AccelTensor patchEmbedding = applyPatchProjection(patchTensor, weights, cfg);
         patchTensor.close();
         // patchEmbedding: [numPatches, visionDim]
 
         // ── 3. Add positional embeddings ──────────────────────────────────────
-        TorchTensor withPos = addPositionalEmbeddings(patchEmbedding, weights, cfg);
+        AccelTensor withPos = addPositionalEmbeddings(patchEmbedding, weights, cfg);
         patchEmbedding.close();
 
         // ── 4. ViT transformer layers ─────────────────────────────────────────
-        TorchTensor encoded = runViTLayers(withPos, weights, cfg);
+        AccelTensor encoded = runViTLayers(withPos, weights, cfg);
         withPos.close();
 
         // ── 5. Projection to LLM dimension ────────────────────────────────────
-        TorchTensor projected = projectToLLM(encoded, weights, cfg);
+        AccelTensor projected = projectToLLM(encoded, weights, cfg);
         encoded.close();
 
         log.debugf("VisionEncoder: encoded image → %d patch tokens × dim=%d",
@@ -236,10 +238,10 @@ public class VisionEncoder {
     // ViT operations — weight-name-aware
     // ─────────────────────────────────────────────────────────────────────────
 
-    private TorchTensor applyPatchProjection(TorchTensor patches, Map<String, TorchTensor> weights, VisionConfig cfg) {
+    private AccelTensor applyPatchProjection(AccelTensor patches, Map<String, AccelTensor> weights, VisionConfig cfg) {
         String prefix = cfg.weightPrefix();
         // Patch embedding: linear projection [patchDim → visionDim]
-        TorchTensor w = weights.get(prefix + "embeddings.patch_embedding.weight");
+        AccelTensor w = weights.get(prefix + "embeddings.patch_embedding.weight");
         if (w == null)
             w = weights.get(prefix + "patch_embed.proj.weight");
         if (w == null) {
@@ -249,15 +251,15 @@ public class VisionEncoder {
         // Flatten conv weights: [visionDim, C, pH, pW] → [visionDim, patchDim]
         long visionDim = w.shape()[0];
         long patchDim = patches.shape()[1];
-        TorchTensor wFlat = w.reshape(visionDim, patchDim);
-        TorchTensor result = patches.matmul(wFlat.transpose(0, 1));
+        AccelTensor wFlat = w.reshape(visionDim, patchDim);
+        AccelTensor result = AccelOps.matmul(patches, wFlat.transpose(0, 1));
         wFlat.close();
         return result;
     }
 
-    private TorchTensor addPositionalEmbeddings(TorchTensor x, Map<String, TorchTensor> weights, VisionConfig cfg) {
+    private AccelTensor addPositionalEmbeddings(AccelTensor x, Map<String, AccelTensor> weights, VisionConfig cfg) {
         String prefix = cfg.weightPrefix();
-        TorchTensor posEmb = weights.get(prefix + "embeddings.position_embedding.weight");
+        AccelTensor posEmb = weights.get(prefix + "embeddings.position_embedding.weight");
         if (posEmb == null)
             posEmb = weights.get(prefix + "pos_embed");
         if (posEmb == null)
@@ -271,10 +273,10 @@ public class VisionEncoder {
         for (int i = 0; i < numPatches * visionDim; i++) {
             xData[i] += posData[posOffset + i];
         }
-        return TorchTensor.fromFloatArray(xData, x.shape());
+        return AccelTensor.fromFloatArray(xData, x.shape());
     }
 
-    private TorchTensor runViTLayers(TorchTensor x, Map<String, TorchTensor> weights, VisionConfig cfg) {
+    private AccelTensor runViTLayers(AccelTensor x, Map<String, AccelTensor> weights, VisionConfig cfg) {
         // Simplified: return x as-is when weights unavailable (allows rest of pipeline
         // to work)
         // Full ViT: L layers of LayerNorm + MultiHeadAttention + LayerNorm + MLP
@@ -283,31 +285,31 @@ public class VisionEncoder {
         // KV cache.
         log.debugf("VisionEncoder: running %d ViT layers (scaffold mode)", cfg.numViTLayers());
 
-        TorchTensor current = x;
+        AccelTensor current = x;
         for (int i = 0; i < cfg.numViTLayers(); i++) {
             String prefix = cfg.weightPrefix() + "encoder.layers." + i + ".";
             // Pre-LayerNorm + attention + residual
-            TorchTensor attnNormW = weights.get(prefix + "layer_norm1.weight");
-            TorchTensor attnNormB = weights.get(prefix + "layer_norm1.bias");
+            AccelTensor attnNormW = weights.get(prefix + "layer_norm1.weight");
+            AccelTensor attnNormB = weights.get(prefix + "layer_norm1.bias");
             if (attnNormW != null) {
-                TorchTensor normed = layerNorm(current, attnNormW, attnNormB, 1e-5);
+                AccelTensor normed = layerNorm(current, attnNormW, attnNormB, 1e-5);
                 // Self-attention (simplified — no KV cache for image encoding)
-                TorchTensor attnOut = selfAttention(normed, weights, prefix, cfg.numViTHeads(), i);
+                AccelTensor attnOut = selfAttention(normed, weights, prefix, cfg.numViTHeads(), i);
                 normed.close();
-                TorchTensor afterAttn = current.add(attnOut);
+                AccelTensor afterAttn = AccelOps.add(current, attnOut);
                 attnOut.close();
                 if (current != x)
                     current.close();
                 current = afterAttn;
 
                 // Post-attention LayerNorm + MLP
-                TorchTensor ffnNormW = weights.get(prefix + "layer_norm2.weight");
-                TorchTensor ffnNormB = weights.get(prefix + "layer_norm2.bias");
+                AccelTensor ffnNormW = weights.get(prefix + "layer_norm2.weight");
+                AccelTensor ffnNormB = weights.get(prefix + "layer_norm2.bias");
                 if (ffnNormW != null) {
-                    TorchTensor normedFfn = layerNorm(current, ffnNormW, ffnNormB, 1e-5);
-                    TorchTensor ffnOut = vitMlp(normedFfn, weights, prefix);
+                    AccelTensor normedFfn = layerNorm(current, ffnNormW, ffnNormB, 1e-5);
+                    AccelTensor ffnOut = vitMlp(normedFfn, weights, prefix);
                     normedFfn.close();
-                    TorchTensor afterFfn = current.add(ffnOut);
+                    AccelTensor afterFfn = AccelOps.add(current, ffnOut);
                     ffnOut.close();
                     current.close();
                     current = afterFfn;
@@ -317,33 +319,33 @@ public class VisionEncoder {
         return current;
     }
 
-    private TorchTensor projectToLLM(TorchTensor visionOut, Map<String, TorchTensor> weights, VisionConfig cfg) {
+    private AccelTensor projectToLLM(AccelTensor visionOut, Map<String, AccelTensor> weights, VisionConfig cfg) {
         // LLaVA-style 2-layer MLP projection
-        TorchTensor linear1W = weights.get("multi_modal_projector.linear_1.weight");
-        TorchTensor linear1B = weights.get("multi_modal_projector.linear_1.bias");
-        TorchTensor linear2W = weights.get("multi_modal_projector.linear_2.weight");
-        TorchTensor linear2B = weights.get("multi_modal_projector.linear_2.bias");
+        AccelTensor linear1W = weights.get("multi_modal_projector.linear_1.weight");
+        AccelTensor linear1B = weights.get("multi_modal_projector.linear_1.bias");
+        AccelTensor linear2W = weights.get("multi_modal_projector.linear_2.weight");
+        AccelTensor linear2B = weights.get("multi_modal_projector.linear_2.bias");
 
         if (linear1W == null) {
             // Qwen-VL single linear projection
-            TorchTensor projW = weights.get("transformer.visual.proj.weight");
+            AccelTensor projW = weights.get("transformer.visual.proj.weight");
             if (projW != null)
-                return visionOut.matmul(projW.transpose(0, 1));
+                return AccelOps.matmul(visionOut, projW.transpose(0, 1));
             return visionOut; // no projection found
         }
 
         // Linear 1 + GELU
-        TorchTensor h = visionOut.matmul(linear1W.transpose(0, 1));
+        AccelTensor h = AccelOps.matmul(visionOut, linear1W.transpose(0, 1));
         if (linear1B != null)
-            h = h.add(linear1B);
-        TorchTensor hGelu = gelu(h);
+            h = AccelOps.add(h, linear1B);
+        AccelTensor hGelu = gelu(h);
         h.close();
 
         // Linear 2
-        TorchTensor out = hGelu.matmul(linear2W.transpose(0, 1));
+        AccelTensor out = AccelOps.matmul(hGelu, linear2W.transpose(0, 1));
         hGelu.close();
         if (linear2B != null) {
-            TorchTensor b = out.add(linear2B);
+            AccelTensor b = AccelOps.add(out, linear2B);
             out.close();
             out = b;
         }
@@ -354,54 +356,56 @@ public class VisionEncoder {
     // ViT math helpers
     // ─────────────────────────────────────────────────────────────────────────
 
-    private TorchTensor selfAttention(TorchTensor x, Map<String, TorchTensor> weights, String prefix,
+    private AccelTensor selfAttention(AccelTensor x, Map<String, AccelTensor> weights, String prefix,
             int numHeads, int layerIdx) {
-        TorchTensor qW = weights.get(prefix + "self_attn.q_proj.weight");
-        TorchTensor kW = weights.get(prefix + "self_attn.k_proj.weight");
-        TorchTensor vW = weights.get(prefix + "self_attn.v_proj.weight");
-        TorchTensor oW = weights.get(prefix + "self_attn.out_proj.weight");
+        AccelTensor qW = weights.get(prefix + "self_attn.q_proj.weight");
+        AccelTensor kW = weights.get(prefix + "self_attn.k_proj.weight");
+        AccelTensor vW = weights.get(prefix + "self_attn.v_proj.weight");
+        AccelTensor oW = weights.get(prefix + "self_attn.out_proj.weight");
         if (qW == null || kW == null || vW == null)
             return x;
 
-        TorchTensor q = x.matmul(qW.transpose(0, 1));
-        TorchTensor k = x.matmul(kW.transpose(0, 1));
-        TorchTensor v = x.matmul(vW.transpose(0, 1));
+        AccelTensor q = AccelOps.matmul(x, qW.transpose(0, 1));
+        AccelTensor k = AccelOps.matmul(x, kW.transpose(0, 1));
+        AccelTensor v = AccelOps.matmul(x, vW.transpose(0, 1));
 
         long seq = x.shape()[0];
         long headDim = q.shape()[1] / numHeads;
         float scale = (float) (1.0 / Math.sqrt(headDim));
 
         // Simplified full attention (no mask for images — bidirectional)
-        TorchTensor kT = k.transpose(0, 1);
-        TorchTensor scores = q.matmul(kT).mul(TorchTensor.fromFloatArray(new float[] { scale }, new long[] { 1 }));
+        AccelTensor kT = k.transpose(0, 1);
+        AccelTensor scoresTemp = AccelOps.matmul(q, kT);
+        AccelTensor scores = AccelOps.mulScalar(scoresTemp, scale);
+        scoresTemp.close();
         kT.close();
-        TorchTensor attn = TorchTensor.softmax(scores, -1L);
+        AccelTensor attn = AccelOps.softmax(scores, -1);
         scores.close();
-        TorchTensor out = attn.matmul(v);
+        AccelTensor out = AccelOps.matmul(attn, v);
         attn.close();
         q.close();
         k.close();
         v.close();
 
-        TorchTensor projected = oW != null ? out.matmul(oW.transpose(0, 1)) : out;
+        AccelTensor projected = oW != null ? AccelOps.matmul(out, oW.transpose(0, 1)) : out;
         if (projected != out)
             out.close();
         return projected;
     }
 
-    private TorchTensor vitMlp(TorchTensor x, Map<String, TorchTensor> weights, String prefix) {
-        TorchTensor fc1W = weights.get(prefix + "mlp.fc1.weight");
-        TorchTensor fc2W = weights.get(prefix + "mlp.fc2.weight");
+    private AccelTensor vitMlp(AccelTensor x, Map<String, AccelTensor> weights, String prefix) {
+        AccelTensor fc1W = weights.get(prefix + "mlp.fc1.weight");
+        AccelTensor fc2W = weights.get(prefix + "mlp.fc2.weight");
         if (fc1W == null)
             return x;
-        TorchTensor h = gelu(x.matmul(fc1W.transpose(0, 1)));
-        TorchTensor out = fc2W != null ? h.matmul(fc2W.transpose(0, 1)) : h;
+        AccelTensor h = gelu(AccelOps.matmul(x, fc1W.transpose(0, 1)));
+        AccelTensor out = fc2W != null ? AccelOps.matmul(h, fc2W.transpose(0, 1)) : h;
         if (out != h)
             h.close();
         return out;
     }
 
-    private static TorchTensor layerNorm(TorchTensor x, TorchTensor weight, TorchTensor bias, double eps) {
+    private static AccelTensor layerNorm(AccelTensor x, AccelTensor weight, AccelTensor bias, double eps) {
         float[] xData = x.toFloatArray();
         float[] wData = weight.toFloatArray();
         long[] shape = x.shape();
@@ -425,10 +429,10 @@ public class VisionEncoder {
                         + (biasData != null ? biasData[d] : 0f);
             }
         }
-        return TorchTensor.fromFloatArray(out, shape);
+        return AccelTensor.fromFloatArray(out, shape);
     }
 
-    private static TorchTensor gelu(TorchTensor x) {
+    private static AccelTensor gelu(AccelTensor x) {
         float[] data = x.toFloatArray();
         float[] out = new float[data.length];
         // GELU approximation: x * 0.5 * (1 + tanh(√(2/π) * (x + 0.044715 * x³)))
@@ -437,7 +441,7 @@ public class VisionEncoder {
             float inner = 0.7978845608f * (v + 0.044715f * v * v * v);
             out[i] = 0.5f * v * (1.0f + (float) Math.tanh(inner));
         }
-        return TorchTensor.fromFloatArray(out, x.shape());
+        return AccelTensor.fromFloatArray(out, x.shape());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -448,7 +452,7 @@ public class VisionEncoder {
      * Result of encoding an image — patch embeddings ready for LLM input.
      */
     public record ImageEmbedding(
-            TorchTensor embeddings, // [numPatches, lmmDim]
+            AccelTensor embeddings, // [numPatches, lmmDim]
             int numPatches,
             int llmDim) implements AutoCloseable {
         @Override

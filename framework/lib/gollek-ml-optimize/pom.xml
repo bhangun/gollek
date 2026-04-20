@@ -17,12 +17,7 @@
     <description>Complete optimizer suite: Adam, SGD, AdamW, RMSprop, and learning rate schedulers</description>
 
     <dependencies>
-        <!-- Core SDK dependencies -->
-        <dependency>
-            <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-ml-ml</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+        <!-- Core dependencies -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-ml-autograd</artifactId>
@@ -41,6 +36,11 @@
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-ml-data</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys.gollek</groupId>
+            <artifactId>gollek-ml-api</artifactId>
             <version>${project.version}</version>
         </dependency>
 

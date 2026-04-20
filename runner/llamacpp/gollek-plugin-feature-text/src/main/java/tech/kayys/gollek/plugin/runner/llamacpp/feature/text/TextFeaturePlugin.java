@@ -12,12 +12,11 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-package tech.kayys.gollek.plugin.runner.gguf.feature.text;
+package tech.kayys.gollek.plugin.runner.llamacpp.feature.text;
 
 import io.smallrye.mutiny.Uni;
-import tech.kayys.gollek.inference.gguf.LlamaCppRunner;
-import tech.kayys.gollek.inference.gguf.GGUFSession;
-import tech.kayys.gollek.plugin.runner.gguf.feature.GGUFFeaturePlugin;
+import tech.kayys.gollek.inference.llamacpp.LlamaCppRunner;
+import tech.kayys.gollek.plugin.runner.llamacpp.feature.GGUFFeaturePlugin;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.Message;

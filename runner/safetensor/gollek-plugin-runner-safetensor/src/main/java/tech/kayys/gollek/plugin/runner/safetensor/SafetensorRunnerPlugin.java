@@ -232,7 +232,7 @@ public class SafetensorRunnerPlugin implements RunnerPlugin {
 
     @Override
     public Set<String> supportedFormats() {
-        return Set.of(".safetensors", ".safetensor", ".gguf", ".bin");
+        return Set.of(".safetensors", ".safetensor", ".bin");
     }
 
     @Override

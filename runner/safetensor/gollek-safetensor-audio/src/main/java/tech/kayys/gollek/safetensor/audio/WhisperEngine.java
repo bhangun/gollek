@@ -6,7 +6,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelOps;
 import tech.kayys.gollek.safetensor.audio.model.AudioConfig;
 import tech.kayys.gollek.safetensor.audio.model.AudioResult;
 import tech.kayys.gollek.safetensor.audio.model.AudioSegment;
@@ -198,10 +199,10 @@ public class WhisperEngine implements SafetensorFeature {
         float[][] melSpec = featureExtractor.extractLogMelSpectrogram(pcm);
 
         // Convert to tensor
-        TorchTensor melTensor = createMelTensor(melSpec);
+        AccelTensor melTensor = createMelTensor(melSpec);
 
         // Run encoder
-        TorchTensor encoderOut = runEncoder(melTensor, model);
+        AccelTensor encoderOut = runEncoder(melTensor, model);
         melTensor.close();
 
         // Run decoder
@@ -217,7 +218,7 @@ public class WhisperEngine implements SafetensorFeature {
                 .build();
     }
 
-    private TorchTensor createMelTensor(float[][] melSpec) {
+    private AccelTensor createMelTensor(float[][] melSpec) {
         int frames = Math.min(melSpec[0].length, MAX_FRAMES);
         float[] flat = new float[N_MEL * frames];
 
@@ -225,21 +226,21 @@ public class WhisperEngine implements SafetensorFeature {
             System.arraycopy(melSpec[m], 0, flat, m * frames, frames);
         }
 
-        return TorchTensor.fromFloatArray(flat, new long[] { 1, N_MEL, frames });
+        return AccelTensor.fromFloatArray(flat, new long[] { 1, N_MEL, frames });
     }
 
-    private TorchTensor runEncoder(TorchTensor mel, SafetensorEngine.LoadedModel model) {
-        Map<String, TorchTensor> weights = model.weights();
+    private AccelTensor runEncoder(AccelTensor mel, SafetensorEngine.LoadedModel model) {
+        @SuppressWarnings("unchecked") Map<String, AccelTensor> weights = (Map<String, AccelTensor>) (Map<?, ?>) model.weights();
         int dModel = getModelDimension(weights);
         int frames = (int) mel.shape()[2];
         int seqLen = frames / 2;
 
-        return TorchTensor.fromFloatArray(
+        return AccelTensor.fromFloatArray(
                 new float[seqLen * dModel],
                 new long[] { 1, seqLen, dModel });
     }
 
-    private String decodeTokens(TorchTensor encoderOut, SafetensorEngine.LoadedModel model, AudioConfig config) {
+    private String decodeTokens(AccelTensor encoderOut, SafetensorEngine.LoadedModel model, AudioConfig config) {
         Tokenizer tokenizer = model.tokenizer();
         StringBuilder text = new StringBuilder();
 
@@ -256,7 +257,7 @@ public class WhisperEngine implements SafetensorFeature {
         return text.toString().trim();
     }
 
-    private List<Integer> greedyDecode(TorchTensor encoderOut, int[] prompt, SafetensorEngine.LoadedModel model) {
+    private List<Integer> greedyDecode(AccelTensor encoderOut, int[] prompt, SafetensorEngine.LoadedModel model) {
         List<Integer> tokens = new ArrayList<>();
         for (int p : prompt) tokens.add(p);
         
@@ -270,7 +271,7 @@ public class WhisperEngine implements SafetensorFeature {
         return tokens;
     }
 
-    private List<AudioSegment> createSegments(TorchTensor encoderOut, SafetensorEngine.LoadedModel model,
+    private List<AudioSegment> createSegments(AccelTensor encoderOut, SafetensorEngine.LoadedModel model,
             AudioConfig config, double timeOffset, String text) {
         return List.of(AudioSegment.builder()
                 .id(0)
@@ -301,8 +302,8 @@ public class WhisperEngine implements SafetensorFeature {
         return new int[] { SOT_TOKEN, langToken, taskToken, NO_TIMESTAMPS };
     }
 
-    private int getModelDimension(Map<String, TorchTensor> weights) {
-        TorchTensor embedWeights = weights.get("model.encoder.embed_positions.weight");
+    private int getModelDimension(Map<String, AccelTensor> weights) {
+        AccelTensor embedWeights = weights.get("model.encoder.embed_positions.weight");
         if (embedWeights != null) {
             return (int) embedWeights.shape()[1];
         }

@@ -18,7 +18,7 @@ final class LocalModelResolver {
     record ResolvedModel(String modelId, ModelInfo info, Path localPath, boolean fromSdk) {
     }
 
-    static Optional<ResolvedModel> resolve(GollekSdk sdk, String requestedId, String branch) {
+    static Optional<ResolvedModel> resolve(GollekSdk sdk, String requestedId, String branch, String format) {
         if (requestedId == null || requestedId.isBlank()) {
             return Optional.empty();
         }
@@ -26,6 +26,19 @@ final class LocalModelResolver {
         // 1. Check SDK/Registry for first-class resolution
         for (String candidate : sdkCandidates(requestedId, branch)) {
             try {
+                if (format != null && !format.isBlank()) {
+                    // When format matters, we must look for the exact matching variant
+                    // since getModelInfo() only returns the first one it finds.
+                    Optional<ModelInfo> matchingModel = sdk.listModels().stream()
+                            .filter(m -> candidate.equals(m.getModelId()) && formatsMatch(format, m.getFormat()))
+                            .findFirst();
+                    if (matchingModel.isPresent()) {
+                         return Optional
+                            .of(new ResolvedModel(candidate, matchingModel.get(), extractPath(matchingModel.get()).orElse(null), true));
+                    }
+                    continue; // Variant not found with this candidate name, try next
+                }
+
                 Optional<ModelInfo> info = sdk.getModelInfo(candidate);
                 if (info.isPresent()) {
                     return Optional
@@ -50,7 +63,7 @@ final class LocalModelResolver {
     }
 
     static Optional<ResolvedModel> resolve(GollekSdk sdk, String requestedId) {
-        return resolve(sdk, requestedId, null);
+        return resolve(sdk, requestedId, null, null);
     }
 
     static Optional<Path> extractPath(ModelInfo info) {
@@ -112,6 +125,22 @@ final class LocalModelResolver {
             candidates.add("hf:" + id + "-GGUF");
         }
         return java.util.List.copyOf(candidates);
+    }
+
+    private static boolean formatsMatch(String requested, String actual) {
+        if (requested == null || actual == null) return false;
+        String r = normalizeFormat(requested);
+        String a = normalizeFormat(actual);
+        return r.equals(a);
+    }
+
+    private static String normalizeFormat(String format) {
+        if (format == null) return "";
+        String n = format.trim().toUpperCase();
+        if (n.equals("SAFETENSORS")) return "SAFETENSOR";
+        if (n.equals("PYTORCH") || n.equals("TORCH")) return "TORCHSCRIPT";
+        if (n.equals("TFLITE") || n.equals("TASK")) return "LITERT";
+        return n;
     }
 
     private static ModelInfo toModelInfo(String id, Path file) {

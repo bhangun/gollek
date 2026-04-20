@@ -26,11 +26,7 @@
             <artifactId>gollek-tokenizer-core</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-runner-libtorch</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+        <!-- gollek-runner-libtorch dependency REMOVED — SPI is now tensor-backend-agnostic -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-spi-multimodal</artifactId>

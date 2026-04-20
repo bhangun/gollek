@@ -54,11 +54,8 @@
             <artifactId>gollek-safetensor-quantization</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-runner-libtorch</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+        <!-- gollek-runner-libtorch dependency REMOVED -->
+        <!-- Engine now uses pure FFM + Apple Accelerate (AccelTensor/AccelOps) -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-safetensor-audio</artifactId>
@@ -128,7 +125,7 @@
             <plugin>
                 <groupId>io.smallrye</groupId>
                 <artifactId>jandex-maven-plugin</artifactId>
-                <version>3.1.2</version>
+                <version>3.1.8</version>
                 <executions>
                     <execution>
                         <id>make-index</id>

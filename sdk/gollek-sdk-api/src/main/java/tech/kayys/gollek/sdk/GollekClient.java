@@ -1,6 +1,5 @@
 package tech.kayys.gollek.sdk;
 
-import tech.kayys.gollek.ml.autograd.GradTensor;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;

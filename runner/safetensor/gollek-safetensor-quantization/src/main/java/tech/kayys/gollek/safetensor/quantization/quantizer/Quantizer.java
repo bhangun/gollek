@@ -9,7 +9,7 @@
  */
 package tech.kayys.gollek.safetensor.quantization.quantizer;
 
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.quantization.QuantConfig;
 
 /**
@@ -27,7 +27,7 @@ public interface Quantizer {
      * @param config quantization configuration
      * @return quantized tensor
      */
-    TorchTensor quantizeTensor(TorchTensor tensor, QuantConfig config);
+    AccelTensor quantizeTensor(AccelTensor tensor, QuantConfig config);
 
     /**
      * Dequantize a tensor.
@@ -36,7 +36,7 @@ public interface Quantizer {
      * @param config          quantization configuration used
      * @return dequantized tensor
      */
-    TorchTensor dequantizeTensor(TorchTensor quantizedTensor, QuantConfig config);
+    AccelTensor dequantizeTensor(AccelTensor quantizedTensor, QuantConfig config);
 
     /**
      * Get the quantizer name.

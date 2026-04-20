@@ -10,6 +10,7 @@
  */
 package tech.kayys.gollek.sdk.api;
 
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.quantization.QuantConfig;
 import tech.kayys.gollek.safetensor.quantization.QuantResult;
 import tech.kayys.gollek.safetensor.quantization.QuantStats;
@@ -220,7 +221,7 @@ public class QuantizationService {
      * @param strategy           quantization strategy
      * @return dequantized weights
      */
-    public java.util.Map<String, tech.kayys.gollek.inference.libtorch.core.TorchTensor> loadQuantizedModel(
+    public java.util.Map<String, AccelTensor> loadQuantizedModel(
             Path quantizedModelPath, QuantizationEngine.QuantStrategy strategy) {
         return engine.loadQuantizedModel(quantizedModelPath, strategy);
     }

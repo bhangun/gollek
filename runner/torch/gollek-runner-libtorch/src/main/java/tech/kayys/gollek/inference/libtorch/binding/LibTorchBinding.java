@@ -117,6 +117,11 @@ public final class LibTorchBinding {
         public static final String TENSOR_TRANSPOSE = "at_transpose";
         public static final FunctionDescriptor TENSOR_TRANSPOSE_DESC = FunctionDescriptor.of(
                         ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG);
+
+        /** tensor.contiguous() → TorchTensor */
+        public static final String TENSOR_CONTIGUOUS = "at_contiguous";
+        public static final FunctionDescriptor TENSOR_CONTIGUOUS_DESC = FunctionDescriptor.of(
+                        ValueLayout.ADDRESS, ValueLayout.ADDRESS);
                         
         public static final String TENSOR_SQUEEZE = "at_squeeze";
         public static final FunctionDescriptor TENSOR_SQUEEZE_DESC = FunctionDescriptor.of(

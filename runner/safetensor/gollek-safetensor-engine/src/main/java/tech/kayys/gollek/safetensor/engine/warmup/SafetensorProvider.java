@@ -31,7 +31,7 @@ import org.jboss.logging.Logger;
 import tech.kayys.gollek.safetensor.spi.SafetensorFeature;
 
 import tech.kayys.gollek.spi.exception.ProviderException;
-import tech.kayys.gollek.inference.libtorch.LibTorchProvider;
+
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.model.ModelFormat;
 import tech.kayys.gollek.spi.observability.AdapterMetricTagResolver;
@@ -56,9 +56,7 @@ import java.util.*;
  * <li><b>gguf</b> — always convert to GGUF and run via llama.cpp.
  * <li><b>direct</b> — run raw safetensors weights directly via
  * DirectInferenceEngine
- * (zero-copy mmap, full forward pass, no conversion).
- * <li><b>libtorch</b> — delegate to LibTorchProvider (requires TorchScript
- * export).
+ * (zero-copy mmap, AccelTensor + Accelerate, no conversion).
  * </ul>
  *
  * <p>

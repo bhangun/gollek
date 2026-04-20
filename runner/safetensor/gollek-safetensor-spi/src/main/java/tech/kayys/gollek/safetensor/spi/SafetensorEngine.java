@@ -5,7 +5,6 @@
  */
 package tech.kayys.gollek.safetensor.spi;
 
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
 import tech.kayys.gollek.spi.model.ModelConfig;
 import tech.kayys.gollek.tokenizer.spi.Tokenizer;
 
@@ -17,8 +16,10 @@ import java.util.Map;
  *
  * <p>Implementations manage the lifecycle of loaded SafeTensor models — loading
  * weights from disk, caching them in memory, and providing access by path or key.
- * The engine is the primary integration point between the Gollek provider layer
- * and the LibTorch/FFM weight-loading infrastructure.
+ *
+ * <p>Weight tensors are exposed as raw {@code Object} maps to avoid coupling the SPI
+ * to a specific tensor backend (LibTorch, Accelerate, etc.). Implementations cast
+ * to the concrete tensor type internally.
  *
  * @see SafetensorLoaderFacade
  */
@@ -32,7 +33,7 @@ public interface SafetensorEngine {
         Path path();
 
         /** All weight tensors keyed by their parameter name. */
-        Map<String, TorchTensor> weights();
+        Map<String, ?> weights();
 
         /** The tokenizer associated with this model. */
         Tokenizer tokenizer();

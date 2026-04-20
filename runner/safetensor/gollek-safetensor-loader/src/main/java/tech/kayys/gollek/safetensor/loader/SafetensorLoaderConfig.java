@@ -82,7 +82,7 @@ public interface SafetensorLoaderConfig {
          * Enable strict header validation.
          * When {@code true}, additional checks are performed:
          * <ul>
-         * <li>TorchTensor data_offsets must be non-overlapping.
+         * <li>AccelTensor data_offsets must be non-overlapping.
          * <li>Declared byte count must match dtype × shape.
          * <li>All offsets must be within the file boundary.
          * </ul>

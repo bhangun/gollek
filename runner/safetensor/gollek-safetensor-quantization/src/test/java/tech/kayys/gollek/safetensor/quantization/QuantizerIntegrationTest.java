@@ -114,14 +114,14 @@ class QuantizerIntegrationTest {
         String customName = "custom-test";
         Quantizer custom = new Quantizer() {
             @Override
-            public tech.kayys.gollek.inference.libtorch.core.TorchTensor quantizeTensor(
-                    tech.kayys.gollek.inference.libtorch.core.TorchTensor tensor, QuantConfig config) {
+            public tech.kayys.gollek.safetensor.core.tensor.AccelTensor quantizeTensor(
+                    tech.kayys.gollek.safetensor.core.tensor.AccelTensor tensor, QuantConfig config) {
                 return tensor;
             }
 
             @Override
-            public tech.kayys.gollek.inference.libtorch.core.TorchTensor dequantizeTensor(
-                    tech.kayys.gollek.inference.libtorch.core.TorchTensor tensor, QuantConfig config) {
+            public tech.kayys.gollek.safetensor.core.tensor.AccelTensor dequantizeTensor(
+                    tech.kayys.gollek.safetensor.core.tensor.AccelTensor tensor, QuantConfig config) {
                 return tensor;
             }
 

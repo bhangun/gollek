@@ -10,7 +10,7 @@
 package tech.kayys.gollek.safetensor.quantization.quantizer;
 
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.quantization.QuantConfig;
 import tech.kayys.gollek.safetensor.quantization.QuantizationEngine;
 
@@ -93,9 +93,9 @@ public class FP8Quantizer implements Quantizer {
      * @return quantized tensor
      */
     @Override
-    public TorchTensor quantizeTensor(TorchTensor tensor, QuantConfig config) {
+    public AccelTensor quantizeTensor(AccelTensor tensor, QuantConfig config) {
         if (tensor == null) {
-            throw new IllegalArgumentException("TorchTensor cannot be null");
+            throw new IllegalArgumentException("AccelTensor cannot be null");
         }
 
         log.debugf("FP8 quantizing tensor (symmetric=%b)", config.isSymmetric());
@@ -129,9 +129,9 @@ public class FP8Quantizer implements Quantizer {
      * @return dequantized tensor
      */
     @Override
-    public TorchTensor dequantizeTensor(TorchTensor quantizedTensor, QuantConfig config) {
+    public AccelTensor dequantizeTensor(AccelTensor quantizedTensor, QuantConfig config) {
         if (quantizedTensor == null) {
-            throw new IllegalArgumentException("TorchTensor cannot be null");
+            throw new IllegalArgumentException("AccelTensor cannot be null");
         }
 
         log.debugf("Dequantizing FP8 tensor");
@@ -322,41 +322,41 @@ public class FP8Quantizer implements Quantizer {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // TorchTensor manipulation helpers
+    // AccelTensor manipulation helpers
     // ─────────────────────────────────────────────────────────────────────────
 
-    private float[] getTensorData(TorchTensor tensor) {
-        // TODO: Implement based on actual TorchTensor API
+    private float[] getTensorData(AccelTensor tensor) {
+        // TODO: Implement based on actual AccelTensor API
         return new float[1024]; // Placeholder
     }
 
-    private int[] getTensorShape(TorchTensor tensor) {
-        // TODO: Implement based on actual TorchTensor API
+    private int[] getTensorShape(AccelTensor tensor) {
+        // TODO: Implement based on actual AccelTensor API
         return new int[] { 1, 1024 }; // Placeholder
     }
 
-    private byte[] getQuantizedData(TorchTensor tensor) {
+    private byte[] getQuantizedData(AccelTensor tensor) {
         // TODO: Extract quantized data from tensor
         return new byte[1024]; // Placeholder
     }
 
-    private float[] getScales(TorchTensor tensor) {
+    private float[] getScales(AccelTensor tensor) {
         // TODO: Extract scales from tensor metadata
         return new float[] { 1.0f }; // Placeholder
     }
 
-    private FP8Format getFormat(TorchTensor tensor) {
+    private FP8Format getFormat(AccelTensor tensor) {
         // TODO: Extract format from tensor metadata
         return DEFAULT_FORMAT; // Placeholder
     }
 
-    private TorchTensor createQuantizedTensor(byte[] data, float[] scales, int[] shape, QuantConfig config,
+    private AccelTensor createQuantizedTensor(byte[] data, float[] scales, int[] shape, QuantConfig config,
             FP8Format format) {
         // TODO: Create tensor with quantized data and metadata
         return null; // Placeholder
     }
 
-    private TorchTensor createDequantizedTensor(float[] data, int[] shape) {
+    private AccelTensor createDequantizedTensor(float[] data, int[] shape) {
         // TODO: Create tensor with dequantized data
         return null; // Placeholder
     }

@@ -248,7 +248,7 @@ public class SafetensorShardLoader {
             return new SafetensorShardSession(index, loader);
         }
 
-        // ── TorchTensor access ─────────────────────────────────────────────────────
+        // ── AccelTensor access ─────────────────────────────────────────────────────
 
         /**
          * Get a tensor by name.

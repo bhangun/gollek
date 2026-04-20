@@ -133,4 +133,14 @@ public class Qwen25Family implements ModelArchitecture {
             return "model.layers.%d.mlp.down_proj.bias".formatted(i);
         }
 
+        @Override
+        public String layerQueryNormWeight(int i) {
+            return "model.layers.%d.self_attn.q_norm.weight".formatted(i);
+        }
+
+        @Override
+        public String layerKeyNormWeight(int i) {
+            return "model.layers.%d.self_attn.k_norm.weight".formatted(i);
+        }
+
     }

@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.Locale;
 
 /**
  * BPE Tokenizer implementation for HuggingFace-compatible models.
@@ -130,6 +131,7 @@ public class HuggingFaceBpeTokenizer implements Tokenizer {
 
         JsonNode addedTokensNode = root.path("added_tokens");
         if (addedTokensNode.isArray()) {
+            state.specialTokens = new HashMap<>();
             for (JsonNode at : addedTokensNode) {
                 if (!at.hasNonNull("id") || !at.hasNonNull("content")) {
                     continue;
@@ -138,14 +140,16 @@ public class HuggingFaceBpeTokenizer implements Tokenizer {
                 String content = at.get("content").asText();
                 state.tokenToId.put(content, id);
                 state.idToToken.put(id, content);
+                state.specialTokens.put(content, id);
 
-                if (content.contains("bos") || content.equals("<s>")) {
-                    state.bosTokenId = id;
-                } else if (content.contains("eos") || content.equals("</s>")) {
-                    state.eosTokenId = id;
-                } else if (content.contains("pad") || content.equals("<pad>")) {
+                String lower = content.toLowerCase(Locale.ROOT);
+                if (lower.contains("bos") || lower.equals("<s>") || lower.equals("<|im_start|>") || lower.equals("<|begin_of_text|>")) {
+                    if (state.bosTokenId < 0) state.bosTokenId = id;
+                } else if (lower.contains("eos") || lower.equals("</s>") || lower.equals("<|im_end|>") || lower.equals("<|endoftext|>") || lower.equals("<|eot_id|>")) {
+                    if (state.eosTokenId < 0) state.eosTokenId = id;
+                } else if (lower.contains("pad") || lower.equals("<pad>")) {
                     state.padTokenId = id;
-                } else if (content.contains("unk") || content.equals("<unk>")) {
+                } else if (lower.contains("unk") || lower.equals("<unk>")) {
                     state.unkTokenId = id;
                 }
             }
@@ -165,16 +169,76 @@ public class HuggingFaceBpeTokenizer implements Tokenizer {
             tokens.add((long) state.bosTokenId);
         }
 
-        List<String> words = preTokenizer.split(text);
-        for (String word : words) {
-            tokens.addAll(bpeEncode(word));
+        // Special token priority encoding: match added_tokens exactly before BPE
+        if (state.specialTokens != null && !state.specialTokens.isEmpty()) {
+            List<Object> parts = parseSpecialTokens(text);
+            for (Object part : parts) {
+                if (part instanceof Integer id) {
+                    tokens.add((long) id);
+                } else if (part instanceof String s) {
+                    List<String> words = preTokenizer.split(s);
+                    for (String word : words) {
+                        tokens.addAll(bpeEncode(word));
+                    }
+                }
+            }
+        } else {
+            List<String> words = preTokenizer.split(text);
+            for (String word : words) {
+                tokens.addAll(bpeEncode(word));
+            }
         }
 
         if (options.addEos && state.eosTokenId >= 0) {
             tokens.add((long) state.eosTokenId);
         }
 
-        return tokens.stream().mapToLong(Long::longValue).toArray();
+        long[] result = tokens.stream().mapToLong(Long::longValue).toArray();
+        if (log.isDebugEnabled()) {
+            log.debugf("Encoded tokens: %s", Arrays.toString(result));
+            for (long id : result) {
+                log.debugf("  ID %d -> [%s]", id, state.idToToken.get((int)id));
+            }
+        }
+        System.out.println("[DIAG-TOKENIZER] Input: \"" + text + "\" -> " + Arrays.toString(result));
+        return result;
+    }
+
+    private List<Object> parseSpecialTokens(String text) {
+        List<Object> result = new ArrayList<>();
+        int current = 0;
+        
+        while (current < text.length()) {
+            String bestMatch = null;
+            int bestId = -1;
+            
+            for (Map.Entry<String, Integer> entry : state.specialTokens.entrySet()) {
+                String key = entry.getKey();
+                if (text.startsWith(key, current)) {
+                    if (bestMatch == null || key.length() > bestMatch.length()) {
+                        bestMatch = key;
+                        bestId = entry.getValue();
+                    }
+                }
+            }
+            
+            if (bestMatch != null) {
+                current += bestMatch.length();
+                result.add(bestId);
+            } else {
+                // Find next special token start
+                int nextStart = text.length();
+                for (String key : state.specialTokens.keySet()) {
+                    int idx = text.indexOf(key, current + 1);
+                    if (idx != -1 && idx < nextStart) {
+                        nextStart = idx;
+                    }
+                }
+                result.add(text.substring(current, nextStart));
+                current = nextStart;
+            }
+        }
+        return result;
     }
 
     @Override
@@ -246,11 +310,15 @@ public class HuggingFaceBpeTokenizer implements Tokenizer {
                 if (state.unkTokenId >= 0) {
                     ids.add((long) state.unkTokenId);
                 } else {
-                    for (byte b : sym.getBytes(java.nio.charset.StandardCharsets.UTF_8)) {
-                        String byteToken = String.format("<0x%02X>", b & 0xFF);
-                        Integer byteId = state.tokenToId.get(byteToken);
-                        if (byteId != null) {
-                            ids.add((long) byteId);
+                    // BBPE Fallback: try to find byte tokens directly
+                    byte[] bytes = sym.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    for (byte b : bytes) {
+                        int unsigned = b & 0xFF;
+                        // For BBPE models like Qwen, bytes are mapped back via byteEncoder characters
+                        String bChar = state.byteEncoder.get((char)unsigned);
+                        Integer bId = state.tokenToId.get(bChar);
+                        if (bId != null) {
+                            ids.add((long) bId);
                         }
                     }
                 }
@@ -326,6 +394,7 @@ public class HuggingFaceBpeTokenizer implements Tokenizer {
         public Map<Integer, String> idToToken = new HashMap<>();
         public Map<String, Integer> mergeRanks = new HashMap<>();
         public Map<Character, String> byteEncoder = new HashMap<>();
+        public Map<String, Integer> specialTokens = new HashMap<>();
         public int vocabSize;
         public int bosTokenId = -1;
         public int eosTokenId = -1;

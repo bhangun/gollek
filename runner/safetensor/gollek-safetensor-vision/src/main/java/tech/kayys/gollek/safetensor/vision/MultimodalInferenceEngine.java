@@ -46,7 +46,8 @@ import tech.kayys.gollek.safetensor.spi.SafetensorFeature;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelOps;
 import tech.kayys.gollek.safetensor.engine.generation.DirectInferenceEngine;
 import tech.kayys.gollek.safetensor.generation.GenerationConfig;
 import tech.kayys.gollek.safetensor.engine.generation.kv.KVCacheManager;
@@ -169,7 +170,7 @@ public class MultimodalInferenceEngine implements SafetensorFeature {
                         model.config().hiddenSize());
 
                 VisionEncoder.ImageEmbedding imgEmb = visionEncoder.encode(imageBytes, format,
-                        model.weights(), visionCfg);
+                        ((Map<String, AccelTensor>)(Map<?, ?>)model.weights()), visionCfg);
 
                 // ── 2. Tokenize text prompt ───────────────────────────────────
                 String prompt = visionRegistry.buildPrompt(model.config().modelType(), textPrompt);
@@ -182,8 +183,8 @@ public class MultimodalInferenceEngine implements SafetensorFeature {
                 List<EncodedInput> inputs = new ArrayList<>();
                 
                 // Lookup text embeddings
-                TorchTensor embedTable = model.weights().get(arch.embedTokensWeight());
-                TorchTensor textEmbeds = forwardPass.embeddingLookup(embedTable, textIds);
+                AccelTensor embedTable = ((Map<String, AccelTensor>)(Map<?, ?>)model.weights()).get(arch.embedTokensWeight());
+                AccelTensor textEmbeds = forwardPass.embeddingLookup(embedTable, textIds);
                 float[] textRaw = textEmbeds.toFloatArray();
                 float[][] textEmbArray = new float[textIds.length][model.config().hiddenSize()];
                 for (int i = 0; i < textIds.length; i++) {
@@ -193,7 +194,7 @@ public class MultimodalInferenceEngine implements SafetensorFeature {
                 
                 inputs.add(new EncodedInput(ModalityType.TEXT, textEmbArray, textIds.length, model.config().hiddenSize()));
                 
-                // Convert Image TorchTensor to float[][] for fusion
+                // Convert Image AccelTensor to float[][] for fusion
                 float[] rawEmb = imgEmb.embeddings().toFloatArray();
                 float[][] imgEmbArray = new float[imgEmb.numPatches()][imgEmb.llmDim()];
                 for (int i = 0; i < imgEmb.numPatches(); i++) {
@@ -206,12 +207,12 @@ public class MultimodalInferenceEngine implements SafetensorFeature {
                 // ── 4. Prefill ────────────────────────────────────────────────
                 KVCacheManager.KVCacheSession kvSession = kvCacheManager.createSession(model.config().maxPositionEmbeddings());
                 
-                // Convert fused embeddings to TorchTensor
+                // Convert fused embeddings to AccelTensor
                 float[] flatEmbeds = flatten(fusion.embeddings());
-                TorchTensor fusedTensor = TorchTensor.fromFloatArray(flatEmbeds, 
+                AccelTensor fusedTensor = AccelTensor.fromFloatArray(flatEmbeds, 
                         new long[] { 1, fusion.totalTokens(), model.config().hiddenSize() });
                 
-                float[] logits = forwardPass.prefill(fusedTensor, textIds, model.weights(), model.config(), arch, kvSession);
+                float[] logits = forwardPass.prefill(fusedTensor, textIds, ((Map<String, AccelTensor>)(Map<?, ?>)model.weights()), model.config(), arch, kvSession);
                 fusedTensor.close();
                 imgEmb.close();
 
@@ -227,7 +228,7 @@ public class MultimodalInferenceEngine implements SafetensorFeature {
                     out.append(piece);
                     generated++;
 
-                    logits = forwardPass.decode(nextToken, startPos, model.weights(), model.config(), arch, kvSession);
+                    logits = forwardPass.decode(nextToken, startPos, ((Map<String, AccelTensor>)(Map<?, ?>)model.weights()), model.config(), arch, kvSession);
                     nextToken = sampler.sample(logits, cfg, new int[0]);
                     startPos++;
                 }

@@ -141,6 +141,9 @@ public class RunCommand implements Runnable {
     @Option(names = { "--force" }, description = "Force re-download and replace existing files", defaultValue = "false")
     boolean force;
 
+    @Option(names = { "--format" }, description = "Preferred model format (e.g., safetensors, gguf, onnx)")
+    String format;
+
     @Option(names = { "--direct" }, description = "Force use of native Safetensor direct engine", defaultValue = "false")
     boolean direct;
 
@@ -287,7 +290,7 @@ public class RunCommand implements Runnable {
                 try {
                     // 1. Initial preparation (pulls and registers if missing)
                     String quant = ggufQuant != null ? ggufQuant : (ggufOutType != null ? ggufOutType : "Q8_0");
-                    var resolution = sdk.prepareModel(modelId, false, quant, progress -> {
+                    var resolution = sdk.prepareModel(modelId, format, false, quant, progress -> {
                         if (progress.getTotal() > 0) {
                             System.out.printf("\r%s %s %d%% (%d/%d MB)",
                                     ChatUIRenderer.CYAN + progress.getStatus() + ChatUIRenderer.RESET,
@@ -309,17 +312,34 @@ public class RunCommand implements Runnable {
                         });
                         System.out.println();
                     }
-                    
+
                     modelId = resolution.getModelId();
                     if (resolution.getLocalPath() != null) {
                         finalLocalPath = resolution.getLocalPath();
-                        System.out.println("Model ready at: " + finalLocalPath);
+                        String displayPath = finalLocalPath;
+                        String userHome = System.getProperty("user.home");
+                        if (userHome != null && displayPath.startsWith(userHome)) {
+                            displayPath = "~" + displayPath.substring(userHome.length());
+                        }
+                        System.out.println("Model ready at: " + displayPath);
                         customModelPathUsed = true; // Signals that we have a local path for metadata
                     }
                     
                     // Auto-select provider based on final format
                     String resolvedFormat = resolution.getInfo().getFormat();
                     maybeAutoSelectProviderByFormat(resolvedFormat);
+                    
+                    // If user explicitly requested a format, let's make sure our providerId matches that intent
+                    // even if the above auto-selection was confused.
+                    if (this.format != null && !this.format.isBlank()) {
+                        String intendedProvider = providerForFormat(this.format);
+                        if (intendedProvider != null && !intendedProvider.equalsIgnoreCase(providerId)) {
+                             if (ensureProviderHealthy(intendedProvider)) {
+                                 providerId = intendedProvider;
+                                 sdk.setPreferredProvider(intendedProvider);
+                             }
+                        }
+                    }
 
                 } catch (Exception e) {
                     System.err.println("\nError: Failed to prepare model: " + e.getMessage());
@@ -380,6 +400,9 @@ public class RunCommand implements Runnable {
             if (steps != null) {
                 requestBuilder.parameter("steps", steps);
             }
+            if (format != null) {
+                requestBuilder.parameter("format", format);
+            }
             if (guidanceScale != null) {
                 requestBuilder.parameter("guidance_scale", guidanceScale);
             }
@@ -419,7 +442,7 @@ public class RunCommand implements Runnable {
             boolean directProviderBypass = "safetensor".equalsIgnoreCase(providerId);
 
             if (!enableJsonSse) {
-                uiRenderer.printModelInfo(modelId, providerId, null, false);
+                uiRenderer.printModelInfo(modelId, providerId, format, null, false);
             }
 
             if (directProviderBypass) {
@@ -692,18 +715,24 @@ public class RunCommand implements Runnable {
 
     private void maybeAutoSelectProvider() {
         try {
-            var modelInfoOpt = LocalModelResolver.resolve(sdk, modelId, branch)
+            var modelInfoOpt = LocalModelResolver.resolve(sdk, modelId, branch, format)
                     .map(LocalModelResolver.ResolvedModel::info);
             if (modelInfoOpt.isEmpty()) {
                 return;
             }
-            maybeAutoSelectProviderByFormat(modelInfoOpt.get().getFormat());
+            this.format = modelInfoOpt.get().getFormat();
+            maybeAutoSelectProviderByFormat(this.format);
         } catch (Exception ignored) {
             // Keep default router behavior when format/provider probing is not available.
         }
     }
 
     private void maybeAutoSelectProviderByFormat(String format) throws SdkException {
+        // Do not overwrite user-specified provider
+        if (this.providerId != null && !this.providerId.trim().isEmpty()) {
+            return;
+        }
+
         String inferredProvider = providerForFormat(format);
         if (inferredProvider == null || inferredProvider.isBlank()) {
             return;
@@ -724,8 +753,8 @@ public class RunCommand implements Runnable {
             case "GGUF" -> "native";
             case "TORCHSCRIPT" -> "libtorch";
             case "PYTORCH" -> "libtorch";
-            case "SAFETENSOR" -> "native";
-            case "SAFETENSORS" -> "native";
+            case "SAFETENSOR" -> "safetensor";
+            case "SAFETENSORS" -> "safetensor";
             case "ONNX" -> "onnx";
             default -> null;
         };
@@ -748,15 +777,15 @@ public class RunCommand implements Runnable {
             if (providerId != null && !providerId.isBlank()) {
                 return ensureProviderHealthy(providerId);
             }
-            var modelInfoOpt = LocalModelResolver.resolve(sdk, modelId, branch)
+            var modelInfoOpt = LocalModelResolver.resolve(sdk, modelId, branch, format)
                     .map(LocalModelResolver.ResolvedModel::info);
             if (modelInfoOpt.isEmpty()) {
                 return true;
             }
             var modelInfo = modelInfoOpt.get();
-            String format = modelInfo.getFormat();
-            if (isCheckpointOnlyFormat(format)) {
-                String checkpointProvider = providerForFormat(format);
+            this.format = modelInfo.getFormat();
+            if (isCheckpointOnlyFormat(this.format)) {
+                String checkpointProvider = providerForFormat(this.format);
                 if (checkpointProvider != null && ensureProviderHealthy(checkpointProvider)) {
                     providerId = checkpointProvider;
                     sdk.setPreferredProvider(checkpointProvider);
@@ -771,7 +800,7 @@ public class RunCommand implements Runnable {
                     return false;
                 }
                 if (tryRefreshCompatibleModel()) {
-                    modelInfoOpt = LocalModelResolver.resolve(sdk, modelId, branch)
+                    modelInfoOpt = LocalModelResolver.resolve(sdk, modelId, branch, format)
                             .map(LocalModelResolver.ResolvedModel::info);
                     if (modelInfoOpt.isPresent()) {
                         format = modelInfoOpt.get().getFormat();
@@ -801,7 +830,12 @@ public class RunCommand implements Runnable {
             if (inferredProvider == null || inferredProvider.isBlank()) {
                 return true;
             }
-            return ensureProviderHealthy(inferredProvider);
+            if (ensureProviderHealthy(inferredProvider)) {
+                providerId = inferredProvider;
+                sdk.setPreferredProvider(inferredProvider);
+                return true;
+            }
+            return false;
         } catch (Exception ignored) {
             return true;
         }
@@ -812,7 +846,7 @@ public class RunCommand implements Runnable {
             return false;
         }
         String normalized = format.trim().toUpperCase();
-        return normalized.equals("PYTORCH") || normalized.equals("SAFETENSORS");
+        return normalized.equals("PYTORCH") || normalized.equals("SAFETENSORS") || normalized.equals("SAFETENSOR");
     }
 
     private void configureCheckpointConversionPreference() {
@@ -844,7 +878,7 @@ public class RunCommand implements Runnable {
         String normalized = modelId.startsWith("hf:") ? modelId.substring(3) : modelId;
         for (String candidate : java.util.List.of(modelId, normalized, modelId + "-GGUF", normalized + "-GGUF")) {
             try {
-                var resolved = LocalModelResolver.resolve(sdk, candidate, branch);
+                var resolved = LocalModelResolver.resolve(sdk, candidate, branch, format);
                 if (resolved.isPresent()) {
                     String fmt = resolved.get().info().getFormat();
                     if (!isCheckpointOnlyFormat(fmt)) {

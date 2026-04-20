@@ -139,6 +139,12 @@ public interface ModelArchitecture {
         return null;
     }
 
+    /** Full tensor name of the Q-norm weight (null if none, e.g. Qwen 2.5). */
+    default String layerQueryNormWeight(int i) { return null; }
+
+    /** Full tensor name of the K-norm weight (null if none, e.g. Qwen 2.5). */
+    default String layerKeyNormWeight(int i) { return null; }
+
     // ── Architecture properties ───────────────────────────────────────────────
 
     /** Whether this architecture uses RMSNorm (true) or LayerNorm (false). */

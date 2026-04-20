@@ -22,10 +22,10 @@ public class StreamingDecoder {
     private static final Pattern SCRIPT_DETECTOR = Pattern.compile(
         "(?:" +
         "\\p{L}\\p{Lo}|" +  // Kana/CJK
-        "\\p{L}\\p{Greek}|" +  // Latin + Greek
-        "\\p{L}\\p{Thai}|" +  // Latin + Thai
-        "\\p{L}\\p{Arabic}|" +  // Latin + Arabic
-        "\\p{L}\\p{Devanagari}" +  // Latin + Devanagari
+        "\\p{L}\\p{IsGreek}|" +  // Latin + Greek
+        "\\p{L}\\p{IsThai}|" +  // Latin + Thai
+        "\\p{L}\\p{IsArabic}|" +  // Latin + Arabic
+        "\\p{L}\\p{IsDevanagari}" +  // Latin + Devanagari
         ")"
     );
     

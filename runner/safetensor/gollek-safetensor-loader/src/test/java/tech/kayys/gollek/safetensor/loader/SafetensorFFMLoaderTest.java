@@ -12,7 +12,7 @@
  *   1. In-memory generation of valid SafeTensors binary blobs to avoid
  *      external file dependencies.
  *   2. Structural tests: header length prefix, JSON parsing, tensor metadata.
- *   3. TorchTensor access tests: dtype, shape, element values, slicing.
+ *   3. AccelTensor access tests: dtype, shape, element values, slicing.
  *   4. Error path tests: corrupt headers, truncated files, bad offsets.
  *   5. F16/BF16 conversion tests.
  *   6. Multi-shard index parsing tests.

@@ -5,7 +5,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelOps;
 import tech.kayys.gollek.safetensor.audio.model.AudioConfig;
 import tech.kayys.gollek.safetensor.audio.model.AudioResult;
 import tech.kayys.gollek.safetensor.spi.SafetensorEngine;
@@ -80,11 +81,11 @@ public class SpeechT5Engine {
                     tokenIds[i] = (int) encoded[i];
 
                 // 2. Encode text
-                TorchTensor encoderOut = runTextEncoder(tokenIds, model);
+                AccelTensor encoderOut = runTextEncoder(tokenIds, model);
 
                 // 3. Get speaker embedding
                 float[] speakerEmb = getSpeakerEmbedding(voice != null ? voice : defaultVoice);
-                TorchTensor speakerTensor = TorchTensor.fromFloatArray(speakerEmb, new long[] { 1, SPEAKER_EMB_DIM });
+                AccelTensor speakerTensor = AccelTensor.fromFloatArray(speakerEmb, new long[] { 1, SPEAKER_EMB_DIM });
 
                 // 4. Decode to mel spectrogram
                 float[][] melFrames = runDecoder(encoderOut, speakerTensor, model, config);
@@ -92,7 +93,9 @@ public class SpeechT5Engine {
                 speakerTensor.close();
 
                 // 5. Vocoder: mel → audio
-                float[] pcm = vocoder.synthesize(melFrames, model.weights());
+                @SuppressWarnings("unchecked")
+                Map<String, AccelTensor> vocoderWeights = (Map<String, AccelTensor>) (Map<?, ?>) model.weights();
+                float[] pcm = vocoder.synthesize(melFrames, vocoderWeights);
 
                 // 6. Apply speed adjustment if requested (using temperature field for speed in
                 // this context)
@@ -185,14 +188,14 @@ public class SpeechT5Engine {
         return res;
     }
 
-    private TorchTensor runTextEncoder(int[] tokenIds, SafetensorEngine.LoadedModel model) {
-        Map<String, TorchTensor> w = model.weights();
-        TorchTensor embedW = w.get("speecht5.encoder.embed_tokens.weight");
+    private AccelTensor runTextEncoder(int[] tokenIds, SafetensorEngine.LoadedModel model) {
+        @SuppressWarnings("unchecked") Map<String, AccelTensor> w = (Map<String, AccelTensor>) (Map<?, ?>) model.weights();
+        AccelTensor embedW = w.get("speecht5.encoder.embed_tokens.weight");
         int hiddenSize = embedW != null ? (int) embedW.shape()[1] : 768;
 
         if (embedW == null) {
             log.warn("SpeechT5: encoder embed_tokens not found — using zeros");
-            return TorchTensor.fromFloatArray(new float[tokenIds.length * hiddenSize],
+            return AccelTensor.fromFloatArray(new float[tokenIds.length * hiddenSize],
                     new long[] { 1, tokenIds.length, hiddenSize });
         }
 
@@ -202,42 +205,42 @@ public class SpeechT5Engine {
             int id = Math.min(tokenIds[i], (int) embedW.shape()[0] - 1);
             System.arraycopy(embedData, id * hiddenSize, tokenEmbeds, i * hiddenSize, hiddenSize);
         }
-        TorchTensor hidden = TorchTensor.fromFloatArray(tokenEmbeds, new long[] { 1, tokenIds.length, hiddenSize });
+        AccelTensor hidden = AccelTensor.fromFloatArray(tokenEmbeds, new long[] { 1, tokenIds.length, hiddenSize });
 
         int numLayers = countEncoderLayers(w);
         for (int i = 0; i < numLayers; i++) {
-            TorchTensor layerOut = encoderLayer(hidden, w, i, hiddenSize);
+            AccelTensor layerOut = encoderLayer(hidden, w, i, hiddenSize);
             hidden.close();
             hidden = layerOut;
         }
         return hidden;
     }
 
-    private TorchTensor encoderLayer(TorchTensor x, Map<String, TorchTensor> w, int i, int d) {
+    private AccelTensor encoderLayer(AccelTensor x, Map<String, AccelTensor> w, int i, int d) {
         String pfx = "speecht5.encoder.layers.%d.".formatted(i);
-        TorchTensor qW = w.get(pfx + "attention.q_proj.weight");
+        AccelTensor qW = w.get(pfx + "attention.q_proj.weight");
         if (qW == null)
             return x;
 
-        TorchTensor kW = w.get(pfx + "attention.k_proj.weight");
-        TorchTensor vW = w.get(pfx + "attention.v_proj.weight");
-        TorchTensor oW = w.get(pfx + "attention.out_proj.weight");
-        TorchTensor n1W = w.get(pfx + "layer_norm.weight");
-        TorchTensor fc1W = w.get(pfx + "feed_forward.intermediate_dense.weight");
-        TorchTensor fc2W = w.get(pfx + "feed_forward.output_dense.weight");
+        AccelTensor kW = w.get(pfx + "attention.k_proj.weight");
+        AccelTensor vW = w.get(pfx + "attention.v_proj.weight");
+        AccelTensor oW = w.get(pfx + "attention.out_proj.weight");
+        AccelTensor n1W = w.get(pfx + "layer_norm.weight");
+        AccelTensor fc1W = w.get(pfx + "feed_forward.intermediate_dense.weight");
+        AccelTensor fc2W = w.get(pfx + "feed_forward.output_dense.weight");
 
-        TorchTensor normed = layerNorm(x, n1W, 1e-5);
-        TorchTensor attnOut = selfAttention(normed, qW, kW, vW, oW, d);
+        AccelTensor normed = layerNorm(x, n1W, 1e-5);
+        AccelTensor attnOut = selfAttention(normed, qW, kW, vW, oW, d);
         normed.close();
-        TorchTensor h = x.add(attnOut);
+        AccelTensor h = AccelOps.add(x, attnOut);
         attnOut.close();
 
         if (fc1W != null && fc2W != null) {
-            TorchTensor n2W = w.get(pfx + "final_layer_norm.weight");
-            TorchTensor normed2 = layerNorm(h, n2W, 1e-5);
-            TorchTensor ffnOut = reluFfn(normed2, fc1W, fc2W);
+            AccelTensor n2W = w.get(pfx + "final_layer_norm.weight");
+            AccelTensor normed2 = layerNorm(h, n2W, 1e-5);
+            AccelTensor ffnOut = reluFfn(normed2, fc1W, fc2W);
             normed2.close();
-            TorchTensor h2 = h.add(ffnOut);
+            AccelTensor h2 = AccelOps.add(h, ffnOut);
             ffnOut.close();
             h.close();
             return h2;
@@ -245,32 +248,32 @@ public class SpeechT5Engine {
         return h;
     }
 
-    private float[][] runDecoder(TorchTensor encoderOut, TorchTensor speakerTensor,
+    private float[][] runDecoder(AccelTensor encoderOut, AccelTensor speakerTensor,
             SafetensorEngine.LoadedModel model, AudioConfig config) {
-        Map<String, TorchTensor> w = model.weights();
+        @SuppressWarnings("unchecked") Map<String, AccelTensor> w = (Map<String, AccelTensor>) (Map<?, ?>) model.weights();
         int hiddenSize = (int) encoderOut.shape()[2];
         List<float[]> melFrames = new ArrayList<>();
         float[] prevMelFrame = new float[N_MEL];
-        TorchTensor decoderHidden = TorchTensor.fromFloatArray(prevMelFrame, new long[] { 1, 1, N_MEL });
+        AccelTensor decoderHidden = AccelTensor.fromFloatArray(prevMelFrame, new long[] { 1, 1, N_MEL });
 
         for (int step = 0; step < MAX_MEL_FRAMES; step++) {
-            TorchTensor prenetW = w.get("speecht5.decoder.prenet.layers.0.weight");
-            TorchTensor projected = prenetW != null ? linear(decoderHidden, prenetW) : decoderHidden;
+            AccelTensor prenetW = w.get("speecht5.decoder.prenet.layers.0.weight");
+            AccelTensor projected = prenetW != null ? linear(decoderHidden, prenetW) : decoderHidden;
 
-            TorchTensor withSpk = addSpeakerEmbedding(projected, speakerTensor, hiddenSize, w);
+            AccelTensor withSpk = addSpeakerEmbedding(projected, speakerTensor, hiddenSize, w);
             if (projected != decoderHidden)
                 projected.close();
 
             int numDecLayers = countDecoderLayers(w);
-            TorchTensor decOut = withSpk;
+            AccelTensor decOut = withSpk;
             for (int i = 0; i < numDecLayers; i++) {
-                TorchTensor layerOut = decoderLayer(decOut, encoderOut, w, i, hiddenSize);
+                AccelTensor layerOut = decoderLayer(decOut, encoderOut, w, i, hiddenSize);
                 decOut.close();
                 decOut = layerOut;
             }
 
-            TorchTensor featW = w.get("speech_decoder_postnet.feat_out.weight");
-            TorchTensor melOut = featW != null ? linear(decOut, featW) : decOut;
+            AccelTensor featW = w.get("speech_decoder_postnet.feat_out.weight");
+            AccelTensor melOut = featW != null ? linear(decOut, featW) : decOut;
             float[] frame = melOut.toFloatArray();
             if (melOut != decOut)
                 melOut.close();
@@ -282,60 +285,57 @@ public class SpeechT5Engine {
 
             if (detectStop(frame, w))
                 break;
-            decoderHidden = TorchTensor.fromFloatArray(melFrame, new long[] { 1, 1, N_MEL });
+            decoderHidden = AccelTensor.fromFloatArray(melFrame, new long[] { 1, 1, N_MEL });
         }
         return melFrames.toArray(float[][]::new);
     }
 
-    private TorchTensor decoderLayer(TorchTensor x, TorchTensor encOut, Map<String, TorchTensor> w, int i, int d) {
+    private AccelTensor decoderLayer(AccelTensor x, AccelTensor encOut, Map<String, AccelTensor> w, int i, int d) {
         String pfx = "speecht5.decoder.layers.%d.".formatted(i);
-        TorchTensor qW = w.get(pfx + "self_attn.q_proj.weight");
+        AccelTensor qW = w.get(pfx + "self_attn.q_proj.weight");
         if (qW == null)
             return x;
 
-        TorchTensor kW = w.get(pfx + "self_attn.k_proj.weight");
-        TorchTensor vW = w.get(pfx + "self_attn.v_proj.weight");
-        TorchTensor oW = w.get(pfx + "self_attn.out_proj.weight");
-        TorchTensor n1W = w.get(pfx + "self_attn_layer_norm.weight");
+        AccelTensor kW = w.get(pfx + "self_attn.k_proj.weight");
+        AccelTensor vW = w.get(pfx + "self_attn.v_proj.weight");
+        AccelTensor oW = w.get(pfx + "self_attn.out_proj.weight");
+        AccelTensor n1W = w.get(pfx + "self_attn_layer_norm.weight");
 
-        TorchTensor normed = layerNorm(x, n1W, 1e-5);
-        TorchTensor attn = selfAttention(normed, qW, kW, vW, oW, d);
+        AccelTensor normed = layerNorm(x, n1W, 1e-5);
+        AccelTensor attn = selfAttention(normed, qW, kW, vW, oW, d);
         normed.close();
-        TorchTensor h = x.add(attn);
+        AccelTensor h = AccelOps.add(x, attn);
         attn.close();
 
-        TorchTensor cqW = w.get(pfx + "encoder_attn.q_proj.weight");
+        AccelTensor cqW = w.get(pfx + "encoder_attn.q_proj.weight");
         if (cqW != null) {
-            TorchTensor ckW = w.get(pfx + "encoder_attn.k_proj.weight");
-            TorchTensor cvW = w.get(pfx + "encoder_attn.v_proj.weight");
-            TorchTensor coW = w.get(pfx + "encoder_attn.out_proj.weight");
-            TorchTensor n2W = w.get(pfx + "encoder_attn_layer_norm.weight");
+            AccelTensor ckW = w.get(pfx + "encoder_attn.k_proj.weight");
+            AccelTensor cvW = w.get(pfx + "encoder_attn.v_proj.weight");
+            AccelTensor coW = w.get(pfx + "encoder_attn.out_proj.weight");
+            AccelTensor n2W = w.get(pfx + "encoder_attn_layer_norm.weight");
 
-            TorchTensor normed2 = layerNorm(h, n2W, 1e-5);
-            TorchTensor q = linear(normed2, cqW);
-            TorchTensor k = linear(encOut, ckW);
-            TorchTensor v = linear(encOut, cvW);
+            AccelTensor normed2 = layerNorm(h, n2W, 1e-5);
+            AccelTensor q = linear(normed2, cqW);
+            AccelTensor k = linear(encOut, ckW);
+            AccelTensor v = linear(encOut, cvW);
 
             float scale = (float) (1.0 / Math.sqrt(d / 8));
-            TorchTensor scores = q.matmul(encOut.transpose(1, 2))
-                    .mul(TorchTensor.fromFloatArray(new float[] { scale }, new long[] { 1 }));
-            TorchTensor exp = scores.exp();
-            TorchTensor sum = exp.sum();
-            TorchTensor attnW = exp.div(sum);
-            TorchTensor crossOut = attnW.matmul(v);
+            AccelTensor scoresTemp = AccelOps.matmul(q, encOut.transpose(1, 2));
+            AccelTensor scores = AccelOps.mulScalar(scoresTemp, scale);
+            scoresTemp.close();
+            AccelTensor attnW = AccelOps.softmax(scores, -1);
+            AccelTensor crossOut = AccelOps.matmul(attnW, v);
             scores.close();
-            exp.close();
-            sum.close();
-            attnW.close();
+                        attnW.close();
             q.close();
             k.close();
             v.close();
             normed2.close();
 
-            TorchTensor projOut = coW != null ? linear(crossOut, coW) : crossOut;
+            AccelTensor projOut = coW != null ? linear(crossOut, coW) : crossOut;
             if (projOut != crossOut)
                 crossOut.close();
-            TorchTensor h2 = h.add(projOut);
+            AccelTensor h2 = AccelOps.add(h, projOut);
             projOut.close();
             h.close();
             h = h2;
@@ -343,44 +343,44 @@ public class SpeechT5Engine {
         return h;
     }
 
-    private TorchTensor selfAttention(TorchTensor x, TorchTensor qW, TorchTensor kW, TorchTensor vW, TorchTensor oW, int d) {
-        TorchTensor q = linear(x, qW), k = linear(x, kW), v = linear(x, vW);
+    private AccelTensor selfAttention(AccelTensor x, AccelTensor qW, AccelTensor kW, AccelTensor vW, AccelTensor oW, int d) {
+        AccelTensor q = linear(x, qW), k = linear(x, kW), v = linear(x, vW);
         float scale = (float) (1.0 / Math.sqrt(d / 8));
-        TorchTensor sc = q.matmul(k.transpose(1, 2)).mul(TorchTensor.fromFloatArray(new float[] { scale }, new long[] { 1 }));
-        TorchTensor exp = sc.exp();
-        TorchTensor sum = exp.sum();
-        TorchTensor aw = exp.div(sum);
-        TorchTensor out = aw.matmul(v);
+        AccelTensor scTemp = AccelOps.matmul(q, k.transpose(1, 2));
+        AccelTensor sc = AccelOps.mulScalar(scTemp, scale);
+        scTemp.close();
+        AccelTensor aw = AccelOps.softmax(sc, -1);
+        AccelTensor out = AccelOps.matmul(aw, v);
         sc.close();
         aw.close();
         q.close();
         k.close();
         v.close();
-        TorchTensor proj = oW != null ? linear(out, oW) : out;
+        AccelTensor proj = oW != null ? linear(out, oW) : out;
         if (proj != out)
             out.close();
         return proj;
     }
 
-    private TorchTensor reluFfn(TorchTensor x, TorchTensor fc1W, TorchTensor fc2W) {
-        TorchTensor h = linear(x, fc1W);
+    private AccelTensor reluFfn(AccelTensor x, AccelTensor fc1W, AccelTensor fc2W) {
+        AccelTensor h = linear(x, fc1W);
         float[] data = h.toFloatArray();
         for (int i = 0; i < data.length; i++)
             data[i] = Math.max(0f, data[i]);
-        TorchTensor activated = TorchTensor.fromFloatArray(data, h.shape());
+        AccelTensor activated = AccelTensor.fromFloatArray(data, h.shape());
         h.close();
-        TorchTensor out = linear(activated, fc2W);
+        AccelTensor out = linear(activated, fc2W);
         activated.close();
         return out;
     }
 
-    private static TorchTensor linear(TorchTensor x, TorchTensor w) {
+    private static AccelTensor linear(AccelTensor x, AccelTensor w) {
         if (w == null)
             return x;
-        return x.matmul(w.transpose(w.shape().length - 2, w.shape().length - 1));
+        return AccelOps.linear(x, w);
     }
 
-    private static TorchTensor layerNorm(TorchTensor x, TorchTensor weight, double eps) {
+    private static AccelTensor layerNorm(AccelTensor x, AccelTensor weight, double eps) {
         if (weight == null)
             return x;
         float[] xd = x.toFloatArray(), wd = weight.toFloatArray();
@@ -401,16 +401,16 @@ public class SpeechT5Engine {
             for (int i = 0; i < dim; i++)
                 out[off + i] = (float) ((xd[off + i] - mean) * inv) * wd[i];
         }
-        return TorchTensor.fromFloatArray(out, sh);
+        return AccelTensor.fromFloatArray(out, sh);
     }
 
-    private TorchTensor addSpeakerEmbedding(TorchTensor x, TorchTensor spkEmb, int d, Map<String, TorchTensor> w) {
-        TorchTensor projW = w.get("speecht5.decoder.speaker_embeddings_layer_norm.weight");
-        return projW != null ? layerNorm(x.add(spkEmb), projW, 1e-5) : x;
+    private AccelTensor addSpeakerEmbedding(AccelTensor x, AccelTensor spkEmb, int d, Map<String, AccelTensor> w) {
+        AccelTensor projW = w.get("speecht5.decoder.speaker_embeddings_layer_norm.weight");
+        return projW != null ? layerNorm(AccelOps.add(x, spkEmb), projW, 1e-5) : x;
     }
 
-    private boolean detectStop(float[] frame, Map<String, TorchTensor> weights) {
-        TorchTensor stopW = weights.get("speech_decoder_postnet.prob_out.weight");
+    private boolean detectStop(float[] frame, Map<String, AccelTensor> weights) {
+        AccelTensor stopW = weights.get("speech_decoder_postnet.prob_out.weight");
         if (stopW == null)
             return false;
         float[] sw = stopW.toFloatArray();
@@ -420,14 +420,14 @@ public class SpeechT5Engine {
         return (float) (1.0 / (1.0 + Math.exp(-prob))) > 0.5f;
     }
 
-    private int countEncoderLayers(Map<String, TorchTensor> w) {
+    private int countEncoderLayers(Map<String, AccelTensor> w) {
         int n = 0;
         while (w.containsKey("speecht5.encoder.layers.%d.attention.q_proj.weight".formatted(n)))
             n++;
         return Math.max(n, 12);
     }
 
-    private int countDecoderLayers(Map<String, TorchTensor> w) {
+    private int countDecoderLayers(Map<String, AccelTensor> w) {
         int n = 0;
         while (w.containsKey("speecht5.decoder.layers.%d.self_attn.q_proj.weight".formatted(n)))
             n++;
@@ -492,7 +492,7 @@ public class SpeechT5Engine {
     }
 
     private static class HiFiGANVocoder {
-        public float[] synthesize(float[][] melFrames, Map<String, TorchTensor> weights) {
+        public float[] synthesize(float[][] melFrames, Map<String, AccelTensor> weights) {
             int numFrames = melFrames.length;
             int pcmLen = numFrames * HOP_LENGTH;
             float[] pcm = new float[pcmLen];

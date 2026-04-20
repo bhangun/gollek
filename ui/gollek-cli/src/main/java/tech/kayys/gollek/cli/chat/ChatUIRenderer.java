@@ -45,10 +45,15 @@ public class ChatUIRenderer {
         System.out.println();
     }
 
-    public void printModelInfo(String modelId, String providerId, String outputFile, boolean isInteractive) {
+    public void printModelInfo(String modelId, String providerId, String format, String outputFile, boolean isInteractive) {
         if (jsonMode) return;
         System.out.printf(BOLD + "Model: " + RESET + CYAN + "%s" + RESET + "%n", modelId);
-        System.out.printf(BOLD + "Provider: " + RESET + YELLOW + "%s" + RESET + "%n", providerId != null ? providerId : "auto-select");
+        String provStr = providerId != null ? providerId : "auto-select";
+        if (format != null && !format.isBlank()) {
+            System.out.printf(BOLD + "Provider: " + RESET + YELLOW + "%s, format=%s" + RESET + "%n", provStr, format.toLowerCase());
+        } else {
+            System.out.printf(BOLD + "Provider: " + RESET + YELLOW + "%s" + RESET + "%n", provStr);
+        }
         if (outputFile != null) {
             System.out.printf(BOLD + "Output: " + RESET + YELLOW + "%s" + RESET + "%n", outputFile);
         }

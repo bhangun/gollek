@@ -143,7 +143,7 @@ public final class SafetensorLoadResult implements AutoCloseable {
         return closed.get();
     }
 
-    // ── TorchTensor access ─────────────────────────────────────────────────────────
+    // ── AccelTensor access ─────────────────────────────────────────────────────────
 
     /**
      * Retrieve a zero-copy tensor view by name.
@@ -153,7 +153,7 @@ public final class SafetensorLoadResult implements AutoCloseable {
      * result's Arena. Do not use the tensor after this result is closed.
      *
      * <p>
-     * TorchTensor views are cached — repeated calls with the same name return the
+     * AccelTensor views are cached — repeated calls with the same name return the
      * same object.
      *
      * @param name tensor key (e.g. {@code "model.embed_tokens.weight"})
@@ -182,7 +182,7 @@ public final class SafetensorLoadResult implements AutoCloseable {
 
     /**
      * Return an unmodifiable view of ALL tensors in this file.
-     * TorchTensor views are created lazily during iteration.
+     * AccelTensor views are created lazily during iteration.
      *
      * @return ordered map of tensor name → tensor
      */

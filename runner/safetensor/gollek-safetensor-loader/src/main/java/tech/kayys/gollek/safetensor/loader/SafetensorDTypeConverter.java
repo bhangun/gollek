@@ -511,7 +511,7 @@ public final class SafetensorDTypeConverter {
     private static void checkFits(SafetensorTensor tensor) {
         if (tensor.numElements() > Integer.MAX_VALUE) {
             throw new SafetensorException.ValidationException(
-                    "TorchTensor '" + tensor.name() + "' has " + tensor.numElements()
+                    "AccelTensor '" + tensor.name() + "' has " + tensor.numElements()
                             + " elements — too large to convert to a Java array (max 2^31-1). "
                             + "Use segment() + streaming for oversized tensors.",
                     null, tensor.name());

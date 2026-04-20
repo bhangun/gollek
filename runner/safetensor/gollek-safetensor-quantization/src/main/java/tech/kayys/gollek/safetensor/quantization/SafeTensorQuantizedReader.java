@@ -12,7 +12,7 @@ package tech.kayys.gollek.safetensor.quantization;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -140,7 +140,7 @@ public class SafeTensorQuantizedReader {
         QuantizedTensorInfo info = model.tensorInfos().get(tensorName);
 
         if (data == null || info == null) {
-            throw new IOException("TorchTensor not found: " + tensorName);
+            throw new IOException("AccelTensor not found: " + tensorName);
         }
 
         return new QuantizedTensor(data, info);

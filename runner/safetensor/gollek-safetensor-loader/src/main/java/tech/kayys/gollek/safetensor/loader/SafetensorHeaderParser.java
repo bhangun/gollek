@@ -305,7 +305,7 @@ public final class SafetensorHeaderParser {
 
             if (absEnd > fileSize) {
                 throw new SafetensorException.ValidationException(
-                        "TorchTensor '" + info.name() + "' data_offsets [" + info.dataBegin()
+                        "AccelTensor '" + info.name() + "' data_offsets [" + info.dataBegin()
                                 + "," + info.dataEnd() + ") extend beyond file size " + fileSize
                                 + " (absolute range [" + absBegin + "," + absEnd + "))",
                         path, info.name());
@@ -314,7 +314,7 @@ public final class SafetensorHeaderParser {
             // Allow zero-length tensors at the same position (degenerate but valid)
             if (info.byteLength() > 0 && info.dataBegin() < prevEnd) {
                 throw new SafetensorException.ValidationException(
-                        "TorchTensor '" + info.name() + "' overlaps with a previous tensor. "
+                        "AccelTensor '" + info.name() + "' overlaps with a previous tensor. "
                                 + "Begin offset " + info.dataBegin() + " < previous end " + prevEnd,
                         path, info.name());
             }
