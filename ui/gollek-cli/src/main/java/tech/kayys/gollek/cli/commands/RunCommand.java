@@ -9,7 +9,7 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 import tech.kayys.gollek.cli.GollekCommand;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.sdk.model.ModelInfo;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.sdk.exception.SdkException;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
@@ -30,6 +30,9 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import tech.kayys.gollek.cli.chat.ChatUIRenderer;
 import tech.kayys.gollek.cli.util.PluginAvailabilityChecker;
+import tech.kayys.gollek.cli.audit.QuantAuditRecord;
+import tech.kayys.gollek.cli.audit.QuantAuditRenderer;
+import tech.kayys.gollek.cli.audit.QuantAuditTrail;
 import tech.kayys.gollek.plugin.kernel.KernelPlatform;
 import tech.kayys.gollek.plugin.kernel.KernelPlatformDetector;
 
@@ -153,6 +156,12 @@ public class RunCommand implements Runnable {
     @Option(names = { "--gguf" }, description = "Force GGUF conversion and usage", defaultValue = "false")
     boolean forceGguf;
 
+    @Option(names = { "--quantize" }, description = "Enable JIT quantization during inference (bnb, turbo, awq, gptq, autoround)")
+    String quantizeStrategy;
+
+    @Option(names = { "--quantize-bits" }, description = "Bit width for JIT quantization (default: 4)", defaultValue = "4")
+    int quantizeBits;
+
     // Stable Diffusion specific parameters
     @Option(names = { "--seed" }, description = "Random seed for image generation (default: random)")
     Long seed;
@@ -175,6 +184,7 @@ public class RunCommand implements Runnable {
 
     @Override
     public void run() {
+        System.err.println("[DEBUG] RunCommand.run() started");
         try {
             // Check plugin availability first
             if (!pluginChecker.hasProviders() && !pluginChecker.hasRunnerPlugins()) {
@@ -350,6 +360,10 @@ public class RunCommand implements Runnable {
                 }
             }
 
+            // Smart quantization suggestion for large models
+            tech.kayys.gollek.cli.util.QuantSuggestionDetector.suggestIfNeeded(
+                    modelId, finalLocalPath, quantizeStrategy, false);
+
             // Set preferred provider if specified
             if (direct) {
                 providerId = "safetensor";
@@ -391,6 +405,12 @@ public class RunCommand implements Runnable {
             }
             if (grammar != null && !grammar.isEmpty()) {
                 requestBuilder.grammar(grammar);
+            }
+
+            // Quantization parameters for JIT
+            if (quantizeStrategy != null && !quantizeStrategy.isBlank()) {
+                requestBuilder.parameter("quantize_strategy", quantizeStrategy);
+                requestBuilder.parameter("quantize_bits", quantizeBits);
             }
 
             // Stable Diffusion parameters

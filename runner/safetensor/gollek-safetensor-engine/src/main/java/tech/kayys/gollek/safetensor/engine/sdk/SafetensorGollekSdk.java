@@ -6,7 +6,7 @@ import org.jboss.logging.Logger;
 import tech.kayys.gollek.safetensor.engine.generation.DirectInferenceEngine;
 import tech.kayys.gollek.safetensor.generation.GenerationConfig;
 import tech.kayys.gollek.sdk.exception.SdkException;
-import tech.kayys.gollek.sdk.model.ModelInfo;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.sdk.model.ModelResolution;
 import tech.kayys.gollek.sdk.model.PullProgress;
 import tech.kayys.gollek.sdk.model.SystemInfo;

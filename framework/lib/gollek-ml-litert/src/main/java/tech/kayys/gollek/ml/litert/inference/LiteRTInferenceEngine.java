@@ -82,7 +82,7 @@ public class LiteRTInferenceEngine implements Closeable {
 
             modelInfos.put(modelId, LiteRTModelInfo.builder()
                     .modelId(modelId)
-                    .modelPath(modelPath.toString())
+                    .path(modelPath.toString())
                     .metadata(Map.of("format", "LiteRT"))
                     .build());
 

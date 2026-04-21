@@ -20,6 +20,10 @@ import tech.kayys.gollek.safetensor.quantization.bridge.AccelSafetensorWriter;
 import tech.kayys.gollek.safetensor.loader.SafetensorShardLoader;
 import tech.kayys.gollek.safetensor.loader.SafetensorShardLoader.SafetensorShardSession;
 import tech.kayys.gollek.safetensor.quantization.quantizer.*;
+import tech.kayys.gollek.safetensor.quantization.quantizer.TurboQuantAdapter;
+import tech.kayys.gollek.safetensor.quantization.quantizer.BnBQuantizerAdapter;
+import tech.kayys.gollek.safetensor.quantization.quantizer.AWQQuantizerAdapter;
+import tech.kayys.gollek.safetensor.quantization.quantizer.GPTQQuantizerAdapter;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -67,10 +71,26 @@ public class QuantizationEngine {
          */
         INT8,
         /**
-         * 8-bit floating point quantization.
+         * 8-bit floating point quantization (E4M3/E5M2).
          * Best for GPU inference with FP8 tensor cores.
          */
-        FP8
+        FP8,
+        /**
+         * TurboQuant (SIMD-optimized MSE/InnerProduct).
+         */
+        TURBO,
+        /**
+         * AWQ (Activation-aware Weight Quantization).
+         */
+        AWQ,
+        /**
+         * GPTQ (Generative Pre-Trained Transformer Quantization).
+         */
+        GPTQ,
+        /**
+         * BitsAndBytes (NF4/INT8).
+         */
+        BNB
     }
 
     /**
@@ -99,13 +119,18 @@ public class QuantizationEngine {
      * Initialize quantization engine with default quantizers.
      */
     public QuantizationEngine() {
-        registerQuantizer(QuantStrategy.INT4, new GPTQQuantizer());
-        registerQuantizer(QuantStrategy.INT8, new INT8Quantizer());
-        registerQuantizer(QuantStrategy.FP8, new FP8Quantizer());
+        // Register legacy/generic placeholders
+        registerQuantizer(QuantStrategy.INT4, new GPTQQuantizerAdapter());
+        registerQuantizer(QuantStrategy.INT8, new BnBQuantizerAdapter()); // INT8 fallback
         
-        // Add new adapters from core/quantizer
-        registerQuantizer(QuantStrategy.INT4, new TurboQuantAdapter());
-        // registerQuantizer(QuantStrategy.INT4, new BnBQuantizerAdapter()); // NF4 candidate
+        // Register high-performance adapters from core/quantizer
+        registerQuantizer(QuantStrategy.TURBO, new TurboQuantAdapter());
+        registerQuantizer(QuantStrategy.AWQ, new AWQQuantizerAdapter());
+        registerQuantizer(QuantStrategy.BNB, new BnBQuantizerAdapter());
+        registerQuantizer(QuantStrategy.INT4, new GPTQQuantizerAdapter());
+        registerQuantizer(QuantStrategy.INT4, new AutoRoundQuantizerAdapter());
+        
+        log.info("QuantizationEngine initialized with TurboQuant, AWQ, GPTQ, AutoRound, and BnB adapters.");
     }
 
     /**

@@ -11,7 +11,7 @@ import tech.kayys.gollek.client.exception.*;
 import tech.kayys.gollek.spi.provider.ProviderInfo;
 import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.gollek.sdk.exception.SdkException;
-import tech.kayys.gollek.sdk.model.ModelInfo;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.sdk.model.PullProgress;
 import tech.kayys.gollek.spi.auth.ApiKeyConstants;
 import tech.kayys.gollek.spi.batch.BatchInferenceRequest;

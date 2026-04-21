@@ -4,7 +4,7 @@ import io.smallrye.mutiny.Multi;
 import tech.kayys.gollek.spi.provider.ProviderInfo;
 import tech.kayys.gollek.sdk.exception.SdkException;
 import tech.kayys.gollek.sdk.mcp.McpRegistryManager;
-import tech.kayys.gollek.sdk.model.ModelInfo;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.sdk.model.ModelResolution;
 import tech.kayys.gollek.sdk.model.PullProgress;
 import tech.kayys.gollek.sdk.model.SystemInfo;

@@ -4,6 +4,7 @@ package tech.kayys.gollek.sdk;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import tech.kayys.gollek.spi.model.ModelInfo;
 
 /**
  * Unified Gollek inference client — single entry point regardless of backend
@@ -185,12 +186,10 @@ public interface GollekClient extends AutoCloseable {
     /**
      * Model metadata.
      *
-     * @param name         model name or path
-     * @param architecture model architecture (e.g. "llama", "qwen", "bert")
-     * @param parameterCount approximate parameter count
-     * @param contextLength maximum context length in tokens
+     * @deprecated Use {@link tech.kayys.gollek.spi.model.ModelInfo} instead.
      */
-    record ModelInfo(String name, String architecture, long parameterCount, int contextLength) {}
+    @Deprecated
+    record LegacyModelInfo(String name, String architecture, long parameterCount, int contextLength) {}
 
     /**
      * Reactive stream for token-by-token generation.

@@ -16,6 +16,8 @@ import jdk.incubator.vector.VectorSpecies;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
+import tech.kayys.gollek.spi.model.ModelConfig;
+
 /**
  * Optimized cache for RoPE (Rotary Positional Embedding) frequencies.
  */
@@ -24,9 +26,10 @@ public class RopeFrequencyCache {
 
     private final Map<String, RopeFrequencies> cache = new ConcurrentHashMap<>();
 
-    public RopeFrequencies get(int rotaryDim, int maxSeqLen, double theta) {
-        String key = rotaryDim + "-" + maxSeqLen + "-" + theta;
-        return cache.computeIfAbsent(key, k -> new RopeFrequencies(rotaryDim, maxSeqLen, theta));
+    public RopeFrequencies get(int rotaryDim, int maxSeqLen, double theta, ModelConfig.RopeScaling scaling) {
+        String scalingKey = scaling == null ? "none" : scaling.type + "-" + scaling.factor;
+        String key = rotaryDim + "-" + maxSeqLen + "-" + theta + "-" + scalingKey;
+        return cache.computeIfAbsent(key, k -> new RopeFrequencies(rotaryDim, maxSeqLen, theta, scaling));
     }
 
     private static final VectorSpecies<Float> SPECIES = FloatVector.SPECIES_PREFERRED;
@@ -36,16 +39,33 @@ public class RopeFrequencyCache {
         private final float[] sin;
         private final int rotaryDim;
 
-        public RopeFrequencies(int rotaryDim, int maxSeqLen, double theta) {
+        public RopeFrequencies(int rotaryDim, int maxSeqLen, double theta, ModelConfig.RopeScaling scaling) {
             this.rotaryDim = rotaryDim;
             this.cos = new float[maxSeqLen * (rotaryDim / 2)];
             this.sin = new float[maxSeqLen * (rotaryDim / 2)];
-            precompute(maxSeqLen, theta);
+            precompute(maxSeqLen, theta, scaling);
         }
 
-        private void precompute(int maxSeqLen, double theta) {
+        private void precompute(int maxSeqLen, double theta, ModelConfig.RopeScaling scaling) {
             for (int i = 0; i < rotaryDim / 2; i++) {
                 double freq = 1.0 / Math.pow(theta, (double) (2 * i) / rotaryDim);
+
+                if (scaling != null && "llama3".equalsIgnoreCase(scaling.type)) {
+                    double wavelen = 2 * Math.PI / freq;
+                    double lowFreqWavelen = scaling.originalMaxPositionEmbeddings / scaling.lowFreqFactor;
+                    double highFreqWavelen = scaling.originalMaxPositionEmbeddings / scaling.highFreqFactor;
+                    
+                    if (wavelen > lowFreqWavelen) {
+                        freq = freq / scaling.factor;
+                    } else if (wavelen > highFreqWavelen) {
+                        double smooth = (scaling.originalMaxPositionEmbeddings / wavelen - scaling.lowFreqFactor) /
+                                (scaling.highFreqFactor - scaling.lowFreqFactor);
+                        freq = (1 - smooth) * freq / scaling.factor + smooth * freq;
+                    }
+                } else if (scaling != null && "linear".equalsIgnoreCase(scaling.type)) {
+                    freq = freq / scaling.factor;
+                }
+
                 for (int t = 0; t < maxSeqLen; t++) {
                     double val = t * freq;
                     cos[t * (rotaryDim / 2) + i] = (float) Math.cos(val);

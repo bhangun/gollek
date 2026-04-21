@@ -7,7 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import tech.kayys.gollek.sdk.exception.SdkException;
-import tech.kayys.gollek.sdk.model.ModelInfo;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.sdk.model.PullProgress;
 
 import java.net.http.HttpClient;

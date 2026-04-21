@@ -22,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 import tech.kayys.gollek.plugin.runner.RunnerPlugin;
 import tech.kayys.gollek.plugin.runner.RunnerSession;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
@@ -372,7 +373,14 @@ class RunnerPluginRegistryTest {
 
         @Override
         public ModelInfo getModelInfo() {
-            return new ModelInfo(modelPath, "llama", 7_000_000_000L, 4096, 4096, Map.of());
+            return ModelInfo.builder()
+                    .name(modelPath)
+                    .architecture("llama")
+                    .parameterCount(String.valueOf(7_000_000_000L))
+                    .contextLength(4096L)
+                    .embeddingSize(4096)
+                    .metadata(Map.of())
+                    .build();
         }
     }
 }

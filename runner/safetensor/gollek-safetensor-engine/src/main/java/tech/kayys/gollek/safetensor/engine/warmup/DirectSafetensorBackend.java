@@ -17,10 +17,8 @@ import tech.kayys.gollek.safetensor.engine.generation.DirectInferenceEngine;
 import tech.kayys.gollek.safetensor.engine.generation.TextInferenceEngine;
 import tech.kayys.gollek.safetensor.generation.GenerationConfig;
 import tech.kayys.gollek.safetensor.text.ChatTemplateFormatter;
-import tech.kayys.gollek.spi.Message;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
-import tech.kayys.gollek.spi.model.ModelConfig;
 import tech.kayys.gollek.spi.provider.ProviderConfig;
 import tech.kayys.gollek.spi.provider.ProviderHealth;
 import tech.kayys.gollek.spi.provider.ProviderRequest;
@@ -76,16 +74,19 @@ public class DirectSafetensorBackend {
                     String finalRequestId = null;
 
                     for (ProviderResponse r : chunks) {
-                        if (finalRequestId == null) finalRequestId = r.getRequestId();
+                        if (finalRequestId == null)
+                            finalRequestId = r.getRequestId();
                         String delta = r.getContent();
-                        if (delta != null) fullText.append(delta);
-                        
-                        // Pick metrics from chunks (usually the last chunk has total, but we'll sum or max them)
+                        if (delta != null)
+                            fullText.append(delta);
+
+                        // Pick metrics from chunks (usually the last chunk has total, but we'll sum or
+                        // max them)
                         totalInputTokens = Math.max(totalInputTokens, r.getPromptTokens());
                         totalOutputTokens = Math.max(totalOutputTokens, r.getCompletionTokens());
                         totalDurationMs = Math.max(totalDurationMs, r.getDurationMs());
                     }
-                    
+
                     if (totalOutputTokens == 0 && fullText.length() > 0) {
                         totalOutputTokens = fullText.length() / 4; // fallback estimate
                     }
@@ -109,7 +110,8 @@ public class DirectSafetensorBackend {
                     boolean isFinal = "stop".equals(response.getFinishReason());
                     int index = idx.getAndIncrement();
                     if (isFinal) {
-                        return StreamingInferenceChunk.finalChunk(response.getRequestId(), index, response.getContent());
+                        return StreamingInferenceChunk.finalChunk(response.getRequestId(), index,
+                                response.getContent());
                     } else {
                         return StreamingInferenceChunk.of(response.getRequestId(), index, response.getContent());
                     }
@@ -131,15 +133,17 @@ public class DirectSafetensorBackend {
 
             // Build messages list — inject a default system message if none provided
             List<tech.kayys.gollek.spi.Message> rawMessages = new ArrayList<>(request.getMessages());
-            boolean hasSystem = rawMessages.stream().anyMatch(m -> m.getRole() == tech.kayys.gollek.spi.Message.Role.SYSTEM);
+            boolean hasSystem = rawMessages.stream()
+                    .anyMatch(m -> m.getRole() == tech.kayys.gollek.spi.Message.Role.SYSTEM);
             if (!hasSystem) {
                 rawMessages.add(0, tech.kayys.gollek.spi.Message.system("You are a helpful assistant."));
             }
 
-            // Apply the chat template — use Object bridge to bypass cross-module generic type identity check
+            // Apply the chat template — use Object bridge to bypass cross-module generic
+            // type identity check
             @SuppressWarnings("unchecked")
             String prompt = ChatTemplateFormatter.format((java.util.List) (Object) rawMessages, modelType);
-
+            System.err.println("FORMATTED PROMPT: " + prompt.replace("\n", "\\n"));
 
             int maxTokens = request.getMaxTokens() > 0 ? request.getMaxTokens() : 256;
 
@@ -147,6 +151,7 @@ public class DirectSafetensorBackend {
                     .maxNewTokens(maxTokens)
                     .temperature((float) request.getTemperature())
                     .topP((float) request.getTopP())
+                    .repetitionPenalty((float) request.getRepeatPenalty())
                     .build();
 
             // Generate response lazily
@@ -155,7 +160,9 @@ public class DirectSafetensorBackend {
                             .requestId(infResp.getRequestId())
                             .content(infResp.getContent())
                             .model(infResp.getModel())
-                            .finishReason(infResp.getFinishReason() != null ? infResp.getFinishReason().name().toLowerCase() : "stop")
+                            .finishReason(
+                                    infResp.getFinishReason() != null ? infResp.getFinishReason().name().toLowerCase()
+                                            : "stop")
                             .promptTokens(infResp.getInputTokens())
                             .completionTokens(infResp.getOutputTokens())
                             .totalTokens(infResp.getTokensUsed())

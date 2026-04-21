@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import tech.kayys.gollek.cli.util.CLIUtils;
 
 @Dependent
 @Unremovable
@@ -37,64 +38,56 @@ public class DeleteCommand implements Runnable {
 
     @Override
     public void run() {
+        final String ANSI_RESET = "\u001B[0m";
+        final String ANSI_RED = "\u001B[31m";
+        final String ANSI_GREEN = "\u001B[32m";
+        final String ANSI_YELLOW = "\u001B[33m";
+
         if (modelRef == null || modelRef.isBlank()) {
-            System.err.println("Model reference is required.");
+            System.err.println(ANSI_RED + "Model reference is required." + ANSI_RESET);
             return;
         }
         LocalModelIndex.refreshFromDisk();
         String ref = modelRef.trim();
 
-        // Fast path: let SDK remove registered models by id.
-        boolean sdkAttempted = false;
-        try {
-            sdkAttempted = true;
-            sdk.deleteModel(ref);
-            List<Path> postDeleteTargets = resolveTargets(ref);
-            if (postDeleteTargets.isEmpty()) {
-                System.out.println("Deleted via SDK: " + ref);
-                return;
-            }
-            // Continue with filesystem cleanup when SDK operation did not remove local
-            // artifacts.
-        } catch (Exception ignored) {
-            // fallback to filesystem matching
-        }
-
+        // 1. Resolve targets (supporting short ID, name, or path)
         List<Path> targets = resolveTargets(ref);
         if (targets.isEmpty()) {
-            if (sdkAttempted) {
-                System.out.println("Delete request accepted by SDK: " + ref);
-                return;
-            }
-            System.err.println("Model not found: " + modelRef);
+            System.err.println(ANSI_RED + "Error: Model not found: " + modelRef + ANSI_RESET);
             return;
         }
 
         if (targets.size() > 1 && !allMatches) {
-            System.err.println("Multiple matches found:");
+            System.err.println(ANSI_YELLOW + "Found multiple matching files for '" + ref + "':" + ANSI_RESET);
             for (Path p : targets) {
                 System.err.println("  - " + p);
             }
-            System.err.println("Use --all-matches or specify a more exact id/path.");
+            System.err.println("Use " + ANSI_YELLOW + "--all-matches" + ANSI_RESET + " to delete all of them, or specify an exact path/ID.");
             return;
         }
 
         List<Path> toDelete = allMatches ? targets : List.of(targets.get(0));
+        
+        // 2. Confirmation
         if (!assumeYes && !confirmDeletion(toDelete)) {
-            System.out.println("Delete cancelled.");
+            System.out.println(ANSI_YELLOW + "Delete cancelled." + ANSI_RESET);
             return;
         }
 
-        int deleted = 0;
+        // 3. Execution
+        int deletedCount = 0;
         for (Path target : toDelete) {
+            System.out.print("Deleting " + target.getFileName() + "... ");
             if (deletePath(target)) {
-                deleted++;
-                System.out.println("Deleted: " + target);
+                deletedCount++;
+                System.out.println(ANSI_GREEN + "DONE" + ANSI_RESET);
+            } else {
+                System.out.println(ANSI_RED + "FAILED" + ANSI_RESET);
             }
         }
-        if (deleted == 0) {
-            System.err.println("No model deleted.");
-        } else {
+
+        if (deletedCount > 0) {
+            System.out.println(ANSI_GREEN + "\nSuccessfully deleted " + deletedCount + " model(s)." + ANSI_RESET);
             LocalModelIndex.refreshFromDisk();
         }
     }

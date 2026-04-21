@@ -80,6 +80,22 @@ public class KVCacheManager {
             return blockTables.get(layerIdx);
         }
 
+        /**
+         * Proactively ensure that enough blocks are allocated for the given token count.
+         * Call this before prefill or decode loops.
+         */
+        public void ensureCapacity(int totalTokensNeeded) {
+            int requiredBlocks = (totalTokensNeeded + tokensPerBlock - 1) / tokensPerBlock;
+            if (totalTokensNeeded <= 0) return;
+
+            for (int i = 0; i < numLayers; i++) {
+                List<Integer> table = blockTables.get(i);
+                while (table.size() < requiredBlocks) {
+                    appendBlock(i);
+                }
+            }
+        }
+
         public void advance(int seqLen) {
             int prevBlockCount = (currentPos + tokensPerBlock - 1) / tokensPerBlock;
             if (currentPos == 0) prevBlockCount = 0;

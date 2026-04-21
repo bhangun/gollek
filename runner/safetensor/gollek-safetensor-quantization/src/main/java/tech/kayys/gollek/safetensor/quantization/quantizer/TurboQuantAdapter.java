@@ -36,22 +36,50 @@ public class TurboQuantAdapter implements Quantizer {
 
         TurboQuantEngine engine = new TurboQuantEngine(tqConfig);
         float[] data = tensor.toFloatArray();
+        int[] indices = new int[dim];
         
-        // TurboQuant_prod for unbiased inner product estimation
-        TurboQuantEngine.QuantProdResult result = engine.quantizeProd(data);
+        // Execute Algorithms 1: TurboQuant_mse
+        engine.quantizeMse(data, indices);
         
-        // TODO: Map TurboQuant Engine results back to AccelTensor bit-layout
-        // This requires implementing the bit-packing for QuantProdResult in AccelTensor.
-        log.warn("TurboQuant bit-packing to AccelTensor not yet implemented in adapter");
+        // Wrap indices in AccelTensor.
+        // We pack indices into a byte[] if bits <= 8
+        byte[] packed = new byte[dim];
+        for (int i = 0; i < dim; i++) {
+            packed[i] = (byte) indices[i];
+        }
         
-        return tensor; // Placeholder
+        AccelTensor quantized = AccelTensor.fromByteArray(packed, tensor.shape());
+        quantized.withQuantization(AccelTensor.QuantType.INT8, null, null, -1);
+        
+        return quantized;
     }
 
     @Override
     public AccelTensor dequantizeTensor(AccelTensor quantizedTensor, QuantConfig config) {
-        log.infof("TurboQuant: dequantizing tensor");
-        // Implementation will depend on how we store TurboQuant results in AccelTensor
-        return quantizedTensor;
+        log.infof("TurboQuant: dequantizing tensor %s", Arrays.toString(quantizedTensor.shape()));
+        
+        int dim = (int) quantizedTensor.numel();
+        byte[] packed = quantizedTensor.dataSegment().toArray(java.lang.foreign.ValueLayout.JAVA_BYTE);
+        int[] indices = new int[dim];
+        for (int i = 0; i < dim; i++) {
+            indices[i] = packed[i] & 0xFF;
+        }
+        
+        TurboQuantConfig tqConfig = new TurboQuantConfig(
+            config.getBits(),
+            dim,
+            TurboQuantConfig.Variant.MSE,
+            TurboQuantConfig.RotationStrategy.HADAMARD,
+            false,
+            0,
+            42L
+        );
+        
+        TurboQuantEngine engine = new TurboQuantEngine(tqConfig);
+        float[] output = new float[dim];
+        engine.dequantizeMse(indices, output);
+        
+        return AccelTensor.fromFloatArray(output, quantizedTensor.shape());
     }
 
     @Override

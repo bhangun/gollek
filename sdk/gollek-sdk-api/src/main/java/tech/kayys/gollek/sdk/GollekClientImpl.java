@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
+import tech.kayys.gollek.spi.model.ModelInfo;
 
 /**
  * Default implementation of {@link GollekClient}.
@@ -89,7 +90,11 @@ final class GollekClientImpl implements GollekClient {
 
     @Override
     public ModelInfo modelInfo() {
-        return new ModelInfo(model, backend, 0L, 4096);
+        return ModelInfo.builder()
+                .modelId(model)
+                .format(backend)
+                .contextLength(4096L)
+                .build();
     }
 
     @Override

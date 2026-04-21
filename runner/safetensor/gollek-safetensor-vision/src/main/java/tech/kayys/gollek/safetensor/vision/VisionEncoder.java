@@ -318,7 +318,7 @@ public class VisionEncoder {
                 AccelTensor ffnNormW = weights.get(prefix + "layer_norm2.weight");
                 AccelTensor ffnNormB = weights.get(prefix + "layer_norm2.bias");
                 if (ffnNormW != null) {
-                    AccelTensor normedFfn = layerNorm(current, ffnNormW, ffnNormB, 1e-5);
+                    AccelTensor normedFfn = AccelOps.layerNorm(current, ffnNormW, ffnNormB, 1e-5);
                     AccelTensor ffnOut = vitMlp(normedFfn, weights, prefix);
                     normedFfn.close();
                     AccelTensor afterFfn = AccelOps.add(current, ffnOut);

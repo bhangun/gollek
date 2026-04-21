@@ -5,8 +5,11 @@ import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
 import tech.kayys.gollek.spi.provider.LLMProvider;
 import tech.kayys.gollek.spi.provider.ProviderRegistry;
+import tech.kayys.gollek.cli.util.CLIUtils;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.gollek.sdk.model.SystemInfo;
+import picocli.CommandLine.Parameters;
 import io.quarkus.arc.Unremovable;
 
 import java.nio.file.Path;
@@ -27,24 +30,69 @@ public class InfoCommand implements Runnable {
     @Inject
     ProviderRegistry providerRegistry;
 
+    @Parameters(index = "0", description = "Optional model reference (ID, short ID, or name) to inspect", arity = "0..1")
+    String modelRef;
+
     @Override
     public void run() {
         try {
-            // Create system info
+            if (modelRef != null && !modelRef.isBlank()) {
+                printDetailedModelInfo(modelRef.trim());
+                return;
+            }
+
+            // Default behavior: system info
             SystemInfo systemInfo = createSystemInfo();
-
-            // Print system information
             printSystemInfo(systemInfo);
-
-            // Print available providers
             printProviders();
-            // Print local model details
             printLocalModels();
 
         } catch (Exception e) {
-            System.err.println("Failed to retrieve system information: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("Failed to retrieve information: " + e.getMessage());
         }
+    }
+
+    private void printDetailedModelInfo(String ref) {
+        var entryOpt = LocalModelIndex.find(ref);
+        if (entryOpt.isEmpty()) {
+            System.err.println("Model not found: " + ref);
+            return;
+        }
+        LocalModelIndex.Entry e = entryOpt.get();
+
+        System.out.println("\n┌──────────────────────── Model Information ─────────────────────────┐");
+        System.out.printf("│ %-18s │ %-36s │%n", "Name", truncate(e.name, 36));
+        System.out.printf("│ %-18s │ %-36s │%n", "Internal ID", truncate(e.id, 36));
+        System.out.printf("│ %-18s │ %-36s │%n", "Short ID", e.shortId);
+        System.out.printf("│ %-18s │ %-36s │%n", "Architecture", e.architecture != null ? e.architecture : "unknown");
+        System.out.printf("│ %-18s │ %-36s │%n", "Format", e.format != null ? e.format.toUpperCase() : "n/a");
+        System.out.printf("│ %-18s │ %-36s │%n", "Size", CLIUtils.formatSize(e.sizeBytes));
+        System.out.printf("│ %-18s │ %-36s │%n", "Modified", e.updatedAt != null ? e.updatedAt.substring(0, 10) : "n/a");
+        System.out.printf("│ %-18s │ %-36s │%n", "Runnable", e.runnable ? "yes" : "no");
+        
+        if (e.quantStrategy != null) {
+            System.out.println("├─────────────────── Quantization Details ───────────────────────────┤");
+            System.out.printf("│ %-18s │ %-36s │%n", "Strategy", e.quantStrategy);
+            System.out.printf("│ %-18s │ %-36d │%n", "Bits", e.quantBits);
+            if (e.quantGroupSize > 0) {
+                System.out.printf("│ %-18s │ %-36d │%n", "Group Size", e.quantGroupSize);
+            }
+            if (e.quantSourceModel != null) {
+                System.out.printf("│ %-18s │ %-36s │%n", "Source Model", truncate(e.quantSourceModel, 36));
+            }
+        }
+        
+        System.out.println("├─────────────────── Filesystem Location ────────────────────────────┤");
+        String path = e.path;
+        if (path != null) {
+            if (path.length() <= 36) {
+                System.out.printf("│ %-18s │ %-36s │%n", "Path", path);
+            } else {
+                System.out.printf("│ %-18s │ %-36s │%n", "Path", truncate(path, 36));
+                System.out.printf("│ %-18s │ %-36s │%n", "", path.substring(Math.min(path.length(), 36)));
+            }
+        }
+        System.out.println("└────────────────────────────────────────────────────────────────────┘");
     }
 
     private SystemInfo createSystemInfo() {

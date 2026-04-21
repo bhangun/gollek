@@ -1,4 +1,4 @@
-package tech.kayys.gollek.sdk.model;
+package tech.kayys.gollek.spi.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -12,8 +12,16 @@ import java.util.Objects;
 public final class ModelInfo {
 
     private final String modelId;
+    private final String shortId;
     private final String name;
     private final String version;
+    private final String architecture;
+    private final String parameterCount;
+    private final String description;
+    private final Long contextLength;
+    private final Integer embeddingSize;
+    private final Integer inputTokenLimit;
+    private final Integer outputTokenLimit;
     @Deprecated
     private final String requestId;
     private final String format;
@@ -26,8 +34,16 @@ public final class ModelInfo {
     @JsonCreator
     public ModelInfo(
             @JsonProperty("modelId") String modelId,
+            @JsonProperty("shortId") String shortId,
             @JsonProperty("name") String name,
             @JsonProperty("version") String version,
+            @JsonProperty("architecture") String architecture,
+            @JsonProperty("parameterCount") String parameterCount,
+            @JsonProperty("description") String description,
+            @JsonProperty("contextLength") Long contextLength,
+            @JsonProperty("embeddingSize") Integer embeddingSize,
+            @JsonProperty("inputTokenLimit") Integer inputTokenLimit,
+            @JsonProperty("outputTokenLimit") Integer outputTokenLimit,
             @JsonProperty("requestId") String requestId,
             @JsonProperty("format") String format,
             @JsonProperty("sizeBytes") Long sizeBytes,
@@ -36,8 +52,16 @@ public final class ModelInfo {
             @JsonProperty("updatedAt") Instant updatedAt,
             @JsonProperty("metadata") Map<String, Object> metadata) {
         this.modelId = Objects.requireNonNull(modelId, "modelId is required");
+        this.shortId = shortId;
         this.name = name;
         this.version = version;
+        this.architecture = architecture;
+        this.parameterCount = parameterCount;
+        this.description = description;
+        this.contextLength = contextLength;
+        this.embeddingSize = embeddingSize;
+        this.inputTokenLimit = inputTokenLimit;
+        this.outputTokenLimit = outputTokenLimit;
         this.requestId = requestId;
         this.format = format;
         this.sizeBytes = sizeBytes;
@@ -51,8 +75,40 @@ public final class ModelInfo {
         return modelId;
     }
 
+    public String getShortId() {
+        return shortId;
+    }
+
     public String getName() {
         return name;
+    }
+
+    public String getArchitecture() {
+        return architecture;
+    }
+
+    public String getParameterCount() {
+        return parameterCount;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public Long getContextLength() {
+        return contextLength;
+    }
+
+    public Integer getEmbeddingSize() {
+        return embeddingSize;
+    }
+
+    public Integer getInputTokenLimit() {
+        return inputTokenLimit;
+    }
+
+    public Integer getOutputTokenLimit() {
+        return outputTokenLimit;
     }
 
     public String getVersion() {
@@ -102,8 +158,16 @@ public final class ModelInfo {
     public Builder toBuilder() {
         return new Builder()
                 .modelId(modelId)
+                .shortId(shortId)
                 .name(name)
                 .version(version)
+                .architecture(architecture)
+                .parameterCount(parameterCount)
+                .description(description)
+                .contextLength(contextLength)
+                .embeddingSize(embeddingSize)
+                .inputTokenLimit(inputTokenLimit)
+                .outputTokenLimit(outputTokenLimit)
                 .requestId(requestId)
                 .format(format)
                 .sizeBytes(sizeBytes)
@@ -137,8 +201,16 @@ public final class ModelInfo {
 
     public static class Builder {
         private String modelId;
+        private String shortId;
         private String name;
         private String version;
+        private String architecture;
+        private String parameterCount;
+        private String description;
+        private Long contextLength;
+        private Integer embeddingSize;
+        private Integer inputTokenLimit;
+        private Integer outputTokenLimit;
         @Deprecated
         private String requestId;
         private String format;
@@ -153,6 +225,11 @@ public final class ModelInfo {
             return this;
         }
 
+        public Builder shortId(String shortId) {
+            this.shortId = shortId;
+            return this;
+        }
+
         public Builder name(String name) {
             this.name = name;
             return this;
@@ -160,6 +237,41 @@ public final class ModelInfo {
 
         public Builder version(String version) {
             this.version = version;
+            return this;
+        }
+
+        public Builder architecture(String architecture) {
+            this.architecture = architecture;
+            return this;
+        }
+
+        public Builder parameterCount(String parameterCount) {
+            this.parameterCount = parameterCount;
+            return this;
+        }
+
+        public Builder description(String description) {
+            this.description = description;
+            return this;
+        }
+
+        public Builder contextLength(Long contextLength) {
+            this.contextLength = contextLength;
+            return this;
+        }
+
+        public Builder embeddingSize(Integer embeddingSize) {
+            this.embeddingSize = embeddingSize;
+            return this;
+        }
+
+        public Builder inputTokenLimit(Integer inputTokenLimit) {
+            this.inputTokenLimit = inputTokenLimit;
+            return this;
+        }
+
+        public Builder outputTokenLimit(Integer outputTokenLimit) {
+            this.outputTokenLimit = outputTokenLimit;
             return this;
         }
 
@@ -209,8 +321,9 @@ public final class ModelInfo {
         }
 
         public ModelInfo build() {
-            return new ModelInfo(modelId, name, version, requestId, format,
-                    sizeBytes, quantization, createdAt, updatedAt, metadata);
+            return new ModelInfo(modelId, shortId, name, version, architecture, parameterCount, 
+                    description, contextLength, embeddingSize, inputTokenLimit, outputTokenLimit,
+                    requestId, format, sizeBytes, quantization, createdAt, updatedAt, metadata);
         }
     }
 

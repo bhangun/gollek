@@ -20,6 +20,7 @@ import org.jboss.logging.Logger;
 
 import tech.kayys.gollek.plugin.runner.RunnerPlugin;
 import tech.kayys.gollek.plugin.runner.RunnerSession;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.quantizer.gptq.GPTQLoader;
 import tech.kayys.gollek.quantizer.gptq.GPTQConfig;
 import tech.kayys.gollek.quantizer.gptq.GPTQQuantizerService;
@@ -354,18 +355,19 @@ public class SafetensorRunnerSession implements RunnerSession {
 
         String device = config.getOrDefault("device", "cpu").toString();
 
-        return new ModelInfo(
-                modelName,
-                architecture,
-                parameters,
-                maxContext,
-                4096, // Default embedding size
-                Map.of(
+        return ModelInfo.builder()
+                .name(modelName)
+                .architecture(architecture)
+                .parameterCount(String.valueOf(parameters))
+                .contextLength((long) maxContext)
+                .embeddingSize(4096) // Default embedding size
+                .format("Safetensor")
+                .metadata(Map.of(
                         "model_name", modelName,
-                        "format", "Safetensor",
                         "backend", providerConfig.backend(),
                         "device", device,
-                        "session_id", sessionId));
+                        "session_id", sessionId))
+                .build();
     }
 
     private String detectArchitecture(String modelPath) {

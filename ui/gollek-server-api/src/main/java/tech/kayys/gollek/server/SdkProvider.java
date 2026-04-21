@@ -10,7 +10,7 @@ import org.jboss.logging.Logger;
 import tech.kayys.gollek.factory.GollekSdkFactory;
 import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.gollek.sdk.exception.SdkException;
-import tech.kayys.gollek.sdk.model.ModelInfo;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.embedding.EmbeddingRequest;
@@ -124,17 +124,17 @@ public class SdkProvider {
         }
 
         @Override
-        public java.util.List<tech.kayys.gollek.sdk.model.ModelInfo> listModels() {
+        public java.util.List<tech.kayys.gollek.spi.model.ModelInfo> listModels() {
             return java.util.List.of();
         }
 
         @Override
-        public java.util.List<tech.kayys.gollek.sdk.model.ModelInfo> listModels(int offset, int limit) {
+        public java.util.List<tech.kayys.gollek.spi.model.ModelInfo> listModels(int offset, int limit) {
             return java.util.List.of();
         }
 
         @Override
-        public Optional<tech.kayys.gollek.sdk.model.ModelInfo> getModelInfo(String modelId) {
+        public Optional<tech.kayys.gollek.spi.model.ModelInfo> getModelInfo(String modelId) {
             return Optional.empty();
         }
 

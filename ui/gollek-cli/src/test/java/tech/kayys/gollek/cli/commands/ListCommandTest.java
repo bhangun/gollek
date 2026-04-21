@@ -7,7 +7,7 @@ import org.mockito.Mockito;
 import jakarta.inject.Inject;
 import tech.kayys.gollek.cli.commands.ListCommand;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.sdk.model.ModelInfo;
+import tech.kayys.gollek.spi.model.ModelInfo;
 
 import java.util.Collections;
 import java.util.List;

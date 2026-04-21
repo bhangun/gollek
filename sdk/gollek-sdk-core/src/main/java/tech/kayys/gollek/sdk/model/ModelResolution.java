@@ -1,6 +1,7 @@
 package tech.kayys.gollek.sdk.model;
 
 import java.util.Objects;
+import tech.kayys.gollek.spi.model.ModelInfo;
 
 /**
  * Result of a model resolution and preparation process.

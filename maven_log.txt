@@ -1,0 +1,15 @@
+[INFO] Scanning for projects...
+[ERROR] [ERROR] Some problems were encountered while processing the POMs:
+[FATAL] Non-resolvable parent POM for tech.kayys.gollek:gollek-framework-parent:0.1.1: The following artifacts could not be resolved: tech.kayys.gollek:gollek-parent:pom:0.1.1 (absent): tech.kayys.gollek:gollek-parent:pom:0.1.1 was not found in file:///Users/bhangun/.m2/repository during a previous attempt. This failure was cached in the local repository and resolution is not reattempted until the update interval of local-repository has elapsed or updates are forced and 'parent.relativePath' points at wrong local POM @ line 6, column 13
+ @ 
+[ERROR] The build could not read 1 project -> [Help 1]
+[ERROR]   
+[ERROR]   The project tech.kayys.gollek:gollek-framework-parent:0.1.1 (/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/gollek/framework/pom.xml) has 1 error
+[ERROR]     Non-resolvable parent POM for tech.kayys.gollek:gollek-framework-parent:0.1.1: The following artifacts could not be resolved: tech.kayys.gollek:gollek-parent:pom:0.1.1 (absent): tech.kayys.gollek:gollek-parent:pom:0.1.1 was not found in file:///Users/bhangun/.m2/repository during a previous attempt. This failure was cached in the local repository and resolution is not reattempted until the update interval of local-repository has elapsed or updates are forced and 'parent.relativePath' points at wrong local POM @ line 6, column 13 -> [Help 2]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/ProjectBuildingException
+[ERROR] [Help 2] http://cwiki.apache.org/confluence/display/MAVEN/UnresolvableModelException

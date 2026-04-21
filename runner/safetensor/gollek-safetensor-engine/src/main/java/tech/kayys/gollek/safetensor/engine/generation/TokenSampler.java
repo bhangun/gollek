@@ -80,9 +80,31 @@ public class TokenSampler {
             return -1;
         }
 
-        // Apply temperature
+        // Extract values
         double temp = config.temperature();
-        if (temp <= 0) temp = 1.0;
+        int topK = config.topK();
+        float topP = config.topP();
+        float minP = config.minP();
+
+        // Apply repetition and frequency penalties (applies to both greedy and sampled modes)
+        float repPenalty = config.repetitionPenalty();
+        float freqPenalty = config.frequencyPenalty();
+        if (freq != null && (repPenalty > 1.0f || freqPenalty > 0.0f)) {
+            for (int i = 0; i < logits.length && i < freq.length; i++) {
+                if (freq[i] > 0) {
+                    if (repPenalty > 1.0f) {
+                        if (logits[i] > 0) {
+                            logits[i] /= repPenalty;
+                        } else {
+                            logits[i] *= repPenalty;
+                        }
+                    }
+                    if (freqPenalty > 0.0f) {
+                        logits[i] -= freqPenalty * freq[i];
+                    }
+                }
+            }
+        }
 
         // Greedy sampling if temperature is very low
         if (temp < 1e-4) {
@@ -97,30 +119,102 @@ public class TokenSampler {
              return best;
         }
 
-        // Apply logit bias / penalties (skipped for brevity, but could be added here)
-        
+        if (temp <= 0) temp = 1.0;
+
+        // Create an index array
+        int[] indices = new int[logits.length];
+        for (int i = 0; i < indices.length; i++) {
+            indices[i] = i;
+        }
+
+        // Sort indices by logit (Descending) - we only need to sort roughly topK + 1,
+        // but sorting the array is generally fast enough.
+        quickSortIndices(logits, indices, 0, logits.length - 1);
+
+        // Max logit is now at indices[0]
+        float maxLogit = logits[indices[0]];
+
         // Softmax with temperature
         double[] probs = new double[logits.length];
-        double maxLogit = Double.NEGATIVE_INFINITY;
-        for (float logit : logits) {
-            if (logit > maxLogit) maxLogit = logit;
-        }
-
         double sum = 0;
-        for (int i = 0; i < logits.length; i++) {
-            probs[i] = Math.exp((logits[i] - maxLogit) / temp);
-            sum += probs[i];
+        
+        // Only evaluate Top-K if topK is valid and < vocab_size
+        int limit = (topK > 0 && topK < logits.length) ? topK : logits.length;
+
+        // Apply Min-P limit first
+        double minProbLimit = 0.0;
+        if (minP > 0.0f) {
+             minProbLimit = minP * Math.exp((maxLogit - maxLogit) / temp); // which is just minP
         }
 
-        double r = rng.nextDouble() * sum;
-        double cumulative = 0;
-        for (int i = 0; i < probs.length; i++) {
-            cumulative += probs[i];
-            if (cumulative >= r) {
-                return i;
+        int actualElements = 0;
+        for (int i = 0; i < limit; i++) {
+            int idx = indices[i];
+            double p = Math.exp((logits[idx] - maxLogit) / temp);
+            
+            if (minP > 0.0f && p < minProbLimit && actualElements > 0) {
+                // If it falls below threshold and we already have at least 1 token, stop.
+                break;
+            }
+            
+            probs[i] = p;
+            sum += p;
+            actualElements++;
+        }
+
+        // Top-P filter
+        if (topP > 0.0f && topP < 1.0f) {
+            double cumulative = 0.0;
+            for (int i = 0; i < actualElements; i++) {
+                double pNorm = probs[i] / sum;
+                cumulative += pNorm;
+                if (cumulative > topP && i > 0) {
+                    actualElements = i + 1;
+                    break;
+                }
             }
         }
 
-        return logits.length - 1;
+        // Recompute sum over filtered elements for exact normalization
+        double filteredSum = 0;
+        for (int i = 0; i < actualElements; i++) {
+            filteredSum += probs[i];
+        }
+
+        double r = rng.nextDouble() * filteredSum;
+        double cumulative = 0;
+        for (int i = 0; i < actualElements; i++) {
+            cumulative += probs[i];
+            if (cumulative >= r) {
+                return indices[i];
+            }
+        }
+
+        return indices[0];
+    }
+
+    private void quickSortIndices(float[] values, int[] indices, int low, int high) {
+        if (low < high) {
+            int pi = partition(values, indices, low, high);
+            quickSortIndices(values, indices, low, pi - 1);
+            quickSortIndices(values, indices, pi + 1, high);
+        }
+    }
+
+    private int partition(float[] values, int[] indices, int low, int high) {
+        float pivot = values[indices[high]];
+        int i = (low - 1);
+        for (int j = low; j < high; j++) {
+            if (values[indices[j]] > pivot) { // Descending order
+                i++;
+                int temp = indices[i];
+                indices[i] = indices[j];
+                indices[j] = temp;
+            }
+        }
+        int temp = indices[i + 1];
+        indices[i + 1] = indices[high];
+        indices[high] = temp;
+        return i + 1;
     }
 }

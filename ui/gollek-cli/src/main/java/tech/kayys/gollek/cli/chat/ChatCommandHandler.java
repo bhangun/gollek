@@ -4,7 +4,7 @@ import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
 import tech.kayys.gollek.cli.commands.*;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.sdk.model.ModelInfo;
+import tech.kayys.gollek.spi.model.ModelInfo;
 
 import java.util.List;
 

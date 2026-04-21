@@ -16,6 +16,7 @@ package tech.kayys.gollek.plugin.runner;
 
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
@@ -91,16 +92,4 @@ public interface RunnerSession {
      * @return Model metadata
      */
     ModelInfo getModelInfo();
-
-    /**
-     * Model information record.
-     */
-    record ModelInfo(
-            String name,
-            String architecture,
-            long parameterCount,
-            int contextLength,
-            int embeddingSize,
-            Map<String, Object> metadata
-    ) {}
 }

@@ -19,14 +19,24 @@ public class LiteRTModelInfo {
     private String modelId;
 
     /**
+     * Model name.
+     */
+    private String name;
+
+    /**
+     * Model architecture.
+     */
+    private String architecture;
+
+    /**
      * Model file path or name.
      */
-    private String modelPath;
+    private String path;
 
     /**
      * Model file size in bytes.
      */
-    private long modelSizeBytes;
+    private long sizeBytes;
 
     /**
      * Input tensor information.
@@ -44,7 +54,7 @@ public class LiteRTModelInfo {
      * Model metadata.
      */
     @Builder.Default
-    private Map<String, String> metadata = Map.of();
+    private Map<String, Object> metadata = Map.of();
 
     /**
      * Tensor information.

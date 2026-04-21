@@ -15,6 +15,7 @@ GIT_TAG=false
 GIT_PUSH=false
 BUILD_JAR=true
 SKIP_COMMIT=false
+FORCE=false
 
 # Colors for output
 RED='\033[0;31m'
@@ -40,6 +41,7 @@ usage() {
     echo "  -s, --snapshot-repo <url>        Override snapshot repository URL"
     echo "  -t, --tag                        Create git tag for the version"
     echo "  -p, --push                       Push git tag to remote"
+    echo "  -f, --force                      Force actions (e.g., overwrite existing tags)"
     echo "  --no-jar                         Skip JAR build"
     echo "  --keep-tests                     Do not skip tests during build"
     echo "  --skip-commit                    Skip git commit after version update"
@@ -63,6 +65,7 @@ while [[ "$#" -gt 0 ]]; do
         -s|--snapshot-repo) SNAPSHOT_REPO_URL="$2"; shift ;;
         -t|--tag) GIT_TAG=true ;;
         -p|--push) GIT_PUSH=true ;;
+        -f|--force) FORCE=true ;;
         --no-jar) BUILD_JAR=false ;;
         --keep-tests) SKIP_TESTS=false ;;
         --skip-commit) SKIP_COMMIT=true ;;
@@ -118,7 +121,14 @@ if [ -n "$NEW_VERSION" ]; then
         
         # Check if tag already exists
         if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo -e "${YELLOW}⚠ Tag $TAG_NAME already exists. Skipping tag creation.${NC}"
+            if [ "$FORCE" = true ]; then
+                echo -e "${YELLOW}⚠ Tag $TAG_NAME already exists. Forcing recreation...${NC}"
+                run_cmd "git tag -d \"$TAG_NAME\""
+                run_cmd "git tag -a \"$TAG_NAME\" -m \"Release $NEW_VERSION\""
+                echo -e "${GREEN}✓ Git tag force-recreated: $TAG_NAME${NC}"
+            else
+                echo -e "${YELLOW}⚠ Tag $TAG_NAME already exists. Skipping tag creation (use -f to force).${NC}"
+            fi
         else
             run_cmd "git tag -a \"$TAG_NAME\" -m \"Release $NEW_VERSION\""
             echo -e "${GREEN}✓ Git tag created: $TAG_NAME${NC}"
@@ -127,7 +137,12 @@ if [ -n "$NEW_VERSION" ]; then
         # Push tag if requested
         if [ "$GIT_PUSH" = true ]; then
             echo -e "${BLUE}>>> Pushing git tag to remote...${NC}"
-            run_cmd "git push origin \"$TAG_NAME\""
+            if [ "$FORCE" = true ]; then
+                run_cmd "git push origin :refs/tags/\"$TAG_NAME\" || true"
+                run_cmd "git push origin \"$TAG_NAME\""
+            else
+                run_cmd "git push origin \"$TAG_NAME\""
+            fi
             echo -e "${GREEN}✓ Git tag pushed: $TAG_NAME${NC}"
         fi
     fi

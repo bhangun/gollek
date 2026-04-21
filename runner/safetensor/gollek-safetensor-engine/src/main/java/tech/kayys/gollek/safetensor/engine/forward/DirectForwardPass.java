@@ -17,6 +17,8 @@ import tech.kayys.gollek.safetensor.engine.generation.attention.FlashAttentionKe
 import tech.kayys.gollek.safetensor.engine.generation.moe.MoeForwardPass;
 
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Full transformer forward pass using AccelTensor + Apple Accelerate.
@@ -46,7 +48,8 @@ public class DirectForwardPass {
         long seqLen = embeddings.size(1);
         AccelTensor hidden = embeddings;
         
-
+        // Ensure KV cache has enough space for the entire prefill sequence
+        kvCache.ensureCapacity((int) seqLen);
 
         for (int i = 0; i < config.numHiddenLayers(); i++) {
             AccelTensor nextHidden = transformerLayer(hidden, inputIds, weights, config, arch, kvCache, i, 0, (int) seqLen);
@@ -62,7 +65,12 @@ public class DirectForwardPass {
         normed.close();
 
         AccelTensor lmHeadW = weights.get(arch.lmHeadWeight());
-        if (lmHeadW == null) lmHeadW = weights.get(arch.embedTokensWeight()); // weight tying
+        if (lmHeadW == null && config.tieWordEmbeddings()) {
+            lmHeadW = weights.get(arch.embedTokensWeight()); // weight tying
+        }
+        if (lmHeadW == null) {
+            throw new IllegalStateException("Missing lm_head weight. Safetensor file might be incomplete or config.tie_word_embeddings is missing.");
+        }
         AccelTensor logits = AccelOps.linear(lastPos, lmHeadW);
         lastPos.close();
 
@@ -76,6 +84,18 @@ public class DirectForwardPass {
             if (f < min) min = f;
             if (f > max) max = f;
         }
+        if (config.numAttentionHeads() > 0) { // Just a dummy condition to keep it quiet usually
+             System.err.printf("[DEBUG] Logits stats: min=%f, max=%f, sum=%f, size=%d\n", min, max, sum, result.length);
+        
+        // Print top 5 IDs for debugging
+        List<Integer> topIndices = new ArrayList<>();
+        for (int i = 0; i < result.length; i++) topIndices.add(i);
+        topIndices.sort((a, b) -> Float.compare(result[b], result[a]));
+        for (int k = 0; k < Math.min(5, topIndices.size()); k++) {
+            int id = topIndices.get(k);
+            System.err.printf("  Top %d: ID=%d, val=%f\n", k, id, result[id]);
+        }
+    }
 
         return result;
     }
@@ -86,6 +106,10 @@ public class DirectForwardPass {
         AccelTensor hidden = embeddingLookup(embedTable, new long[] { tokenId });
         try {
             long[] tokenIds = new long[] { tokenId };
+            
+            // Ensure KV cache has space for the next generated token
+            kvCache.ensureCapacity(startPos + 1);
+
             for (int i = 0; i < config.numHiddenLayers(); i++) {
                 AccelTensor nextHidden = transformerLayer(hidden, tokenIds, weights, config, arch, kvCache, i, startPos, 1);
                 hidden.close();
@@ -97,7 +121,12 @@ public class DirectForwardPass {
             hidden.close();
 
             AccelTensor lmHeadW = weights.get(arch.lmHeadWeight());
-            if (lmHeadW == null) lmHeadW = weights.get(arch.embedTokensWeight());
+            if (lmHeadW == null && config.tieWordEmbeddings()) {
+                 lmHeadW = weights.get(arch.embedTokensWeight());
+            }
+            if (lmHeadW == null) {
+                 throw new IllegalStateException("Missing lm_head weight. Safetensor file might be incomplete or config.tie_word_embeddings is missing.");
+            }
             AccelTensor logits = AccelOps.linear(normed, lmHeadW);
             normed.close();
 
@@ -110,22 +139,11 @@ public class DirectForwardPass {
     }
 
     private AccelTensor transformerLayer(AccelTensor hidden, long[] inputIds, Map<String, AccelTensor> weights, ModelConfig config, ModelArchitecture arch, KVCacheManager.KVCacheSession kvCache, int layerIdx, int startPos, int seqLen) {
-        if (layerIdx == 0 && startPos == 0) {
-            String keys[] = { arch.layerQueryWeight(0), arch.layerQueryBias(0), arch.layerKeyWeight(0), arch.layerKeyBias(0) };
-            for (String k : keys) {
-                AccelTensor t = weights.get(k);
-            }
-        }
         AccelTensor residual = hidden;
-        if (layerIdx == 0 && startPos == 0) {
-        }
 
         // Attention norm
         AccelTensor normedAttn = AccelOps.rmsNorm(residual, weights.get(arch.layerAttentionNormWeight(layerIdx)), config.rmsNormEps());
         
-        if (layerIdx == 0 && startPos == 0) {
-        }
-
         FlashAttentionKernel.AttentionInput attnIn = new FlashAttentionKernel.AttentionInput(
                 normedAttn,
                 weights.get(arch.layerQueryWeight(layerIdx)),
@@ -143,21 +161,14 @@ public class DirectForwardPass {
                 null);
 
         AccelTensor attnOut = attentionKernel.compute(attnIn);
-        if (layerIdx == 0 && startPos == 0) {
-        }
         normedAttn.close();
 
-        // Combined Add + RMSNorm
-        AccelTensor normedFfn = AccelOps.addRmsNorm(residual, attnOut, weights.get(arch.layerFfnNormWeight(layerIdx)), config.rmsNormEps());
+        AccelTensor nextResidual = AccelOps.add(residual, attnOut);
+        AccelTensor normedFfn = AccelOps.rmsNorm(nextResidual, weights.get(arch.layerFfnNormWeight(layerIdx)), config.rmsNormEps());
         attnOut.close();
+        if (residual != hidden) residual.close();
+        residual = nextResidual;
         
-        if (layerIdx == 0 && startPos == 0) {
-        }
-
-
-        if (layerIdx == 0 && startPos == 0) {
-        }
-
         AccelTensor ffnOut;
         if (config.isMoeLayer(layerIdx)) {
             ffnOut = moeForwardPass.computeAccel(normedFfn, weights, config, layerIdx);
@@ -169,16 +180,10 @@ public class DirectForwardPass {
                     ? ffnNonGated(normedFfn, uW, dW)
                     : swigluFfn(normedFfn, gW, null, uW, null, dW, null);
         }
-        if (layerIdx == 0 && startPos == 0) {
-        }
         normedFfn.close();
 
         AccelTensor output = AccelOps.add(residual, ffnOut);
         ffnOut.close();
-        normedFfn.close();
-
-        if (layerIdx == 0 && startPos == 0) {
-        }
 
         return output;
     }
@@ -205,7 +210,6 @@ public class DirectForwardPass {
     }
 
     public AccelTensor swigluFfn(AccelTensor x, AccelTensor gateW, AccelTensor gateB, AccelTensor upW, AccelTensor upB, AccelTensor downW, AccelTensor downB) {
-        long start = System.nanoTime();
         AccelTensor gate = AccelOps.linear(x, gateW);
         AccelTensor up = AccelOps.linear(x, upW);
         AccelTensor combined = AccelOps.swiglu(gate, up);

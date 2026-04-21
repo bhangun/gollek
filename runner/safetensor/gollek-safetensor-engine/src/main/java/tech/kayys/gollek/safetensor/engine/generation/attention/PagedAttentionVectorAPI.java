@@ -27,7 +27,8 @@ public class PagedAttentionVectorAPI {
             float scale, 
             boolean causal,
             int tokensPerBlock,
-            int totalTokens) {
+            int totalTokens,
+            int numKVHeads) {
             
         long batch = q.size(0);
         long numQHeads = q.size(1);
@@ -42,7 +43,7 @@ public class PagedAttentionVectorAPI {
         for (int b = 0; b < batch; b++) {
             for (int h = 0; h < numQHeads; h++) {
                 for (int i = 0; i < seqLenQ; i++) {
-                    computePagedHeadQuery(b, h, i, q, blockTable, blockManager, out, scale, causal, tokensPerBlock, totalTokens);
+                    computePagedHeadQuery(b, h, i, q, blockTable, blockManager, out, scale, causal, tokensPerBlock, totalTokens, numKVHeads);
                 }
             }
         }
@@ -51,13 +52,18 @@ public class PagedAttentionVectorAPI {
 
     private static void computePagedHeadQuery(int b, int h, int i, 
                                             AccelTensor q, List<Integer> blockTable, BlockManager blockManager, AccelTensor out,
-                                            float scale, boolean causal, int tokensPerBlock, int totalTokens) {
+                                            float scale, boolean causal, int tokensPerBlock, int totalTokens, int numKVHeads) {
         
         MemorySegment qSeg = q.dataSegment();
         MemorySegment oSeg = out.dataSegment();
 
         long headDim = q.size(3);
-        long qOff = ((((long)b * q.size(1) + h) * q.size(2) + i) * headDim) * 4;
+        long qStride0 = q.stride()[0];
+        long qStride1 = q.stride()[1];
+        long qStride2 = q.stride()[2];
+        
+        // Correct offset accounting for tensor strides and internal offset
+        long qOff = (q.offset() + (long)b * qStride0 + (long)h * qStride1 + (long)i * qStride2) * 4;
         
         float m = Float.NEGATIVE_INFINITY;
         float l = 0.0f;
@@ -65,22 +71,25 @@ public class PagedAttentionVectorAPI {
 
         // Softmax Online Loop over blocks
         int currentTokCount = 0;
+        int groupSize = (int) (q.size(1) / numKVHeads);
+        int kvH = h / groupSize;
+
+        // Block layout: [tokensPerBlock, numKVHeads, headDim, 2 (K, V)]
+        long headStride = (long) headDim * 2;
+        long tokStride = (long) numKVHeads * headStride;
+
         for (int blockIdx : blockTable) {
             MemorySegment blockSeg = blockManager.getBlock(blockIdx);
             int tokensInThisBlock = Math.min(tokensPerBlock, totalTokens - currentTokCount);
-            
-            // In each block, K and V are stored back-to-back or interleaved.
-            // Layout in BlockManager.init: [tokensPerBlock, numHeads, headDim, 2 (K, V)]
-            // Let's use: K_offset = headDim * 0, V_offset = headDim * 1
-            long headStride = (long) headDim * 2;
-            long tokStride = (long) q.size(1) * headStride;
 
             for (int tok = 0; tok < tokensInThisBlock; tok++) {
                 int absPos = currentTokCount + tok;
-                if (causal && absPos > i) break;
+                long seqLenQ = q.size(2);
+                long startPos = totalTokens - seqLenQ;
+                if (causal && absPos > startPos + i) break;
 
                 // 1. Compute Dot Product Q_i @ K_j
-                long kOff = (long) tok * tokStride + (long) h * headStride;
+                long kOff = (long) tok * tokStride + (long) kvH * headStride;
                 float score = dotProduct(qSeg, qOff, blockSeg, kOff * 4, headDim) * scale;
 
                 // 2. Online Softmax Update
@@ -100,7 +109,11 @@ public class PagedAttentionVectorAPI {
         }
 
         // 4. Final Normalization
-        long oOff = ((((long)b * out.size(1) + h) * out.size(2) + i) * headDim) * 4;
+        long oStride0 = out.stride()[0];
+        long oStride1 = out.stride()[1];
+        long oStride2 = out.stride()[2];
+        long oOff = (out.offset() + (long)b * oStride0 + (long)h * oStride1 + (long)i * oStride2) * 4;
+        
         for (int d = 0; d < headDim; d++) {
             oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, (oOff / 4) + d, acc[d] / l);
         }
@@ -128,8 +141,11 @@ public class PagedAttentionVectorAPI {
         int j = 0;
         for (; j < SPECIES.loopBound(dim); j += SPECIES.length()) {
             FloatVector vacc = FloatVector.fromArray(SPECIES, acc, j);
-            FloatVector vv = FloatVector.fromMemorySegment(SPECIES, vSeg, vOff + (long)j * 4, java.nio.ByteOrder.nativeOrder());
-            FloatVector res = vacc.mul(vExpPrev).fma(vExpCurr, vv);
+            FloatVector vv = FloatVector.fromMemorySegment(SPECIES, vSeg, vOff + (long)j * 4, java.nio.ByteOrder.LITTLE_ENDIAN);
+            
+            // Correct update formula: acc = (acc * exp_prev) + (vv * exp_curr)
+            // Using fma: res = vv * exp_curr + (vacc * exp_prev)
+            FloatVector res = vv.fma(vExpCurr, vacc.mul(vExpPrev));
             res.intoArray(acc, j);
         }
         for (; j < dim; j++) {

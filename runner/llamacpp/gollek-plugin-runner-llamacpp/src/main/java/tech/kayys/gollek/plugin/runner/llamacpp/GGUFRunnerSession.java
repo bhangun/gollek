@@ -19,6 +19,7 @@ import io.smallrye.mutiny.Uni;
 import org.jboss.logging.Logger;
 import tech.kayys.gollek.plugin.runner.RunnerPlugin;
 import tech.kayys.gollek.plugin.runner.RunnerSession;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
@@ -126,13 +127,15 @@ public class GGUFRunnerSession implements RunnerSession {
     private ModelInfo loadModelInfo(String modelPath) {
         // TODO: Load actual model info from GGUF file
         // For now, return placeholder
-        return new ModelInfo(
-                "placeholder",
-                "llama",
-                7_000_000_000L, // 7B placeholder
-                4096,
-                4096,
-                Map.of("format", "GGUF", "path", modelPath));
+        return ModelInfo.builder()
+                .name("placeholder")
+                .architecture("llama")
+                .parameterCount(String.valueOf(7_000_000_000L)) // 7B placeholder
+                .contextLength(4096L)
+                .embeddingSize(4096)
+                .format("GGUF")
+                .metadata(Map.of("path", modelPath))
+                .build();
     }
 
     private InferenceResponse executeInference(InferenceRequest request) {

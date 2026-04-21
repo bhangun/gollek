@@ -26,8 +26,8 @@ public final class DefaultHealthCheckService implements HealthCheckService {
 
     // ── Components ─────────────────────────────────────────────────────
 
-    /** Registered models: modelId → ModelInfo */
-    private final Map<String, ModelInfo> models = new ConcurrentHashMap<>();
+    /** Registered models: modelId → ModelHealthEntry */
+    private final Map<String, ModelHealthEntry> models = new ConcurrentHashMap<>();
 
     /** Registered schedulers: modelId → scheduler */
     private final Map<String, ContinuousBatchScheduler> schedulers = new ConcurrentHashMap<>();
@@ -74,7 +74,7 @@ public final class DefaultHealthCheckService implements HealthCheckService {
      * Registers a model for health tracking.
      */
     public void registerModel(String modelId) {
-        models.put(modelId, new ModelInfo(modelId));
+        models.put(modelId, new ModelHealthEntry(modelId));
         LOG.infof("Registered model for health tracking: %s", modelId);
     }
 
@@ -82,7 +82,7 @@ public final class DefaultHealthCheckService implements HealthCheckService {
      * Marks a model as loaded.
      */
     public void markModelLoaded(String modelId) {
-        ModelInfo info = models.get(modelId);
+        ModelHealthEntry info = models.get(modelId);
         if (info != null) {
             info.loaded = true;
             info.loadedAt = LocalDateTime.now();
@@ -97,7 +97,7 @@ public final class DefaultHealthCheckService implements HealthCheckService {
      * Marks a model as warmed (ready for inference).
      */
     public void markModelWarmed(String modelId) {
-        ModelInfo info = models.get(modelId);
+        ModelHealthEntry info = models.get(modelId);
         if (info != null) {
             info.warmed = true;
         }
@@ -161,7 +161,7 @@ public final class DefaultHealthCheckService implements HealthCheckService {
         // Check if all models loaded
         for (var entry : models.entrySet()) {
             String modelId = entry.getKey();
-            ModelInfo info = entry.getValue();
+            ModelHealthEntry info = entry.getValue();
 
             if (!info.loaded) {
                 return HealthResult.unhealthy("readiness",
@@ -214,7 +214,7 @@ public final class DefaultHealthCheckService implements HealthCheckService {
         // Check for critical failures
         for (var entry : models.entrySet()) {
             String modelId = entry.getKey();
-            ModelInfo info = entry.getValue();
+            ModelHealthEntry info = entry.getValue();
 
             if (info.failed) {
                 return HealthResult.unhealthy("liveness",
@@ -236,7 +236,7 @@ public final class DefaultHealthCheckService implements HealthCheckService {
         Map<String, ModelHealth> modelHealth = new HashMap<>();
         for (var entry : models.entrySet()) {
             String modelId = entry.getKey();
-            ModelInfo info = entry.getValue();
+            ModelHealthEntry info = entry.getValue();
 
             String status;
             if (info.failed) {
@@ -366,7 +366,7 @@ public final class DefaultHealthCheckService implements HealthCheckService {
     /**
      * Internal model tracking info.
      */
-    private static final class ModelInfo {
+    private static final class ModelHealthEntry {
         final String modelId;
         boolean loaded = false;
         boolean warmed = false;
@@ -374,7 +374,7 @@ public final class DefaultHealthCheckService implements HealthCheckService {
         String errorMessage = "";
         LocalDateTime loadedAt = null;
 
-        ModelInfo(String modelId) {
+        ModelHealthEntry(String modelId) {
             this.modelId = modelId;
         }
     }

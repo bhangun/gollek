@@ -13,6 +13,7 @@ import org.jboss.logging.Logger;
 import tech.kayys.gollek.onnx.binding.OnnxRuntimeBinding;
 import tech.kayys.gollek.plugin.runner.RunnerPlugin;
 import tech.kayys.gollek.plugin.runner.RunnerSession;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
@@ -178,8 +179,15 @@ public class OnnxRunnerSession implements RunnerSession {
     private ModelInfo loadModelInfo(String modelPath) {
         Path path = Paths.get(modelPath);
         String modelName = path.getFileName().toString();
-        return new ModelInfo(modelName, "onnx", 0, 4096, 768, 
-            Map.of("format", "ONNX", "session_id", sessionId));
+        return ModelInfo.builder()
+                .name(modelName)
+                .architecture("onnx")
+                .parameterCount("0")
+                .contextLength(4096L)
+                .embeddingSize(768)
+                .format("ONNX")
+                .metadata(Map.of("session_id", sessionId))
+                .build();
     }
 
     private Tokenizer loadTokenizer(String modelPath) {

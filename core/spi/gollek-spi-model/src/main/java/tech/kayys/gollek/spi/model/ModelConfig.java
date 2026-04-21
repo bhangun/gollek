@@ -377,6 +377,13 @@ public class ModelConfig {
         this.architectures = null;
     }
 
+    /**
+     * Direct setter for runtime overrides.
+     */
+    public void setArchitectures(List<String> architectures) {
+        this.architectures = architectures;
+    }
+
     @JsonSetter("bos_token_id")
     public void setBosTokenId(JsonNode node) {
         this.bosTokenId = firstInt(node);

@@ -3,6 +3,7 @@ package tech.kayys.gollek.sdk.internal;
 import tech.kayys.gollek.sdk.GollekClient;
 import tech.kayys.gollek.sdk.model.*;
 import tech.kayys.gollek.sdk.internal.util.Json;
+import tech.kayys.gollek.spi.model.ModelInfo;
 
 import java.net.URI;
 import java.net.http.HttpClient;

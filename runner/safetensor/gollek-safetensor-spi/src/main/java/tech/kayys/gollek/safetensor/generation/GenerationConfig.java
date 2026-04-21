@@ -21,6 +21,7 @@ public final class GenerationConfig {
     private final float temperature;
     private final int topK;
     private final float topP;
+    private final float minP;
     private final int beamWidth;
     private final int maxNewTokens;
     private final int minNewTokens;
@@ -37,6 +38,7 @@ public final class GenerationConfig {
         this.temperature = b.temperature;
         this.topK = b.topK;
         this.topP = b.topP;
+        this.minP = b.minP;
         this.beamWidth = b.beamWidth;
         this.maxNewTokens = b.maxNewTokens;
         this.minNewTokens = b.minNewTokens;
@@ -75,6 +77,8 @@ public final class GenerationConfig {
     public int topK() { return topK; }
     /** @return nucleus sampling threshold (default: 1.0 = disabled) */
     public float topP() { return topP; }
+    /** @return probability scaling floor threshold (default: 0.0 = disabled) */
+    public float minP() { return minP; }
     /** @return beam width for beam search (default: 1) */
     public int beamWidth() { return beamWidth; }
     /** @return maximum number of new tokens to generate (default: 512) */
@@ -113,6 +117,7 @@ public final class GenerationConfig {
         private float temperature = 1.0f;
         private int topK = 50;
         private float topP = 1.0f;
+        private float minP = 0.0f;
         private int beamWidth = 1;
         private int maxNewTokens = 512;
         private int minNewTokens = 1;
@@ -132,6 +137,8 @@ public final class GenerationConfig {
         public Builder topK(int v) { this.topK = v; return this; }
         /** @param v nucleus sampling threshold in {@code (0, 1]}; 1.0 disables */
         public Builder topP(float v) { this.topP = v; return this; }
+        /** @param v minimum probability scaling threshold */
+        public Builder minP(float v) { this.minP = v; return this; }
         /** @param v beam width for beam search; 1 = greedy */
         public Builder beamWidth(int v) { this.beamWidth = v; return this; }
         /** @param v maximum new tokens to generate; must be &gt; 0 */

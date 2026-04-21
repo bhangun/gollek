@@ -29,6 +29,7 @@ import tech.kayys.gollek.cli.commands.RegisterCommand;
 import tech.kayys.gollek.cli.commands.MultimodalCommand;
 import tech.kayys.gollek.cli.commands.LiteRTCommand;
 import tech.kayys.gollek.cli.commands.OnnxCommand;
+import tech.kayys.gollek.cli.commands.QuantizeCommand;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
@@ -55,7 +56,8 @@ import picocli.CommandLine.Option;
         RegisterCommand.class,
         MultimodalCommand.class,
         LiteRTCommand.class,
-        OnnxCommand.class
+        OnnxCommand.class,
+        QuantizeCommand.class
 })
 
 public class GollekCommand implements Runnable {

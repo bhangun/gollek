@@ -86,7 +86,7 @@ public class FlashAttentionKernel {
             double theta = config.ropeThetaForLayer(in.layerIdx());
             int rotaryDim = (int) (headDim * config.partialRotaryFactorForLayer(in.layerIdx()));
             if (rotaryDim > 0) {
-                RopeFrequencyCache.RopeFrequencies rope = ropeCache.get(rotaryDim, config.maxPositionEmbeddings(), theta);
+                RopeFrequencyCache.RopeFrequencies rope = ropeCache.get(rotaryDim, config.maxPositionEmbeddings(), theta, config.ropeScaling());
                 
                 // Optimized RoPE: Process in-place on continuous segments
                 applyRopeToSegment(qReshaped.dataSegment(), (int)batch, numQHeads, (int)seqLen, headDim, in.startPos(), rope);
@@ -128,7 +128,8 @@ public class FlashAttentionKernel {
                 scale, 
                 causal, 
                 kvSession.tokensPerBlock(), 
-                totalTokens);
+                totalTokens,
+                config.resolvedNumKvHeads());
     }
 
     private void applyRopeToSegment(MemorySegment seg, int batch, int numHeads, int seqLen, int headDim, int startPos, RopeFrequencyCache.RopeFrequencies rope) {

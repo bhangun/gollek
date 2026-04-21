@@ -15,9 +15,36 @@ public class BnBQuantizerAdapter implements Quantizer {
 
     @Override
     public AccelTensor quantizeTensor(AccelTensor tensor, QuantConfig config) {
-        // BnB is primarily used for dequantization of pre-quantized models.
-        // Implementing the quantization (compression) side if needed.
-        throw new UnsupportedOperationException("BnB quantization side not implemented yet");
+        if (tensor == null) throw new IllegalArgumentException("Tensor cannot be null");
+        
+        int numElements = (int) tensor.numel();
+        int blockSize = 64; // NF4 default
+        int numBlocks = (numElements + blockSize - 1) / blockSize;
+        
+        float[] weights = tensor.toFloatArray();
+        byte[] packedOut = new byte[(numElements + 1) / 2];
+        float[] absmaxOut = new float[numBlocks];
+        
+        // Execute the quantization side of BnB engine
+        engine.quantizeNF4(weights, packedOut, absmaxOut);
+        
+        // Create quantized AccelTensor with metadata
+        AccelTensor quantized = AccelTensor.fromByteArray(packedOut, tensor.shape());
+        
+        // Attach scales (absmax) as a secondary MemorySegment
+        java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofShared();
+        java.lang.foreign.MemorySegment scaleSeg = arena.allocateFrom(
+            java.lang.foreign.ValueLayout.JAVA_FLOAT, absmaxOut);
+            
+        quantized.withQuantization(
+            AccelTensor.QuantType.INT4, 
+            scaleSeg, 
+            null, // no zeros for NF4
+            blockSize
+        );
+        
+        log.debugf("BnB: quantized %d elements to NF4 (blockSize=%d)", numElements, blockSize);
+        return quantized;
     }
 
     @Override

@@ -4,6 +4,7 @@ import io.smallrye.mutiny.Multi;
 import tech.kayys.gollek.engine.inference.InferenceService;
 import tech.kayys.gollek.sdk.GollekClient;
 import tech.kayys.gollek.sdk.model.*;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
@@ -94,7 +95,7 @@ public class LocalGollekClient implements GollekClient {
 
     @Override
     public ModelInfo getModelInfo(String modelId) {
-        return ModelInfo.builder().id(modelId).build();
+        return ModelInfo.builder().modelId(modelId).build();
     }
 
     /**

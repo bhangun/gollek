@@ -140,6 +140,44 @@ public class QuantConfig {
         return builder().strategy(QuantizationEngine.QuantStrategy.FP8).symmetric(true).build();
     }
 
+    /**
+     * Create AWQ configuration.
+     *
+     * @param bits      number of bits
+     * @param groupSize group size
+     * @return AWQ configuration
+     */
+    public static QuantConfig awq(int bits, int groupSize) {
+        return builder().strategy(QuantizationEngine.QuantStrategy.AWQ).bits(bits).groupSize(groupSize).build();
+    }
+
+    /**
+     * Create default TurboQuant configuration.
+     *
+     * @return TurboQuant configuration
+     */
+    public static QuantConfig turbo() {
+        return builder().strategy(QuantizationEngine.QuantStrategy.TURBO).build();
+    }
+
+    /**
+     * Create default BitsAndBytes configuration.
+     *
+     * @return BNB configuration
+     */
+    public static QuantConfig bnb() {
+        return builder().strategy(QuantizationEngine.QuantStrategy.BNB).build();
+    }
+
+    /**
+     * Create default AutoRound configuration.
+     *
+     * @return AutoRound configuration
+     */
+    public static QuantConfig autoRound() {
+        return builder().strategy(QuantizationEngine.QuantStrategy.INT4).build();
+    }
+
     public QuantizationEngine.QuantStrategy getStrategy() {
         return strategy;
     }

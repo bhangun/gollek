@@ -5,7 +5,7 @@ import tech.kayys.gollek.sdk.model.GenerationResponse;
 import tech.kayys.gollek.sdk.model.GenerationStream;
 import tech.kayys.gollek.sdk.model.EmbeddingRequest;
 import tech.kayys.gollek.sdk.model.EmbeddingResponse;
-import tech.kayys.gollek.sdk.model.ModelInfo;
+import tech.kayys.gollek.spi.model.ModelInfo;
 
 /**
  * Main entry point for the Gollek SDK.

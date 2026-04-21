@@ -7,7 +7,7 @@ import org.mockito.Mockito;
 import jakarta.inject.Inject;
 
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.sdk.model.ModelInfo;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 

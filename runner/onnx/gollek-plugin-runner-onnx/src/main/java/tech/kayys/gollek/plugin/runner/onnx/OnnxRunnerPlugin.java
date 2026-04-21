@@ -132,7 +132,7 @@ public class OnnxRunnerPlugin implements RunnerPlugin {
         return ModelHandle.of(
             request.getModelPath(),
             request.getFormat(),
-            session.getModelInfo().metadata()
+            session.getModelInfo().getMetadata()
         );
     }
 

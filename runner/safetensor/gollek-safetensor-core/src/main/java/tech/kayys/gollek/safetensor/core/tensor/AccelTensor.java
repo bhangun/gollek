@@ -139,6 +139,18 @@ public class AccelTensor implements AutoCloseable {
     }
 
     /**
+     * Creates a tensor from a Java byte array (copies data).
+     * Useful for storing quantized weights.
+     */
+    public static AccelTensor fromByteArray(byte[] data, long... shape) {
+        // For byte arrays, the element size depends on the quantType,
+        // but the factory just allocates the raw bytes.
+        Arena arena = Arena.ofShared();
+        MemorySegment seg = arena.allocateFrom(ValueLayout.JAVA_BYTE, data);
+        return new AccelTensor(seg, shape, contiguousStride(shape), 0, arena);
+    }
+
+    /**
      * Creates a tensor from a long array (for indices). Stored as float internally.
      */
     public static AccelTensor fromLongArray(long[] data, long... shape) {
@@ -178,6 +190,7 @@ public class AccelTensor implements AutoCloseable {
 
     public long[] shape() { return shape.clone(); }
     public long[] stride() { return stride.clone(); }
+    public long offset() { return offset; }
     public int rank() { return shape.length; }
 
     public long size(int dim) {
@@ -411,6 +424,23 @@ public class AccelTensor implements AutoCloseable {
         long[] newShape = shape.clone();
         newShape[d] = end - start;
         long newOffset = offset + start * stride[d];
+        return new AccelTensor(data, newShape, stride, newOffset, this);
+    }
+
+    /**
+     * Multi-dimensional slice [starts, ends).
+     */
+    public AccelTensor slice(long[] starts, long[] ends) {
+        checkClosed();
+        if (starts.length != shape.length || ends.length != shape.length) {
+            throw new IllegalArgumentException("Slice indices length mismatch");
+        }
+        long[] newShape = new long[shape.length];
+        long newOffset = offset;
+        for (int i = 0; i < shape.length; i++) {
+            newShape[i] = ends[i] - starts[i];
+            newOffset += starts[i] * stride[i];
+        }
         return new AccelTensor(data, newShape, stride, newOffset, this);
     }
 

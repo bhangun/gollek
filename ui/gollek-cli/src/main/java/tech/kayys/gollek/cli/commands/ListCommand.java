@@ -6,7 +6,7 @@ import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.sdk.model.ModelInfo;
+import tech.kayys.gollek.spi.model.ModelInfo;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import tech.kayys.gollek.cli.util.CLIUtils;
 
 /**
  * List local models using GollekSdk.
@@ -110,20 +111,43 @@ public class ListCommand implements Runnable {
     }
 
     private void printTable(List<ModelInfo> models) {
-        System.out.printf("%-30s %-12s %-10s %-20s%n", "NAME", "SIZE", "FORMAT", "MODIFIED");
-        System.out.println("-".repeat(75));
+        // ANSI escape codes for coloring
+        final String ANSI_RESET = "\u001B[0m";
+        final String ANSI_CYAN = "\u001B[36m";
+        final String ANSI_YELLOW = "\u001B[33m";
+        final String ANSI_GREEN = "\u001B[32m";
+        final String ANSI_WHITE_BOLD = "\u001B[1;37m";
+        final String ANSI_GRAY = "\u001B[90m";
+
+        System.out.printf(ANSI_WHITE_BOLD + "%-7s %-32s %-12s %-10s %-12s %-10s" + ANSI_RESET + "%n", 
+                "ID", "NAME", "ARCH", "FORMAT", "SIZE", "MODIFIED");
+        System.out.println(ANSI_GRAY + "─".repeat(85) + ANSI_RESET);
 
         for (ModelInfo model : models) {
+            String id = model.getShortId() != null ? model.getShortId() : "n/a";
+            String arch = model.getArchitecture() != null ? model.getArchitecture() : "unknown";
             String modified = model.getUpdatedAt() != null
                     ? model.getUpdatedAt().toString().substring(0, 10)
                     : "N/A";
-            System.out.printf("%-30s %-12s %-10s %-20s%n",
-                    truncate(model.getModelId(), 30),
-                    model.getSizeFormatted(),
-                    model.getFormat() != null ? model.getFormat() : "N/A",
+            
+            String formatColor = switch (model.getFormat() != null ? model.getFormat().toUpperCase() : "") {
+                case "GGUF" -> ANSI_CYAN;
+                case "SAFETENSORS" -> ANSI_YELLOW;
+                case "LITERT" -> ANSI_GREEN;
+                default -> "";
+            };
+
+            System.out.printf("%-7s %-32s %-12s %s%-10s%s %-12s %-10s%n",
+                    ANSI_YELLOW + id + ANSI_RESET,
+                    truncate(model.getName() != null ? model.getName() : model.getModelId(), 32),
+                    truncate(arch, 12),
+                    formatColor,
+                    truncate(model.getFormat() != null ? model.getFormat() : "N/A", 10),
+                    ANSI_RESET,
+                    CLIUtils.formatSize(model.getSizeBytes() != null ? model.getSizeBytes() : 0),
                     modified);
         }
-        System.out.printf("%n%d model(s) found%n", models.size());
+        System.out.printf(ANSI_WHITE_BOLD + "%n%d model(s) found" + ANSI_RESET + "%n", models.size());
     }
 
     private void printJson(List<ModelInfo> models) {

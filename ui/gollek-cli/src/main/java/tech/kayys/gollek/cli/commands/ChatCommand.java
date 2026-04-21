@@ -11,7 +11,7 @@ import tech.kayys.gollek.cli.chat.*;
 import tech.kayys.gollek.spi.provider.ProviderHealth;
 import tech.kayys.gollek.spi.provider.ProviderInfo;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.sdk.model.ModelInfo;
+import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 
 import org.jline.console.CmdDesc;
@@ -138,6 +138,12 @@ public class ChatCommand implements Runnable {
             "Options: Q4_0 (fastest, smallest), Q4_K_M (balanced), Q5_0, Q5_K_M, Q6_K, Q8_0 (best quality), " +
             "F16, F32 (no quantization). Default: Q4_K_M")
     public String quantization = "Q4_K_M";
+
+    @Option(names = { "--quantize" }, description = "Enable JIT quantization during inference (bnb, turbo, awq, gptq, autoround)")
+    public String quantizeStrategy;
+
+    @Option(names = { "--quantize-bits" }, description = "Bit width for JIT quantization (default: 4)", defaultValue = "4")
+    public int quantizeBits = 4;
 
     private static final String DEFAULT_CONCISE_SYSTEM_PROMPT = "Answer briefly and directly. Keep responses relevant to the question. "
             + "Prefer 1-4 short sentences unless the user asks for detail.";
@@ -280,6 +286,10 @@ public class ChatCommand implements Runnable {
                 return;
             }
 
+            // Smart quantization suggestion for large models
+            tech.kayys.gollek.cli.util.QuantSuggestionDetector.suggestIfNeeded(
+                    modelId, modelPathOverride, quantizeStrategy, quiet);
+
             setupSession();
             startChatLoop();
 
@@ -375,6 +385,12 @@ public class ChatCommand implements Runnable {
                 reqBuilder.parameter("mirostat", mirostat);
             if (grammar != null && !grammar.isEmpty())
                 reqBuilder.parameter("grammar", grammar);
+
+            // JIT quantization parameters
+            if (quantizeStrategy != null && !quantizeStrategy.isBlank()) {
+                reqBuilder.parameter("quantize_strategy", quantizeStrategy);
+                reqBuilder.parameter("quantize_bits", quantizeBits);
+            }
 
             sessionManager.executeInference(reqBuilder, stream, enableJsonSse);
         }

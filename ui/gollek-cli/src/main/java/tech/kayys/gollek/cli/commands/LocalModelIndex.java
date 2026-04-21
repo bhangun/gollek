@@ -12,18 +12,33 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import tech.kayys.gollek.cli.GollekHome;
+import tech.kayys.gollek.cli.util.CLIUtils;
+import tech.kayys.gollek.cli.util.QuantSuggestionDetector;
 
 final class LocalModelIndex {
 
     static final class Entry {
         public String id;
+        public String shortId;
         public String name;
+        public String architecture;
+        public String parameterCount;
         public String format;
         public boolean runnable;
         public long sizeBytes;
         public String path;
         public String updatedAt;
         public String source;
+
+        // ── Quantization metadata ────────────────────────────────────
+        /** Quantization strategy (bnb, turbo, awq, gptq, autoround), null if not quantized */
+        public String quantStrategy;
+        /** Bit width (4, 8, etc.), 0 if not quantized */
+        public int quantBits;
+        /** Group size for block quantization, 0 if not quantized */
+        public int quantGroupSize;
+        /** Original (unquantized) model ID this was derived from, null if original */
+        public String quantSourceModel;
     }
 
     private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
@@ -51,7 +66,7 @@ final class LocalModelIndex {
         if (e == null) {
             return false;
         }
-        if (ref.equals(e.id) || ref.equals(e.name) || ref.equals(e.path)) {
+        if (ref.equals(e.id) || ref.equals(e.shortId) || ref.equals(e.name) || ref.equals(e.path)) {
             return true;
         }
         String normalized = ref.replace("\\", "/").toLowerCase(Locale.ROOT);
@@ -115,18 +130,63 @@ final class LocalModelIndex {
     private static Entry toEntry(Path base, Path file, String fallbackFormat, boolean runnable) {
         Entry e = new Entry();
         e.id = base.relativize(file).toString().replace("\\", "/");
+        e.shortId = CLIUtils.generateShortId(e.id);
         e.name = file.getFileName().toString();
         e.format = detectFormat(file, fallbackFormat);
         e.runnable = runnable && !e.format.equalsIgnoreCase("safetensors") && !e.format.equalsIgnoreCase("bin");
         e.path = file.toAbsolutePath().toString();
         e.source = "local";
+        double pc = QuantSuggestionDetector.parseParamCount(e.name);
+        e.parameterCount = pc > 0 ? String.format("%.1fB", pc) : null;
+        
         try {
             e.sizeBytes = Files.size(file);
             e.updatedAt = Files.getLastModifiedTime(file).toInstant().toString();
         } catch (Exception ignored) {
             e.sizeBytes = 0L;
         }
+
+        // Try to detect architecture from config.json
+        detectArchitecture(e, file.getParent());
+
+        // Populate quantization metadata from gollek_quant.json if present
+        populateQuantMetadata(e, file.getParent());
         return e;
+    }
+
+    private static void detectArchitecture(Entry e, Path modelDir) {
+        if (modelDir == null) return;
+        Path configJson = modelDir.resolve("config.json");
+        if (!Files.isRegularFile(configJson)) return;
+        try {
+            var node = JSON.readTree(configJson.toFile());
+            if (node.has("architectures") && node.get("architectures").isArray() && node.get("architectures").size() > 0) {
+                e.architecture = node.get("architectures").get(0).asText();
+            } else if (node.has("model_type")) {
+                e.architecture = node.get("model_type").asText();
+            }
+        } catch (Exception ignored) {
+            // best effort
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void populateQuantMetadata(Entry e, Path modelDir) {
+        if (modelDir == null) return;
+        Path quantMeta = modelDir.resolve("gollek_quant.json");
+        if (!Files.isRegularFile(quantMeta)) return;
+        try {
+            var map = JSON.readValue(quantMeta.toFile(), java.util.Map.class);
+            var quant = (java.util.Map<String, Object>) map.get("gollek_quant");
+            if (quant != null) {
+                e.quantStrategy = (String) quant.get("strategy");
+                e.quantBits = quant.get("bits") instanceof Number n ? n.intValue() : 0;
+                e.quantGroupSize = quant.get("group_size") instanceof Number n ? n.intValue() : 0;
+                e.quantSourceModel = (String) quant.get("source_model");
+            }
+        } catch (Exception ignored) {
+            // best effort — skip if malformed
+        }
     }
 
     private static boolean isLikelyWeightFile(Path path) {
