@@ -72,8 +72,8 @@ public final class GemmaArchMapper {
         model.addMeta(pfx + "vocab_size",
                 GgufMetaValue.ofUInt32(cfg.vocabSize()));
 
-        // head_dim = hidden_size / num_attention_heads
-        int headDim = cfg.hiddenSize() / Math.max(1, cfg.numAttentionHeads());
+        // head_dim from config override, fallback to hidden_size / num_attention_heads
+        int headDim = cfg.headDim() > 0 ? cfg.headDim() : (cfg.hiddenSize() / Math.max(1, cfg.numAttentionHeads()));
         model.addMeta(pfx + "rope.dimension_count",
                 GgufMetaValue.ofUInt32(headDim));
 

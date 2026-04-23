@@ -85,7 +85,8 @@ public class ProviderConnectionPool {
         LOG.info("Provider connection pool manager started (adaptive=" + adaptiveEnabled + ")");
     }
 
-    void onStop(@Observes ShutdownEvent ev) {
+    @jakarta.annotation.PreDestroy
+    public void shutdown() {
         scaler.shutdownNow();
         pools.values().forEach(PoolEntry::close);
         LOG.info("Provider connection pool manager stopped");

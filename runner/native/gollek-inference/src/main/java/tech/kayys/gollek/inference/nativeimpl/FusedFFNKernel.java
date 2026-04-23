@@ -1,6 +1,8 @@
 package tech.kayys.gollek.inference.nativeimpl;
 
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import tech.kayys.gollek.gguf.loader.GGUFDequantizer;
 import java.lang.foreign.ValueLayout;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,17 +42,40 @@ public final class FusedFFNKernel {
             final int s = start;
             final int e = Math.min(start + step1, ffnDim);
             tasks1.add(() -> {
-                for (int f = s; f < e; f++) {
-                    float sumG = dot(x, w.wG, (long) f * hidden, hidden);
-                    if (w.bg != null) sumG += w.bg.get(ValueLayout.JAVA_FLOAT, (long) f * 4L);
-                    
-                    float sumU = dot(x, w.wU, (long) f * hidden, hidden);
-                    if (w.bu != null) sumU += w.bu.get(ValueLayout.JAVA_FLOAT, (long) f * 4L);
+                try (Arena taskArena = Arena.ofConfined()) {
+                    MemorySegment rowF32 = taskArena.allocate((long) hidden * Float.BYTES, 64);
+                    for (int f = s; f < e; f++) {
+                        float sumG = 0;
+                        if (w.wG.isQ8_0()) {
+                            long bytesPerRow = (hidden / 32) * 34L;
+                            GGUFDequantizer.dequantizeQ8_0(w.wG.segment(), f * bytesPerRow, rowF32, hidden);
+                            sumG = dot(x, rowF32, 0, hidden);
+                        } else if (w.wG.isF16()) {
+                            GGUFDequantizer.dequantizeF16(w.wG.segment(), (long) f * hidden * 2L, rowF32, hidden);
+                            sumG = dot(x, rowF32, 0, hidden);
+                        } else {
+                            sumG = dot(x, w.wG.segment(), (long) f * hidden, hidden);
+                        }
+                        if (w.bg != null) sumG += w.bg.get(ValueLayout.JAVA_FLOAT, (long) f * 4L);
+                        
+                        float sumU = 0;
+                        if (w.wU.isQ8_0()) {
+                            long bytesPerRow = (hidden / 32) * 34L;
+                            GGUFDequantizer.dequantizeQ8_0(w.wU.segment(), f * bytesPerRow, rowF32, hidden);
+                            sumU = dot(x, rowF32, 0, hidden);
+                        } else if (w.wU.isF16()) {
+                            GGUFDequantizer.dequantizeF16(w.wU.segment(), (long) f * hidden * 2L, rowF32, hidden);
+                            sumU = dot(x, rowF32, 0, hidden);
+                        } else {
+                            sumU = dot(x, w.wU.segment(), (long) f * hidden, hidden);
+                        }
+                        if (w.bu != null) sumU += w.bu.get(ValueLayout.JAVA_FLOAT, (long) f * 4L);
 
-                    float silu = sumG / (1.0f + (float) Math.exp(-sumG));
-                    float val = silu * sumU;
+                        float silu = sumG / (1.0f + (float) Math.exp(-sumG));
+                        float val = silu * sumU;
 
-                    ffnState.set(ValueLayout.JAVA_FLOAT, (long) f * 4L, val);
+                        ffnState.set(ValueLayout.JAVA_FLOAT, (long) f * 4L, val);
+                    }
                 }
                 return null;
             });
@@ -71,12 +96,25 @@ public final class FusedFFNKernel {
             final int s = start;
             final int e = Math.min(start + step2, hidden);
             tasks2.add(() -> {
-                for (int h = s; h < e; h++) {
-                    float sumD = dot(ffnState, w.wD, (long) h * ffnDim, ffnDim);
-                    if (w.bd != null) sumD += w.bd.get(ValueLayout.JAVA_FLOAT, (long) h * 4L);
-                    
-                    float res = residual.get(ValueLayout.JAVA_FLOAT, (long) h * 4L);
-                    out.set(ValueLayout.JAVA_FLOAT, (long) h * 4L, res + sumD);
+                try (Arena taskArena = Arena.ofConfined()) {
+                    MemorySegment rowF32 = taskArena.allocate((long) ffnDim * Float.BYTES, 64);
+                    for (int h = s; h < e; h++) {
+                        float sumD = 0;
+                        if (w.wD.isQ8_0()) {
+                            long bytesPerRow = (ffnDim / 32) * 34L;
+                            GGUFDequantizer.dequantizeQ8_0(w.wD.segment(), h * bytesPerRow, rowF32, ffnDim);
+                            sumD = dot(ffnState, rowF32, 0, ffnDim);
+                        } else if (w.wD.isF16()) {
+                            GGUFDequantizer.dequantizeF16(w.wD.segment(), (long) h * ffnDim * 2L, rowF32, ffnDim);
+                            sumD = dot(ffnState, rowF32, 0, ffnDim);
+                        } else {
+                            sumD = dot(ffnState, w.wD.segment(), (long) h * ffnDim, ffnDim);
+                        }
+                        if (w.bd != null) sumD += w.bd.get(ValueLayout.JAVA_FLOAT, (long) h * 4L);
+                        
+                        float res = residual.get(ValueLayout.JAVA_FLOAT, (long) h * 4L);
+                        out.set(ValueLayout.JAVA_FLOAT, (long) h * 4L, res + sumD);
+                    }
                 }
                 return null;
             });

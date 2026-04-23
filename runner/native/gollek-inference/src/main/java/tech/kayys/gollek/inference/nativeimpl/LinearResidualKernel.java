@@ -23,7 +23,7 @@ public final class LinearResidualKernel {
 
     public static void computeParallel(
             MemorySegment in,         // [inDim]
-            MemorySegment weight,     // [outDim, inDim]
+            tech.kayys.gollek.gguf.loader.TensorData weight, // [outDim, inDim]
             MemorySegment bias,       // [outDim] or null
             MemorySegment residual,   // [outDim]
             MemorySegment out,        // [outDim] (can be the same as residual)
@@ -39,11 +39,25 @@ public final class LinearResidualKernel {
             final int s = start;
             final int e = Math.min(start + step, outDim);
             tasks.add(() -> {
-                for (int h = s; h < e; h++) {
-                    float sum = dot(in, weight, (long) h * inDim, inDim);
-                    float res = residual.get(ValueLayout.JAVA_FLOAT, (long) h * 4L);
-                    float b = (bias != null) ? bias.get(ValueLayout.JAVA_FLOAT, (long) h * 4L) : 0.0f;
-                    out.set(ValueLayout.JAVA_FLOAT, (long) h * 4L, res + b + sum);
+                try (java.lang.foreign.Arena taskArena = java.lang.foreign.Arena.ofConfined()) {
+                    MemorySegment rowF32 = taskArena.allocate((long) inDim * Float.BYTES, 64);
+                    for (int h = s; h < e; h++) {
+                        float sum = 0;
+                        if (weight.isQ8_0()) {
+                            long bytesPerRow = (inDim / 32) * 34L;
+                            tech.kayys.gollek.gguf.loader.GGUFDequantizer.dequantizeQ8_0(weight.segment(), h * bytesPerRow, rowF32, inDim);
+                            sum = dot(in, rowF32, 0, inDim);
+                        } else if (weight.isF16()) {
+                            tech.kayys.gollek.gguf.loader.GGUFDequantizer.dequantizeF16(weight.segment(), (long) h * inDim * 2L, rowF32, inDim);
+                            sum = dot(in, rowF32, 0, inDim);
+                        } else {
+                            sum = dot(in, weight.segment(), (long) h * inDim, inDim);
+                        }
+                        
+                        float res = residual.get(ValueLayout.JAVA_FLOAT, (long) h * 4L);
+                        float b = (bias != null) ? bias.get(ValueLayout.JAVA_FLOAT, (long) h * 4L) : 0.0f;
+                        out.set(ValueLayout.JAVA_FLOAT, (long) h * 4L, res + b + sum);
+                    }
                 }
                 return null;
             });

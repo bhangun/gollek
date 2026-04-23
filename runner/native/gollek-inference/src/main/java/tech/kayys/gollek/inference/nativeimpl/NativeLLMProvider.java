@@ -317,26 +317,33 @@ public class NativeLLMProvider implements StreamingProvider {
 
         // 1. Prepare prompt with ChatTemplate
         String arch = (String) engine.getModel().metadata().getOrDefault("general.architecture", "llama");
+        LOG.info("Applying chat template...");
         ChatTemplate template = ChatTemplate.forArchitecture(arch);
         String promptText = template.apply(request.getMessages());
 
+        LOG.info("Encoding prompt...");
         long[] tokens = tokenizer.encode(promptText, EncodeOptions.builder().build());
-        
-        LOG.debugf("Prompt Tokens: %d", tokens.length);
+        LOG.infof("Encoded %d tokens.", tokens.length);
         
         try (NativeInferenceSession session = new NativeInferenceSession(engine, 4096)) {
+            LOG.info("Starting pre-fill...");
             long prefillStartTime = System.nanoTime();
             
             // Prefill loop (process all but the last prompt token)
             for (int i = 0; i < tokens.length - 1; i++) {
+                if (i % 10 == 0 && i > 0) LOG.infof("Pre-fill progress: %d/%d", i, tokens.length - 1);
                 session.tick((int) tokens[i], executor);
             }
+            LOG.info("Pre-fill complete.");
 
             long prefillEndTime = System.nanoTime();
             long firstTokenTime = 0;
             
             int lastToken = (int) tokens[tokens.length - 1];
             int maxNewTokens = request.getMaxTokens() > 0 ? request.getMaxTokens() : 512;
+            
+            LOG.info("Starting generation...");
+
             
             // Extract sampling parameters using standardized helper methods
             float temperature = request.getTemperature() > 0 ? (float) request.getTemperature() : 1.0f;
@@ -363,7 +370,7 @@ public class NativeLLMProvider implements StreamingProvider {
                     if (i == 0) firstTokenTime = System.nanoTime();
 
                     // Logit Projection
-                    LogitProjectionKernel.execute(hidden, engine.getOutputWeight(), logits, engine.getHidden(), vocabSize);
+                    LogitProjectionKernel.execute(hidden, engine.getOutputWeight(), logits, engine.getHidden(), vocabSize, engine.getFinalSoftCap());
                     
                     // Controlled Sampling
                     lastToken = SamplingKernel.sample(logits, vocabSize, temperature, topK, topP, repPenalty, tokenHistory);

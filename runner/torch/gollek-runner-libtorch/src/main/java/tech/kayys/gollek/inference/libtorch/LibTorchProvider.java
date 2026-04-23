@@ -171,7 +171,8 @@ public class LibTorchProvider implements StreamingProvider {
         }
     }
 
-    void onShutdown(@Observes ShutdownEvent ev) {
+    @jakarta.annotation.PreDestroy
+    public void shutdown() {
         shutdown();
     }
 

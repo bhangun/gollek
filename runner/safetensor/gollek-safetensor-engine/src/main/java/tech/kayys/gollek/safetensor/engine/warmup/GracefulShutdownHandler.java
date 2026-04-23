@@ -88,7 +88,8 @@ public class GracefulShutdownHandler {
         log.info("GracefulShutdownHandler: ready");
     }
 
-    void onShutdown(@Observes ShutdownEvent e) {
+    @jakarta.annotation.PreDestroy
+    public void shutdown() {
         log.infof("GracefulShutdownHandler: SIGTERM received — draining (timeout=%ds)",
                 drainTimeoutSeconds);
 

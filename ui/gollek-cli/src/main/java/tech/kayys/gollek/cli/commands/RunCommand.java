@@ -184,7 +184,6 @@ public class RunCommand implements Runnable {
 
     @Override
     public void run() {
-        System.err.println("[DEBUG] RunCommand.run() started");
         try {
             // Check plugin availability first
             if (!pluginChecker.hasProviders() && !pluginChecker.hasRunnerPlugins()) {
@@ -337,12 +336,12 @@ public class RunCommand implements Runnable {
                     
                     // Auto-select provider based on final format
                     String resolvedFormat = resolution.getInfo().getFormat();
-                    maybeAutoSelectProviderByFormat(resolvedFormat);
+                    maybeAutoSelectProviderByFormat(resolvedFormat, finalLocalPath);
                     
                     // If user explicitly requested a format, let's make sure our providerId matches that intent
                     // even if the above auto-selection was confused.
                     if (this.format != null && !this.format.isBlank()) {
-                        String intendedProvider = providerForFormat(this.format);
+                        String intendedProvider = providerForFormat(this.format, finalLocalPath);
                         if (intendedProvider != null && !intendedProvider.equalsIgnoreCase(providerId)) {
                              if (ensureProviderHealthy(intendedProvider)) {
                                  providerId = intendedProvider;
@@ -735,40 +734,55 @@ public class RunCommand implements Runnable {
 
     private void maybeAutoSelectProvider() {
         try {
-            var modelInfoOpt = LocalModelResolver.resolve(sdk, modelId, branch, format)
-                    .map(LocalModelResolver.ResolvedModel::info);
-            if (modelInfoOpt.isEmpty()) {
+            var resolvedOpt = LocalModelResolver.resolve(sdk, modelId, branch, format);
+            if (resolvedOpt.isEmpty()) {
                 return;
             }
-            this.format = modelInfoOpt.get().getFormat();
-            maybeAutoSelectProviderByFormat(this.format);
+            var resolved = resolvedOpt.get();
+            this.format = resolved.info().getFormat();
+            String path = resolved.localPath() != null ? resolved.localPath().toString() : modelId;
+            maybeAutoSelectProviderByFormat(this.format, path);
         } catch (Exception ignored) {
             // Keep default router behavior when format/provider probing is not available.
         }
     }
 
-    private void maybeAutoSelectProviderByFormat(String format) throws SdkException {
+    private void maybeAutoSelectProviderByFormat(String format, String path) throws SdkException {
         // Do not overwrite user-specified provider
         if (this.providerId != null && !this.providerId.trim().isEmpty()) {
             return;
         }
 
-        String inferredProvider = providerForFormat(format);
+        String inferredProvider = providerForFormat(format, path);
         if (inferredProvider == null || inferredProvider.isBlank()) {
             return;
         }
         if (!isProviderHealthy(inferredProvider)) {
+            System.err.println("Warning: Auto-selected provider '" + inferredProvider + "' is not available or healthy. Falling back to default routing.");
             return;
         }
         sdk.setPreferredProvider(inferredProvider);
         providerId = inferredProvider;
     }
 
-    private String providerForFormat(String format) {
+    private String providerForFormat(String format, String path) {
         if (format == null || format.isBlank()) {
             return null;
         }
         String normalized = format.trim().toUpperCase();
+        
+        // Special case: Stable Diffusion (requires ONNX or specialized runner)
+        if ("SAFETENSORS".equals(normalized) || "SAFETENSOR".equals(normalized)) {
+            try {
+                Path p = path != null ? Path.of(path) : null;
+                boolean isSd = p != null && tech.kayys.gollek.spi.model.ModelFormatDetector.isStableDiffusion(p);
+                System.err.println("SD Detection: format=" + normalized + ", path=" + path + " -> isSd=" + isSd);
+                if (isSd) {
+                    return "onnx";
+                }
+            } catch (Exception ignored) {}
+        }
+
         return switch (normalized) {
             case "GGUF" -> "native";
             case "TORCHSCRIPT" -> "libtorch";
@@ -794,8 +808,11 @@ public class RunCommand implements Runnable {
 
     private boolean ensureProviderReady() {
         try {
+            System.err.println("ensureProviderReady: providerId=" + providerId + ", modelId=" + modelId);
             if (providerId != null && !providerId.isBlank()) {
-                return ensureProviderHealthy(providerId);
+                boolean healthy = ensureProviderHealthy(providerId);
+                System.err.println("ensureProviderReady: providerId=" + providerId + " healthy=" + healthy);
+                if (healthy) return true;
             }
             var modelInfoOpt = LocalModelResolver.resolve(sdk, modelId, branch, format)
                     .map(LocalModelResolver.ResolvedModel::info);
@@ -805,7 +822,7 @@ public class RunCommand implements Runnable {
             var modelInfo = modelInfoOpt.get();
             this.format = modelInfo.getFormat();
             if (isCheckpointOnlyFormat(this.format)) {
-                String checkpointProvider = providerForFormat(this.format);
+                String checkpointProvider = providerForFormat(this.format, modelId);
                 if (checkpointProvider != null && ensureProviderHealthy(checkpointProvider)) {
                     providerId = checkpointProvider;
                     sdk.setPreferredProvider(checkpointProvider);
@@ -827,7 +844,7 @@ public class RunCommand implements Runnable {
                     }
                 }
                 if (isCheckpointOnlyFormat(format)) {
-                    checkpointProvider = providerForFormat(format);
+                    checkpointProvider = providerForFormat(format, modelId);
                     if (checkpointProvider != null && ensureProviderHealthy(checkpointProvider)) {
                         providerId = checkpointProvider;
                         sdk.setPreferredProvider(checkpointProvider);
@@ -846,7 +863,7 @@ public class RunCommand implements Runnable {
                 }
             }
 
-            String inferredProvider = providerForFormat(format);
+            String inferredProvider = providerForFormat(format, modelId);
             if (inferredProvider == null || inferredProvider.isBlank()) {
                 return true;
             }

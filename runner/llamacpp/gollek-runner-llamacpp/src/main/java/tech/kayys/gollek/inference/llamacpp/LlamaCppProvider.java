@@ -150,7 +150,8 @@ public class LlamaCppProvider implements StreamingProvider {
         }
     }
 
-    void onStop(@Observes ShutdownEvent event) {
+    @jakarta.annotation.PreDestroy
+    public void shutdown() {
         shutdown();
     }
 

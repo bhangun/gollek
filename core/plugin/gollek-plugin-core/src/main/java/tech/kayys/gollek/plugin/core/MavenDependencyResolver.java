@@ -317,11 +317,17 @@ public class MavenDependencyResolver {
      *
      * @return Repository system instance
      */
+    /**
+     * Create Maven Repository System.
+     *
+     * @return Repository system instance
+     */
     private RepositorySystem newRepositorySystem() {
-        DefaultServiceLocator locator = new DefaultServiceLocator();
+        DefaultServiceLocator locator = org.apache.maven.repository.internal.MavenRepositorySystemUtils.newServiceLocator();
         locator.addService(RepositoryConnectorFactory.class, BasicRepositoryConnectorFactory.class);
         locator.addService(TransporterFactory.class, FileTransporterFactory.class);
         locator.addService(TransporterFactory.class, HttpTransporterFactory.class);
+
         locator.setErrorHandler(new DefaultServiceLocator.ErrorHandler() {
             @Override
             public void serviceCreationFailed(Class<?> type, Class<?> impl, Throwable exception) {
@@ -339,7 +345,7 @@ public class MavenDependencyResolver {
      * @return Repository session
      */
     private RepositorySystemSession newRepositorySession(RepositorySystem system, String localRepoPath) {
-        DefaultRepositorySystemSession session = new DefaultRepositorySystemSession();
+        DefaultRepositorySystemSession session = org.apache.maven.repository.internal.MavenRepositorySystemUtils.newSession();
 
         // Set local repository
         LocalRepository localRepo = new LocalRepository(localRepoPath);

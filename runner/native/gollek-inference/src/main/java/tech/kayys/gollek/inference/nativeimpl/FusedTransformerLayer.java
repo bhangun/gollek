@@ -27,6 +27,7 @@ public final class FusedTransformerLayer {
         int headDim,
         boolean isNeox,
         float eps,
+        float attnSoftCap,
         ExecutorService executor
     ) {
         // 1. RMSNorm (Attention) -> buf.norm
@@ -58,7 +59,7 @@ public final class FusedTransformerLayer {
         }
 
         // 5. FlashAttention -> buf.attnOut
-        FlashAttentionKernel.computeParallel(buf.attnOut, buf.q, kvCache, null, layerIdx, pos + 1, numHeads, headDim, executor);
+        FlashAttentionKernel.computeParallel(buf.attnOut, buf.q, kvCache, null, layerIdx, pos + 1, numHeads, headDim, attnSoftCap, executor);
 
         // 6. Output Projection and Residual connection (handles Output bias)
         LinearResidualKernel.computeParallel(buf.attnOut, w.wo, w.bo, x, x, hidden, hidden, executor);

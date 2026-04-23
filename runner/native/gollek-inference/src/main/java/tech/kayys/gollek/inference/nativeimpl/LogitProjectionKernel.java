@@ -19,36 +19,57 @@ public final class LogitProjectionKernel {
 
     public static void execute(
         MemorySegment x,          // [hidden]
-        MemorySegment outputWeight, // [vocab_size, hidden]
+        tech.kayys.gollek.gguf.loader.TensorData outputWeight, // [vocab_size, hidden]
         MemorySegment logits,       // [vocab_size]
         int hidden,
-        int vocabSize
+        int vocabSize,
+        float softCap
     ) {
-        // Paraellize across tokens
-        java.util.stream.IntStream.range(0, vocabSize).parallel().forEach(v -> {
-            float sum = 0.0f;
-            long weightOffset = (long) v * hidden * Float.BYTES;
-            
-            int i = 0;
-            int upperBound = SPECIES.loopBound(hidden);
-            
-            FloatVector acc = FloatVector.zero(SPECIES);
-            
-            for (; i < upperBound; i += SPECIES.length()) {
-                FloatVector vx = FloatVector.fromMemorySegment(SPECIES, x, (long) i * Float.BYTES, java.nio.ByteOrder.nativeOrder());
-                FloatVector vw = FloatVector.fromMemorySegment(SPECIES, outputWeight, weightOffset + (long) i * Float.BYTES, java.nio.ByteOrder.nativeOrder());
-                acc = vx.fma(vw, acc);
+        int tasksCount = Runtime.getRuntime().availableProcessors();
+        int step = (vocabSize + tasksCount - 1) / tasksCount;
+
+        java.util.stream.IntStream.range(0, tasksCount).parallel().forEach(t -> {
+            int start = t * step;
+            int end = Math.min(start + step, vocabSize);
+            if (start >= end) return;
+
+            try (java.lang.foreign.Arena taskArena = java.lang.foreign.Arena.ofConfined()) {
+                MemorySegment rowF32 = taskArena.allocate((long) hidden * Float.BYTES, 64);
+                
+                for (int v = start; v < end; v++) {
+                    if (outputWeight.isQ8_0()) {
+                        long bytesPerRow = (hidden / 32) * 34L;
+                        tech.kayys.gollek.gguf.loader.GGUFDequantizer.dequantizeQ8_0(outputWeight.segment(), (long) v * bytesPerRow, rowF32, hidden);
+                    } else if (outputWeight.isF16()) {
+                        tech.kayys.gollek.gguf.loader.GGUFDequantizer.dequantizeF16(outputWeight.segment(), (long) v * hidden * 2L, rowF32, hidden);
+                    } else {
+                        MemorySegment.copy(outputWeight.segment(), (long) v * hidden * Float.BYTES, rowF32, 0, (long) hidden * Float.BYTES);
+                    }
+                    
+                    float sum = 0.0f;
+                    int i = 0;
+                    int upperBound = SPECIES.loopBound(hidden);
+                    FloatVector acc = FloatVector.zero(SPECIES);
+                    
+                    for (; i < upperBound; i += SPECIES.length()) {
+                        FloatVector vx = FloatVector.fromMemorySegment(SPECIES, x, (long) i * Float.BYTES, java.nio.ByteOrder.nativeOrder());
+                        FloatVector vw = FloatVector.fromMemorySegment(SPECIES, rowF32, (long) i * Float.BYTES, java.nio.ByteOrder.nativeOrder());
+                        acc = vx.fma(vw, acc);
+                    }
+                    
+                    sum = acc.reduceLanes(VectorOperators.ADD);
+                    for (; i < hidden; i++) {
+                        sum += x.get(ValueLayout.JAVA_FLOAT, (long) i * Float.BYTES) * 
+                               rowF32.get(ValueLayout.JAVA_FLOAT, (long) i * Float.BYTES);
+                    }
+                    
+                    if (softCap > 0.0f) {
+                        sum = (float) (softCap * Math.tanh(sum / softCap));
+                    }
+                    
+                    logits.set(ValueLayout.JAVA_FLOAT, (long) v * Float.BYTES, sum);
+                }
             }
-            
-            sum = acc.reduceLanes(VectorOperators.ADD);
-            
-            // Tail loop
-            for (; i < hidden; i++) {
-                sum += x.get(ValueLayout.JAVA_FLOAT, (long) i * Float.BYTES) * 
-                       outputWeight.get(ValueLayout.JAVA_FLOAT, weightOffset + (long) i * Float.BYTES);
-            }
-            
-            logits.set(ValueLayout.JAVA_FLOAT, (long) v * Float.BYTES, sum);
         });
     }
 }

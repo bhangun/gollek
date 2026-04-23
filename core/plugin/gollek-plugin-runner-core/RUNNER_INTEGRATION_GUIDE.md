@@ -196,7 +196,8 @@ public class InferenceEngineBootstrap {
         providerRegistry.discoverProviders();
     }
 
-    public void onShutdown(@Observes ShutdownEvent event) {
+    public @jakarta.annotation.PreDestroy
+    public void shutdown() { {
         runnerRegistry.shutdown();
     }
 }

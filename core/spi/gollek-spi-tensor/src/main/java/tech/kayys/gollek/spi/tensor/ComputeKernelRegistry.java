@@ -102,8 +102,8 @@ public class ComputeKernelRegistry {
                         kernel.deviceType(), kernel.deviceName());
                     return kernel;
                 }
-            } catch (Exception e) {
-                LOG.debugf(e, "Device %s not available: %s", deviceType, e.getMessage());
+            } catch (Throwable t) {
+                LOG.debugf(t, "Device %s not available: %s", deviceType, t.getMessage());
             }
         }
 
@@ -141,8 +141,8 @@ public class ComputeKernelRegistry {
                         deviceType, kernel.deviceName());
                     return kernel;
                 }
-            } catch (Exception e) {
-                LOG.debugf(e, "Failed to instantiate %s kernel", deviceType);
+            } catch (Throwable t) {
+                LOG.debugf(t, "Failed to instantiate %s kernel", deviceType);
             }
         }
 
@@ -199,7 +199,7 @@ public class ComputeKernelRegistry {
             try {
                 Class<?> clazz = Class.forName("tech.kayys.gollek.cuda.binding.CudaBinding");
                 return (ComputeKernel) clazz.getDeclaredConstructor().newInstance();
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 throw new IllegalStateException("CUDA not available", e);
             }
         });
@@ -209,8 +209,8 @@ public class ComputeKernelRegistry {
             try {
                 Class<?> clazz = Class.forName("tech.kayys.gollek.metal.binding.MetalBinding");
                 return (ComputeKernel) clazz.getDeclaredConstructor().newInstance();
-            } catch (Exception e) {
-                throw new IllegalStateException("Metal not available", e);
+            } catch (Throwable t) {
+                throw new IllegalStateException("Metal not available", t);
             }
         });
 
@@ -219,8 +219,8 @@ public class ComputeKernelRegistry {
             try {
                 Class<?> clazz = Class.forName("tech.kayys.gollek.rocm.binding.RocmHipBinding");
                 return (ComputeKernel) clazz.getDeclaredConstructor().newInstance();
-            } catch (Exception e) {
-                throw new IllegalStateException("ROCm not available", e);
+            } catch (Throwable t) {
+                throw new IllegalStateException("ROCm not available", t);
             }
         });
 

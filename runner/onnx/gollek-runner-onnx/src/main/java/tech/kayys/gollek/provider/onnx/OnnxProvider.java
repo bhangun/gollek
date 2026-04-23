@@ -210,15 +210,10 @@ public class OnnxProvider implements StreamingProvider {
 
     /**
      * Detects Stable Diffusion pipeline by checking for UNet + VAE subdirectories.
-     * Handles both ONNX variant (vae_decoder/) and safetensors variant (vae/).
+     * Delegates to shared utility in {@link ModelFormatDetector}.
      */
     private boolean isStableDiffusion(Path modelPath) {
-        if (modelPath == null) return false;
-        Path dir = Files.isDirectory(modelPath) ? modelPath : modelPath.getParent();
-        boolean hasUnet = Files.isDirectory(dir.resolve("unet"));
-        boolean hasVae = Files.isDirectory(dir.resolve("vae_decoder"))
-                       || Files.isDirectory(dir.resolve("vae"));
-        return hasUnet && hasVae;
+        return tech.kayys.gollek.spi.model.ModelFormatDetector.isStableDiffusion(modelPath);
     }
 
     /**

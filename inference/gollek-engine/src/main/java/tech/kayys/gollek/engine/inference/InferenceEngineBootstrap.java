@@ -35,7 +35,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * - Performing health checks
  * - Graceful shutdown handling
  */
-@Startup
 @ApplicationScoped
 public class InferenceEngineBootstrap {
 
@@ -74,7 +73,7 @@ public class InferenceEngineBootstrap {
     /**
      * Bootstrap on application startup
      */
-    void onStart(@Observes StartupEvent event) {
+    public void initialize() {
         if (!engineEnabled) {
             LOG.warn("Inference engine is disabled via configuration");
             return;
@@ -110,7 +109,8 @@ public class InferenceEngineBootstrap {
     /**
      * Graceful shutdown handling
      */
-    void onStop(@Observes ShutdownEvent event) {
+    @jakarta.annotation.PreDestroy
+    public void shutdown() {
         if (!initialized) {
             return;
         }

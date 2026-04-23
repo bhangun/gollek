@@ -47,7 +47,8 @@ public class GracefulShutdownHandler {
         log.info("GracefulShutdownHandler initialized");
     }
 
-    void onShutdown(@Observes ShutdownEvent ev) {
+    @jakarta.annotation.PreDestroy
+    public void shutdown() {
         log.infof("Initiating graceful shutdown (timeout=%ds, quiet=%ds)...",
                 shutdownTimeoutS, quietPeriodS);
         shuttingDown.set(true);

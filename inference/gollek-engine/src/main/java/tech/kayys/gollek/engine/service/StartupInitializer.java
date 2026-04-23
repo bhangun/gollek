@@ -1,8 +1,6 @@
 package tech.kayys.gollek.engine.service;
 
-import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import tech.kayys.gollek.spi.inference.InferenceEngine;
 import tech.kayys.gollek.runner.ModelRunnerFactory;
@@ -27,7 +25,7 @@ public class StartupInitializer {
     @Inject
     ModelRunnerFactory runnerFactory;
 
-    void onStart(@Observes StartupEvent event) {
+    public void initialize() {
 
         LOG.info("=".repeat(80));
         LOG.info("Gollek Inference Platform Runtime Starting...");

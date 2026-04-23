@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-cli:
+  build-jvm:
     name: Build CLI (JVM)
     runs-on: ubuntu-latest
 
@@ -79,7 +79,7 @@ jobs:
           fi
           ./scripts/check-no-local-paths.sh
 
-      - name: Build Gollek CLI
+      - name: Build Gollek CLI (JVM)
         shell: bash
         env:
           MAVEN_OPTS: -Xmx3G
@@ -89,3 +89,48 @@ jobs:
           export GOLLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch"
           export GOLLEK_LIBTORCH_LIB_PATH="$HOME/.gollek/source/vendor/libtorch/lib"
           mvn -B clean package -pl ui/gollek-cli -am -DskipTests
+
+  build-native:
+    name: Build CLI (Native Smoke)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: graalvm
+          java-version: "25"
+          cache: maven
+
+      - name: Prepare llama.cpp source
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOLLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp" \
+          ./scripts/prepare-llama-source.sh
+
+      - name: Prepare libtorch source
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOLLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch" \
+          ./scripts/prepare-libtorch-source.sh
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libssl-dev zlib1g-dev pkg-config
+
+      - name: Build Gollek CLI (Native)
+        shell: bash
+        env:
+          MAVEN_OPTS: -Xmx3G
+        run: |
+          set -euo pipefail
+          export GOLLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp"
+          export GOLLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch"
+          export GOLLEK_LIBTORCH_LIB_PATH="$HOME/.gollek/source/vendor/libtorch/lib"
+          mvn -B clean package -pl ui/gollek-cli -am -DskipTests -Pnative

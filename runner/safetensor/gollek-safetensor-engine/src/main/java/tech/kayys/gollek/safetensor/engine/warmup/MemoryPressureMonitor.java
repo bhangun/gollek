@@ -94,7 +94,8 @@ public class MemoryPressureMonitor implements HealthCheck {
         log.infof("MemoryPressureMonitor: started (interval=%ds)", checkIntervalSeconds);
     }
 
-    void onShutdown(@Observes ShutdownEvent e) {
+    @jakarta.annotation.PreDestroy
+    public void shutdown() {
         running = false;
     }
 

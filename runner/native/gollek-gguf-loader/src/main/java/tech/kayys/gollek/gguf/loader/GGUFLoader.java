@@ -2,8 +2,10 @@ package tech.kayys.gollek.gguf.loader;
 
 import tech.kayys.gollek.gguf.loader.GGUFModel;
 import tech.kayys.gollek.gguf.loader.GGUFTensorInfo;
+import tech.kayys.gollek.gguf.loader.TensorData;
 import tech.kayys.gollek.gguf.loader.GGUFReader;
 import tech.kayys.gollek.gguf.loader.GGUFParser;
+import tech.kayys.gollek.gguf.loader.TransformerLayerWeights;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -60,14 +62,41 @@ public final class GGUFLoader {
         }
         if (nHeadsKv == 0) nHeadsKv = nHeads; // Final fallback
 
-        int headDim = hidden / nHeads;
+        int headDim = getMetadataIntOptional(meta, 
+            arch + ".attention.head_dim", 
+            "gemma2.attention.head_dim",
+            "llama.attention.head_dim",
+            "key_length");
+            
+        if (headDim == 0) {
+            // Try to derive from tensor shape: [hidden, nHeads * headDim]
+            try {
+                GGUFTensorInfo qInfo = model.tensors().stream()
+                    .filter(t -> t.name().equals("blk.0.attn_q.weight"))
+                    .findFirst().orElse(null);
+                if (qInfo != null && qInfo.shape().length >= 2) {
+                    headDim = (int) (qInfo.shape()[1] / nHeads);
+                }
+            } catch (Exception e) {
+                // Fallback to traditional calculation
+                headDim = hidden / nHeads;
+            }
+        }
+        
+        if (headDim == 0) headDim = hidden / nHeads;
+
         
         System.out.println("Loading " + nLayer + " layers: arch=" + arch + ", hidden=" + hidden + ", nHeads=" + nHeads + ", nHeadsKv=" + nHeadsKv);
 
         List<TransformerLayerWeights> layers = new ArrayList<>(nLayer);
 
         for (int i = 0; i < nLayer; i++) {
+            if (i % 10 == 0) {
+                System.out.print("Loading layers " + i + "-" + Math.min(i + 9, nLayer - 1) + "... ");
+                System.out.flush();
+            }
             String prefix = "blk." + i + ".";
+
             
             MemorySegment rms = findAndPrepareTensor(model, prefix + "attn_norm.weight", arena);
             
@@ -100,18 +129,18 @@ public final class GGUFLoader {
             
             MemorySegment packed = QKVPrepacker.prepack(wqkv, hidden, nHeads, nHeadsKv, headDim, arena);
 
-            MemorySegment wo = findAndPrepareTensor(model, prefix + "attn_output.weight", arena);
+            TensorData wo = findTensorLazy(model, prefix + "attn_output.weight");
             MemorySegment bo = findAndPrepareTensorOptional(model, prefix + "attn_output.bias", arena);
 
             MemorySegment ffnNorm = findAndPrepareTensor(model, prefix + "ffn_norm.weight", arena);
             
-            MemorySegment wG = findAndPrepareTensor(model, prefix + "ffn_gate.weight", arena);
+            TensorData wG = findTensorLazy(model, prefix + "ffn_gate.weight");
             MemorySegment bg = findAndPrepareTensorOptional(model, prefix + "ffn_gate.bias", arena);
             
-            MemorySegment wU = findAndPrepareTensor(model, prefix + "ffn_up.weight", arena);
+            TensorData wU = findTensorLazy(model, prefix + "ffn_up.weight");
             MemorySegment bu = findAndPrepareTensorOptional(model, prefix + "ffn_up.bias", arena);
             
-            MemorySegment wD = findAndPrepareTensor(model, prefix + "ffn_down.weight", arena);
+            TensorData wD = findTensorLazy(model, prefix + "ffn_down.weight");
             MemorySegment bd = findAndPrepareTensorOptional(model, prefix + "ffn_down.bias", arena);
 
             layers.add(new TransformerLayerWeights(
@@ -130,8 +159,20 @@ public final class GGUFLoader {
             ));
         }
 
+        System.out.println("Done.");
         return layers;
     }
+
+    public static TensorData findTensorLazy(GGUFModel model, String name) {
+        GGUFTensorInfo info = model.tensors().stream()
+            .filter(t -> t.name().equals(name))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Tensor not found: " + name));
+
+        MemorySegment raw = model.segment().asSlice(model.dataStart() + info.offset(), info.sizeInBytes());
+        return new TensorData(raw, info.typeId());
+    }
+
 
     private static MemorySegment combineQKVBias(MemorySegment bq, MemorySegment bk, MemorySegment bv, int nHeads, int nHeadsKv, int headDim, Arena arena) {
         long qLen = (long) nHeads * headDim;
@@ -222,11 +263,12 @@ public final class GGUFLoader {
     }
 
     private static MemorySegment combineQKV(MemorySegment q, MemorySegment k, MemorySegment v, int hidden, int nHeads, int nHeadsKv, int headDim, Arena arena) {
-        long qBytes = (long) hidden * nHeads * headDim * Float.BYTES;
-        long kBytes = (long) hidden * nHeadsKv * headDim * Float.BYTES;
-        long vBytes = (long) hidden * nHeadsKv * headDim * Float.BYTES;
+        long qBytes = q.byteSize();
+        long kBytes = k.byteSize();
+        long vBytes = v.byteSize();
         
         MemorySegment combined = arena.allocate(qBytes + kBytes + vBytes, 64);
+
         
         MemorySegment.copy(q, 0, combined, 0, qBytes);
         MemorySegment.copy(k, 0, combined, qBytes, kBytes);

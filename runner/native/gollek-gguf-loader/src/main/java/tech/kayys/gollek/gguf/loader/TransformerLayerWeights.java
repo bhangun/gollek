@@ -13,30 +13,30 @@ public final class TransformerLayerWeights {
     public final MemorySegment wqkvPacked;       // [3][heads][headDim][hidden]
     public final MemorySegment bqkv;             // [heads * headDim + 2 * headKv * headDim]
 
-    public final MemorySegment wo;               // [hidden, hidden]
+    public final TensorData wo;               // [hidden, hidden]
     public final MemorySegment bo;               // [hidden] (Bias for output projection)
 
     public final MemorySegment ffnNormWeight;    // [hidden]
 
-    public final MemorySegment wG;               // [ffnDim, hidden]
+    public final TensorData wG;               // [ffnDim, hidden]
     public final MemorySegment bg;               // [ffnDim] (Bias for gate projection)
-    public final MemorySegment wU;               // [ffnDim, hidden]
+    public final TensorData wU;               // [ffnDim, hidden]
     public final MemorySegment bu;               // [ffnDim] (Bias for up projection)
-    public final MemorySegment wD;               // [hidden, ffnDim]
+    public final TensorData wD;               // [hidden, ffnDim]
     public final MemorySegment bd;               // [hidden] (Bias for down projection)
 
     public TransformerLayerWeights(
             MemorySegment rmsWeight,
             MemorySegment wqkvPacked,
             MemorySegment bqkv,
-            MemorySegment wo,
+            TensorData wo,
             MemorySegment bo,
             MemorySegment ffnNormWeight,
-            MemorySegment wG,
+            TensorData wG,
             MemorySegment bg,
-            MemorySegment wU,
+            TensorData wU,
             MemorySegment bu,
-            MemorySegment wD,
+            TensorData wD,
             MemorySegment bd) {
         this.rmsWeight = rmsWeight;
         this.wqkvPacked = wqkvPacked;

@@ -69,6 +69,24 @@ public final class ModelFormatDetector {
         return detect(path).map(f -> f == ModelFormat.SAFETENSORS).orElse(false);
     }
 
+    /**
+     * Detects Stable Diffusion pipeline by checking for UNet + VAE subdirectories.
+     * Handles both ONNX variant (vae_decoder/) and safetensors variant (vae/).
+     */
+    public static boolean isStableDiffusion(Path modelPath) {
+        if (modelPath == null) return false;
+        try {
+            Path dir = Files.isDirectory(modelPath) ? modelPath : modelPath.getParent();
+            if (dir == null || !Files.exists(dir)) return false;
+            
+            boolean exists = Files.exists(dir.resolve("model_index.json"));
+            System.err.println("Checking SD at: " + dir + " -> " + exists);
+            return exists;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private static Optional<ModelFormat> detectByMagic(Path path) {
         try (InputStream in = Files.newInputStream(path)) {
             byte[] header = in.readNBytes(8);

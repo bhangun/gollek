@@ -5,6 +5,7 @@ import tech.kayys.gollek.gguf.loader.TransformerLayerWeights;
 import tech.kayys.gollek.gguf.loader.GGUFTensorInfo;
 import tech.kayys.gollek.gguf.loader.GGUFDequantizer;
 import tech.kayys.gollek.gguf.loader.GGUFLoader;
+import tech.kayys.gollek.gguf.loader.TensorData;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -25,9 +26,9 @@ public final class NativeInferenceEngine implements AutoCloseable {
     private final List<TransformerLayerWeights> layers;
     private final int vocabSize;
     
-    private final MemorySegment tokenEmbeddings;
+    private final TensorData tokenEmbeddings;
     private final MemorySegment outputNorm;
-    private final MemorySegment outputWeight;
+    private final TensorData outputWeight;
     private final RoPECache ropeCache;
 
     private final boolean isNeox;
@@ -44,22 +45,44 @@ public final class NativeInferenceEngine implements AutoCloseable {
         this.layers = GGUFLoader.loadLayers(model, weightArena);
         
         String arch = (String) model.metadata().getOrDefault("general.architecture", "llama");
-        
+        System.out.println("Engine Config: arch=" + arch);
+
         this.hidden = getMetaInt(arch + ".embedding_length", "llama.embedding_length");
         this.nHeads = getMetaInt(arch + ".attention.head_count", "llama.attention.head_count");
         this.nHeadsKv = getMetaInt(arch + ".attention.head_count_kv", "llama.attention.head_count_kv", "general.attention.head_count_kv");
-        this.headDim = hidden / nHeads;
+        
+        System.out.println("Detecting headDim...");
+        int hd = getMetaIntOptional(arch + ".attention.head_dim", 
+                                  "gemma2.attention.head_dim", 
+                                  arch + ".attention.key_length",
+                                  "llama.attention.head_dim",
+                                  "head_dim",
+                                  "key_length");
+        if (hd == 0) {
+            try {
+                GGUFTensorInfo qInfo = model.tensors().stream()
+                    .filter(t -> t.name().equals("blk.0.attn_q.weight"))
+                    .findFirst().orElse(null);
+                if (qInfo != null && qInfo.shape().length >= 2) {
+                    hd = (int) (qInfo.shape()[1] / nHeads);
+                }
+            } catch (Exception e) {
+                hd = hidden / nHeads;
+            }
+        }
+        if (hd == 0) hd = hidden / nHeads;
+        this.headDim = hd;
+
         this.nLayers = layers.size();
         
-        // Auto-detect RoPE style from GGUF metadata
-        // In GGML: rope mode bit 1 (value 2) = Neox/split-half, mode 0 = LLaMA/interleaved
+        System.out.println("Detecting RoPE style...");
         this.isNeox = detectRopeStyle(arch, model.metadata());
         
-        this.tokenEmbeddings = findAndPrepareTensor("token_embd.weight", arch + ".token_embd.weight");
+        this.tokenEmbeddings = findTensorLazy("token_embd.weight", arch + ".token_embd.weight");
         this.outputNorm = findAndPrepareTensor("output_norm.weight", arch + ".output_norm.weight");
-        this.outputWeight = findAndPrepareTensor("output.weight", "lm_head.weight", arch + ".output.weight", "token_embd.weight");
+        this.outputWeight = findTensorLazy("output.weight", "lm_head.weight", arch + ".output.weight", "token_embd.weight");
 
-        // Determine vocab size robustly
+        System.out.println("Determining vocab size...");
         int vs = 0;
         Object vsObj = model.metadata().get("general.vocab_size");
         if (vsObj == null) vsObj = model.metadata().get(arch + ".vocab_size");
@@ -67,12 +90,11 @@ public final class NativeInferenceEngine implements AutoCloseable {
         if (vsObj instanceof Number n) {
             vs = n.intValue();
         } else {
-            // Fallback: use outputWeight shape if possible (via GGUFModel tensors)
             vs = model.tensors().stream()
                     .filter(t -> t.name().equals("output.weight") || t.name().equals("lm_head.weight"))
                     .findFirst()
                     .map(t -> (int) t.shape()[0])
-                    .orElse(32000); // Absolute fallback
+                    .orElse(32000);
         }
         this.vocabSize = vs;
         
@@ -84,12 +106,41 @@ public final class NativeInferenceEngine implements AutoCloseable {
         
         this.eps = getMetaFloat(1e-5f, arch + ".attention.layer_norm_rms_epsilon", "llama.attention.layer_norm_rms_epsilon", "general.attention.layer_norm_rms_epsilon");
         
-        LOG.debug("Engine Config: arch={}, eps={}, rope_freq_base={}, isNeox={}", arch, eps, ropeFreqBase, isNeox);
+        System.out.println("Building RoPE cache...");
         this.ropeCache = RoPECache.build(weightArena, 4096, headDim, ropeFreqBase);
+
+        this.attnSoftCap = getMetaFloat(0.0f, arch + ".attention.logit_softcapping", "gemma2.attention.logit_softcapping");
+        this.finalSoftCap = getMetaFloat(0.0f, arch + ".logit_softcapping", "gemma2.logit_softcapping");
+
+        
+        if (attnSoftCap > 0 || finalSoftCap > 0) {
+            LOG.info("Gemma2 Soft-capping enabled: attn={}, final={}", attnSoftCap, finalSoftCap);
+        }
     }
+
+    private final float attnSoftCap;
+    private final float finalSoftCap;
+
+    public float getAttnSoftCap() { return attnSoftCap; }
+    public float getFinalSoftCap() { return finalSoftCap; }
 
     private final float eps;
     public float getEps() { return eps; }
+
+    private TensorData findTensorLazy(String... names) {
+        GGUFTensorInfo info = null;
+        for (String name : names) {
+            info = model.tensors().stream().filter(t -> t.name().equals(name)).findFirst().orElse(null);
+            if (info != null) break;
+        }
+        
+        if (info == null) {
+            throw new IllegalArgumentException("None of the tensors found in GGUF: " + java.util.Arrays.toString(names));
+        }
+
+        MemorySegment raw = model.segment().asSlice(model.dataStart() + info.offset(), info.sizeInBytes());
+        return new TensorData(raw, info.typeId());
+    }
 
     private MemorySegment findAndPrepareTensor(String... names) {
         GGUFTensorInfo info = null;
@@ -144,9 +195,9 @@ public final class NativeInferenceEngine implements AutoCloseable {
     public int getHeadDim() { return headDim; }
     public int getNLayers() { return nLayers; }
     public List<TransformerLayerWeights> getLayers() { return layers; }
-    public MemorySegment getTokenEmbeddings() { return tokenEmbeddings; }
+    public TensorData getTokenEmbeddings() { return tokenEmbeddings; }
     public MemorySegment getOutputNorm() { return outputNorm; }
-    public MemorySegment getOutputWeight() { return outputWeight; }
+    public TensorData getOutputWeight() { return outputWeight; }
     public RoPECache getRopeCache() { return ropeCache; }
     public GGUFModel getModel() { return model; }
     public boolean isNeox() { return isNeox; }
@@ -157,6 +208,14 @@ public final class NativeInferenceEngine implements AutoCloseable {
             if (val instanceof Number n) return n.intValue();
         }
         throw new IllegalArgumentException("Metadata keys missing or invalid: " + java.util.Arrays.toString(keys));
+    }
+
+    private int getMetaIntOptional(String... keys) {
+        for (String key : keys) {
+            Object val = model.metadata().get(key);
+            if (val instanceof Number n) return n.intValue();
+        }
+        return 0;
     }
 
     private float getMetaFloat(float defaultVal, String... keys) {
@@ -193,11 +252,11 @@ public final class NativeInferenceEngine implements AutoCloseable {
         }
 
         // Fallback: architecture-based heuristic
-        // Most modern models (Qwen2, LLaMA 2/3, Mistral) use Neox-style in GGUF
+        // Modern models (LLaMA 2/3, Gemma, Mistral, Qwen2) use Interleaved (GPT-J style) in GGUF
         boolean neox = switch (arch) {
-            case "qwen2", "qwen", "llama", "mistral", "gemma", "phi3" -> true;
-            case "gptj" -> false; // GPT-J uses interleaved
-            default -> true; // Default to Neox for modern architectures
+            case "qwen2", "qwen", "llama", "mistral", "gemma", "phi3" -> false;
+            case "gptj" -> false;
+            default -> false; // Default to Interleaved as it's most common for GGUF
         };
         LOG.debug("RoPE: no metadata, arch={} → isNeox={}", arch, neox);
         return neox;

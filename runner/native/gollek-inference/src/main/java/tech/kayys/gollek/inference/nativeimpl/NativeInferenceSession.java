@@ -82,6 +82,7 @@ public final class NativeInferenceSession implements AutoCloseable {
                 engine.getHeadDim(),
                 engine.isNeox(),
                 engine.getEps(),
+                engine.getAttnSoftCap(),
                 executor
             );
             
@@ -99,8 +100,19 @@ public final class NativeInferenceSession implements AutoCloseable {
     }
 
     private void lookupEmbedding(int tokenId, MemorySegment dst) {
-        long offset = (long) tokenId * engine.getHidden() * Float.BYTES;
-        MemorySegment.copy(engine.getTokenEmbeddings(), offset, dst, 0, dst.byteSize());
+        tech.kayys.gollek.gguf.loader.TensorData embd = engine.getTokenEmbeddings();
+        if (embd.isQ8_0()) {
+            long blocksPerRow = engine.getHidden() / 32;
+            long bytesPerRow = blocksPerRow * 34; // 34 bytes per Q8_0 block
+            long offset = (long) tokenId * bytesPerRow;
+            tech.kayys.gollek.gguf.loader.GGUFDequantizer.dequantizeQ8_0(embd.segment(), offset, dst, engine.getHidden());
+        } else if (embd.isF16()) {
+            long offset = (long) tokenId * engine.getHidden() * 2L;
+            tech.kayys.gollek.gguf.loader.GGUFDequantizer.dequantizeF16(embd.segment(), offset, dst, engine.getHidden());
+        } else {
+            long offset = (long) tokenId * engine.getHidden() * Float.BYTES;
+            MemorySegment.copy(embd.segment(), offset, dst, 0, dst.byteSize());
+        }
     }
 
     public int getPos() { return pos; }

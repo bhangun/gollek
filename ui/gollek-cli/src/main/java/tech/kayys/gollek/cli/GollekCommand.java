@@ -61,6 +61,19 @@ import picocli.CommandLine.Option;
 })
 
 public class GollekCommand implements Runnable {
+    static {
+        // Enforce silent logging by default as early as possible (before Quarkus boots or any Logger is created)
+        System.setProperty("quarkus.log.console.enabled", "false");
+        System.setProperty("quarkus.log.console.json", "false");
+        System.setProperty("quarkus.log.level", "WARN");
+        System.setProperty("quarkus.log.console.level", "WARN");
+        System.setProperty("quarkus.log.category.\"tech.kayys.gollek\".level", "WARN");
+        System.setProperty("quarkus.log.category.\"tech.kayys.gollek.sdk\".level", "WARN");
+        System.setProperty("quarkus.log.category.\"io.quarkus\".level", "WARN");
+        System.setProperty("quarkus.log.category.\"io.quarkus.config\".level", "ERROR");
+        System.setProperty("quarkus.log.category.\"io.quarkus.runtime.logging.LoggingSetupRecorder\".level", "ERROR");
+    }
+
     private static final org.jboss.logging.Logger LOG = org.jboss.logging.Logger.getLogger(GollekCommand.class);
     private static final String HF_TOKEN_PROPERTY = "wayang.inference.repository.huggingface.token";
     private static final String GGUF_LIB_DIR_PROPERTY = "gguf.provider.native.library-dir";
@@ -99,21 +112,6 @@ public class GollekCommand implements Runnable {
     String platform;
 
     public GollekCommand() {
-        GollekHome.applySystemProperties();
-        // Enforce silent logging by default as early as possible
-        System.setProperty("quarkus.log.level", "WARN");
-        System.setProperty("quarkus.log.console.level", "WARN");
-        System.setProperty("quarkus.log.category.\"tech.kayys.gollek\".level", "WARN");
-        System.setProperty("quarkus.log.category.\"tech.kayys.gollek.sdk\".level", "WARN");
-        System.setProperty("quarkus.log.category.\"io.quarkus\".level", "WARN");
-
-        configureFileLoggingFromEnvironment();
-        configureHuggingFaceTokenFromDotEnv();
-        configureGgufNativeLibraryDir();
-        configureMcpServersFromEnvironmentAndArgs();
-
-        // Configure kernel platform
-        configureKernelPlatform();
     }
 
     /**
@@ -138,17 +136,29 @@ public class GollekCommand implements Runnable {
 
     @Override
     public void run() {
+        GollekHome.applySystemProperties();
+        configureFileLoggingFromEnvironment();
+        configureHuggingFaceTokenFromDotEnv();
+        configureGgufNativeLibraryDir();
+        configureMcpServersFromEnvironmentAndArgs();
+        configureKernelPlatform();
+
         applyRuntimeOverrides();
+
+        // Default: hide console logs, log to file
+        System.setProperty("quarkus.log.console.enabled", "false");
+        System.setProperty("quarkus.log.file.enabled", "true");
+        if (!hasText(System.getProperty("quarkus.log.file.path"))) {
+            System.setProperty("quarkus.log.file.path", GollekHome.path("logs", "gollek.log").toString());
+        }
+
         if (verbose) {
+            System.setProperty("quarkus.log.console.enabled", "true");
             System.setProperty("quarkus.log.level", "DEBUG");
             System.setProperty("quarkus.log.console.level", "DEBUG");
             System.setProperty("quarkus.log.category.\"tech.kayys.gollek\".level", "DEBUG");
             System.setProperty("quarkus.log.category.\"tech.kayys.gollek.inference.libtorch\".level", "DEBUG");
             System.setProperty("gguf.provider.verbose-logging", "true");
-            // Workaround for programmatic change during runtime if possible,
-            // but Picocli runs before Quarkus finishes all init in some modes.
-            // For now, these system properties might help, or we check this flag in
-            // commands.
         }
     }
 

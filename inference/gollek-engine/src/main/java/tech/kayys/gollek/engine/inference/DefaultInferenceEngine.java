@@ -48,7 +48,10 @@ public class DefaultInferenceEngine implements InferenceEngine {
         private long failedInferences = 0;
 
         @Override
-        public void initialize() {
+        public synchronized void initialize() {
+                if (initialized) {
+                        return;
+                }
                 LOG.info("Initializing Gollek Inference Engine...");
 
                 // Initialize plugin systems first
@@ -71,7 +74,11 @@ public class DefaultInferenceEngine implements InferenceEngine {
         }
 
         @Override
+        @jakarta.annotation.PreDestroy
         public void shutdown() {
+                if (!initialized) {
+                        return;
+                }
                 LOG.info("Shutting down Gollek Inference Engine...");
 
                 // Shutdown orchestrator first
@@ -86,7 +93,7 @@ public class DefaultInferenceEngine implements InferenceEngine {
         @Override
         public Uni<InferenceResponse> infer(InferenceRequest request) {
                 if (!initialized) {
-                        return Uni.createFrom().failure(new IllegalStateException("Engine not initialized"));
+                        initialize();
                 }
 
                 return orchestrator.executeAsync(request.getModel(), request)
@@ -104,8 +111,11 @@ public class DefaultInferenceEngine implements InferenceEngine {
 
         @Override
         public Multi<StreamingInferenceChunk> stream(InferenceRequest request) {
-                if (!initialized || !healthy) {
-                        return Multi.createFrom().failure(new IllegalStateException("Engine not ready"));
+                if (!initialized) {
+                        initialize();
+                }
+                if (!healthy) {
+                        return Multi.createFrom().failure(new IllegalStateException("Engine not healthy"));
                 }
 
                 return orchestrator.streamExecute(request.getModel(), request);

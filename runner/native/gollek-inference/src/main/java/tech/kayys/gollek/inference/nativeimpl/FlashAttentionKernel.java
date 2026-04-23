@@ -29,6 +29,7 @@ public final class FlashAttentionKernel {
             int seqLen,
             int numHeads,
             int headDim,
+            float softCap,
             ExecutorService executor
     ) {
         float scale = (float) (1.0 / Math.sqrt(headDim));
@@ -38,7 +39,7 @@ public final class FlashAttentionKernel {
         for (int h = 0; h < numHeads; h++) {
             final int head = h;
             tasks.add(() -> {
-                computeHead(out, q, kvCache, mask, layer, seqLen, numHeads, headDim, head, scale);
+                computeHead(out, q, kvCache, mask, layer, seqLen, numHeads, headDim, head, scale, softCap);
                 return null;
             });
         }
@@ -61,7 +62,8 @@ public final class FlashAttentionKernel {
             int numHeads,
             int headDim,
             int head,
-            float scale
+            float scale,
+            float softCap
     ) {
         long qBase = (long) head * headDim * Float.BYTES;
         
@@ -86,7 +88,13 @@ public final class FlashAttentionKernel {
             }
         }
 
-        // Apply Optional Mask
+        // Apply Optional Mask and Soft-capping
+        if (softCap > 0.0f) {
+            for (int p = 0; p < seqLen; p++) {
+                scores[p] = (float) (softCap * Math.tanh(scores[p] / softCap));
+            }
+        }
+
         if (mask != null) {
             for (int p = 0; p < seqLen; p++) {
                 float mv = mask.get(ValueLayout.JAVA_FLOAT, (long) p * Float.BYTES);

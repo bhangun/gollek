@@ -156,14 +156,37 @@ public class FormatAwareProviderRouter {
     }
 
     private List<StreamingProvider> orderedProviders(ProviderRequest request) {
+        String modelId = request.getModel();
         boolean preferGguf = request.getParameter("gguf", Boolean.class).orElse(false);
         Optional<String> preferredProviderId = request.getPreferredProvider();
         
+        // Detect Stable Diffusion pipeline to steer away from text-only safetensor provider.
+        // We resolve the model path via the registry first to handle relative IDs/aliases.
+        boolean isSd = false;
+        try {
+            Path actualPath = localModelRegistry.resolve(modelId)
+                    .map(ModelEntry::physicalPath)
+                    .orElseGet(() -> {
+                        try { return Path.of(modelId); } catch (Exception e) { return null; }
+                    });
+            
+            if (actualPath != null) {
+                isSd = ModelFormatDetector.isStableDiffusion(actualPath);
+            }
+        } catch (Exception ignored) {}
+
         List<StreamingProvider> all = new ArrayList<>();
         providers.forEach(all::add);
 
         List<String> priority = new ArrayList<>(PROVIDER_PRIORITY);
         
+        // If it's a Stable Diffusion model, move 'onnx' to the front unless it's already there
+        if (isSd && priority.contains("onnx")) {
+            priority.remove("onnx");
+            priority.add(0, "onnx");
+            LOG.debugf("Stable Diffusion detected for model %s; prioritizing 'onnx' provider", modelId);
+        }
+
         // Adjust priority based on flags
         if (preferGguf && priority.contains("gguf")) {
             priority.remove("gguf");

@@ -40,6 +40,15 @@ public class TokenizerFactory {
         Path hfConfig = modelDir.resolve("tokenizer.json");
         Path spmModel = modelDir.resolve("tokenizer.model");
 
+        // Diffusers / Stable Diffusion compatibility: check 'tokenizer' subdirectory
+        if (!Files.exists(hfConfig) && !Files.exists(spmModel)) {
+            Path subDir = modelDir.resolve("tokenizer");
+            if (Files.isDirectory(subDir)) {
+                hfConfig = subDir.resolve("tokenizer.json");
+                spmModel = subDir.resolve("tokenizer.model");
+            }
+        }
+
         if (Files.exists(spmModel)) {
             Path effectiveLibPath = nativeLibPath;
             if (effectiveLibPath == null) {
@@ -68,6 +77,16 @@ public class TokenizerFactory {
         // Try vocab.json + merges.txt fallback (Legacy CLIP/BPE format)
         Path vocabJson = modelDir.resolve("vocab.json");
         Path mergesTxt = modelDir.resolve("merges.txt");
+
+        // Diffusers / Stable Diffusion compatibility: check 'tokenizer' subdirectory
+        if (!Files.exists(vocabJson) || !Files.exists(mergesTxt)) {
+            Path subDir = modelDir.resolve("tokenizer");
+            if (Files.isDirectory(subDir)) {
+                vocabJson = subDir.resolve("vocab.json");
+                mergesTxt = subDir.resolve("merges.txt");
+            }
+        }
+
         if (Files.exists(vocabJson) && Files.exists(mergesTxt)) {
             // Assume GPT-2/CLIP style BPE
             return HuggingFaceBpeTokenizer.load(vocabJson, mergesTxt, new Gpt2PreTokenizer(), true, false);

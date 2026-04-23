@@ -181,7 +181,8 @@ public class InferenceEngineBootstrap {
         log.info("Engine startup complete");
     }
 
-    public void onShutdown(@Observes ShutdownEvent event) {
+    public @jakarta.annotation.PreDestroy
+    public void shutdown() { {
         log.info("Shutting down engine...");
         runnerRegistry.shutdown();
         log.info("Engine shutdown complete");

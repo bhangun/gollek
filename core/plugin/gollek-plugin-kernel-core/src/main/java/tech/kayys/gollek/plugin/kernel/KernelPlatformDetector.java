@@ -132,7 +132,6 @@ public class KernelPlatformDetector {
      * @return detected platform
      */
     public static KernelPlatform detect() {
-        System.err.println("[DEBUG] KernelPlatformDetector.detect() called");
         return getInstance().detectPlatform();
     }
 
@@ -140,7 +139,6 @@ public class KernelPlatformDetector {
      * Detect platform with auto-detection logic.
      */
     private KernelPlatform detectPlatform() {
-        System.err.println("[DEBUG] KernelPlatformDetector.detectPlatform() started");
         // Check if user forced a platform
         String forcedPlatform = System.getProperty(PLATFORM_PROPERTY);
         boolean forceCpu = Boolean.getBoolean(FORCE_CPU_PROPERTY);

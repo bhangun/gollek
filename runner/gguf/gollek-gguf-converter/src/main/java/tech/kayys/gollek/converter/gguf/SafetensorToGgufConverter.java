@@ -355,9 +355,6 @@ public final class SafetensorToGgufConverter {
                 long written = metaLen; // track position for alignment padding
 
                 // We need data starting at alignUp(metaLen, alignment)
-                // GgufWriter already pads the meta section; the offsets in
-                // TensorInfo are relative to after the padding, so we just
-                // write tensors in offset order with per-tensor alignment.
                 long dataBase = alignUp(metaLen, alignment);
                 long padNeeded = dataBase - metaLen;
                 for (long p = 0; p < padNeeded; p++) fos.write(0);
@@ -371,16 +368,15 @@ public final class SafetensorToGgufConverter {
                                 i + 1, total, tp.ggufName()));
                     }
                     
-                    byte[] converted = convertTensor(tp);
+                    long convertedBytes = convertAndWriteTensor(tp, fos);
                     
-                    if (converted.length == 0) {
+                    if (convertedBytes == 0) {
                         log(opts, String.format("  WARNING: tensor %s converted to 0 bytes, skipping", 
                                 tp.ggufName()));
                         continue;
                     }
 
-                    fos.write(converted);
-                    written += converted.length;
+                    written += convertedBytes;
 
                     // Pad to alignment
                     long nextAligned = alignUp(written - dataBase, alignment) + dataBase;
@@ -391,9 +387,8 @@ public final class SafetensorToGgufConverter {
                     if (opts.onProgress != null) opts.onProgress.accept(i + 1, total);
                     
                     if (i < 3 || i % 50 == 0) {
-                        log(opts, String.format("  [%d/%d] wrote %s (%.1f KB, total: %.1f MB)",
-                                i + 1, total, tp.ggufName(), 
-                                converted.length / 1024.0, written / 1024.0 / 1024.0));
+                        log(opts, String.format("  [%d/%d] wrote %s (total: %.1f MB)",
+                                i + 1, total, tp.ggufName(), written / 1024.0 / 1024.0));
                     }
                 }
             }
@@ -404,8 +399,8 @@ public final class SafetensorToGgufConverter {
 
     // ── Tensor conversion ─────────────────────────────────────────────────
 
-    /** Open shard, copy tensor bytes via mmap, convert in-memory. */
-    private static byte[] convertTensor(TensorPlan tp) throws IOException {
+    /** Open shard, copy tensor bytes via mmap, convert in chunks, write directly to stream. */
+    private static long convertAndWriteTensor(TensorPlan tp, FileOutputStream fos) throws IOException {
         try (Arena arena = Arena.ofConfined();
              FileChannel fc = FileChannel.open(tp.shard(), StandardOpenOption.READ)) {
 
@@ -423,7 +418,7 @@ public final class SafetensorToGgufConverter {
             if (srcBytesCount == 0 && numElem > 0) {
                 System.err.printf("[gguf] WARN: tensor %s has %d elements but 0 bytes, skipping%n",
                         tp.ggufName(), numElem);
-                return new byte[0];
+                return 0;
             }
             
             // Log large tensors
@@ -432,75 +427,79 @@ public final class SafetensorToGgufConverter {
                         tp.ggufName(), srcBytesCount / 1024.0 / 1024.0, numElem);
             }
             
-            byte[] srcBytes = new byte[(int) srcBytesCount];
-            try {
-                MemorySegment.copy(fileSeg, ValueLayout.JAVA_BYTE,
-                        dataOffset + tp.dataStart(), srcBytes, 0, srcBytes.length);
-            } catch (Exception e) {
-                System.err.printf("[gguf] ERROR: Failed to read tensor %s from file: %s%n",
-                        tp.ggufName(), e.getMessage());
-                throw new IOException("Failed to read tensor " + tp.ggufName(), e);
-            }
-
             GgmlType srcType = ggmlTypeForDtype(tp.dtype());
             GgmlType dstType = tp.targetType();
+            
+            long srcBytesPerElem = srcBytesCount / numElem;
+            if (srcBytesPerElem * numElem != srcBytesCount) {
+                throw new IOException("Source bytes " + srcBytesCount + " not exactly divisible by elements " + numElem);
+            }
+            
+            // Chunk size: 16M elements (~64MB F32)
+            long chunkSizeElem = 16 * 1024 * 1024L;
+            if (dstType.blockSize > 1) {
+                chunkSizeElem = (chunkSizeElem / dstType.blockSize) * dstType.blockSize;
+            }
+            
+            long elementsProcessed = 0;
+            long totalBytesWritten = 0;
+            
+            while (elementsProcessed < numElem) {
+                long chunkElem = Math.min(chunkSizeElem, numElem - elementsProcessed);
+                long chunkSrcBytes = chunkElem * srcBytesPerElem;
+                long chunkSrcOffset = dataOffset + tp.dataStart() + (elementsProcessed * srcBytesPerElem);
+                
+                byte[] srcBytes = new byte[(int) chunkSrcBytes];
+                MemorySegment.copy(fileSeg, ValueLayout.JAVA_BYTE, chunkSrcOffset, srcBytes, 0, srcBytes.length);
 
-            // Step 1: normalise to F32
-            byte[] f32;
-            try {
-                f32 = switch (srcType) {
-                    case F32  -> srcBytes;
-                    case BF16 -> TensorConverter.bf16ToF32(srcBytes, numElem);
-                    case F16  -> TensorConverter.f16ToF32(srcBytes, numElem);
-                    case F64  -> f64ToF32(srcBytes, numElem);
-                    default   -> srcBytes; // integer types passed through
-                };
-            } catch (Exception e) {
-                System.err.printf("[gguf] ERROR: Failed to convert %s from %s to F32: %s%n",
-                        tp.ggufName(), srcType.label, e.getMessage());
-                throw new IOException("F32 conversion failed for " + tp.ggufName(), e);
-            }
-            
-            // Validate F32 conversion
-            long expectedF32Size = numElem * 4; // 4 bytes per F32
-            if (f32.length != expectedF32Size) {
-                System.err.printf("[gguf] ERROR: F32 size mismatch for %s: expected %d, got %d%n",
-                        tp.ggufName(), expectedF32Size, f32.length);
-            }
+                // Step 1: normalise to F32
+                byte[] f32;
+                try {
+                    f32 = switch (srcType) {
+                        case F32  -> srcBytes;
+                        case BF16 -> TensorConverter.bf16ToF32(srcBytes, chunkElem);
+                        case F16  -> TensorConverter.f16ToF32(srcBytes, chunkElem);
+                        case F64  -> f64ToF32(srcBytes, chunkElem);
+                        default   -> srcBytes; // integer types passed through
+                    };
+                } catch (Exception e) {
+                    System.err.printf("[gguf] ERROR: Failed to convert %s from %s to F32: %s%n",
+                            tp.ggufName(), srcType.label, e.getMessage());
+                    throw new IOException("F32 conversion failed for " + tp.ggufName(), e);
+                }
 
-            // Step 2: quantize / re-encode
-            byte[] result;
-            try {
-                result = switch (dstType) {
-                    case F32  -> f32;
-                    case F16  -> TensorConverter.f32ToF16(f32, numElem);
-                    case BF16 -> TensorConverter.f32ToBf16(f32, numElem);
-                    case Q8_0 -> TensorConverter.quantizeQ8_0(f32, numElem);
-                    case Q4_0 -> TensorConverter.quantizeQ4_0(f32, numElem);
-                    case Q2_K -> TensorConverter.quantizeQ2_K(f32, numElem);
-                    case Q4_K -> TensorConverter.quantizeQ4_K(f32, numElem);
-                    case Q5_K -> TensorConverter.quantizeQ5_K(f32, numElem);
-                    case Q6_K -> TensorConverter.quantizeQ6_K(f32, numElem);
-                    default   -> {
-                        System.err.printf("[gguf] WARN: unsupported dst type %s for %s – keeping F32%n",
-                                dstType.label, tp.ggufName());
-                        yield f32;
-                    }
-                };
-            } catch (Exception e) {
-                System.err.printf("[gguf] ERROR: Failed to quantize %s to %s: %s%n",
-                        tp.ggufName(), dstType.label, e.getMessage());
-                e.printStackTrace();
-                throw new IOException("Quantization failed for " + tp.ggufName(), e);
+                // Step 2: quantize / re-encode
+                byte[] result;
+                try {
+                    result = switch (dstType) {
+                        case F32  -> f32;
+                        case F16  -> TensorConverter.f32ToF16(f32, chunkElem);
+                        case BF16 -> TensorConverter.f32ToBf16(f32, chunkElem);
+                        case Q8_0 -> TensorConverter.quantizeQ8_0(f32, chunkElem);
+                        case Q4_0 -> TensorConverter.quantizeQ4_0(f32, chunkElem);
+                        case Q2_K -> TensorConverter.quantizeQ2_K(f32, chunkElem);
+                        case Q4_K -> TensorConverter.quantizeQ4_K(f32, chunkElem);
+                        case Q5_K -> TensorConverter.quantizeQ5_K(f32, chunkElem);
+                        case Q6_K -> TensorConverter.quantizeQ6_K(f32, chunkElem);
+                        default   -> {
+                            if (elementsProcessed == 0) {
+                                System.err.printf("[gguf] WARN: unsupported dst type %s for %s – keeping F32%n",
+                                        dstType.label, tp.ggufName());
+                            }
+                            yield f32;
+                        }
+                    };
+                } catch (Exception e) {
+                    System.err.printf("[gguf] ERROR: Failed to quantize %s to %s: %s%n",
+                            tp.ggufName(), dstType.label, e.getMessage());
+                    throw new IOException("Quantization failed for " + tp.ggufName(), e);
+                }
+                
+                fos.write(result);
+                totalBytesWritten += result.length;
+                elementsProcessed += chunkElem;
             }
-            
-            // Log first tensor to verify
-            if (tp.ggufName().equals("token_embd.weight")) {
-                System.out.printf("[gguf] Sample tensor: %s, src=%s, dst=%s, srcBytes=%d, dstBytes=%d, numElem=%d%n",
-                        tp.ggufName(), srcType.label, dstType.label, srcBytes.length, result.length, numElem);
-            }
-            
-            return result;
+            return totalBytesWritten;
         }
     }
 

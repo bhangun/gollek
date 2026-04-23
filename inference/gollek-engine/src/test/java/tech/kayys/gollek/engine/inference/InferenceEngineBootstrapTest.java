@@ -110,7 +110,7 @@ class InferenceEngineBootstrapTest {
     @DisplayName("Should initialize successfully with valid configuration")
     void shouldInitializeSuccessfully() {
         // When
-        bootstrap.onStart(startupEvent);
+        bootstrap.initialize();
 
         // Then
         assertThat(bootstrap.isInitialized()).isTrue();
@@ -128,7 +128,7 @@ class InferenceEngineBootstrapTest {
     @Test
     @DisplayName("Should validate configuration before startup")
     void shouldValidateConfigurationBeforeStartup() {
-        assertThatCode(() -> bootstrap.onStart(startupEvent))
+        assertThatCode(() -> bootstrap.initialize())
                 .doesNotThrowAnyException();
     }
 
@@ -140,7 +140,7 @@ class InferenceEngineBootstrapTest {
                 .thenReturn(Uni.createFrom().failure(new RuntimeException("Plugin load failed")));
 
         // When/Then
-        assertThatThrownBy(() -> bootstrap.onStart(startupEvent))
+        assertThatThrownBy(() -> bootstrap.initialize())
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Inference engine startup failed");
 
@@ -161,7 +161,7 @@ class InferenceEngineBootstrapTest {
                 .thenReturn(Uni.createFrom().failure(new RuntimeException("Init failed")));
 
         // When/Then - Only test if not already initialized
-        assertThatCode(() -> bootstrap.onStart(startupEvent))
+        assertThatCode(() -> bootstrap.initialize())
                 .doesNotThrowAnyException(); // Graceful mode handles failures
     }
 
@@ -176,7 +176,7 @@ class InferenceEngineBootstrapTest {
                 .thenReturn(Arrays.asList(successPlugin, failPlugin));
 
         // When
-        bootstrap.onStart(startupEvent);
+        bootstrap.initialize();
 
         // Then
         assertThat(bootstrap.isInitialized()).isTrue();
@@ -196,7 +196,7 @@ class InferenceEngineBootstrapTest {
                         .onItem().delayIt().by(Duration.ofSeconds(60)));
 
         // When/Then - Check for Mutiny TimeoutException
-        assertThatThrownBy(() -> bootstrap.onStart(startupEvent))
+        assertThatThrownBy(() -> bootstrap.initialize())
                 .hasCauseInstanceOf(io.smallrye.mutiny.TimeoutException.class);
     }
 
@@ -205,12 +205,12 @@ class InferenceEngineBootstrapTest {
     void shouldNotInitializeTwice() {
         // Ensure first initialization
         if (!bootstrap.isInitialized()) {
-            bootstrap.onStart(startupEvent);
+            bootstrap.initialize();
         }
         assertThat(bootstrap.isInitialized()).isTrue();
 
         // When - Try to initialize again
-        bootstrap.onStart(startupEvent);
+        bootstrap.initialize();
 
         // Then - Should remain initialized (idempotent)
         assertThat(bootstrap.isInitialized()).isTrue();
@@ -231,7 +231,7 @@ class InferenceEngineBootstrapTest {
         when(pluginLoader.checkAllHealth()).thenReturn(healthMap);
 
         // When
-        bootstrap.onStart(startupEvent);
+        bootstrap.initialize();
 
         // Then
         assertThat(bootstrap.isInitialized()).isTrue();
@@ -242,7 +242,7 @@ class InferenceEngineBootstrapTest {
     @DisplayName("Should collect startup metrics")
     void shouldCollectStartupMetrics() {
         // When
-        bootstrap.onStart(startupEvent);
+        bootstrap.initialize();
 
         // Then
         assertThat(bootstrap.isInitialized()).isTrue();

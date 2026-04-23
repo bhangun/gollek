@@ -1,13 +1,13 @@
+import jdk.incubator.vector.*;
 public class TestFloat {
     public static void main(String[] args) {
-        float[] v = { 10.0f, 20.0f, 30.0f };
-        float temp = 0.0f;
-        int best = -1;
-        float max = Float.NEGATIVE_INFINITY;
-        for(int i=0;i<v.length;i++) {
-            float scaled = v[i] / temp;
-            if (scaled > max) { max = scaled; best = i; }
-        }
-        System.out.println("Best: " + best + ", Max: " + max);
+        VectorSpecies<Byte> B8 = VectorSpecies.of(byte.class, VectorShape.S_64_BIT);
+        VectorSpecies<Float> F8 = VectorSpecies.of(float.class, VectorShape.S_256_BIT);
+        byte[] arr = {1, 2, 3, 4, 5, 6, 7, 8};
+        ByteVector bvec = ByteVector.fromArray(B8, arr, 0);
+        FloatVector fvec = (FloatVector) bvec.castShape(F8, 0);
+        float[] out = new float[8];
+        fvec.intoArray(out, 0);
+        for(float f : out) System.out.println(f);
     }
 }
