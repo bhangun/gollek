@@ -51,4 +51,21 @@ public final class TransformerLayerWeights {
         this.wD = wD;
         this.bd = bd;
     }
+
+    public TransformerLayerWeights dequantize(java.lang.foreign.Arena arena, int hidden, int ffnDim) {
+        return new TransformerLayerWeights(
+            rmsWeight,
+            wqkvPacked,
+            bqkv,
+            wo.dequantize(arena, (long) hidden * hidden),
+            bo,
+            ffnNormWeight,
+            wG.dequantize(arena, (long) ffnDim * hidden),
+            bg,
+            wU.dequantize(arena, (long) ffnDim * hidden),
+            bu,
+            wD.dequantize(arena, (long) hidden * ffnDim),
+            bd
+        );
+    }
 }

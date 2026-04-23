@@ -24,26 +24,25 @@ public final class RoPECache {
     }
 
     public static RoPECache build(Arena arena, int maxSeq, int dim, float base) {
+        System.out.print("Building RoPE cache (" + maxSeq + "x" + dim + ")... ");
+        System.out.flush();
         int half = dim / 2;
-        long size = (long) maxSeq * half * 4;
-
-        MemorySegment cosSeg = arena.allocate(size, 64);
-        MemorySegment sinSeg = arena.allocate(size, 64);
+        MemorySegment sin = arena.allocate((long) maxSeq * half * Float.BYTES, 64);
+        MemorySegment cos = arena.allocate((long) maxSeq * half * Float.BYTES, 64);
+        
+        float[] invFreq = new float[half];
+        for (int i = 0; i < half; i++) {
+            invFreq[i] = (float) (1.0 / Math.pow(base, (2.0 * i) / (double) dim));
+        }
 
         for (int pos = 0; pos < maxSeq; pos++) {
             for (int i = 0; i < half; i++) {
-                double theta = pos / Math.pow(base, (2.0 * i) / dim);
-
-                float c = (float) Math.cos(theta);
-                float s = (float) Math.sin(theta);
-
-                long idx = ((long) pos * half + i) * 4;
-
-                cosSeg.set(ValueLayout.JAVA_FLOAT, idx, c);
-                sinSeg.set(ValueLayout.JAVA_FLOAT, idx, s);
+                float theta = pos * invFreq[i];
+                sin.set(ValueLayout.JAVA_FLOAT, ((long) pos * half + i) * 4, (float) Math.sin(theta));
+                cos.set(ValueLayout.JAVA_FLOAT, ((long) pos * half + i) * 4, (float) Math.cos(theta));
             }
         }
-
-        return new RoPECache(cosSeg, sinSeg, maxSeq, dim);
+        System.out.println("Done.");
+        return new RoPECache(cos, sin, maxSeq, dim);
     }
 }

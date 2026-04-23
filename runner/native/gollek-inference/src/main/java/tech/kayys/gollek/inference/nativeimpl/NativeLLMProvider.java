@@ -317,24 +317,24 @@ public class NativeLLMProvider implements StreamingProvider {
 
         // 1. Prepare prompt with ChatTemplate
         String arch = (String) engine.getModel().metadata().getOrDefault("general.architecture", "llama");
-        LOG.info("Applying chat template...");
+        System.out.println("Applying chat template...");
         ChatTemplate template = ChatTemplate.forArchitecture(arch);
         String promptText = template.apply(request.getMessages());
 
-        LOG.info("Encoding prompt...");
+        System.out.println("Encoding prompt...");
         long[] tokens = tokenizer.encode(promptText, EncodeOptions.builder().build());
-        LOG.infof("Encoded %d tokens.", tokens.length);
+        System.out.println("Encoded " + tokens.length + " tokens.");
         
         try (NativeInferenceSession session = new NativeInferenceSession(engine, 4096)) {
-            LOG.info("Starting pre-fill...");
+            System.out.println("Starting pre-fill...");
             long prefillStartTime = System.nanoTime();
             
             // Prefill loop (process all but the last prompt token)
             for (int i = 0; i < tokens.length - 1; i++) {
-                if (i % 10 == 0 && i > 0) LOG.infof("Pre-fill progress: %d/%d", i, tokens.length - 1);
+                if (i % 10 == 0 && i > 0) System.out.println("Pre-fill progress: " + i + "/" + (tokens.length - 1));
                 session.tick((int) tokens[i], executor);
             }
-            LOG.info("Pre-fill complete.");
+            System.out.println("Pre-fill complete.");
 
             long prefillEndTime = System.nanoTime();
             long firstTokenTime = 0;
@@ -342,7 +342,8 @@ public class NativeLLMProvider implements StreamingProvider {
             int lastToken = (int) tokens[tokens.length - 1];
             int maxNewTokens = request.getMaxTokens() > 0 ? request.getMaxTokens() : 512;
             
-            LOG.info("Starting generation...");
+            System.out.println("Starting generation loop...");
+
 
             
             // Extract sampling parameters using standardized helper methods
