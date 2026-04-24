@@ -41,12 +41,12 @@
             <artifactId>gollek-spi-inference</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
+        <!--  <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-plugin-runner-llamacpp</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
-        </dependency>
+        </dependency> -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-runner-onnx</artifactId>

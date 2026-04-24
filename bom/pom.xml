@@ -247,7 +247,7 @@
                 <version>${project.version}</version>
             </dependency>
             -->
-            <dependency>
+            <!--   <dependency>
                 <groupId>tech.kayys.gollek</groupId>
                 <artifactId>gollek-runner-llamacpp</artifactId>
                 <version>${project.version}</version>
@@ -256,7 +256,7 @@
                 <groupId>tech.kayys.gollek</groupId>
                 <artifactId>gollek-plugin-runner-llamacpp</artifactId>
                 <version>${project.version}</version>
-            </dependency>
+            </dependency> -->
             <dependency>
                 <groupId>tech.kayys.gollek</groupId>
                 <artifactId>gollek-runner-onnx</artifactId>
