@@ -53,7 +53,7 @@
 
         <!-- Model modules -->
         <module>model/gollek-model-repo-core</module>
-        <module>model/gollek-models-family</module>
+        <!-- <module>model/gollek-models-family</module> -->
         <module>model/gollek-model-registry</module>
         <module>model/gollek-model-routing</module>
         <module>model/gollek-model-runner</module>

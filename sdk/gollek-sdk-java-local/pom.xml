@@ -60,16 +60,19 @@
             <artifactId>gollek-model-repo-local</artifactId>
         </dependency>
 
-        <!-- GGUF Inference (for conversion service) -->
+<!--
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-runner-llamacpp</artifactId>
         </dependency>
+-->
+<!--
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-gguf-converter</artifactId>
             <version>${project.version}</version>
         </dependency>
+-->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-runner-onnx</artifactId>

@@ -64,12 +64,6 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- Direct Safetensor Evaluation -->
-        <dependency>
-            <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-safetensor-engine</artifactId>
-            <version>${project.version}</version>
-        </dependency>
 
         <!-- Test dependencies -->
         <dependency>
