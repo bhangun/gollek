@@ -120,15 +120,8 @@ public class PagedAttentionVectorAPI {
     }
 
     private static float dotProduct(MemorySegment q, long qOff, MemorySegment k, long kOff, long dim) {
-        FloatVector sum = FloatVector.zero(SPECIES);
-        int j = 0;
-        for (; j < SPECIES.loopBound(dim); j += SPECIES.length()) {
-            FloatVector vq = FloatVector.fromMemorySegment(SPECIES, q, qOff + (long)j * 4, java.nio.ByteOrder.nativeOrder());
-            FloatVector vk = FloatVector.fromMemorySegment(SPECIES, k, kOff + (long)j * 4, java.nio.ByteOrder.nativeOrder());
-            sum = vq.fma(vk, sum);
-        }
-        float res = sum.reduceLanes(VectorOperators.ADD);
-        for (; j < dim; j++) {
+        float res = 0;
+        for (int j = 0; j < dim; j++) {
             res += q.getAtIndex(ValueLayout.JAVA_FLOAT, (qOff / 4) + j) * 
                    k.getAtIndex(ValueLayout.JAVA_FLOAT, (kOff / 4) + j);
         }
@@ -136,19 +129,7 @@ public class PagedAttentionVectorAPI {
     }
 
     private static void updateAccumulator(float[] acc, MemorySegment vSeg, long vOff, float exp_prev, float exp_curr, long dim) {
-        FloatVector vExpPrev = FloatVector.broadcast(SPECIES, exp_prev);
-        FloatVector vExpCurr = FloatVector.broadcast(SPECIES, exp_curr);
-        int j = 0;
-        for (; j < SPECIES.loopBound(dim); j += SPECIES.length()) {
-            FloatVector vacc = FloatVector.fromArray(SPECIES, acc, j);
-            FloatVector vv = FloatVector.fromMemorySegment(SPECIES, vSeg, vOff + (long)j * 4, java.nio.ByteOrder.LITTLE_ENDIAN);
-            
-            // Correct update formula: acc = (acc * exp_prev) + (vv * exp_curr)
-            // Using fma: res = vv * exp_curr + (vacc * exp_prev)
-            FloatVector res = vv.fma(vExpCurr, vacc.mul(vExpPrev));
-            res.intoArray(acc, j);
-        }
-        for (; j < dim; j++) {
+        for (int j = 0; j < dim; j++) {
             acc[j] = acc[j] * exp_prev + vSeg.getAtIndex(ValueLayout.JAVA_FLOAT, (vOff / 4) + j) * exp_curr;
         }
     }

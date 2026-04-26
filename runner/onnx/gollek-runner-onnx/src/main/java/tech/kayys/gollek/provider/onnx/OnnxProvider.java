@@ -303,8 +303,13 @@ public class OnnxProvider implements StreamingProvider {
         }
 
         if (targetPath != null && Files.isDirectory(targetPath)) {
-            // For ONNX pipelines (like SD), the "model" might be a directory or a specific file
-            // We'll look for .onnx files
+            // For ONNX pipelines (like SD), the "model" might be a directory.
+            // Check if it's a Stable Diffusion pipeline first.
+            if (isStableDiffusion(targetPath)) {
+                return targetPath;
+            }
+
+            // Otherwise, look for a single .onnx file (legacy behavior for simple models in dirs)
             try (var stream = Files.walk(targetPath, 3)) {
                 return stream.filter(p -> p.toString().endsWith(".onnx"))
                         .findFirst()

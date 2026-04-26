@@ -106,7 +106,7 @@ public class AccelTensor implements AutoCloseable {
     public static AccelTensor zeros(long... shape) {
         long n = numelOf(shape);
         Arena arena = Arena.ofAuto();
-        MemorySegment seg = arena.allocate(n * Float.BYTES, 16);
+        MemorySegment seg = arena.allocate(n * Float.BYTES, 64);
         seg.fill((byte) 0);
         return new AccelTensor(seg, shape, contiguousStride(shape), 0, arena);
     }
@@ -117,7 +117,7 @@ public class AccelTensor implements AutoCloseable {
     public static AccelTensor ones(long... shape) {
         long n = numelOf(shape);
         Arena arena = Arena.ofAuto();
-        MemorySegment seg = arena.allocate(n * Float.BYTES, 16);
+        MemorySegment seg = arena.allocate(n * Float.BYTES, 64);
         for (long i = 0; i < n; i++) {
             seg.setAtIndex(ValueLayout.JAVA_FLOAT, i, 1.0f);
         }
@@ -181,7 +181,7 @@ public class AccelTensor implements AutoCloseable {
     public static AccelTensor copyOf(MemorySegment source, long[] shape) {
         long n = numelOf(shape);
         Arena arena = Arena.ofAuto();
-        MemorySegment seg = arena.allocate(n * Float.BYTES, 16);
+        MemorySegment seg = arena.allocate(n * Float.BYTES, 64);
         MemorySegment.copy(source, 0, seg, 0, n * Float.BYTES);
         return new AccelTensor(seg, shape, contiguousStride(shape), 0, arena);
     }
@@ -593,7 +593,7 @@ public class AccelTensor implements AutoCloseable {
     private AccelTensor materialize(long[] srcShape, long[] srcStride) {
         long n = numelOf(srcShape);
         Arena newArena = Arena.ofAuto();
-        MemorySegment newSeg = newArena.allocate(n * Float.BYTES, 16);
+        MemorySegment newSeg = newArena.allocate(n * Float.BYTES, 64);
 
         if (srcShape.length > 0 && srcStride[srcShape.length - 1] == 1) {
             // Optimized row-copy for tensors contiguous in the last dimension (common for transposes)

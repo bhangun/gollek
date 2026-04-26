@@ -236,6 +236,11 @@ public final class SafetensorLoadResult implements AutoCloseable {
         try {
             arena.close();
             log.debugf("SafetensorLoadResult closed [%s, mode=%s]", filePath, mode);
+        } catch (UnsupportedOperationException e) {
+            log.debugf("Arena is auto-managed, skipping explicit close for [%s]", filePath);
+        } catch (Error e) {
+            // GraalVM throws UnsupportedFeatureError when attempting to close an auto/shared arena
+            log.debugf("Arena close unsupported (GraalVM) for [%s]: %s", filePath, e.getMessage());
         } catch (Exception e) {
             log.warnf(e, "Failed to close Arena for SafeTensors file [%s]", filePath);
         }

@@ -535,74 +535,36 @@ public final class AccelOps {
         MemorySegment bSeg = b.dataSegment();
         MemorySegment oSeg = out.dataSegment();
 
-        if (b.numel() == n) {
-            // Element-wise
-            int i = 0;
-            for (; i < SPECIES.loopBound(n); i += SPECIES.length()) {
-                FloatVector va = FloatVector.fromMemorySegment(SPECIES, aSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-                FloatVector vb = FloatVector.fromMemorySegment(SPECIES, bSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-                FloatVector res;
-                if (isAdd) res = va.add(vb);
-                else if (isSub) res = va.sub(vb);
-                else res = va.mul(vb);
-                res.intoMemorySegment(oSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-            }
-            for (; i < n; i++) {
-                float va = aSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i);
-                float vb = bSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i);
-                float res;
-                if (isAdd) res = va + vb;
-                else if (isSub) res = va - vb;
-                else res = va * vb;
-                oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, i, res);
-            }
-        } else if (b.numel() == 1) {
-            // Scalar broadcasting
-            float val = b.item();
-            FloatVector vVal = FloatVector.broadcast(SPECIES, val);
-            int i = 0;
-            for (; i < SPECIES.loopBound(n); i += SPECIES.length()) {
-                FloatVector va = FloatVector.fromMemorySegment(SPECIES, aSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-                FloatVector res;
-                if (isAdd) res = va.add(vVal);
-                else if (isSub) res = va.sub(vVal);
-                else res = va.mul(vVal);
-                res.intoMemorySegment(oSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-            }
-            for (; i < n; i++) {
-                float va = aSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i);
-                float res;
-                if (isAdd) res = va + val;
-                else if (isSub) res = va - val;
-                else res = va * val;
-                oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, i, res);
-            }
-        } else {
-            // Bias broadcasting [batch, hidden] + [hidden]
-            int hidden = (int) b.numel();
-            int batches = (int) (n / hidden);
-            for (int bIdx = 0; bIdx < batches; bIdx++) {
-                long offset = (long) bIdx * hidden;
-                int i = 0;
-                for (; i < SPECIES.loopBound(hidden); i += SPECIES.length()) {
-                    FloatVector va = FloatVector.fromMemorySegment(SPECIES, aSeg, (offset + i) * 4, ByteOrder.LITTLE_ENDIAN);
-                    FloatVector vb = FloatVector.fromMemorySegment(SPECIES, bSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-                    FloatVector res;
-                    if (isAdd) res = va.add(vb);
-                    else if (isSub) res = va.sub(vb);
-                    else res = va.mul(vb);
-                    res.intoMemorySegment(oSeg, (offset + i) * 4, ByteOrder.LITTLE_ENDIAN);
+        try {
+            if (b.numel() == n) {
+                MethodHandle handle = isAdd ? vadd() : (isSub ? vsub() : vmul());
+                handle.invokeExact(aSeg, 1L, bSeg, 1L, oSeg, 1L, n);
+            } else if (b.numel() == 1) {
+                MethodHandle handle = isAdd ? vsadd() : vsmul();
+                if (isSub) {
+                    // vDSP doesn't have vssub, so we do A + (-B)
+                    float negB = -b.item();
+                    try (Arena arena = Arena.ofConfined()) {
+                        MemorySegment pNegB = arena.allocate(ValueLayout.JAVA_FLOAT, negB);
+                        vsadd().invokeExact(aSeg, 1L, pNegB, oSeg, 1L, n);
+                    }
+                } else {
+                    handle.invokeExact(aSeg, 1L, bSeg, oSeg, 1L, n);
                 }
-                for (; i < hidden; i++) {
-                    float va = aSeg.getAtIndex(ValueLayout.JAVA_FLOAT, offset + i);
-                    float vb = bSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i);
-                    float res;
-                    if (isAdd) res = va + vb;
-                    else if (isSub) res = va - vb;
-                    else res = va * vb;
-                    oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, offset + i, res);
+            } else {
+                // Bias broadcasting fallback - still safe as it uses getAtIndex
+                int hidden = (int) b.numel();
+                int batches = (int) (n / hidden);
+                for (int bIdx = 0; bIdx < batches; bIdx++) {
+                    long offset = (long) bIdx * hidden;
+                    MemorySegment aPart = aSeg.asSlice(offset * 4);
+                    MemorySegment oPart = oSeg.asSlice(offset * 4);
+                    MethodHandle handle = isAdd ? vadd() : (isSub ? vsub() : vmul());
+                    handle.invokeExact(aPart, 1L, bSeg, 1L, oPart, 1L, (long) hidden);
                 }
             }
+        } catch (Throwable t) {
+            throw new RuntimeException("vDSP binary op failed", t);
         }
         return out;
     }
@@ -616,43 +578,30 @@ public final class AccelOps {
         MemorySegment bSeg = b.dataSegment();
         MemorySegment oSeg = out.dataSegment();
 
-        if (b.numel() == n) {
-            int i = 0;
-            for (; i < SPECIES.loopBound(n); i += SPECIES.length()) {
-                FloatVector va = FloatVector.fromMemorySegment(SPECIES, aSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-                FloatVector vb = FloatVector.fromMemorySegment(SPECIES, bSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-                va.div(vb).intoMemorySegment(oSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-            }
-            for (; i < n; i++) {
-                oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, i, aSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i) / bSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i));
-            }
-        } else if (b.numel() == 1) {
-            float val = b.item();
-            FloatVector vVal = FloatVector.broadcast(SPECIES, val);
-            int i = 0;
-            for (; i < SPECIES.loopBound(n); i += SPECIES.length()) {
-                FloatVector va = FloatVector.fromMemorySegment(SPECIES, aSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-                va.div(vVal).intoMemorySegment(oSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-            }
-            for (; i < n; i++) {
-                oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, i, aSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i) / val);
-            }
-        } else {
-            // Broadcasting fallback
-            int hidden = (int) b.numel();
-            int batches = (int) (n / hidden);
-            for (int bIdx = 0; bIdx < batches; bIdx++) {
-                long offset = (long) bIdx * hidden;
-                int i = 0;
-                for (; i < SPECIES.loopBound(hidden); i += SPECIES.length()) {
-                    FloatVector va = FloatVector.fromMemorySegment(SPECIES, aSeg, (offset + i) * 4, ByteOrder.LITTLE_ENDIAN);
-                    FloatVector vb = FloatVector.fromMemorySegment(SPECIES, bSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-                    va.div(vb).intoMemorySegment(oSeg, (offset + i) * 4, ByteOrder.LITTLE_ENDIAN);
+        try {
+            if (b.numel() == n) {
+                vdiv().invokeExact(aSeg, 1L, bSeg, 1L, oSeg, 1L, n);
+            } else if (b.numel() == 1) {
+                float val = b.item();
+                try (Arena arena = Arena.ofConfined()) {
+                    MemorySegment pVal = arena.allocate(ValueLayout.JAVA_FLOAT, val);
+                    // vDSP_vsdiv(A, strideA, B_scalar, C, strideC, N) -> C = A / B
+                    MethodHandle vsdiv = LINKER.downcallHandle(
+                        accelerate().find("vDSP_vsdiv").orElseThrow(),
+                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG)
+                    );
+                    vsdiv.invokeExact(aSeg, 1L, pVal, oSeg, 1L, n);
                 }
-                for (; i < hidden; i++) {
-                    oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, offset + i, aSeg.getAtIndex(ValueLayout.JAVA_FLOAT, offset + i) / bSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i));
+            } else {
+                int hidden = (int) b.numel();
+                int batches = (int) (n / hidden);
+                for (int bIdx = 0; bIdx < batches; bIdx++) {
+                    long offset = (long) bIdx * hidden;
+                    vdiv().invokeExact(aSeg.asSlice(offset * 4), 1L, bSeg, 1L, oSeg.asSlice(offset * 4), 1L, (long) hidden);
                 }
             }
+        } catch (Throwable t) {
+            throw new RuntimeException("vDSP_vdiv failed", t);
         }
         return out;
     }
@@ -690,49 +639,31 @@ public final class AccelOps {
             long base = (long) row * hidden;
             float sumSq = 0.0f;
             
-            // Pass 1: Add (if residual exists) and Sum Squares
-            int i = 0;
-            if (hidden >= SPECIES.length()) {
-                FloatVector sumSqV = FloatVector.zero(SPECIES);
-                for (; i < SPECIES.loopBound(hidden); i += SPECIES.length()) {
-                    FloatVector vx = FloatVector.fromMemorySegment(SPECIES, xSeg, (base + i) * 4, ByteOrder.LITTLE_ENDIAN);
-                    if (rSeg != null) {
-                        FloatVector vr = FloatVector.fromMemorySegment(SPECIES, rSeg, (base + i) * 4, ByteOrder.LITTLE_ENDIAN);
-                        vx = vx.add(vr);
-                        // If we want to update x in-place for residual, we could do it here, 
-                        // but for purity we'll keep x intact and use vx.
-                    }
-                    sumSqV = sumSqV.add(vx.mul(vx));
-                }
-                sumSq = sumSqV.reduceLanes(VectorOperators.ADD);
-            }
-            for (; i < hidden; i++) {
+            // Pass 1: Add (if residual exists) and Sum Squares (Scalar fallback for stability)
+            for (int i = 0; i < hidden; i++) {
                 float val = xSeg.getAtIndex(ValueLayout.JAVA_FLOAT, base + i);
                 if (rSeg != null) val += rSeg.getAtIndex(ValueLayout.JAVA_FLOAT, base + i);
                 sumSq += val * val;
             }
 
             float rms = (float) (1.0 / Math.sqrt(sumSq / hidden + eps));
-            FloatVector vRms = FloatVector.broadcast(SPECIES, rms);
             
-            // Pass 2: Normalize and Weight
-            i = 0;
-            if (hidden >= SPECIES.length()) {
-                for (; i < SPECIES.loopBound(hidden); i += SPECIES.length()) {
-                    FloatVector vx = FloatVector.fromMemorySegment(SPECIES, xSeg, (base + i) * 4, ByteOrder.LITTLE_ENDIAN);
-                    if (rSeg != null) {
-                        FloatVector vr = FloatVector.fromMemorySegment(SPECIES, rSeg, (base + i) * 4, ByteOrder.LITTLE_ENDIAN);
-                        vx = vx.add(vr);
-                    }
-                    FloatVector vw = FloatVector.fromMemorySegment(SPECIES, wSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-                    vx.mul(vRms).mul(vw).intoMemorySegment(oSeg, (base + i) * 4, ByteOrder.LITTLE_ENDIAN);
+            // Pass 2: Normalize and Weight (Using vDSP_vsmul + vDSP_vmul)
+            try {
+                MemorySegment oPart = oSeg.asSlice(base * 4);
+                if (rSeg != null) {
+                    vadd().invokeExact(xSeg.asSlice(base * 4), 1L, rSeg.asSlice(base * 4), 1L, oPart, 1L, (long) hidden);
+                } else {
+                    MemorySegment.copy(xSeg, base * 4, oPart, 0, (long) hidden * 4);
                 }
-            }
-            for (; i < hidden; i++) {
-                float val = xSeg.getAtIndex(ValueLayout.JAVA_FLOAT, base + i);
-                if (rSeg != null) val += rSeg.getAtIndex(ValueLayout.JAVA_FLOAT, base + i);
-                float w = wSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i);
-                oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, base + i, val * rms * w);
+                
+                try (Arena arena = Arena.ofConfined()) {
+                    MemorySegment pRms = arena.allocate(ValueLayout.JAVA_FLOAT, rms);
+                    vsmul().invokeExact(oPart, 1L, pRms, oPart, 1L, (long) hidden);
+                }
+                vmul().invokeExact(oPart, 1L, wSeg, 1L, oPart, 1L, (long) hidden);
+            } catch (Throwable t) {
+                throw new RuntimeException("vDSP rmsNorm pass 2 failed", t);
             }
         }
         return out;
@@ -753,57 +684,30 @@ public final class AccelOps {
         for (int row = 0; row < outer; row++) {
             long base = (long) row * lastDim;
             
-            // 1. Find max
+            // 1. Find max (Scalar fallback for stability)
             float max = Float.NEGATIVE_INFINITY;
-            int i = 0;
-            if (lastDim >= SPECIES.length()) {
-                FloatVector maxV = FloatVector.broadcast(SPECIES, Float.NEGATIVE_INFINITY);
-                for (; i < SPECIES.loopBound(lastDim); i += SPECIES.length()) {
-                    maxV = maxV.max(FloatVector.fromMemorySegment(SPECIES, xSeg, (base + i) * 4, ByteOrder.LITTLE_ENDIAN));
-                }
-                max = maxV.reduceLanes(VectorOperators.MAX);
-            }
-            for (; i < lastDim; i++) {
+            for (int i = 0; i < lastDim; i++) {
                 max = Math.max(max, xSeg.getAtIndex(ValueLayout.JAVA_FLOAT, base + i));
             }
 
-            // 2. Exp and Sum (Vectorized)
+            // 2. Exp and Sum
             float sum = 0.0f;
-            i = 0;
-            if (lastDim >= SPECIES.length()) {
-                FloatVector sumV = FloatVector.zero(SPECIES);
-                FloatVector vMax = FloatVector.broadcast(SPECIES, max);
-                for (; i < SPECIES.loopBound(lastDim); i += SPECIES.length()) {
-                    FloatVector v = FloatVector.fromMemorySegment(SPECIES, xSeg, (base + i) * 4, ByteOrder.LITTLE_ENDIAN);
-                    // Standard softmax: exp(x - max)
-                    // Note: Vector API doesn't have exp(), so we use a loop or call Math.exp in a loop.
-                    // However, we can still benefit from vectorizing the subtraction.
-                    // For now, let's use the most reliable path:
-                    for (int j = 0; j < SPECIES.length(); j++) {
-                        float val = (float) Math.exp(v.lane(j) - max);
-                        oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, base + i + j, val);
-                        sum += val;
-                    }
-                }
-            }
-            for (; i < lastDim; i++) {
+            for (int i = 0; i < lastDim; i++) {
                 float val = (float) Math.exp(xSeg.getAtIndex(ValueLayout.JAVA_FLOAT, base + i) - max);
                 oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, base + i, val);
                 sum += val;
             }
-            // Add epsilon to prevent division by zero
-            sum += 1e-12f;
+            sum += 1e-12f; // prevent div by zero
 
-            // 3. Normalize
-            float invSum = (sum == 0.0f) ? 0.0f : 1.0f / sum;
-            FloatVector vInvSum = FloatVector.broadcast(SPECIES, invSum);
-            i = 0;
-            for (; i < SPECIES.loopBound(lastDim); i += SPECIES.length()) {
-                FloatVector v = FloatVector.fromMemorySegment(SPECIES, oSeg, (base + i) * 4, ByteOrder.LITTLE_ENDIAN);
-                v.mul(vInvSum).intoMemorySegment(oSeg, (base + i) * 4, ByteOrder.LITTLE_ENDIAN);
-            }
-            for (; i < lastDim; i++) {
-                oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, base + i, oSeg.getAtIndex(ValueLayout.JAVA_FLOAT, base + i) * invSum);
+            // 3. Normalize (Using vDSP_vsmul)
+            float invSum = 1.0f / sum;
+            try {
+                try (Arena arena = Arena.ofConfined()) {
+                    MemorySegment pInvSum = arena.allocate(ValueLayout.JAVA_FLOAT, invSum);
+                    vsmul().invokeExact(oSeg.asSlice(base * 4), 1L, pInvSum, oSeg.asSlice(base * 4), 1L, (long) lastDim);
+                }
+            } catch (Throwable t) {
+                throw new RuntimeException("vDSP softmax normalization failed", t);
             }
         }
         return out;
@@ -840,21 +744,7 @@ public final class AccelOps {
         MemorySegment uSeg = up.dataSegment();
         MemorySegment oSeg = out.dataSegment();
 
-        int i = 0;
-        if (n >= SPECIES.length()) {
-            for (; i < SPECIES.loopBound(n); i += SPECIES.length()) {
-                FloatVector vg = FloatVector.fromMemorySegment(SPECIES, gSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-                FloatVector vu = FloatVector.fromMemorySegment(SPECIES, uSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-                
-                // SiLU: x * sigmoid(x) = x / (1 + exp(-x))
-                // We use our expVector approximation.
-                FloatVector sigmoid = FloatVector.broadcast(SPECIES, 1.0f).div(
-                    FloatVector.broadcast(SPECIES, 1.0f).add(expVector(vg.neg())));
-                
-                vg.mul(sigmoid).mul(vu).intoMemorySegment(oSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-            }
-        }
-        for (; i < n; i++) {
+        for (int i = 0; i < n; i++) {
             float g = gSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i);
             float u = uSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i);
             float silu = (float) (g / (1.0 + Math.exp(-g)));
@@ -898,31 +788,7 @@ public final class AccelOps {
         MemorySegment xSeg = x.dataSegment();
         MemorySegment oSeg = out.dataSegment();
 
-        int i = 0;
-        if (n >= SPECIES.length()) {
-            FloatVector vSqrt2Pi = FloatVector.broadcast(SPECIES, 0.79788456f); // sqrt(2/pi)
-            FloatVector v044 = FloatVector.broadcast(SPECIES, 0.044715f);
-            FloatVector vOne = FloatVector.broadcast(SPECIES, 1.0f);
-            FloatVector vHalf = FloatVector.broadcast(SPECIES, 0.5f);
-
-            for (; i < SPECIES.loopBound(n); i += SPECIES.length()) {
-                FloatVector vx = FloatVector.fromMemorySegment(SPECIES, xSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-                // (x + 0.044715 * x^3)
-                FloatVector inner = vx.add(v044.mul(vx.mul(vx).mul(vx)));
-                // sqrt(2/pi) * inner
-                FloatVector arg = vSqrt2Pi.mul(inner);
-
-                // tanh approximation or lane-wise tanh
-                // We use a simplified tanh: x * (3 + x^2) / (1 + 3*x^2) or just use lane-wise Math.tanh for precision
-                for (int j = 0; j < SPECIES.length(); j++) {
-                    float val = arg.lane(j);
-                    float res = (float) Math.tanh(val);
-                    float xVal = vx.lane(j);
-                    oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, i + j, 0.5f * xVal * (1.0f + res));
-                }
-            }
-        }
-        for (; i < n; i++) {
+        for (int i = 0; i < n; i++) {
             float v = xSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i);
             float inner = 0.79788456f * (v + 0.044715f * v * v * v);
             oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, i, 0.5f * v * (1.0f + (float) Math.tanh(inner)));
@@ -949,19 +815,7 @@ public final class AccelOps {
             long base = (long) r * dim;
             float sum = 0, sumSq = 0;
 
-            int i = 0;
-            if (dim >= SPECIES.length()) {
-                FloatVector vSum = FloatVector.zero(SPECIES);
-                FloatVector vSumSq = FloatVector.zero(SPECIES);
-                for (; i < SPECIES.loopBound(dim); i += SPECIES.length()) {
-                    FloatVector v = FloatVector.fromMemorySegment(SPECIES, xSeg, (base + i) * 4, ByteOrder.LITTLE_ENDIAN);
-                    vSum = vSum.add(v);
-                    vSumSq = vSumSq.add(v.mul(v));
-                }
-                sum = vSum.reduceLanes(VectorOperators.ADD);
-                sumSq = vSumSq.reduceLanes(VectorOperators.ADD);
-            }
-            for (; i < dim; i++) {
+            for (int i = 0; i < dim; i++) {
                 float v = xSeg.getAtIndex(ValueLayout.JAVA_FLOAT, base + i);
                 sum += v;
                 sumSq += v * v;
@@ -969,27 +823,27 @@ public final class AccelOps {
 
             float mean = sum / dim;
             float var = (float) Math.sqrt(sumSq / dim - mean * mean + eps);
-            FloatVector vMean = FloatVector.broadcast(SPECIES, mean);
-            FloatVector vVar = FloatVector.broadcast(SPECIES, 1.0f / var);
 
-            i = 0;
-            if (dim >= SPECIES.length()) {
-                for (; i < SPECIES.loopBound(dim); i += SPECIES.length()) {
-                    FloatVector vx = FloatVector.fromMemorySegment(SPECIES, xSeg, (base + i) * 4, ByteOrder.LITTLE_ENDIAN);
-                    FloatVector vw = FloatVector.fromMemorySegment(SPECIES, wSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-                    FloatVector res = vx.sub(vMean).mul(vVar).mul(vw);
-                    if (bSeg != null) {
-                        FloatVector vb = FloatVector.fromMemorySegment(SPECIES, bSeg, (long) i * 4, ByteOrder.LITTLE_ENDIAN);
-                        res = res.add(vb);
-                    }
-                    res.intoMemorySegment(oSeg, (base + i) * 4, ByteOrder.LITTLE_ENDIAN);
+            try {
+                MemorySegment oPart = oSeg.asSlice(base * 4);
+                MemorySegment xPart = xSeg.asSlice(base * 4);
+                MemorySegment.copy(xPart, 0, oPart, 0, (long) dim * 4);
+                
+                try (Arena arena = Arena.ofConfined()) {
+                    float negMean = -mean;
+                    float invVar = 1.0f / var;
+                    MemorySegment pNegMean = arena.allocate(ValueLayout.JAVA_FLOAT, negMean);
+                    MemorySegment pInvVar = arena.allocate(ValueLayout.JAVA_FLOAT, invVar);
+                    
+                    vsadd().invokeExact(oPart, 1L, pNegMean, oPart, 1L, (long) dim);
+                    vsmul().invokeExact(oPart, 1L, pInvVar, oPart, 1L, (long) dim);
                 }
-            }
-            for (; i < dim; i++) {
-                float val = xSeg.getAtIndex(ValueLayout.JAVA_FLOAT, base + i);
-                float w = wSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i);
-                float b = bSeg != null ? bSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i) : 0.0f;
-                oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, base + i, (val - mean) / var * w + b);
+                vmul().invokeExact(oPart, 1L, wSeg, 1L, oPart, 1L, (long) dim);
+                if (bSeg != null) {
+                    vadd().invokeExact(oPart, 1L, bSeg, 1L, oPart, 1L, (long) dim);
+                }
+            } catch (Throwable t) {
+                throw new RuntimeException("vDSP layerNorm failed", t);
             }
         }
         return out;

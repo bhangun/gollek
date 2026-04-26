@@ -99,10 +99,9 @@ public final class SafetensorHeader {
             Map<String, SafetensorTensorInfo> tensors,
             Map<String, String> fileMetadata) {
         Objects.requireNonNull(tensors, "tensors must not be null");
-        if (dataBlobOffset < 8) {
+        if (dataBlobOffset < 0) {
             throw new IllegalArgumentException(
-                    "dataBlobOffset must be >= 8 (8-byte length prefix + at least one JSON byte), got "
-                            + dataBlobOffset);
+                    "dataBlobOffset must be >= 0, got " + dataBlobOffset);
         }
         return new SafetensorHeader(dataBlobOffset, tensors, fileMetadata);
     }

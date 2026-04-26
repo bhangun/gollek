@@ -84,30 +84,13 @@ public class RopeFrequencyCache {
             
             // Vectorized Split-Half RoPE (Llama/Qwen Style)
             // x1 = x[0...half], x2 = x[half...d]
-            for (int i = 0; i < half; i += SPECIES.length()) {
-                int limit = Math.min(i + SPECIES.length(), half);
-                int num = limit - i;
-                
-                if (num == SPECIES.length()) {
-                    FloatVector x1 = FloatVector.fromMemorySegment(SPECIES, seg, (elementOffset + i) * 4, ByteOrder.LITTLE_ENDIAN);
-                    FloatVector x2 = FloatVector.fromMemorySegment(SPECIES, seg, (elementOffset + i + half) * 4, ByteOrder.LITTLE_ENDIAN);
-                    FloatVector c = FloatVector.fromArray(SPECIES, cos, freqOffset + i);
-                    FloatVector s = FloatVector.fromArray(SPECIES, sin, freqOffset + i);
-                    
-                    // res1 = x1*c - x2*s
-                    // res2 = x1*s + x2*c
-                    x1.mul(c).sub(x2.mul(s)).intoMemorySegment(seg, (elementOffset + i) * 4, ByteOrder.LITTLE_ENDIAN);
-                    x1.mul(s).add(x2.mul(c)).intoMemorySegment(seg, (elementOffset + i + half) * 4, ByteOrder.LITTLE_ENDIAN);
-                } else {
-                    for (int j = i; j < limit; j++) {
-                        float xv1 = seg.getAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + j);
-                        float xv2 = seg.getAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + j + half);
-                        float cv = cos[freqOffset + j];
-                        float sv = sin[freqOffset + j];
-                        seg.setAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + j, xv1 * cv - xv2 * sv);
-                        seg.setAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + j + half, xv1 * sv + xv2 * cv);
-                    }
-                }
+            for (int i = 0; i < half; i++) {
+                float xv1 = seg.getAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i);
+                float xv2 = seg.getAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i + half);
+                float cv = cos[freqOffset + i];
+                float sv = sin[freqOffset + i];
+                seg.setAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i, xv1 * cv - xv2 * sv);
+                seg.setAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i + half, xv1 * sv + xv2 * cv);
             }
         }
 

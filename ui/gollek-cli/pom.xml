@@ -300,6 +300,20 @@
                 </configuration>
             </plugin>
         </plugins>
+        <!-- Filter META-INF/gollek-version.properties so ${project.version} is substituted -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <includes>
+                    <include>META-INF/gollek-version.properties</include>
+                </includes>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
     </build>
 
     <profiles>

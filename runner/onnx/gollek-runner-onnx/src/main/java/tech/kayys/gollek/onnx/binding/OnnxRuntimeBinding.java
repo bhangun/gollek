@@ -658,20 +658,32 @@ public class OnnxRuntimeBinding {
                 shapeSeg.setAtIndex(ValueLayout.JAVA_LONG, i, shape[i]);
 
             MemorySegment valPtr = a.allocate(ValueLayout.ADDRESS);
-            MemorySegment status = (MemorySegment) vtable(SLOT_CREATE_TENSOR_WITH_DATA,
-                    FunctionDescriptor.of(ValueLayout.ADDRESS,
-                            ValueLayout.ADDRESS, // OrtMemoryInfo*
-                            ValueLayout.ADDRESS, // data pointer
-                            ValueLayout.JAVA_LONG, // data length bytes
-                            ValueLayout.ADDRESS, // shape int64*
-                            ValueLayout.JAVA_LONG, // shape length
-                            ValueLayout.JAVA_INT, // element type
-                            ValueLayout.ADDRESS // OrtValue** out
-                    )).invokeExact(
-                            memInfo, data, data.byteSize(),
-                            shapeSeg, (long) shape.length,
-                            dataType, valPtr);
-            checkStatusPtr(status, "CreateTensorWithDataAsOrtValue");
+            MemorySegment status = MemorySegment.NULL;
+            try {
+                status = (MemorySegment) vtable(SLOT_CREATE_TENSOR_WITH_DATA,
+                        FunctionDescriptor.of(ValueLayout.ADDRESS,
+                                ValueLayout.ADDRESS, // OrtMemoryInfo*
+                                ValueLayout.ADDRESS, // data pointer
+                                ValueLayout.JAVA_LONG, // data length bytes
+                                ValueLayout.ADDRESS, // shape int64*
+                                ValueLayout.JAVA_LONG, // shape length
+                                ValueLayout.JAVA_INT, // element type
+                                ValueLayout.ADDRESS // OrtValue** out
+                        )).invokeExact(
+                                memInfo, data, data.byteSize(),
+                                shapeSeg, (long) shape.length,
+                                dataType, valPtr);
+            } catch (Throwable t) {
+                System.err.printf("[ORT-FATAL] CreateTensor vtable call failed: %s (data_bytes=%d, shape=%s, type=%d)\n",
+                        t.getMessage(), data.byteSize(), java.util.Arrays.toString(shape), dataType);
+                throw new RuntimeException("ORT CreateTensorWithData vtable call failed", t);
+            }
+
+            if (!isNull(status)) {
+                System.err.printf("[ORT-DEBUG] CreateTensor FAILED: data_bytes=%d, shape=%s, type=%d\n",
+                        data.byteSize(), java.util.Arrays.toString(shape), dataType);
+                checkStatusPtr(status, "CreateTensorWithDataAsOrtValue");
+            }
             return valPtr.get(ValueLayout.ADDRESS, 0);
         } catch (Throwable t) {
             throw new RuntimeException("ORT CreateTensorWithData failed", t);
@@ -935,7 +947,13 @@ public class OnnxRuntimeBinding {
             return;
 
         String msg = "Unknown error";
+        int code = -1;
         try {
+            // GetErrorCode(OrtStatus*) -> OrtErrorCode (int)
+            code = (int) vtable(SLOT_GET_ERROR_CODE,
+                    FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
+                    .invokeExact(status);
+
             // GetErrorMessage(OrtStatus*) -> const char*
             MemorySegment msgPtr = (MemorySegment) vtable(SLOT_GET_ERROR_MESSAGE,
                     FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS))
@@ -955,8 +973,9 @@ public class OnnxRuntimeBinding {
                 LOG.warn("Failed to release ORT status", t);
             }
         }
-        System.err.println("!!! ORT ERROR: " + op + " failed: " + msg);
-        throw new RuntimeException("ORT " + op + " failed: " + msg);
+        String fullMsg = String.format("%s failed: %s (code %d)", op, msg, code);
+        System.err.println("[ONNX-ERROR] " + fullMsg);
+        throw new RuntimeException("ORT " + fullMsg);
     }
 
     private static boolean isNull(MemorySegment seg) {

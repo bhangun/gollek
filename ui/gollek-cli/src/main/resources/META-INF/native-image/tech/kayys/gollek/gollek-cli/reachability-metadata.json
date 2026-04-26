@@ -253,6 +253,132 @@
                     "int",
                     "int"
                 ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "int",
+                    "long",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long",
+                    "int"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "int",
+                    "long",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long",
+                    "long",
+                    "long",
+                    "int",
+                    "long",
+                    "long",
+                    "int",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long",
+                    "int",
+                    "long",
+                    "long",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "int",
+                    "int",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "long",
+                "parameterTypes": [
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "int",
+                    "long"
+                ]
             }
         ]
     }

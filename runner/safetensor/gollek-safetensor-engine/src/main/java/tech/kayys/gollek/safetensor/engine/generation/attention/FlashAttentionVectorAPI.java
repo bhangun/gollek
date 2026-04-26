@@ -97,15 +97,8 @@ public class FlashAttentionVectorAPI {
     }
 
     private static float dotProduct(MemorySegment q, long qOff, MemorySegment k, long kOff, long dim) {
-        FloatVector sum = FloatVector.zero(SPECIES);
-        int i = 0;
-        for (; i < SPECIES.loopBound(dim); i += SPECIES.length()) {
-            FloatVector vq = FloatVector.fromMemorySegment(SPECIES, q, qOff + (long)i * 4, java.nio.ByteOrder.nativeOrder());
-            FloatVector vk = FloatVector.fromMemorySegment(SPECIES, k, kOff + (long)i * 4, java.nio.ByteOrder.nativeOrder());
-            sum = vq.fma(vk, sum);
-        }
-        float res = sum.reduceLanes(VectorOperators.ADD);
-        for (; i < dim; i++) {
+        float res = 0;
+        for (int i = 0; i < dim; i++) {
             res += q.getAtIndex(ValueLayout.JAVA_FLOAT, (qOff / 4) + i) * 
                    k.getAtIndex(ValueLayout.JAVA_FLOAT, (kOff / 4) + i);
         }
@@ -113,19 +106,7 @@ public class FlashAttentionVectorAPI {
     }
 
     private static void updateAccumulator(float[] acc, MemorySegment vSeg, long vOff, float exp_prev, float exp_curr, long dim) {
-        FloatVector vExpPrev = FloatVector.broadcast(SPECIES, exp_prev);
-        FloatVector vExpCurr = FloatVector.broadcast(SPECIES, exp_curr);
-        
-        int i = 0;
-        for (; i < SPECIES.loopBound(dim); i += SPECIES.length()) {
-            FloatVector vacc = FloatVector.fromArray(SPECIES, acc, i);
-            FloatVector vv = FloatVector.fromMemorySegment(SPECIES, vSeg, vOff + (long)i * 4, java.nio.ByteOrder.nativeOrder());
-            
-            // acc = acc * exp_prev + v * exp_curr
-            FloatVector res = vacc.mul(vExpPrev).fma(vExpCurr, vv);
-            res.intoArray(acc, i);
-        }
-        for (; i < dim; i++) {
+        for (int i = 0; i < dim; i++) {
             acc[i] = acc[i] * exp_prev + vSeg.getAtIndex(ValueLayout.JAVA_FLOAT, (vOff / 4) + i) * exp_curr;
         }
     }
