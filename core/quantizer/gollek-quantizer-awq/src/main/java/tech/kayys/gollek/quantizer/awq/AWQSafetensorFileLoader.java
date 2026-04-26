@@ -107,7 +107,7 @@ public class AWQSafetensorFileLoader implements AutoCloseable {
     // ── MMAP load ─────────────────────────────────────────────────────────────
 
     private SafetensorLoadResult loadMmap(Path resolved) throws IOException {
-        Arena arena = Arena.ofShared();
+        Arena arena = Arena.ofAuto();
         try (FileChannel channel = FileChannel.open(resolved, StandardOpenOption.READ)) {
             long fileSize = channel.size();
             if (fileSize == 0) {
@@ -142,7 +142,7 @@ public class AWQSafetensorFileLoader implements AutoCloseable {
     // ── COPY load (fallback) ──────────────────────────────────────────────────
 
     private SafetensorLoadResult loadCopy(Path resolved) throws IOException {
-        Arena arena = Arena.ofShared();
+        Arena arena = Arena.ofAuto();
         try (FileChannel channel = FileChannel.open(resolved, StandardOpenOption.READ)) {
             long fileSize = channel.size();
             if (fileSize == 0) {

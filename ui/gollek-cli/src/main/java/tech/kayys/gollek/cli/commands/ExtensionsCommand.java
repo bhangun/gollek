@@ -30,10 +30,10 @@ public class ExtensionsCommand implements Runnable {
 
     private static final List<ExtensionDef> EXTENSIONS = List.of(
             // Local runtimes
-            new ExtensionDef("runtime", "GGUF", "base", "tech.kayys.gollek.inference.llamacpp.GGUFProvider", "gguf"),
+            new ExtensionDef("runtime", "GGUF", "base", "tech.kayys.gollek.inference.llamacpp.LlamaCppProvider", "gguf"),
             new ExtensionDef("runtime", "ONNX", "base", "tech.kayys.gollek.onnx.runner.OnnxRuntimeRunner", "onnx"),
             new ExtensionDef("runtime", "SafeTensor", "base",
-                    "tech.kayys.gollek.safetensor.engine.SafeTensorProvider", "safetensor"),
+                    "tech.kayys.gollek.safetensor.engine.warmup.SafetensorProvider", "safetensor"),
             new ExtensionDef("runtime", "LibTorch", "experimental",
                     "tech.kayys.gollek.inference.libtorch.LibTorchProvider", "libtorch"),
             new ExtensionDef("runtime", "LiteRT", "optional",

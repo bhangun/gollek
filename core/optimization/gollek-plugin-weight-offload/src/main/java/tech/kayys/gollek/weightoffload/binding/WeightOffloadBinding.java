@@ -110,7 +110,7 @@ public class WeightOffloadBinding {
      * {@link tech.kayys.gollek.extension.metal.binding.MetalBinding} instead.
      *
      * @param dstDevice  device pointer (MemorySegment backed by GPU memory)
-     * @param srcHost    pinned host pointer (Arena.ofShared() segment)
+     * @param srcHost    pinned host pointer (Arena.ofAuto() segment)
      * @param bytes      number of bytes to transfer
      * @param streamId   CUDA stream index (0 = default stream)
      * @return 0 on success, CUDA error code on failure

@@ -19,7 +19,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 public class KVPool {
 
     private final Map<Long, ConcurrentLinkedQueue<MemorySegment>> segmentsBySize = new ConcurrentHashMap<>();
-    private final Arena globalArena = Arena.ofShared();
+    private final Arena globalArena = Arena.ofAuto();
 
     /**
      * Acquires a memory segment of at least the requested size.

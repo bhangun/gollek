@@ -1,5 +1,6 @@
 package tech.kayys.gollek.ml.serialize;
 
+import java.io.*;
 import java.nio.*;
 import java.nio.file.*;
 import java.util.*;
@@ -29,7 +30,8 @@ public class NumPyBridge {
         DataOutputStream headerOut = new DataOutputStream(header);
         
         // Magic string
-        headerOut.writeBytes("\x93NUMPY");
+        headerOut.writeByte(0x93);
+        headerOut.writeBytes("NUMPY");
         headerOut.writeByte(1); // Major version
         headerOut.writeByte(0); // Minor version
         
@@ -125,7 +127,8 @@ public class NumPyBridge {
         
         try {
             // Magic and version
-            out.writeBytes("\x93NUMPY");
+            out.writeByte(0x93);
+            out.writeBytes("NUMPY");
             out.writeByte(1);
             out.writeByte(0);
             

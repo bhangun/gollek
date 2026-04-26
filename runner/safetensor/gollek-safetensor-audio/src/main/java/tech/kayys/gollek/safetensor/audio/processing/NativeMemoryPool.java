@@ -130,7 +130,7 @@ public final class NativeMemoryPool implements AutoCloseable {
     private NativeMemoryPool(long bufferCapacity, int poolSize) {
         this.bufferCapacity = bufferCapacity;
         this.poolSize = poolSize;
-        this.arena = Arena.ofShared();
+        this.arena = Arena.ofAuto();
         this.availableBuffers = new ArrayBlockingQueue<>(poolSize);
 
         // Pre-allocate buffers

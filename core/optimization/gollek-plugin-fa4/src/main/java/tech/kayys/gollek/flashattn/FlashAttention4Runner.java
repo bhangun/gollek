@@ -172,7 +172,7 @@ public class FlashAttention4Runner extends AbstractGollekRunner {
         headDim = config.getIntParameter("head_dim", headDim);
 
         // Memory-map model weights
-        weightsArena = Arena.ofShared();
+        weightsArena = Arena.ofAuto();
         Path modelPath = resolveModelPath(modelManifest);
         mmapWeights(modelPath, weightsArena);
 

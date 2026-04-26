@@ -221,7 +221,7 @@ public class OnnxRunnerSession implements RunnerSession {
         long[] inputIds = tokenizer.encode(prompt, EncodeOptions.defaultOptions());
         int maxNewTokens = extractInt(request.getParameters(), "max_tokens", 128);
         
-        try (Arena arena = Arena.ofShared()) {
+        try (Arena arena = Arena.ofAuto()) {
             StringBuilder sb = new StringBuilder();
             List<Long> currentTokens = new ArrayList<>();
             for (long id : inputIds) currentTokens.add(id);
@@ -284,7 +284,7 @@ public class OnnxRunnerSession implements RunnerSession {
         long[] inputIds = tokenizer.encode(prompt, EncodeOptions.defaultOptions());
         int maxNewTokens = extractInt(request.getParameters(), "max_tokens", 128);
         
-        try (Arena arena = Arena.ofShared()) {
+        try (Arena arena = Arena.ofAuto()) {
             List<Long> currentTokens = new ArrayList<>();
             for (long id : inputIds) currentTokens.add(id);
 

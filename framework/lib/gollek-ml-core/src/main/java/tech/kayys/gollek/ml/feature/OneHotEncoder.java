@@ -1,34 +1,44 @@
 package tech.kayys.gollek.ml.feature;
 
+import tech.kayys.gollek.ml.base.BaseTransformer;
+import java.util.*;
+
 /**
  * One-Hot Encoder for categorical features.
  */
 public class OneHotEncoder extends BaseTransformer {
     private final boolean sparseOutput;
     private final int handleUnknown; // 0=error, 1=ignore
-    private Map<Integer, Map<Object, Integer>> categoryMaps;
+    private Map<Integer, Map<Float, Integer>> categoryMaps;
     private int[] nValues;
+    private int[] featureIndices;
 
     public OneHotEncoder() {
-        this(false, 0);
+        this(false, 0, null);
     }
 
-    public OneHotEncoder(boolean sparseOutput, int handleUnknown) {
+    public OneHotEncoder(boolean sparseOutput, int handleUnknown, int[] featureIndices) {
         this.sparseOutput = sparseOutput;
         this.handleUnknown = handleUnknown;
+        this.featureIndices = featureIndices;
     }
 
     @Override
-    public void fit(Object[][] X, int[] featureIndices) {
-        categoryMaps = new HashMap<>();
+    public void fit(float[][] X) {
+        if (featureIndices == null) {
+            featureIndices = new int[X[0].length];
+            for (int i = 0; i < featureIndices.length; i++) featureIndices[i] = i;
+        }
+        
+        categoryMaps = new LinkedHashMap<>();
         nValues = new int[featureIndices.length];
 
         for (int idx = 0; idx < featureIndices.length; idx++) {
             int col = featureIndices[idx];
-            Map<Object, Integer> catMap = new LinkedHashMap<>();
+            Map<Float, Integer> catMap = new LinkedHashMap<>();
 
-            for (Object[] row : X) {
-                Object value = row[col];
+            for (float[] row : X) {
+                float value = row[col];
                 if (!catMap.containsKey(value)) {
                     catMap.put(value, catMap.size());
                 }
@@ -37,9 +47,13 @@ public class OneHotEncoder extends BaseTransformer {
             categoryMaps.put(col, catMap);
             nValues[idx] = catMap.size();
         }
+        setFitted(true);
     }
 
-    public float[][] transform(Object[][] X) {
+    @Override
+    public float[][] transform(float[][] X) {
+        validateInput(X);
+        
         // Calculate output dimensions
         int totalFeatures = 0;
         for (int n : nValues)
@@ -49,12 +63,12 @@ public class OneHotEncoder extends BaseTransformer {
         float[][] transformed = new float[nSamples][totalFeatures];
 
         int offset = 0;
-        for (Map.Entry<Integer, Map<Object, Integer>> entry : categoryMaps.entrySet()) {
-            int col = entry.getKey();
-            Map<Object, Integer> catMap = entry.getValue();
+        for (int idx = 0; idx < featureIndices.length; idx++) {
+            int col = featureIndices[idx];
+            Map<Float, Integer> catMap = categoryMaps.get(col);
 
             for (int i = 0; i < nSamples; i++) {
-                Object value = X[i][col];
+                float value = X[i][col];
                 Integer catIdx = catMap.get(value);
 
                 if (catIdx != null) {
@@ -70,15 +84,16 @@ public class OneHotEncoder extends BaseTransformer {
         return transformed;
     }
 
+    @Override
     public List<String> getFeatureNames(List<String> inputFeatures) {
         List<String> featureNames = new ArrayList<>();
 
-        for (Map.Entry<Integer, Map<Object, Integer>> entry : categoryMaps.entrySet()) {
-            int col = entry.getKey();
+        for (int idx = 0; idx < featureIndices.length; idx++) {
+            int col = featureIndices[idx];
             String inputName = inputFeatures.get(col);
-            Map<Object, Integer> catMap = entry.getValue();
+            Map<Float, Integer> catMap = categoryMaps.get(col);
 
-            for (Object category : catMap.keySet()) {
+            for (Float category : catMap.keySet()) {
                 featureNames.add(inputName + "_" + category);
             }
         }

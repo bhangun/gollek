@@ -75,7 +75,7 @@ public class LiteRTMetalBridgeExample {
         int M = 1024, K = 1024, N = 1024;
         System.out.println("Benchmark: FP32 Matrix Multiplication [" + M + "x" + K + "x" + N + "]");
 
-        try (Arena arena = Arena.ofShared()) { // Use shared arena for zero-copy unified memory
+        try (Arena arena = Arena.ofAuto()) { // Use shared arena for zero-copy unified memory
             long sizeA = (long) M * K * 4;
             long sizeB = (long) K * N * 4;
             long sizeC = (long) M * N * 4;

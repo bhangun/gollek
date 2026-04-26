@@ -11,7 +11,7 @@
  * Loading strategy
  * ════════════════
  *                          ┌──────────────────────────────────────────┐
- *           .safetensors   │  FileChannel.map(…, Arena.ofShared())    │
+ *           .safetensors   │  FileChannel.map(…, Arena.ofAuto())    │
  *               file  ────▶│  → MemorySegment (mmap, off-heap, lazy) │
  *                          └──────────────────────────────────────────┘
  *                                           │
@@ -28,7 +28,7 @@
  *
  * Key FFM APIs used
  * ═════════════════
- *  • Arena.ofShared()          — shared, thread-safe arena for mmap lifetime
+ *  • Arena.ofAuto()          — shared, thread-safe arena for mmap lifetime
  *  • FileChannel.map(…, arena) — produces MemorySegment directly from JDK 22+
  *  • MemorySegment.asSlice()   — zero-copy view of a tensor's byte range
  *  • ValueLayout.*             — typed element access with explicit byte order
@@ -191,13 +191,13 @@ public class SafetensorFFMLoader {
      * eventually page in all data, but the initial map call is O(1).
      */
     private SafetensorLoadResult loadMmap(Path resolved) {
-        Arena arena = Arena.ofShared(); // arena outlives this method
+        Arena arena = Arena.ofAuto(); // arena is managed by GC, safe for GraalVM Vector API
         try {
             FileChannel channel = FileChannel.open(resolved, StandardOpenOption.READ);
             long fileSize = channel.size();
 
             if (fileSize == 0) {
-                arena.close();
+                // arena.close(); // Not needed for ofAuto()
                 throw new SafetensorException.ValidationException(
                         "File is empty", resolved);
             }
@@ -216,16 +216,16 @@ public class SafetensorFFMLoader {
                     resolved, header, fileSegment, arena, SafetensorLoadResult.LoadMode.MMAP);
 
         } catch (SafetensorException e) {
-            safeClose(arena);
+            // safeClose(arena);
             throw e;
         } catch (UnsupportedOperationException e) {
             // mmap not supported on this filesystem — fall back to copy
-            safeClose(arena);
+            // safeClose(arena);
             log.infof("mmap not supported for [%s], falling back to COPY mode: %s",
                     resolved, e.getMessage());
             return loadCopy(resolved);
         } catch (IOException e) {
-            safeClose(arena);
+            // safeClose(arena);
             throw new SafetensorException.IoException(resolved, e);
         }
     }
@@ -242,12 +242,12 @@ public class SafetensorFFMLoader {
      * startup) but works on all filesystems.
      */
     private SafetensorLoadResult loadCopy(Path resolved) {
-        Arena arena = Arena.ofShared();
+        Arena arena = Arena.ofAuto();
         try (FileChannel channel = FileChannel.open(resolved, StandardOpenOption.READ)) {
             long fileSize = channel.size();
 
             if (fileSize == 0) {
-                arena.close();
+                // arena.close();
                 throw new SafetensorException.ValidationException("File is empty", resolved);
             }
 
@@ -291,10 +291,10 @@ public class SafetensorFFMLoader {
                     resolved, header, nativeBuffer, arena, SafetensorLoadResult.LoadMode.COPY);
 
         } catch (SafetensorException e) {
-            safeClose(arena);
+            // safeClose(arena);
             throw e;
         } catch (IOException e) {
-            safeClose(arena);
+            // safeClose(arena);
             throw new SafetensorException.IoException(resolved, e);
         }
     }
@@ -325,7 +325,7 @@ public class SafetensorFFMLoader {
      */
     private long peekHeaderLength(Path resolved) {
         try (FileChannel channel = FileChannel.open(resolved, StandardOpenOption.READ)) {
-            try (Arena arena = Arena.ofConfined()) {
+            try (Arena arena = Arena.ofAuto()) {
                 MemorySegment prefix = channel.map(
                         FileChannel.MapMode.READ_ONLY, 0L, 8L, arena);
                 long length = prefix.get(
@@ -346,9 +346,6 @@ public class SafetensorFFMLoader {
     }
 
     private static void safeClose(Arena arena) {
-        try {
-            arena.close();
-        } catch (Exception ignored) {
-        }
+        // No-op for Arena.ofAuto()
     }
 }

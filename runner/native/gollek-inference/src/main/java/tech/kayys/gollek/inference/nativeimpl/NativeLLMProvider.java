@@ -432,7 +432,7 @@ public class NativeLLMProvider implements StreamingProvider {
             // Robust vocab size lookup
             int vocabSize = engine.getVocabSize();
 
-            try (Arena localArena = Arena.ofShared()) {
+            try (Arena localArena = Arena.ofAuto()) {
                 MemorySegment logits = localArena.allocate((long) vocabSize * Float.BYTES, 64);
 
                 for (int i = 0; i < maxNewTokens; i++) {

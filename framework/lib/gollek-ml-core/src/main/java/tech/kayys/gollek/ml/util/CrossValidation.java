@@ -1,24 +1,31 @@
 package tech.kayys.gollek.ml.util;
 
+import tech.kayys.gollek.ml.base.BaseEstimator;
+import tech.kayys.gollek.ml.model_selection.ModelSelection;
+import tech.kayys.gollek.ml.metrics.Metrics;
+import java.util.*;
+import java.util.stream.*;
+
 /**
  * Cross-validation utilities.
  */
 public class CrossValidation {
 
     /**
-     * K-Fold cross-validation.
+     * K-Fold cross-validation score.
      */
     public static double crossValScore(BaseEstimator estimator, float[][] X, int[] y,
             int nFolds, String scoring) {
-        List<Fold> folds = kFoldSplit(X.length, nFolds, 42);
+        ModelSelection.KFold kfold = new ModelSelection.KFold(nFolds);
+        List<ModelSelection.Fold> folds = kfold.split(X.length);
         double[] scores = new double[nFolds];
 
         // Parallel execution of folds
-        IntStream.range(0, nFolds).parallel().forEach(fold -> {
-            Fold foldData = folds.get(fold);
+        IntStream.range(0, nFolds).parallel().forEach(foldIdx -> {
+            ModelSelection.Fold foldData = folds.get(foldIdx);
 
             // Create a fresh copy of the estimator
-            BaseEstimator foldEstimator = cloneEstimator(estimator);
+            BaseEstimator foldEstimator = estimator.clone();
 
             // Extract training and validation sets
             float[][] XTrain = new float[foldData.trainIndices.length][];
@@ -37,17 +44,12 @@ public class CrossValidation {
 
             // Train and evaluate
             foldEstimator.fit(XTrain, yTrain);
-            int[] predictions = foldEstimator.predict(XVal);
 
             if ("accuracy".equals(scoring)) {
-                int correct = 0;
-                for (int i = 0; i < predictions.length; i++) {
-                    if (predictions[i] == yVal[i])
-                        correct++;
-                }
-                scores[fold] = (double) correct / predictions.length;
+                scores[foldIdx] = foldEstimator.score(XVal, yVal);
             } else if ("f1".equals(scoring)) {
-                scores[fold] = f1Score(yVal, predictions);
+                int[] predictions = foldEstimator.predict(XVal);
+                scores[foldIdx] = Metrics.f1Score(yVal, predictions, 1); // Assuming binary class 1 for now
             }
         });
 
@@ -60,13 +62,13 @@ public class CrossValidation {
     public static GridSearchResult gridSearch(BaseEstimator estimator,
             Map<String, Object[]> paramGrid,
             float[][] X, int[] y, int nFolds) {
-        List<ParameterSet> paramSets = generateParameterSets(paramGrid);
+        List<Map<String, Object>> paramSets = generateParameterSets(paramGrid);
 
         // Evaluate each parameter set in parallel
         List<GridSearchResult> results = paramSets.parallelStream()
                 .map(params -> {
-                    BaseEstimator clone = cloneEstimator(estimator);
-                    setParameters(clone, params);
+                    BaseEstimator clone = estimator.clone();
+                    clone.setParams(params);
                     double score = crossValScore(clone, X, y, nFolds, "accuracy");
                     return new GridSearchResult(params, score);
                 })
@@ -79,72 +81,48 @@ public class CrossValidation {
 
         // Train best model on all data
         if (best != null) {
-            setParameters(estimator, best.params);
+            estimator.setParams(best.params);
             estimator.fit(X, y);
         }
 
         return best;
     }
 
-    /**
-     * Learning curve analysis.
-     */
-    public static LearningCurve learningCurve(BaseEstimator estimator, float[][] X, int[] y,
-            int[] trainSizes, int nFolds) {
-        LearningCurve curve = new LearningCurve();
+    private static List<Map<String, Object>> generateParameterSets(Map<String, Object[]> paramGrid) {
+        List<Map<String, Object>> combinations = new ArrayList<>();
+        combinations.add(new LinkedHashMap<>());
 
-        for (int trainSize : trainSizes) {
-            double[] scores = new double[nFolds];
+        for (Map.Entry<String, Object[]> entry : paramGrid.entrySet()) {
+            String key = entry.getKey();
+            Object[] values = entry.getValue();
+            List<Map<String, Object>> nextCombinations = new ArrayList<>();
 
-            for (int fold = 0; fold < nFolds; fold++) {
-                // Sample subset of training data
-                int[] indices = randomSample(X.length, trainSize, fold);
-                float[][] XSub = new float[trainSize][];
-                int[] ySub = new int[trainSize];
-                for (int i = 0; i < trainSize; i++) {
-                    XSub[i] = X[indices[i]];
-                    ySub[i] = y[indices[i]];
+            for (Map<String, Object> combination : combinations) {
+                for (Object value : values) {
+                    Map<String, Object> next = new LinkedHashMap<>(combination);
+                    next.put(key, value);
+                    nextCombinations.add(next);
                 }
-
-                BaseEstimator foldEstimator = cloneEstimator(estimator);
-                foldEstimator.fit(XSub, ySub);
-
-                // Cross-validation on subset
-                double cvScore = crossValScore(foldEstimator, X, y, 3, "accuracy");
-                scores[fold] = cvScore;
             }
-
-            curve.trainSizes.add(trainSize);
-            double meanScore = Arrays.stream(scores).average().orElse(0);
-            double stdScore = Math.sqrt(Arrays.stream(scores)
-                    .map(s -> Math.pow(s - meanScore, 2))
-                    .average().orElse(0));
-            curve.trainScores.add(meanScore);
-            curve.trainStd.add(stdScore);
+            combinations = nextCombinations;
         }
-
-        return curve;
+        return combinations;
     }
 
     // Helper classes
-    static class Fold {
-        int[] trainIndices;
-        int[] valIndices;
-    }
+    public static class GridSearchResult {
+        public Map<String, Object> params;
+        public double score;
 
-    static class GridSearchResult {
-        ParameterSet params;
-        double score;
-
-        GridSearchResult(ParameterSet params, double score) {
+        public GridSearchResult(Map<String, Object> params, double score) {
             this.params = params;
             this.score = score;
         }
     }
 
-    static class LearningCurve {
-        List<Integer> trainSizes = new ArrayList<>();
-        List<Double> trainScores = new ArrayList<>();
-        List<Double> trainStd = new ArrayList<>();
+    public static class LearningCurve {
+        public List<Integer> trainSizes = new ArrayList<>();
+        public List<Double> trainScores = new ArrayList<>();
+        public List<Double> trainStd = new ArrayList<>();
     }
 }

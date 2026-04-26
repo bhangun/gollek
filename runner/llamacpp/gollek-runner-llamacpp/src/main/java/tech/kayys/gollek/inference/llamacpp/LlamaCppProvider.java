@@ -73,7 +73,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class LlamaCppProvider implements StreamingProvider {
 
     private static final Logger log = Logger.getLogger(LlamaCppProvider.class);
-    private static final String PROVIDER_ID = "llamacpp";
+    private static final String PROVIDER_ID = "gguf";
     private static final String PROVIDER_VERSION = "1.1.0";
 
     private final LlamaCppProviderConfig config;

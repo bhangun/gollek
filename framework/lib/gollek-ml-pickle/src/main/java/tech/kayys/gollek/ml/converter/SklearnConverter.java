@@ -3,6 +3,8 @@ package tech.kayys.gollek.ml.converter;
 import tech.kayys.gollek.ml.base.*;
 import tech.kayys.gollek.ml.ensemble.*;
 import tech.kayys.gollek.ml.tree.*;
+import tech.kayys.gollek.ml.linear_model.LinearModel;
+import tech.kayys.gollek.ml.svm.SVC;
 import tech.kayys.gollek.ml.pickle.*;
 
 import java.util.*;
@@ -72,17 +74,43 @@ public class SklearnConverter {
                 maxDepth, minSamplesSplit, 1, "gini", "sqrt");
 
         // Extract tree structure
-        int[] childrenLeft = (int[]) tree.getState("children_left");
-        int[] childrenRight = (int[]) tree.getState("children_right");
-        int[] feature = (int[]) tree.getState("feature");
-        double[] threshold = (double[]) tree.getState("threshold");
-        double[] value = (double[]) tree.getState("value");
-        int[] nNodeSamples = (int[]) tree.getState("n_node_samples");
+        Map<String, Object> treeState = (Map<String, Object>) tree.getState("tree_");
+        int[] childrenLeft = (int[]) treeState.get("children_left");
+        int[] childrenRight = (int[]) treeState.get("children_right");
+        int[] feature = (int[]) treeState.get("feature");
+        double[] threshold = (double[]) treeState.get("threshold");
+        double[] value = (double[]) treeState.get("value");
 
-        // Convert to Gollek tree structure
-        // This would recursively build the decision tree
-
+        model.setRoot(buildClassifierNode(0, childrenLeft, childrenRight, feature, threshold, value));
         return model;
+    }
+
+    private static DecisionTreeClassifier.Node buildClassifierNode(int nodeIdx, int[] left, int[] right, int[] feature, double[] threshold, double[] value) {
+        if (left[nodeIdx] == -1) {
+            // Leaf node. value[nodeIdx] is usually double[1][n_classes] flattened or similar.
+            // Simplified: extract the class with max count.
+            // In practice, sklearn value is double[node_count][1][n_classes]
+            int nClasses = value.length / left.length;
+            double[] probs = new double[nClasses];
+            int maxClass = 0;
+            for (int i = 0; i < nClasses; i++) {
+                probs[i] = value[nodeIdx * nClasses + i];
+                if (probs[i] > probs[maxClass]) maxClass = i;
+            }
+            // Normalize probs
+            double sum = Arrays.stream(probs).sum();
+            if (sum > 0) for (int i = 0; i < nClasses; i++) probs[i] /= sum;
+            
+            return new DecisionTreeClassifier.LeafNode(maxClass, probs);
+        } else {
+            return new DecisionTreeClassifier.SplitNode(
+                feature[nodeIdx],
+                threshold[nodeIdx],
+                buildClassifierNode(left[nodeIdx], left, right, feature, threshold, value),
+                buildClassifierNode(right[nodeIdx], left, right, feature, threshold, value),
+                0.0 // Gain not easily available from pickle
+            );
+        }
     }
 
     /**
@@ -96,13 +124,47 @@ public class SklearnConverter {
         String loss = (String) gb.getState("loss");
 
         GradientBoostingClassifier model = new GradientBoostingClassifier(
-                nEstimators, (float) learningRate, maxDepth, minSamplesSplit, loss, 1.0, 10);
+                nEstimators, learningRate, maxDepth, minSamplesSplit, loss, 1.0, 10);
 
         // Extract estimators
         @SuppressWarnings("unchecked")
-        List<PickleParser.PickleObject> estimators = gb.getState("estimators_");
+        List<PickleParser.PickleObject[]> estimators = (List<PickleParser.PickleObject[]>) gb.getState("estimators_");
+        
+        // GBC in sklearn has estimators_ as a list of arrays (one array per estimator, each array contains regressors for each class)
+        // For binary classification, it's usually 1 regressor per stage.
+        
+        for (PickleParser.PickleObject[] stage : estimators) {
+            for (PickleParser.PickleObject treeObj : stage) {
+                DecisionTreeRegressor regressor = convertDecisionTreeRegressor(treeObj);
+                model.addTree(regressor, learningRate);
+            }
+        }
 
         return model;
+    }
+
+    private static DecisionTreeRegressor convertDecisionTreeRegressor(PickleParser.PickleObject tree) {
+        Map<String, Object> treeState = (Map<String, Object>) tree.getState("tree_");
+        int[] childrenLeft = (int[]) treeState.get("children_left");
+        int[] childrenRight = (int[]) treeState.get("children_right");
+        int[] feature = (int[]) treeState.get("feature");
+        double[] threshold = (double[]) treeState.get("threshold");
+        double[] value = (double[]) treeState.get("value");
+
+        DecisionTreeRegressor model = new DecisionTreeRegressor();
+        model.setRoot(buildRegressorNode(0, childrenLeft, childrenRight, feature, threshold, value));
+        return model;
+    }
+
+    private static DecisionTreeRegressor.Node buildRegressorNode(int nodeIdx, int[] left, int[] right, int[] feature, double[] threshold, double[] value) {
+        if (left[nodeIdx] == -1) {
+            return new DecisionTreeRegressor.Node(value[nodeIdx]);
+        } else {
+            DecisionTreeRegressor.Node node = new DecisionTreeRegressor.Node(feature[nodeIdx], (float) threshold[nodeIdx]);
+            node.left = buildRegressorNode(left[nodeIdx], left, right, feature, threshold, value);
+            node.right = buildRegressorNode(right[nodeIdx], left, right, feature, threshold, value);
+            return node;
+        }
     }
 
     /**
@@ -120,7 +182,8 @@ public class SklearnConverter {
         LinearModel model = new LinearModel(gollekPenalty, alpha, 1.0, 1e-4, 1000, 0.01);
 
         // Set coefficients
-        // Note: Need to add setCoefficients method to LinearModel
+        model.setCoefficients(coef);
+        model.setIntercept(intercept);
 
         return model;
     }
@@ -141,6 +204,24 @@ public class SklearnConverter {
         double[][] supportVectors = (double[][]) svm.getState("support_vectors_");
         double[] dualCoef = (double[]) svm.getState("dual_coef_");
         double intercept = (Double) svm.getState("intercept_");
+        
+        // Convert support vectors to float[][]
+        float[][] svFloat = new float[supportVectors.length][];
+        for (int i = 0; i < supportVectors.length; i++) {
+            svFloat[i] = new float[supportVectors[i].length];
+            for (int j = 0; j < supportVectors[i].length; j++) {
+                svFloat[i][j] = (float) supportVectors[i][j];
+            }
+        }
+        
+        // sklearn's dual_coef_ is (n_classes-1, n_SV)
+        // For binary, it's (1, n_SV)
+        // supportVectorLabels should be +1/-1 based on sklearn's decision function
+        // This is a simplification.
+        int[] labels = new int[dualCoef.length];
+        for (int i = 0; i < labels.length; i++) labels[i] = dualCoef[i] > 0 ? 1 : -1;
+
+        model.setSupportVectors(svFloat, labels, dualCoef, -intercept);
 
         return model;
     }
@@ -156,7 +237,7 @@ public class SklearnConverter {
 
         tech.kayys.gollek.ml.pipeline.PCA model = new tech.kayys.gollek.ml.pipeline.PCA(nComponents);
 
-        // Set PCA parameters (would need to add setter methods)
+        model.setParameters(components, mean, explainedVariance);
 
         return model;
     }
@@ -171,8 +252,7 @@ public class SklearnConverter {
 
         tech.kayys.gollek.ml.pipeline.StandardScaler model = new tech.kayys.gollek.ml.pipeline.StandardScaler();
 
-        // Set scaler parameters
-        // Would need to add setMean/setScale methods
+        model.setParameters(mean, scale);
 
         return model;
     }

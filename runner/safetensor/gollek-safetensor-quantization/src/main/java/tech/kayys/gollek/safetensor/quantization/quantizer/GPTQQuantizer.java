@@ -285,7 +285,7 @@ public class GPTQQuantizer implements Quantizer {
         long[] lShape = new long[shape.length];
         for (int i = 0; i < shape.length; i++) lShape[i] = shape[i];
         
-        java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofShared();
+        java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofAuto();
         MemorySegment dataSeg = arena.allocateFrom(ValueLayout.JAVA_INT, data);
         
         // Find scales and zeros (they should be calculated during gptqQuantize but let's assume they're available)

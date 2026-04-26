@@ -334,7 +334,7 @@ public final class InferenceRequest {
 
     public static class Builder {
         private String requestId = UUID.randomUUID().toString();
-        private String apiKey;
+        private String apiKey = ApiKeyConstants.COMMUNITY_API_KEY;
         private String model;
         private final List<Message> messages = new ArrayList<>();
         private final List<ToolDefinition> tools = new ArrayList<>();

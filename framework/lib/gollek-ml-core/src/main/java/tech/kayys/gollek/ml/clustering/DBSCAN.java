@@ -1,7 +1,9 @@
 package tech.kayys.gollek.ml.clustering;
 
+import tech.kayys.gollek.ml.base.BaseEstimator;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.IntStream;
 
 /**
  * DBSCAN - Density-Based Spatial Clustering of Applications with Noise.
@@ -29,6 +31,10 @@ public class DBSCAN extends BaseEstimator {
     }
 
     @Override
+    public void fit(float[][] X, int[] y) {
+        fit(X);
+    }
+
     public void fit(float[][] X) {
         int nSamples = X.length;
         labels = new int[nSamples];

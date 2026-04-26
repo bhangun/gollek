@@ -38,7 +38,7 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
     private final Path modelPath;
     private final LiteRTTokenizer tokenizer;
 
-    private final Arena arena = Arena.ofShared();
+    private final Arena arena = Arena.ofAuto();
     private Map<String, MemorySegment> weightSegments;
     private final Map<String, MemorySegment> dequantizedWeights = new java.util.concurrent.ConcurrentHashMap<>();
     private boolean initialized = false;

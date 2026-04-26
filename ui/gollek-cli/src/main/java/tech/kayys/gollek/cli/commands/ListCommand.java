@@ -111,58 +111,99 @@ public class ListCommand implements Runnable {
     }
 
     private void printTable(List<ModelInfo> models) {
-        // ANSI escape codes for coloring
-        final String ANSI_RESET = "\u001B[0m";
-        final String ANSI_CYAN = "\u001B[36m";
-        final String ANSI_YELLOW = "\u001B[33m";
-        final String ANSI_GREEN = "\u001B[32m";
-        final String ANSI_WHITE_BOLD = "\u001B[1;37m";
-        final String ANSI_GRAY = "\u001B[90m";
+        final String ANSI_RESET   = "\u001B[0m";
+        final String ANSI_CYAN    = "\u001B[36m";
+        final String ANSI_YELLOW  = "\u001B[33m";
+        final String ANSI_GREEN   = "\u001B[32m";
+        final String ANSI_MAGENTA = "\u001B[35m";
+        final String ANSI_BOLD    = "\u001B[1;37m";
+        final String ANSI_GRAY    = "\u001B[90m";
 
-        System.out.printf(ANSI_WHITE_BOLD + "%-7s %-32s %-12s %-10s %-12s %-10s" + ANSI_RESET + "%n", 
-                "ID", "NAME", "ARCH", "FORMAT", "SIZE", "MODIFIED");
-        System.out.println(ANSI_GRAY + "─".repeat(85) + ANSI_RESET);
+        // Header
+        System.out.printf(ANSI_BOLD + "%-7s %-14s %-26s %-12s %-10s %-12s %-10s" + ANSI_RESET + "%n",
+                "ID", "GROUP", "NAME", "ARCH", "FORMAT", "SIZE", "MODIFIED");
+        System.out.println(ANSI_GRAY + "─".repeat(97) + ANSI_RESET);
 
         for (ModelInfo model : models) {
-            String id = model.getShortId() != null ? model.getShortId() : "n/a";
-            String arch = model.getArchitecture() != null ? model.getArchitecture() : "unknown";
+            // Short ID
+            String id = model.getShortId();
+            if (id == null || id.isBlank() || id.equalsIgnoreCase("n/a")) {
+                id = tech.kayys.gollek.spi.model.ModelUtils.generateShortId(model.getModelId());
+            }
+
+            // Group from modelId (e.g., "Qwen/Qwen2.5-..." → "Qwen")
+            String group = "";
+            String displayName = model.getName() != null ? model.getName() : model.getModelId();
+            String modelId = model.getModelId();
+            if (modelId != null && modelId.contains("/")) {
+                int slash = modelId.indexOf('/');
+                group = modelId.substring(0, slash);
+                // Strip group prefix from displayName if still present
+                String withUnder = group + "_";
+                String withDouble = group + "__";
+                if (displayName.startsWith(withDouble)) {
+                    displayName = displayName.substring(withDouble.length());
+                } else if (displayName.startsWith(withUnder)) {
+                    displayName = displayName.substring(withUnder.length());
+                }
+            }
+
+            String arch     = model.getArchitecture() != null ? model.getArchitecture() : "unknown";
             String modified = model.getUpdatedAt() != null
-                    ? model.getUpdatedAt().toString().substring(0, 10)
-                    : "N/A";
-            
-            String formatColor = switch (model.getFormat() != null ? model.getFormat().toUpperCase() : "") {
-                case "GGUF" -> ANSI_CYAN;
+                    ? model.getUpdatedAt().toString().substring(0, 10) : "N/A";
+
+            String fmtStr  = model.getFormat() != null ? model.getFormat() : "N/A";
+            String fmtColor = switch (fmtStr.toUpperCase()) {
+                case "GGUF"        -> ANSI_CYAN;
                 case "SAFETENSORS" -> ANSI_YELLOW;
-                case "LITERT" -> ANSI_GREEN;
-                default -> "";
+                case "LITERT"      -> ANSI_GREEN;
+                case "ONNX"        -> ANSI_MAGENTA;
+                default            -> "";
             };
 
-            System.out.printf("%-7s %-32s %-12s %s%-10s%s %-12s %-10s%n",
+            System.out.printf("%-7s %-14s %-26s %-12s %s%-10s%s %-12s %-10s%n",
                     ANSI_YELLOW + id + ANSI_RESET,
-                    truncate(model.getName() != null ? model.getName() : model.getModelId(), 32),
+                    truncate(group, 14),
+                    truncate(displayName, 26),
                     truncate(arch, 12),
-                    formatColor,
-                    truncate(model.getFormat() != null ? model.getFormat() : "N/A", 10),
+                    fmtColor,
+                    truncate(fmtStr, 10),
                     ANSI_RESET,
                     CLIUtils.formatSize(model.getSizeBytes() != null ? model.getSizeBytes() : 0),
                     modified);
         }
-        System.out.printf(ANSI_WHITE_BOLD + "%n%d model(s) found" + ANSI_RESET + "%n", models.size());
+        System.out.printf(ANSI_BOLD + "%n%d model(s) found" + ANSI_RESET + "%n", models.size());
     }
 
     private void printJson(List<ModelInfo> models) {
         System.out.println("[");
         for (int i = 0; i < models.size(); i++) {
             ModelInfo model = models.get(i);
-            System.out.printf("  {\"modelId\": \"%s\", \"name\": \"%s\", \"size\": %d, \"format\": \"%s\"}%s%n",
-                    model.getModelId(),
-                    model.getName() != null ? model.getName() : model.getModelId(),
-                    model.getSizeBytes() != null ? model.getSizeBytes() : 0,
-                    model.getFormat() != null ? model.getFormat() : "",
-                    i < models.size() - 1 ? "," : "");
+            String modelId = model.getModelId() != null ? model.getModelId() : "";
+            String group = "";
+            String name  = model.getName() != null ? model.getName() : modelId;
+            if (modelId.contains("/")) {
+                group = modelId.substring(0, modelId.indexOf('/'));
+            }
+            String shortId = model.getShortId();
+            if (shortId == null || shortId.isBlank()) {
+                shortId = tech.kayys.gollek.spi.model.ModelUtils.generateShortId(modelId);
+            }
+            System.out.printf(
+                "  {\"id\": \"%s\", \"shortId\": \"%s\", \"group\": \"%s\", \"name\": \"%s\", " +
+                "\"modelId\": \"%s\", \"format\": \"%s\", \"size\": %d}%s%n",
+                model.getModelId(),
+                shortId,
+                group,
+                name,
+                modelId,
+                model.getFormat() != null ? model.getFormat() : "",
+                model.getSizeBytes() != null ? model.getSizeBytes() : 0,
+                i < models.size() - 1 ? "," : "");
         }
         System.out.println("]");
     }
+
 
     private String truncate(String str, int maxLen) {
         if (str == null)

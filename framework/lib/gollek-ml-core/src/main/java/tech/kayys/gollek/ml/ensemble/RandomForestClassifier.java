@@ -1,5 +1,11 @@
 package tech.kayys.gollek.ml.ensemble;
 
+import tech.kayys.gollek.ml.base.BaseEstimator;
+import tech.kayys.gollek.ml.tree.DecisionTreeClassifier;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.stream.IntStream;
+
 /**
  * Random Forest - bagging ensemble of decision trees.
  * Supports parallel tree building and out-of-bag scoring.
@@ -11,14 +17,17 @@ public class RandomForestClassifier extends BaseEstimator {
     private final int maxDepth;
     private final int minSamplesSplit;
     private final String criterion;
-    private final double maxFeatures;
+    private final String maxFeatures;
     private final boolean bootstrap;
     private final int nJobs;
     private final boolean oobScore;
 
+    private int nClasses;
+    private int nFeatures;
     private double oobScore_;
-    private double[][] oobPredictions;
+    private Object[] oobPredictions;
     private int[] oobCounts;
+    private boolean isFitted = false;
 
     public RandomForestClassifier() {
         this(100, 10, 2, "gini", "sqrt", true, -1, false);
@@ -39,11 +48,14 @@ public class RandomForestClassifier extends BaseEstimator {
 
     @Override
     public void fit(float[][] X, int[] y) {
+        validateData(X, y);
         int nSamples = X.length;
+        this.nFeatures = X[0].length;
+        this.nClasses = (int) Arrays.stream(y).distinct().count();
 
         // Initialize OOB tracking if needed
         if (oobScore) {
-            oobPredictions = new double[nSamples][];
+            oobPredictions = new Object[nSamples];
             oobCounts = new int[nSamples];
             for (int i = 0; i < nSamples; i++) {
                 oobPredictions[i] = new int[nClasses];
@@ -125,6 +137,8 @@ public class RandomForestClassifier extends BaseEstimator {
             }
             oobScore_ = total > 0 ? (double) correct / total : 0.0;
         }
+        
+        this.isFitted = true;
     }
 
     /**
@@ -162,15 +176,16 @@ public class RandomForestClassifier extends BaseEstimator {
      */
     @Override
     public int[] predict(float[][] X) {
+        validateInput(X);
         int[] predictions = new int[X.length];
 
         // Parallel prediction
-        Arrays.parallelSetAll(predictions, i -> {
+        IntStream.range(0, X.length).parallel().forEach(i -> {
             int[] votes = new int[nClasses];
             for (DecisionTreeClassifier tree : trees) {
                 votes[tree.predictSingle(X[i])]++;
             }
-            return argmax(votes);
+            predictions[i] = argmax(votes);
         });
 
         return predictions;
@@ -179,21 +194,21 @@ public class RandomForestClassifier extends BaseEstimator {
     /**
      * Predict probabilities (averaged across trees).
      */
-    public double[][] predict_proba(float[][] X) {
+    @Override
+    public double[][] predictProba(float[][] X) {
+        validateInput(X);
         double[][] probabilities = new double[X.length][nClasses];
 
-        Arrays.parallelSetAll(probabilities, i -> {
-            double[] probs = new double[nClasses];
+        IntStream.range(0, X.length).parallel().forEach(i -> {
             for (DecisionTreeClassifier tree : trees) {
-                double[] treeProbs = tree.predictProbaSingle(X[i]);
+                double[][] treeProbs = tree.predictProba(new float[][] { X[i] });
                 for (int c = 0; c < nClasses; c++) {
-                    probs[c] += treeProbs[c];
+                    probabilities[i][c] += treeProbs[0][c];
                 }
             }
             for (int c = 0; c < nClasses; c++) {
-                probs[c] /= trees.size();
+                probabilities[i][c] /= trees.size();
             }
-            return probs;
         });
 
         return probabilities;
@@ -201,6 +216,23 @@ public class RandomForestClassifier extends BaseEstimator {
 
     public double oobScore() {
         return oobScore_;
+    }
+
+    @Override
+    public boolean isFitted() {
+        return isFitted;
+    }
+
+    private int argmax(int[] values) {
+        int bestIdx = 0;
+        int maxVal = values[0];
+        for (int i = 1; i < values.length; i++) {
+            if (values[i] > maxVal) {
+                maxVal = values[i];
+                bestIdx = i;
+            }
+        }
+        return bestIdx;
     }
 
     public double[] featureImportances() {

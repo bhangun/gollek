@@ -196,7 +196,7 @@ public class WeightOffloadingV2Runner extends AbstractGollekRunner {
         paBinding = PagedAttentionBinding.getInstance();
 
         // Memory-map model into pinned CPU off-heap (Arena.ofShared)
-        cpuArena = Arena.ofShared();
+        cpuArena = Arena.ofAuto();
         Path modelPath = resolveModelPath(modelManifest);
         int numLayers = resolveNumLayers(modelManifest, modelPath);
         cpuWeights = loadWeightsToOffHeap(modelPath, numLayers, cpuArena);
@@ -206,7 +206,7 @@ public class WeightOffloadingV2Runner extends AbstractGollekRunner {
         gpuSlots = new MemorySegment[prefetchDepth];
         long layerBytes = cpuWeights.length > 0 ? cpuWeights[0].byteSize() : 512L * 1024 * 1024;
         for (int i = 0; i < prefetchDepth; i++) {
-            gpuSlotArenas[i] = Arena.ofShared();
+            gpuSlotArenas[i] = Arena.ofAuto();
             gpuSlots[i] = gpuSlotArenas[i].allocate(layerBytes, 64);
         }
 

@@ -2,6 +2,7 @@ package tech.kayys.gollek.ml.pipeline;
 
 import tech.kayys.gollek.ml.base.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * ColumnTransformer applies different transformers to different columns.
@@ -10,9 +11,9 @@ import java.util.*;
 public class ColumnTransformer extends BaseTransformer {
 
     private final List<TransformerColumn> transformers;
-    private final String remainder; // "drop", "passthrough", or transformer
-    private List<String> featureNames;
+    private final String remainder; // "drop", "passthrough"
     private int nFeaturesOut;
+    private int nFeaturesIn;
 
     public ColumnTransformer() {
         this.transformers = new ArrayList<>();
@@ -24,15 +25,10 @@ public class ColumnTransformer extends BaseTransformer {
         return this;
     }
 
-    public ColumnTransformer addTransformer(String name, BaseTransformer transformer, String columns) {
-        // For named column selection (when feature names are available)
-        transformers.add(new TransformerColumn(name, transformer, columns));
-        return this;
-    }
-
     @Override
     public void fit(float[][] X) {
-        int nFeatures = X[0].length;
+        validateInput(X);
+        this.nFeaturesIn = X[0].length;
         Set<Integer> usedColumns = new HashSet<>();
 
         // Fit each transformer on its columns
@@ -44,24 +40,18 @@ public class ColumnTransformer extends BaseTransformer {
             }
         }
 
-        // Handle remainder columns
-        if ("passthrough".equals(remainder)) {
-            List<Integer> remainderCols = new ArrayList<>();
-            for (int i = 0; i < nFeatures; i++) {
-                if (!usedColumns.contains(i)) {
-                    remainderCols.add(i);
-                }
-            }
-            // Could add a passthrough transformer
-        }
-
         // Calculate output feature count
         nFeaturesOut = 0;
         for (TransformerColumn tc : transformers) {
-            nFeaturesOut += tc.transformer.getNFeaturesOut();
+            float[][] subset = extractColumns(X, tc.columns);
+            float[][] transformed = tc.transformer.transform(subset);
+            nFeaturesOut += transformed[0].length;
         }
+        
         if ("passthrough".equals(remainder)) {
-            nFeaturesOut += (nFeatures - usedColumns.size());
+            for (int i = 0; i < nFeaturesIn; i++) {
+                if (!usedColumns.contains(i)) nFeaturesOut++;
+            }
         }
 
         setFitted(true);
@@ -69,33 +59,32 @@ public class ColumnTransformer extends BaseTransformer {
 
     @Override
     public float[][] transform(float[][] X) {
-        if (!isFitted()) {
-            throw new IllegalStateException("ColumnTransformer must be fitted before transform");
-        }
-
-        List<float[]> allOutputs = new ArrayList<>();
-
-        // Transform each column group
-        for (TransformerColumn tc : transformers) {
-            float[][] subset = extractColumns(X, tc.columns);
-            float[][] transformed = tc.transformer.transform(subset);
-            for (float[] row : transformed) {
-                allOutputs.add(row);
-            }
-        }
-
-        // Combine results
+        validateInput(X);
         int nSamples = X.length;
         float[][] result = new float[nSamples][nFeaturesOut];
         int colOffset = 0;
+        Set<Integer> usedColumns = new HashSet<>();
 
         for (TransformerColumn tc : transformers) {
-            float[][] transformed = tc.transformer.transform(extractColumns(X, tc.columns));
+            float[][] subset = extractColumns(X, tc.columns);
+            float[][] transformed = tc.transformer.transform(subset);
             int nOut = transformed[0].length;
             for (int i = 0; i < nSamples; i++) {
                 System.arraycopy(transformed[i], 0, result[i], colOffset, nOut);
             }
             colOffset += nOut;
+            for (int col : tc.columns) usedColumns.add(col);
+        }
+
+        if ("passthrough".equals(remainder)) {
+            for (int j = 0; j < nFeaturesIn; j++) {
+                if (!usedColumns.contains(j)) {
+                    for (int i = 0; i < nSamples; i++) {
+                        result[i][colOffset] = X[i][j];
+                    }
+                    colOffset++;
+                }
+            }
         }
 
         return result;
@@ -104,26 +93,30 @@ public class ColumnTransformer extends BaseTransformer {
     private float[][] extractColumns(float[][] X, int[] columns) {
         int nSamples = X.length;
         float[][] subset = new float[nSamples][columns.length];
-
         for (int i = 0; i < nSamples; i++) {
             for (int j = 0; j < columns.length; j++) {
                 subset[i][j] = X[i][columns[j]];
             }
         }
-
         return subset;
     }
 
     @Override
     public List<String> getFeatureNames(List<String> inputFeatures) {
         List<String> names = new ArrayList<>();
+        Set<Integer> usedColumns = new HashSet<>();
         for (TransformerColumn tc : transformers) {
-            List<String> tcNames = tc.transformer.getFeatureNames(
-                    inputFeatures != null
-                            ? Arrays.asList(
-                                    Arrays.stream(tc.columns).mapToObj(inputFeatures::get).toArray(String[]::new))
-                            : null);
-            names.addAll(tcNames);
+            List<String> tcInputNames = new ArrayList<>();
+            for (int col : tc.columns) {
+                tcInputNames.add(inputFeatures.get(col));
+                usedColumns.add(col);
+            }
+            names.addAll(tc.transformer.getFeatureNames(tcInputNames));
+        }
+        if ("passthrough".equals(remainder)) {
+            for (int i = 0; i < nFeaturesIn; i++) {
+                if (!usedColumns.contains(i)) names.add(inputFeatures.get(i));
+            }
         }
         return names;
     }
@@ -137,20 +130,11 @@ public class ColumnTransformer extends BaseTransformer {
         final String name;
         final BaseTransformer transformer;
         final int[] columns;
-        final String columnNames; // For named columns
 
         TransformerColumn(String name, BaseTransformer transformer, int[] columns) {
             this.name = name;
             this.transformer = transformer;
             this.columns = columns;
-            this.columnNames = null;
-        }
-
-        TransformerColumn(String name, BaseTransformer transformer, String columnNames) {
-            this.name = name;
-            this.transformer = transformer;
-            this.columnNames = columnNames;
-            this.columns = null;
         }
     }
 }

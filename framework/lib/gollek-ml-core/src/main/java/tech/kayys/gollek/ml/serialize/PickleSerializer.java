@@ -4,6 +4,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.*;
+import tech.kayys.gollek.ml.base.BaseEstimator;
 
 /**
  * Python pickle compatible serialization for Gollek models.

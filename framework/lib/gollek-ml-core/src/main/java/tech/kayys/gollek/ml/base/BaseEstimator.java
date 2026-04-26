@@ -1,6 +1,8 @@
 package tech.kayys.gollek.ml.base;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import java.util.*;
+import java.io.*;
 import java.lang.reflect.*;
 
 /**
@@ -8,6 +10,7 @@ import java.lang.reflect.*;
  * Provides common functionality: parameter validation, cloning, and
  * get_params/set_params.
  */
+@RegisterForReflection(registerFullHierarchy = true)
 public abstract class BaseEstimator implements Cloneable, Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -60,7 +63,12 @@ public abstract class BaseEstimator implements Cloneable, Serializable {
             // Deep clone internal state
             for (Field field : getClass().getDeclaredFields()) {
                 field.setAccessible(true);
-                Object value = field.get(this);
+                Object value;
+                try {
+                    value = field.get(this);
+                } catch (IllegalAccessException e) {
+                    continue;
+                }
                 if (value instanceof Cloneable) {
                     try {
                         Method cloneMethod = value.getClass().getMethod("clone");
@@ -76,15 +84,32 @@ public abstract class BaseEstimator implements Cloneable, Serializable {
         }
     }
 
+    private boolean isFitted = false;
+
     /**
      * Check if the estimator has been fitted.
      */
-    public abstract boolean isFitted();
+    public boolean isFitted() {
+        return isFitted;
+    }
+
+    protected void setFitted(boolean fitted) {
+        this.isFitted = fitted;
+    }
 
     /**
      * Validate input data dimensionality.
      */
     protected void validateData(float[][] X, int[] y) {
+        if (X == null || X.length == 0) {
+            throw new IllegalArgumentException("Training data cannot be null or empty");
+        }
+        if (y == null || y.length != X.length) {
+            throw new IllegalArgumentException("Labels must match number of samples");
+        }
+    }
+
+    protected void validateData(float[][] X, int[][] y) {
         if (X == null || X.length == 0) {
             throw new IllegalArgumentException("Training data cannot be null or empty");
         }
@@ -115,7 +140,27 @@ public abstract class BaseEstimator implements Cloneable, Serializable {
     // Abstract methods that all estimators must implement
     public abstract void fit(float[][] X, int[] y);
 
+    public void fit(float[][] X, int[][] y) {
+        throw new UnsupportedOperationException("This estimator does not support multi-output training");
+    }
+
     public abstract int[] predict(float[][] X);
+
+    public int predictSingle(float[] x) {
+        return (int) Math.round(predictSingleValue(x));
+    }
+
+    public double[] predictValues(float[][] X) {
+        int[] labels = predict(X);
+        double[] values = new double[labels.length];
+        for (int i = 0; i < labels.length; i++) values[i] = labels[i];
+        return values;
+    }
+
+    public double predictSingleValue(float[] x) {
+        float[][] X = new float[][] { x };
+        return predictValues(X)[0];
+    }
 
     // Optional methods with default implementations
     public double[][] predictProba(float[][] X) {

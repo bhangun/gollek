@@ -42,7 +42,7 @@ public class GPUMemoryPool {
         this.totalFrees = new AtomicLong(0);
         this.poolHits = new AtomicLong(0);
         this.poolMisses = new AtomicLong(0);
-        this.arena = Arena.ofShared();
+        this.arena = Arena.ofAuto();
         
         log.infof("GPU Memory Pool created: blockSize=%d bytes, maxBlocks=%d", 
                  blockSize, maxBlocks);

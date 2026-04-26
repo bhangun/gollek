@@ -79,12 +79,14 @@ public class DefaultLocalModelRegistry implements LocalModelRegistry {
         Objects.requireNonNull(physicalPath, "physicalPath must not be null");
 
         ModelFormat resolved = resolveFormat(physicalPath, format);
+        long sizeBytes = calculateSize(physicalPath);
+
         ModelEntry entry = new ModelEntry(
                 modelId,
                 calculateDisplayName(physicalPath, resolved),
                 resolved,
                 physicalPath.toAbsolutePath().normalize(),
-                0L, // sizeBytes not computed here for simplicity
+                sizeBytes,
                 resolved.getRuntime(),
                 java.util.Map.of(),
                 Instant.now());
@@ -142,7 +144,14 @@ public class DefaultLocalModelRegistry implements LocalModelRegistry {
             if (afterScan != null) results.add(afterScan);
         }
 
-        // 5. Fuzzy matching
+        // 5. Short ID match (prefix)
+        if (results.isEmpty() && modelRef.length() >= 6 && modelRef.length() <= 8) {
+             index.values().stream()
+                 .filter(e -> modelRef.equalsIgnoreCase(tech.kayys.gollek.spi.model.ModelUtils.generateShortId(e.modelId())))
+                 .findFirst().ifPresent(results::add);
+        }
+
+        // 6. Fuzzy matching
         results.addAll(fuzzyMatchAll(modelRef));
 
         return results.stream().distinct().collect(Collectors.toList());
@@ -265,5 +274,27 @@ public class DefaultLocalModelRegistry implements LocalModelRegistry {
             return hint;
         }
         return ModelFormatDetector.detect(path).orElse(ModelFormat.UNKNOWN);
+    }
+
+    private long calculateSize(Path path) {
+        if (path == null || !Files.exists(path)) return 0L;
+        try {
+            if (Files.isRegularFile(path)) {
+                return Files.size(path);
+            }
+            try (Stream<Path> walk = Files.walk(path)) {
+                return walk.filter(Files::isRegularFile)
+                        .mapToLong(p -> {
+                            try {
+                                return Files.size(p);
+                            } catch (IOException e) {
+                                return 0L;
+                            }
+                        })
+                        .sum();
+            }
+        } catch (IOException e) {
+            return 0L;
+        }
     }
 }

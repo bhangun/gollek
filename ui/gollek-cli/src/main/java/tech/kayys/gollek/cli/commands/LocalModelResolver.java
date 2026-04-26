@@ -25,13 +25,31 @@ final class LocalModelResolver {
         }
 
         // 1. Check SDK/Registry for first-class resolution
+        java.util.List<ModelInfo> allModels = null;
+        try {
+            allModels = sdk.listModels();
+        } catch (Exception ignored) {
+        }
+
+        // Short ID check (6-character hex)
+        if (requestedId.length() == 6 && allModels != null) {
+            final java.util.List<ModelInfo> models = allModels;
+            Optional<ModelInfo> byShortId = models.stream()
+                    .filter(m -> requestedId.equalsIgnoreCase(tech.kayys.gollek.spi.model.ModelUtils.generateShortId(m.getModelId())))
+                    .findFirst();
+            if (byShortId.isPresent()) {
+                ModelInfo mi = byShortId.get();
+                return Optional.of(new ResolvedModel(mi.getModelId(), mi, extractPath(mi).orElse(null), true));
+            }
+        }
+
         for (String candidate : sdkCandidates(requestedId, branch)) {
             try {
                 if (format != null && !format.isBlank()) {
                     // When format matters, we must look for the exact matching variant
                     // since getModelInfo() only returns the first one it finds.
                     Optional<ModelInfo> matchingModel = sdk.listModels().stream()
-                            .filter(m -> candidate.equals(m.getModelId()) && formatsMatch(format, m.getFormat()))
+                            .filter(m -> (candidate.equals(m.getModelId()) || candidate.equals(m.getName())) && formatsMatch(format, m.getFormat()))
                             .findFirst();
                     if (matchingModel.isPresent()) {
                          return Optional

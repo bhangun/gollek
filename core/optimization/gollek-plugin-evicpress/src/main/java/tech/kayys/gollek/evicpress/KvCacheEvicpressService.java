@@ -118,7 +118,7 @@ public class KvCacheEvicpressService {
         evicpress = EvicpressBinding.getInstance();
 
         // Pre-allocate CPU eviction pool (pinned off-heap)
-        evictArena = Arena.ofShared();
+        evictArena = Arena.ofAuto();
         long poolBytes = (long) evictPoolBlocks
                 * kvCacheManager.getBlockPool().getBytesPerBlock()
                 * kvCacheManager.getConfig().getNumLayers() * 2L; // K + V

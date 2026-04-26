@@ -1,5 +1,7 @@
 package tech.kayys.gollek.ml.pipeline;
 
+import tech.kayys.gollek.ml.base.BaseTransformer;
+
 /**
  * Principal Component Analysis (PCA).
  */
@@ -130,5 +132,12 @@ public class PCA extends BaseTransformer {
         }
 
         return transformed;
+    }
+
+    public void setParameters(double[][] components, double[] mean, double[] explainedVariance) {
+        this.components = components;
+        this.mean = mean;
+        this.explainedVariance = explainedVariance;
+        this.setFitted(true);
     }
 }

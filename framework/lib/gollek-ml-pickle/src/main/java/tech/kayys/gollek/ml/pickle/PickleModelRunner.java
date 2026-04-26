@@ -3,6 +3,8 @@ package tech.kayys.gollek.ml.pickle;
 import tech.kayys.gollek.ml.base.*;
 import tech.kayys.gollek.ml.converter.*;
 import tech.kayys.gollek.ml.autograd.*;
+import tech.kayys.gollek.ml.persistence.ModelPersistence;
+import tech.kayys.gollek.ml.ensemble.RandomForestClassifier;
 
 import java.io.*;
 import java.util.*;
@@ -45,15 +47,30 @@ public class PickleModelRunner implements AutoCloseable {
             if (isSklearnModel(className)) {
                 this.model = SklearnConverter.convert(pickleObj);
             } else if (isPyTorchModel(className)) {
+                // PyTorch models usually require a state dict loader or architecture reconstruction
+                // Here we attempt to load the state dict if it's a direct module save
                 this.model = convertPyTorchToSklearn(pickleObj);
             }
 
             // Extract metadata
             this.metadata = extractMetadata(pickleObj);
+        } else if (obj instanceof Map) {
+            // Likely a PyTorch state dict saved as a map
+            @SuppressWarnings("unchecked")
+            Map<String, Object> stateDict = (Map<String, Object>) obj;
+            this.metadata = new HashMap<>();
+            this.metadata.put("type", "pytorch_state_dict");
+            this.metadata.put("param_count", stateDict.size());
+            // PyTorch state dicts need an NNModule to load into
+            System.out.println("Loaded PyTorch state dict. Use PyTorchConverter to map to an NNModule.");
         }
 
         this.loadTime = System.currentTimeMillis() - startTime;
-        System.out.printf("Model loaded in %d ms: %s\n", loadTime, model.getClass().getSimpleName());
+        if (this.model != null) {
+            System.out.printf("Model loaded in %d ms: %s\n", loadTime, model.getClass().getSimpleName());
+        } else {
+            System.out.printf("Pickle object loaded in %d ms, but no estimator mapped.\n", loadTime);
+        }
     }
 
     /**
@@ -61,12 +78,11 @@ public class PickleModelRunner implements AutoCloseable {
      */
     public int predict(float[] sample) {
         if (model == null) {
-            throw new IllegalStateException("Model not loaded. Call load() first.");
+            throw new IllegalStateException("Model not loaded or not a classification model. Call load() first.");
         }
 
         long startTime = System.nanoTime();
-        float[][] batch = new float[][] { sample };
-        int result = model.predict(batch)[0];
+        int result = model.predictSingle(sample);
 
         totalInferenceTime += (System.nanoTime() - startTime) / 1_000_000.0;
         inferenceCount++;
@@ -166,10 +182,10 @@ public class PickleModelRunner implements AutoCloseable {
 
     private BaseEstimator convertPyTorchToSklearn(PickleParser.PickleObject pytorchObj) {
         // Extract architecture and convert to sklearn-compatible model
-        // This is complex - would need to rebuild the network structure
-
-        // For now, return a placeholder
-        return new RandomForestClassifier();
+        // In a real scenario, this would use PyTorchConverter to rebuild the NNModule
+        // and wrap it in a BaseEstimator.
+        
+        return null;
     }
 
     @SuppressWarnings("unchecked")

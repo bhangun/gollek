@@ -27,7 +27,7 @@ public class FastSentencePieceTokenizer implements Tokenizer, AutoCloseable {
             this.nativeLib = new SentencePieceNative(libPath.toString());
 
             // shared arena = long-lived
-            this.arena = Arena.ofShared();
+            this.arena = Arena.ofAuto();
 
             // create ONCE
             this.handle = nativeLib.create();

@@ -313,7 +313,7 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
                         prompt, steps, guidance, seed, width, height, scheduler);
 
                 long pipelineStart = System.currentTimeMillis();
-                try (Arena arena = Arena.ofShared()) {
+                try (Arena arena = Arena.ofAuto()) {
 
                     // 1. Text Encoding — run CLIP on prompt and empty string
                     emitter.emit(progressChunk(reqId, 0, 

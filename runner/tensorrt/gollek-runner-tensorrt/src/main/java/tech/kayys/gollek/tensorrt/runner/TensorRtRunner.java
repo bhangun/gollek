@@ -252,7 +252,7 @@ public class TensorRtRunner extends AbstractGollekRunner {
                     ErrorCode.INIT_NATIVE_LIBRARY_FAILED, "TRT createRuntime returned NULL");
 
         // Load and deserialise engine from disk — mmap for zero-copy
-        deviceArena = Arena.ofShared();
+        deviceArena = Arena.ofAuto();
         MemorySegment engineBlob = mmapEngine(Path.of(resolvedEnginePath), deviceArena);
         trtEngine = trt.deserializeEngineSegment(trtRuntime, engineBlob);
         if (trtEngine.equals(MemorySegment.NULL))
@@ -449,7 +449,7 @@ public class TensorRtRunner extends AbstractGollekRunner {
      * On CUDA UVM / HMM-capable systems the CPU writes to the device
      * buffer directly (page-fault mechanism migrates pages to GPU before
      * the kernel reads them). On PCIe-discrete GPUs the programmer must
-     * {@code cudaMemcpy} first — this runner uses Arena.ofShared() which
+     * {@code cudaMemcpy} first — this runner uses Arena.ofAuto() which
      * maps to pinned host memory and is accessible by the GPU as
      * {@code cudaMemcpyHostToDevice} staging.
      */

@@ -1,9 +1,8 @@
-
 package tech.kayys.gollek.ml.tree;
 
+import tech.kayys.gollek.ml.base.BaseEstimator;
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.*;
+import java.util.stream.IntStream;
 
 /**
  * Decision Tree with Gini/Entropy splitting criteria.
@@ -34,21 +33,27 @@ public class DecisionTreeClassifier extends BaseEstimator {
         this.minSamplesSplit = minSamplesSplit;
         this.minSamplesLeaf = minSamplesLeaf;
         this.criterion = criterion;
-        this.maxFeatures = maxFeatures.equals("sqrt") ? Math.sqrt(nFeatures)
-                : maxFeatures.equals("log2") ? Math.log(nFeatures) : Double.parseDouble(maxFeatures);
+        this.maxFeatures = "sqrt".equals(maxFeatures) ? -1.0 : "log2".equals(maxFeatures) ? -2.0 : Double.parseDouble(maxFeatures);
         this.random = new Random();
     }
 
-    /**
-     * Fit decision tree on training data.
-     */
     @Override
     public void fit(float[][] X, int[] y) {
+        validateData(X, y);
         this.nFeatures = X[0].length;
-        this.nClasses = Arrays.stream(y).max().getAsInt() + 1;
+        this.nClasses = (int) Arrays.stream(y).distinct().count();
 
-        // Build tree recursively with parallel processing
-        this.root = buildTree(X, y, 0, new int[0]);
+        // Resolve maxFeatures
+        double mf;
+        if (maxFeatures == -1.0) mf = Math.sqrt(nFeatures);
+        else if (maxFeatures == -2.0) mf = Math.log(nFeatures) / Math.log(2);
+        else if (maxFeatures <= 1.0) mf = maxFeatures * nFeatures;
+        else mf = maxFeatures;
+        int nFeaturesToConsider = (int) Math.max(1, Math.min(nFeatures, mf));
+
+        // Build tree recursively
+        int[] indices = IntStream.range(0, X.length).toArray();
+        this.root = buildTree(X, y, 0, indices, nFeaturesToConsider);
 
         // Calculate feature importances
         featureImportances = new double[nFeatures];
@@ -56,35 +61,24 @@ public class DecisionTreeClassifier extends BaseEstimator {
 
         // Normalize importances
         double total = Arrays.stream(featureImportances).sum();
-        for (int i = 0; i < featureImportances.length; i++) {
-            featureImportances[i] /= total;
+        if (total > 0) {
+            for (int i = 0; i < featureImportances.length; i++) {
+                featureImportances[i] /= total;
+            }
         }
     }
 
-    /**
-     * Build tree node with parallel best split search.
-     */
-    private Node buildTree(float[][] X, int[] y, int depth, int[] indices) {
-        if (indices.length == 0) {
-            indices = new int[X.length];
-            for (int i = 0; i < X.length; i++)
-                indices[i] = i;
+    private Node buildTree(float[][] X, int[] y, int depth, int[] indices, int nFeaturesToConsider) {
+        if (depth >= maxDepth || indices.length < minSamplesSplit || isPure(y, indices)) {
+            return new LeafNode(getMajorityClass(y, indices), getClassProbs(y, indices));
         }
 
-        // Check stopping criteria
-        if (depth >= maxDepth || indices.length < minSamplesSplit ||
-                isPure(y, indices)) {
-            return new LeafNode(getMajorityClass(y, indices));
-        }
-
-        // Find best split (parallelized)
-        Split bestSplit = findBestSplitParallel(X, y, indices);
+        Split bestSplit = findBestSplitParallel(X, y, indices, nFeaturesToConsider);
 
         if (bestSplit == null || bestSplit.gain < 1e-8) {
-            return new LeafNode(getMajorityClass(y, indices));
+            return new LeafNode(getMajorityClass(y, indices), getClassProbs(y, indices));
         }
 
-        // Split data
         int[] leftIndices = new int[bestSplit.leftCount];
         int[] rightIndices = new int[bestSplit.rightCount];
         int leftIdx = 0, rightIdx = 0;
@@ -97,136 +91,143 @@ public class DecisionTreeClassifier extends BaseEstimator {
             }
         }
 
-        // Recursively build children
-        Node left = buildTree(X, y, depth + 1, leftIndices);
-        Node right = buildTree(X, y, depth + 1, rightIndices);
+        Node left = buildTree(X, y, depth + 1, leftIndices, nFeaturesToConsider);
+        Node right = buildTree(X, y, depth + 1, rightIndices, nFeaturesToConsider);
 
         return new SplitNode(bestSplit.feature, bestSplit.threshold, left, right, bestSplit.gain);
     }
 
-    /**
-     * Find best split using parallel processing.
-     */
-    private Split findBestSplitParallel(float[][] X, int[] y, int[] indices) {
-        int nSamples = indices.length;
-        int nFeaturesToConsider = (int) Math.min(nFeatures,
-                maxFeatures > 0 && maxFeatures < 1 ? maxFeatures * nFeatures : maxFeatures);
-
-        // Select random subset of features
+    private Split findBestSplitParallel(float[][] X, int[] y, int[] indices, int nFeaturesToConsider) {
         int[] featureIndices = selectRandomFeatures(nFeaturesToConsider);
 
-        // Parallel stream for feature evaluation
-        Split bestSplit = Arrays.stream(featureIndices)
+        return Arrays.stream(featureIndices)
                 .parallel()
                 .mapToObj(feature -> evaluateFeature(X, y, indices, feature))
                 .filter(Objects::nonNull)
                 .max((a, b) -> Double.compare(a.gain, b.gain))
                 .orElse(null);
-
-        return bestSplit;
     }
 
-    /**
-     * Evaluate a single feature for best split.
-     */
     private Split evaluateFeature(float[][] X, int[] y, int[] indices, int feature) {
-        // Collect values for this feature
         double[] values = new double[indices.length];
         for (int i = 0; i < indices.length; i++) {
             values[i] = X[indices[i]][feature];
         }
 
-        // Sort indices by feature value
         Integer[] sortedIndices = new Integer[indices.length];
-        for (int i = 0; i < indices.length; i++)
-            sortedIndices[i] = i;
-        Arrays.sort(sortedIndices, (a, b) -> Double.compare(values[a], values[b]));
+        for (int i = 0; i < indices.length; i++) sortedIndices[i] = i;
+        Arrays.sort(sortedIndices, Comparator.comparingDouble(a -> values[a]));
 
-        // Try each possible split point
         Split bestSplit = null;
         double bestGain = 0;
 
         int[] leftCounts = new int[nClasses];
         int[] rightCounts = new int[nClasses];
-
-        // Initialize right counts (all samples initially on right)
-        for (int idx : indices) {
-            rightCounts[y[idx]]++;
-        }
+        for (int idx : indices) rightCounts[y[idx]]++;
 
         int totalLeft = 0;
+        int totalSamples = indices.length;
 
-        for (int i = 0; i < indices.length - 1; i++) {
+        for (int i = 0; i < totalSamples - 1; i++) {
             int idx = sortedIndices[i];
             int currentClass = y[indices[idx]];
 
-            // Move sample from right to left
             rightCounts[currentClass]--;
             leftCounts[currentClass]++;
             totalLeft++;
 
-            // Skip if threshold not unique
-            if (values[idx] == values[sortedIndices[i + 1]])
-                continue;
+            if (values[idx] == values[sortedIndices[i + 1]]) continue;
+            if (totalLeft < minSamplesLeaf || (totalSamples - totalLeft) < minSamplesLeaf) continue;
 
-            // Minimum samples checks
-            if (totalLeft < minSamplesLeaf ||
-                    (indices.length - totalLeft) < minSamplesLeaf)
-                continue;
-
-            // Calculate impurity gain
-            double currentImpurity = calculateImpurity(rightCounts, leftCounts,
-                    indices.length - totalLeft, totalLeft);
-            double gain = currentImpurity - (totalLeft / (double) indices.length) *
-                    calculateImpurity(leftCounts) -
-                    ((indices.length - totalLeft) / (double) indices.length) *
-                            calculateImpurity(rightCounts);
+            double currentImpurity = calculateImpurity(leftCounts, rightCounts, totalLeft, totalSamples - totalLeft);
+            double gain = calculateImpurity(getClassCounts(y, indices)) - currentImpurity;
 
             if (gain > bestGain) {
                 bestGain = gain;
-                bestSplit = new Split(
-                        feature,
-                        (values[idx] + values[sortedIndices[i + 1]]) / 2,
-                        totalLeft,
-                        indices.length - totalLeft,
-                        bestGain);
+                bestSplit = new Split(feature, (values[idx] + values[sortedIndices[i+1]]) / 2.0, totalLeft, totalSamples - totalLeft, bestGain);
             }
         }
-
         return bestSplit;
     }
 
-    /**
-     * Calculate Gini impurity or entropy.
-     */
+    private int[] getClassCounts(int[] y, int[] indices) {
+        int[] counts = new int[nClasses];
+        for (int idx : indices) counts[y[idx]]++;
+        return counts;
+    }
+
     private double calculateImpurity(int[] counts) {
         int total = Arrays.stream(counts).sum();
-        if (total == 0)
-            return 0;
+        if (total == 0) return 0;
+        double impurity = ("gini".equals(criterion)) ? 1.0 : 0.0;
+        for (int count : counts) {
+            double p = count / (double) total;
+            if (p > 0) {
+                if ("gini".equals(criterion)) impurity -= p * p;
+                else impurity -= p * Math.log(p) / Math.log(2);
+            }
+        }
+        return impurity;
+    }
 
-        if ("gini".equals(criterion)) {
-            double impurity = 1.0;
-            for (int count : counts) {
-                double p = count / (double) total;
-                impurity -= p * p;
-            }
-            return impurity;
-        } else { // entropy
-            double impurity = 0;
-            for (int count : counts) {
-                if (count > 0) {
-                    double p = count / (double) total;
-                    impurity -= p * Math.log(p);
-                }
-            }
-            return impurity;
+    private double calculateImpurity(int[] leftCounts, int[] rightCounts, int leftTotal, int rightTotal) {
+        int total = leftTotal + rightTotal;
+        return (leftTotal / (double) total) * calculateImpurity(leftCounts) +
+               (rightTotal / (double) total) * calculateImpurity(rightCounts);
+    }
+
+    private boolean isPure(int[] y, int[] indices) {
+        int first = y[indices[0]];
+        for (int i = 1; i < indices.length; i++) {
+            if (y[indices[i]] != first) return false;
+        }
+        return true;
+    }
+
+    private int getMajorityClass(int[] y, int[] indices) {
+        int[] counts = getClassCounts(y, indices);
+        int maxIdx = 0;
+        for (int i = 1; i < nClasses; i++) {
+            if (counts[i] > counts[maxIdx]) maxIdx = i;
+        }
+        return maxIdx;
+    }
+
+    private double[] getClassProbs(int[] y, int[] indices) {
+        double[] probs = new double[nClasses];
+        for (int idx : indices) probs[y[idx]]++;
+        for (int i = 0; i < nClasses; i++) probs[i] /= indices.length;
+        return probs;
+    }
+
+    private int[] selectRandomFeatures(int k) {
+        int[] features = IntStream.range(0, nFeatures).toArray();
+        for (int i = 0; i < k; i++) {
+            int j = i + random.nextInt(nFeatures - i);
+            int temp = features[i];
+            features[i] = features[j];
+            features[j] = temp;
+        }
+        return Arrays.copyOf(features, k);
+    }
+
+    private void computeImportances(Node node, double[] importances) {
+        if (node instanceof SplitNode) {
+            SplitNode split = (SplitNode) node;
+            importances[split.feature] += split.gain;
+            computeImportances(split.left, importances);
+            computeImportances(split.right, importances);
         }
     }
 
-    /**
-     * Predict class labels.
-     */
+    @Override
+    public boolean isFitted() {
+        return root != null;
+    }
+
+    @Override
     public int[] predict(float[][] X) {
+        validateInput(X);
         int[] predictions = new int[X.length];
         for (int i = 0; i < X.length; i++) {
             predictions[i] = predictSingle(X[i]);
@@ -234,18 +235,17 @@ public class DecisionTreeClassifier extends BaseEstimator {
         return predictions;
     }
 
-    /**
-     * Predict class probabilities.
-     */
-    public double[][] predict_proba(float[][] X) {
-        double[][] probabilities = new double[X.length][nClasses];
+    @Override
+    public double[][] predictProba(float[][] X) {
+        validateInput(X);
+        double[][] probs = new double[X.length][nClasses];
         for (int i = 0; i < X.length; i++) {
-            probabilities[i] = predictProbaSingle(X[i]);
+            probs[i] = predictProbaSingle(X[i]);
         }
-        return probabilities;
+        return probs;
     }
 
-    private int predictSingle(float[] x) {
+    public int predictSingle(float[] x) {
         Node node = root;
         while (node instanceof SplitNode) {
             SplitNode split = (SplitNode) node;
@@ -254,7 +254,7 @@ public class DecisionTreeClassifier extends BaseEstimator {
         return ((LeafNode) node).prediction;
     }
 
-    private double[] predictProbaSingle(float[] x) {
+    public double[] predictProbaSingle(float[] x) {
         Node node = root;
         while (node instanceof SplitNode) {
             SplitNode split = (SplitNode) node;
@@ -267,46 +267,40 @@ public class DecisionTreeClassifier extends BaseEstimator {
         return featureImportances;
     }
 
-    // Inner classes for tree nodes
-    static abstract class Node {
+    public void setRoot(Node root) {
+        this.root = root;
+        this.setFitted(true);
     }
 
-    static class SplitNode extends Node {
-        final int feature;
-        final double threshold;
-        final Node left, right;
-        final double gain;
+    public static abstract class Node {}
 
-        SplitNode(int feature, double threshold, Node left, Node right, double gain) {
-            this.feature = feature;
-            this.threshold = threshold;
-            this.left = left;
-            this.right = right;
-            this.gain = gain;
+    public static class SplitNode extends Node {
+        public final int feature;
+        public final double threshold;
+        public final Node left, right;
+        public final double gain;
+        public SplitNode(int feature, double threshold, Node left, Node right, double gain) {
+            this.feature = feature; this.threshold = threshold; this.left = left; this.right = right; this.gain = gain;
         }
     }
 
-    static class LeafNode extends Node {
-        final int prediction;
-        final double[] probabilities;
-
-        LeafNode(int prediction) {
+    public static class LeafNode extends Node {
+        public final int prediction;
+        public final double[] probabilities;
+        public LeafNode(int prediction, double[] probabilities) {
             this.prediction = prediction;
-            this.probabilities = null;
-        }
-
-        LeafNode(double[] probabilities) {
-            this.prediction = argmax(probabilities);
             this.probabilities = probabilities;
         }
+    }
 
-        private int argmax(double[] arr) {
-            int maxIdx = 0;
-            for (int i = 1; i < arr.length; i++) {
-                if (arr[i] > arr[maxIdx])
-                    maxIdx = i;
-            }
-            return maxIdx;
+    private static class Split {
+        final int feature;
+        final double threshold;
+        final int leftCount;
+        final int rightCount;
+        final double gain;
+        Split(int feature, double threshold, int leftCount, int rightCount, double gain) {
+            this.feature = feature; this.threshold = threshold; this.leftCount = leftCount; this.rightCount = rightCount; this.gain = gain;
         }
     }
 }

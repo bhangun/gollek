@@ -1,6 +1,7 @@
 package tech.kayys.gollek.ml.runner.onnx;
 
 import tech.kayys.gollek.ml.runner.*;
+import tech.kayys.gollek.ml.tensor.RunnerDevice;
 import org.jboss.logging.Logger;
 
 import java.lang.foreign.*;

@@ -1,6 +1,7 @@
 package tech.kayys.gollek.ml.runner;
 
 import tech.kayys.gollek.spi.model.ModelFormat;
+import tech.kayys.gollek.ml.tensor.RunnerDevice;
 
 import java.nio.file.Path;
 import java.util.Map;

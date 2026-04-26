@@ -60,7 +60,8 @@ public final class KaggleRepository implements ModelRepository {
 
     @Override
     public boolean supports(ModelRef ref) {
-        return "kaggle".equalsIgnoreCase(ref.scheme());
+        String scheme = ref.scheme();
+        return "kaggle".equalsIgnoreCase(scheme);
     }
 
     @Override
@@ -133,7 +134,11 @@ public final class KaggleRepository implements ModelRepository {
                             artifacts = discoverLocalArtifacts(modelDir);
                         }
                     } catch (Exception e) {
-                        LOG.warnf("Kaggle download failed for %s: %s", slug, e.getMessage());
+                        if (modelId.startsWith("kaggle:")) {
+                            LOG.warnf("Kaggle download failed for %s: %s", slug, e.getMessage());
+                        } else {
+                            LOG.debugf("Kaggle lookup failed for %s (not a Kaggle model or unauthorized): %s", slug, e.getMessage());
+                        }
                     }
                 }
 
@@ -206,7 +211,8 @@ public final class KaggleRepository implements ModelRepository {
     }
 
     private boolean isKaggleModelId(String modelId) {
-        return modelId != null && (modelId.startsWith("kaggle:") || modelId.contains("/"));
+        if (modelId == null) return false;
+        return modelId.startsWith("kaggle:");
     }
 
     private String normalizeSlug(String modelId) {

@@ -38,7 +38,7 @@ public class MemoryAllocator implements AutoCloseable {
 
     public MemoryAllocator() {
         // Shared arena allows segments to be passed across threads
-        this.arena = Arena.ofShared();
+        this.arena = Arena.ofAuto();
         log.debug("Created shared FFM Arena for tensor allocation");
     }
 

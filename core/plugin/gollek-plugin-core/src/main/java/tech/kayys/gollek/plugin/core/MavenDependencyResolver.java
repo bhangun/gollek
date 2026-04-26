@@ -14,25 +14,21 @@
 
 package tech.kayys.gollek.plugin.core;
 
+import org.eclipse.aether.supplier.RepositorySystemSupplier;
 import org.eclipse.aether.DefaultRepositorySystemSession;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.collection.CollectRequest;
-import org.eclipse.aether.connector.basic.BasicRepositoryConnectorFactory;
 import org.eclipse.aether.graph.DependencyNode;
-import org.eclipse.aether.impl.DefaultServiceLocator;
 import org.eclipse.aether.repository.LocalRepository;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.resolution.ArtifactRequest;
 import org.eclipse.aether.resolution.ArtifactResult;
 import org.eclipse.aether.resolution.DependencyRequest;
 import org.eclipse.aether.resolution.DependencyResolutionException;
-import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
-import org.eclipse.aether.spi.connector.transport.TransporterFactory;
-import org.eclipse.aether.transport.file.FileTransporterFactory;
-import org.eclipse.aether.transport.http.HttpTransporterFactory;
+import org.eclipse.aether.resolution.DependencyResult;
 import org.eclipse.aether.util.repository.AuthenticationBuilder;
 import org.eclipse.aether.util.repository.SimpleResolutionErrorPolicy;
 import org.jboss.logging.Logger;
@@ -51,13 +47,13 @@ import java.util.stream.Collectors;
 @RegisterForReflection(targets = {
     org.eclipse.aether.internal.impl.DefaultRepositorySystem.class,
     org.eclipse.aether.internal.impl.DefaultArtifactResolver.class,
-    org.eclipse.aether.internal.impl.DefaultDependencyCollector.class,
+    org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.class,
     org.eclipse.aether.internal.impl.DefaultDeployer.class,
     org.eclipse.aether.internal.impl.DefaultInstaller.class,
     org.eclipse.aether.internal.impl.DefaultMetadataResolver.class,
     org.eclipse.aether.internal.impl.DefaultRepositoryConnectorProvider.class,
     org.eclipse.aether.internal.impl.DefaultRemoteRepositoryManager.class,
-    org.eclipse.aether.internal.impl.DefaultSyncContextFactory.class,
+    org.eclipse.aether.internal.impl.synccontext.DefaultSyncContextFactory.class,
     org.eclipse.aether.internal.impl.DefaultTransporterProvider.class,
     org.eclipse.aether.internal.impl.EnhancedLocalRepositoryManagerFactory.class,
     org.eclipse.aether.internal.impl.SimpleLocalRepositoryManagerFactory.class,
@@ -136,7 +132,7 @@ public final class MavenDependencyResolver {
     public MavenDependencyResolver(String localRepoPath, List<RemoteRepository> remoteRepos) {
         this.repoSystem = newRepositorySystem();
         this.repoSession = repoSystem != null ? newRepositorySession(repoSystem, localRepoPath) : null;
-        this.remoteRepos = remoteRepos != null ? remoteRepos : DEFAULT_REPOS;
+        this.remoteRepos = new ArrayList<>(remoteRepos != null ? remoteRepos : DEFAULT_REPOS);
 
         if (repoSystem == null) {
             LOG.warn("Maven Repository System could not be initialized. Dependency resolution will be unavailable.");
@@ -176,10 +172,16 @@ public final class MavenDependencyResolver {
 
             // Resolve dependencies
             DependencyRequest depRequest = new DependencyRequest(collectRequest, null);
-            repoSystem.resolveDependencies(repoSession, depRequest);
+            DependencyResult result = repoSystem.resolveDependencies(repoSession, depRequest);
 
-            // Get resolved JARs
-            List<File> jars = resolveArtifact(artifact);
+            // Get all resolved JARs (including transitive)
+            List<File> jars = result.getArtifactResults().stream()
+                    .map(ArtifactResult::getArtifact)
+                    .filter(Objects::nonNull)
+                    .map(Artifact::getFile)
+                    .filter(Objects::nonNull)
+                    .filter(File::exists)
+                    .collect(Collectors.toList());
 
             // Cache result
             resolvedCache.put(coordinate, jars);
@@ -200,15 +202,39 @@ public final class MavenDependencyResolver {
      * @return List of all resolved JAR files
      */
     public List<File> resolveAll(List<String> coordinates) {
-        List<File> allJars = new ArrayList<>();
-
-        for (String coordinate : coordinates) {
-            List<File> jars = resolve(coordinate);
-            allJars.addAll(jars);
+        if (repoSystem == null || repoSession == null) {
+            throw new IllegalStateException("Maven Repository System is not initialized.");
         }
 
-        // Remove duplicates
-        return allJars.stream().distinct().collect(Collectors.toList());
+        if (coordinates == null || coordinates.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        LOG.infof("Resolving %d dependencies in one batch", coordinates.size());
+
+        try {
+            CollectRequest collectRequest = new CollectRequest();
+            for (String coordinate : coordinates) {
+                collectRequest.addDependency(new org.eclipse.aether.graph.Dependency(new DefaultArtifact(coordinate), null));
+            }
+            collectRequest.setRepositories(remoteRepos);
+
+            DependencyRequest depRequest = new DependencyRequest(collectRequest, null);
+            DependencyResult result = repoSystem.resolveDependencies(repoSession, depRequest);
+
+            return result.getArtifactResults().stream()
+                    .map(ArtifactResult::getArtifact)
+                    .filter(Objects::nonNull)
+                    .map(Artifact::getFile)
+                    .filter(Objects::nonNull)
+                    .filter(File::exists)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+        } catch (DependencyResolutionException e) {
+            LOG.errorf(e, "Failed to resolve dependencies: %s", coordinates);
+            throw new RuntimeException("Failed to resolve dependencies", e);
+        }
     }
 
     /**
@@ -306,28 +332,18 @@ public final class MavenDependencyResolver {
     // ───────────────────────────────────────────────────────────────────────
 
     /**
-     * Create Maven Repository System.
-     *
-     * @return Repository system instance
-     */
-    /**
-     * Create Maven Repository System.
+     * Create Maven Repository System using modern supplier.
      *
      * @return Repository system instance
      */
     private RepositorySystem newRepositorySystem() {
-        DefaultServiceLocator locator = org.apache.maven.repository.internal.MavenRepositorySystemUtils.newServiceLocator();
-        locator.addService(RepositoryConnectorFactory.class, BasicRepositoryConnectorFactory.class);
-        locator.addService(TransporterFactory.class, FileTransporterFactory.class);
-        locator.addService(TransporterFactory.class, HttpTransporterFactory.class);
-
-        locator.setErrorHandler(new DefaultServiceLocator.ErrorHandler() {
-            @Override
-            public void serviceCreationFailed(Class<?> type, Class<?> impl, Throwable exception) {
-                LOG.errorf(exception, "Service creation failed: %s → %s", type, impl);
-            }
-        });
-        return locator.getService(RepositorySystem.class);
+        try {
+            // Use modern supplier instead of deprecated DefaultServiceLocator
+            return new RepositorySystemSupplier().get();
+        } catch (Exception e) {
+            LOG.error("Failed to initialize Maven Repository System using supplier", e);
+            return null;
+        }
     }
 
     /**
@@ -354,10 +370,10 @@ public final class MavenDependencyResolver {
     }
 
     /**
-     * Resolve artifact and all transitive dependencies.
+     * Resolve artifact only.
      *
      * @param artifact Artifact to resolve
-     * @return List of resolved JAR files
+     * @return List containing the resolved JAR file
      */
     private List<File> resolveArtifact(Artifact artifact) {
         try {
@@ -389,9 +405,6 @@ public final class MavenDependencyResolver {
 
     /**
      * Dependency tree structure.
-     *
-     * @param coordinate   Maven coordinate
-     * @param dependencies Child dependencies
      */
     public record DependencyTree(
             String coordinate,

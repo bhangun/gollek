@@ -1,5 +1,7 @@
 package tech.kayys.gollek.ml.pipeline;
 
+import tech.kayys.gollek.ml.base.BaseTransformer;
+
 /**
  * Transformers for feature preprocessing and engineering.
  */
@@ -58,5 +60,11 @@ public class StandardScaler extends BaseTransformer {
             transformed[j] = (float) ((x[j] - mean[j]) / std[j]);
         }
         return transformed;
+    }
+
+    public void setParameters(double[] mean, double[] std) {
+        this.mean = mean;
+        this.std = std;
+        this.setFitted(true);
     }
 }

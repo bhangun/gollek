@@ -106,11 +106,11 @@ final class LlamaHandles {
                 FunctionDescriptor.of(LlamaStructLayouts.MODEL_PARAMS));
         contextDefaultParams = linkOpt(linker, lookup, "llama_context_default_params",
                 FunctionDescriptor.of(LlamaStructLayouts.CONTEXT_PARAMS));
-        gollekModelDefaultParamsInto   = link(linker, lookup, "gollek_llama_model_default_params_into",
+        gollekModelDefaultParamsInto   = linkOpt(linker, lookup, "gollek_llama_model_default_params_into",
                 FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
-        gollekContextDefaultParamsInto = link(linker, lookup, "gollek_llama_context_default_params_into",
+        gollekContextDefaultParamsInto = linkOpt(linker, lookup, "gollek_llama_context_default_params_into",
                 FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
-        gollekLogDisable = link(linker, lookup, "gollek_llama_log_disable", FunctionDescriptor.ofVoid());
+        gollekLogDisable = linkOpt(linker, lookup, "gollek_llama_log_disable", FunctionDescriptor.ofVoid());
 
         loadModelFromFile = link(linker, lookup, "llama_model_load_from_file",
                 FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, LlamaStructLayouts.MODEL_PARAMS));

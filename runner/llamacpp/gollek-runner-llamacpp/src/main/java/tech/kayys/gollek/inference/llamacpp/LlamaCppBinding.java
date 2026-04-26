@@ -42,7 +42,7 @@ public class LlamaCppBinding {
 
     private LlamaCppBinding(LlamaHandles handles) {
         this.h       = handles;
-        this.arena   = Arena.ofShared();
+        this.arena   = Arena.ofAuto();
         this.batch   = new LlamaBatchOps(handles);
         this.sampler = new LlamaSamplerOps(handles, arena);
     }

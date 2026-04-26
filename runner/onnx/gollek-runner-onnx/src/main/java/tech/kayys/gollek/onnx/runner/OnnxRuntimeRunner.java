@@ -363,7 +363,7 @@ public class OnnxRuntimeRunner extends AbstractGollekRunner {
                     .build();
         }
 
-        try (Arena arena = Arena.ofShared()) {
+        try (Arena arena = Arena.ofAuto()) {
             StringBuilder sb = new StringBuilder();
             List<Integer> tokenIds = new ArrayList<>();
             for (int t : prompt)

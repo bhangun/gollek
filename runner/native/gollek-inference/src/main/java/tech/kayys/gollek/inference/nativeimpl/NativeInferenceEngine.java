@@ -49,7 +49,7 @@ public final class NativeInferenceEngine implements AutoCloseable {
     public NativeInferenceEngine(GGUFModel model, tech.kayys.gollek.spi.model.ModelArchitecture architecture) {
         this.model = model;
         this.architecture = architecture;
-        this.weightArena = Arena.ofShared();
+        this.weightArena = Arena.ofAuto();
         this.layers = GGUFLoader.loadLayers(model, weightArena);
         
         String arch = (String) model.metadata().getOrDefault("general.architecture", "llama");

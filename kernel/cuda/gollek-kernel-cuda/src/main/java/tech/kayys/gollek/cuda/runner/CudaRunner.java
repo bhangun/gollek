@@ -322,7 +322,7 @@ public class CudaRunner extends AbstractGollekRunner {
         }
 
         // Memory-map model weights
-        weightsArena = Arena.ofShared();
+        weightsArena = Arena.ofAuto();
         Path modelPath = resolveModelPath(modelManifest);
         weightsMem = mmapWeights(modelPath, weightsArena);
         layerSlices = sliceLayerWeights(weightsMem, numLayers);

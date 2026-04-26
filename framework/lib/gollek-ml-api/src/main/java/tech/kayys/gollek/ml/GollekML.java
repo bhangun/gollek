@@ -1,12 +1,29 @@
 package tech.kayys.gollek.ml;
 
-package tech.kayys.gollek.ml;
+import tech.kayys.gollek.ml.base.BaseEstimator;
+import tech.kayys.gollek.ml.autograd.GradTensor;
+import tech.kayys.gollek.ml.nn.NNModule;
+import tech.kayys.gollek.ml.nn.Parameter;
+import tech.kayys.gollek.ml.optim.Optimizer;
+import tech.kayys.gollek.ml.nn.loss.*;
+import tech.kayys.gollek.ml.ensemble.*;
+import tech.kayys.gollek.ml.svm.*;
+import tech.kayys.gollek.ml.naive_bayes.*;
+import tech.kayys.gollek.ml.linear_model.*;
+import tech.kayys.gollek.ml.clustering.*;
+import tech.kayys.gollek.ml.pipeline.*;
+import tech.kayys.gollek.ml.model_selection.*;
+import tech.kayys.gollek.ml.util.*;
+
+import java.util.List;
+import java.util.Map;
 
 /**
- * Unified ML API - combines sklearn-style estimators with deep learning.
- * This is the main entry point for Gollek's ML functionality.
+ * @deprecated Use {@link Gollek} as the unified ML entry point.
+ *             {@code Gollek.ML} mirrors the scikit-learn factory API and
+ *             {@code Gollek.DL} mirrors the PyTorch/autograd API.
  */
-
+@Deprecated(since = "0.1.1", forRemoval = true)
 public class GollekML {
 
     // ==================== Deep Learning ====================
@@ -16,15 +33,15 @@ public class GollekML {
         }
 
         public static NNModule sequential(NNModule... layers) {
-            return new Sequential(layers);
+            return Gollek.DL.sequential(layers);
         }
 
         public static Optimizer adamW(List<Parameter> params, float lr) {
-            return AdamW.builder(params, lr).build();
+            return Gollek.DL.adamW(params, lr);
         }
 
         public static CrossEntropyLoss crossEntropy() {
-            return new CrossEntropyLoss();
+            return Gollek.DL.crossEntropy();
         }
     }
 
@@ -32,143 +49,71 @@ public class GollekML {
     public static class ML {
         // Classification
         public static RandomForestClassifier randomForest() {
-            return new RandomForestClassifier();
+            return Gollek.ML.randomForest();
         }
 
         public static GradientBoostingClassifier gradientBoosting() {
-            return new GradientBoostingClassifier();
+            return Gollek.ML.gradientBoosting();
         }
 
         public static SVC svm() {
-            return new SVC();
+            return Gollek.ML.svm();
         }
 
         public static GaussianNB naiveBayes() {
-            return new GaussianNB();
+            return Gollek.ML.naiveBayes();
         }
 
         // Regression
         public static LinearModel linearRegression() {
-            return new LinearModel("none", 0, 0, 1e-4, 1000, 0.01);
+            return Gollek.ML.linearRegression();
         }
 
         public static LinearModel ridge(double alpha) {
-            return new LinearModel("l2", alpha, 0, 1e-4, 1000, 0.01);
+            return Gollek.ML.ridge(alpha);
         }
 
         public static LinearModel lasso(double alpha) {
-            return new LinearModel("l1", alpha, 1, 1e-4, 1000, 0.01);
+            return Gollek.ML.lasso(alpha);
         }
 
         // Clustering
         public static KMeans kMeans(int nClusters) {
-            return new KMeans(nClusters);
+            return Gollek.ML.kMeans(nClusters);
         }
 
         public static DBSCAN dbscan(double eps, int minSamples) {
-            return new DBSCAN(eps, minSamples, "euclidean", -1);
+            return Gollek.ML.dbscan(eps, minSamples);
         }
 
         // Preprocessing
         public static StandardScaler standardScaler() {
-            return new StandardScaler();
+            return Gollek.ML.standardScaler();
         }
 
         public static PCA pca(int nComponents) {
-            return new PCA(nComponents);
+            return Gollek.ML.pca(nComponents);
         }
 
         public static PolynomialFeatures polynomialFeatures(int degree) {
-            return new PolynomialFeatures(degree);
+            return Gollek.ML.polynomialFeatures(degree);
         }
     }
 
     // ==================== Model Selection ====================
     public static class Selection {
         public static double crossValScore(BaseEstimator estimator, float[][] X, int[] y, int nFolds) {
-            return CrossValidation.crossValScore(estimator, X, y, nFolds, "accuracy");
+            return Gollek.Selection.crossValScore(estimator, X, y, nFolds);
         }
 
-        public static GridSearchResult gridSearch(BaseEstimator estimator,
+        public static CrossValidation.GridSearchResult gridSearch(BaseEstimator estimator,
                 Map<String, Object[]> paramGrid,
                 float[][] X, int[] y) {
-            return CrossValidation.gridSearch(estimator, paramGrid, X, y, 5);
+            return Gollek.Selection.gridSearch(estimator, paramGrid, X, y);
         }
 
-        public static TrainTestSplit trainTestSplit(float[][] X, int[] y, double testSize, int randomState) {
-            return CrossValidation.trainTestSplit(X, y, testSize, randomState);
+        public static ModelSelection.TrainTestSplit trainTestSplit(float[][] X, int[] y, double testSize, int randomState) {
+            return Gollek.Selection.trainTestSplit(X, y, testSize, randomState);
         }
-    }
-
-    // ==================== Example Usage ====================
-    public static void main(String[] args) {
-        // Load data (e.g., Iris dataset)
-        float[][] X = loadIrisData();
-        int[] y = loadIrisLabels();
-
-        System.out.println("╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║              Gollek ML - Complete ML Framework              ║");
-        System.out.println("╚══════════════════════════════════════════════════════════════╝\n");
-
-        // 1. Traditional ML: Random Forest
-        System.out.println("1. Training Random Forest...");
-        RandomForestClassifier rf = GollekML.ML.randomForest();
-        double rfScore = GollekML.Selection.crossValScore(rf, X, y, 5);
-        System.out.printf("   Random Forest CV Accuracy: %.4f\n", rfScore);
-
-        // 2. SVM with RBF kernel
-        System.out.println("\n2. Training SVM...");
-        SVC svm = GollekML.ML.svm();
-        double svmScore = GollekML.Selection.crossValScore(svm, X, y, 5);
-        System.out.printf("   SVM CV Accuracy: %.4f\n", svmScore);
-
-        // 3. Deep Learning: MLP
-        System.out.println("\n3. Training Neural Network...");
-        NNModule mlp = GollekML.DL.sequential(
-                new Linear(4, 64),
-                new ReLU(),
-                new Dropout(0.2f),
-                new Linear(64, 32),
-                new ReLU(),
-                new Linear(32, 3));
-
-        // 4. Clustering
-        System.out.println("\n4. Clustering with K-Means...");
-        KMeans kmeans = GollekML.ML.kMeans(3);
-        kmeans.fit(X);
-        System.out.printf("   K-Means Inertia: %.4f\n", kmeans.getInertia());
-
-        // 5. Feature engineering
-        System.out.println("\n5. Feature Engineering...");
-        StandardScaler scaler = GollekML.ML.standardScaler();
-        float[][] XScaled = scaler.fitTransform(X);
-
-        PCA pca = GollekML.ML.pca(2);
-        float[][] XReduced = pca.fitTransform(XScaled);
-        System.out.printf("   PCA explained variance: %.4f\n",
-                pca.getExplainedVarianceRatio()[0] + pca.getExplainedVarianceRatio()[1]);
-
-        System.out.println("\n✓ All ML components working!");
-    }
-
-    private static float[][] loadIrisData() {
-        // Iris dataset: 150 samples, 4 features
-        float[][] data = new float[150][4];
-        // Sample data generation...
-        for (int i = 0; i < 150; i++) {
-            data[i][0] = 5.0f + (float) Math.random() * 3;
-            data[i][1] = 3.0f + (float) Math.random() * 2;
-            data[i][2] = 1.0f + (float) Math.random() * 5;
-            data[i][3] = 0.2f + (float) Math.random() * 2;
-        }
-        return data;
-    }
-
-    private static int[] loadIrisLabels() {
-        int[] labels = new int[150];
-        for (int i = 0; i < 150; i++) {
-            labels[i] = i / 50; // 0, 1, 2
-        }
-        return labels;
     }
 }

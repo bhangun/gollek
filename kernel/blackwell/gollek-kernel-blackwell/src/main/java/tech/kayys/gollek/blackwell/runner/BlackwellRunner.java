@@ -345,7 +345,7 @@ public class BlackwellRunner extends AbstractGollekRunner {
         dFfnBuf = blackwell.mallocManaged((long) ffnDim * 2 * elemBytes, 1);
 
         // Memory-map model weights
-        weightsArena = Arena.ofShared();
+        weightsArena = Arena.ofAuto();
         Path modelPath = resolveModelPath(modelManifest);
         weightsMem = mmapWeights(modelPath, weightsArena);
         layerSlices = sliceLayerWeights(weightsMem, numLayers);

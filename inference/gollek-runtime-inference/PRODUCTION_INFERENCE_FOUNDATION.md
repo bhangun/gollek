@@ -42,7 +42,7 @@ PagedKVCache cache = PagedKVCache.builder()
     .numHeads(32)
     .headDim(128)
     .dtype(DType.FLOAT16)
-    .arena(Arena.ofShared())
+    .arena(Arena.ofAuto())
     .build();
 
 // Create per-sequence cache

@@ -67,7 +67,7 @@ public class DocBin {
     public static DocBin fromFile(Path path) throws IOException {
         DocBin bin = new DocBin();
         try (var channel = FileChannel.open(path, StandardOpenOption.READ)) {
-            try (Arena arena = Arena.ofShared()) {
+            try (Arena arena = Arena.ofAuto()) {
                 MemorySegment segment = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size(), arena);
                 
                 long offset = 0;

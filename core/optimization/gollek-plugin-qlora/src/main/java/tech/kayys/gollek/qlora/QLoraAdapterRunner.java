@@ -155,7 +155,7 @@ public class QLoraAdapterRunner extends AbstractGollekRunner {
         paBinding = PagedAttentionBinding.getInstance();
 
         // Memory-map NF4 base weights
-        weightsArena = Arena.ofShared();
+        weightsArena = Arena.ofAuto();
         Path modelPath = resolveModelPath(modelManifest);
         baseWeights = mmapWeights(modelPath, weightsArena);
 
@@ -329,7 +329,7 @@ public class QLoraAdapterRunner extends AbstractGollekRunner {
     }
 
     private AdapterWeights loadAdapter(String adapterId) {
-        Arena arena = Arena.ofShared();
+        Arena arena = Arena.ofAuto();
         Path adapterPath = Path.of(adapterStore, adapterId + ".bin");
         try (RandomAccessFile raf = new RandomAccessFile(adapterPath.toFile(), "r");
                 FileChannel ch = raf.getChannel()) {

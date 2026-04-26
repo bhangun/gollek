@@ -1,6 +1,7 @@
 package tech.kayys.gollek.ml.feature;
 
 import java.util.*;
+import tech.kayys.gollek.ml.base.BaseTransformer;
 
 /**
  * Polynomial feature expansion.

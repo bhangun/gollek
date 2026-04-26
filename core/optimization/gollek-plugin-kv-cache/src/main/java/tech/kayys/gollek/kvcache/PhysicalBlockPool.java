@@ -37,7 +37,7 @@ public class PhysicalBlockPool implements AutoCloseable {
      */
     public PhysicalBlockPool(KVCacheConfig config) {
         this.config = config;
-        this.arena = Arena.ofShared();
+        this.arena = Arena.ofAuto();
 
         // Each block stores: blockSize × numHeads × headDim values in Float16 (2 bytes)
         // Note: numLayers is handled by the cache manager which stores separate

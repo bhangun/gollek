@@ -36,7 +36,7 @@ public final class NativeTensorStorage implements AutoCloseable {
 
     /** Allocate off-heap storage with a shared (thread-safe) arena. */
     public static NativeTensorStorage allocateShared(long numel) {
-        return new NativeTensorStorage(numel, Arena.ofShared());
+        return new NativeTensorStorage(numel, Arena.ofAuto());
     }
 
     /** Wrap existing on-heap float[] into a temporary off-heap view (auto arena). */

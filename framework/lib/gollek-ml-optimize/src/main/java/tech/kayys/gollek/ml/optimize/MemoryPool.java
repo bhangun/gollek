@@ -1,6 +1,6 @@
 package tech.kayys.gollek.ml.optimize;
 
-import tech.kayys.gollek.ml.runner.RunnerDevice;
+import tech.kayys.gollek.ml.tensor.RunnerDevice;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -51,7 +51,7 @@ public class MemoryPool {
         this.maxSize = builder.maxSize;
         this.strategy = builder.strategy;
         this.arena = switch (device) {
-            case CPU, AUTO -> Arena.ofShared();
+            case CPU, AUTO -> Arena.ofAuto();
             default -> Arena.ofConfined();  // GPU would use native arena
         };
     }

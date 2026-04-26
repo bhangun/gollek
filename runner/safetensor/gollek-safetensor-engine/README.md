@@ -66,7 +66,7 @@ A lightweight tensor wrapping a `MemorySegment` (Float32 only for v1) with:
 Key design decisions:
 - **Float32 only** — BF16/F16 weights are upcast at load time (already done in current code)
 - **Contiguous by default** — `transpose()` returns a new contiguous copy (eliminates MPS Placeholder)
-- **FFM Arena per tensor** — each tensor owns an `Arena.ofShared()` managing its `MemorySegment`
+- **FFM Arena per tensor** — each tensor owns an `Arena.ofAuto()` managing its `MemorySegment`
 
 #### [NEW] AccelOps.java
 `gollek-safetensor-engine/.../engine/tensor/AccelOps.java`

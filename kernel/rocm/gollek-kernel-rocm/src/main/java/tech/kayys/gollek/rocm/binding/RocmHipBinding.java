@@ -228,16 +228,16 @@ public class RocmHipBinding {
      * @return unified memory pointer
      */
     public MemorySegment mallocManaged(long bytes, int flags) {
-        if (!nativeAvailable) return Arena.ofShared().allocate(bytes, 64);
+        if (!nativeAvailable) return Arena.ofAuto().allocate(bytes, 64);
         try (Arena a = Arena.ofConfined()) {
             MemorySegment ptrPtr = a.allocate(ValueLayout.ADDRESS);
             int err = (int) invoke(FN_MALLOC_MANAGED, ptrPtr, bytes, flags);
             if (err != 0) {
                 LOG.warnf("hipMallocManaged(%d bytes) failed: %d — using Java heap", bytes, err);
-                return Arena.ofShared().allocate(bytes, 64);
+                return Arena.ofAuto().allocate(bytes, 64);
             }
             return ptrPtr.get(ValueLayout.ADDRESS, 0).reinterpret(bytes);
-        } catch (Throwable t) { return Arena.ofShared().allocate(bytes, 64); }
+        } catch (Throwable t) { return Arena.ofAuto().allocate(bytes, 64); }
     }
 
     /** Free device memory previously allocated by {@link #malloc}. */

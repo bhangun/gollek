@@ -1,9 +1,7 @@
-package tech.kayys.gollek.ml.runner;
+package tech.kayys.gollek.ml.tensor;
 
 /**
- * Target device for model inference.
- *
- * @since 0.3.0
+ * Target device for model inference and memory allocation.
  */
 public enum RunnerDevice {
     /** Auto-select best available device */

@@ -105,7 +105,7 @@ public class AccelTensor implements AutoCloseable {
      */
     public static AccelTensor zeros(long... shape) {
         long n = numelOf(shape);
-        Arena arena = Arena.ofShared();
+        Arena arena = Arena.ofAuto();
         MemorySegment seg = arena.allocate(n * Float.BYTES, 16);
         seg.fill((byte) 0);
         return new AccelTensor(seg, shape, contiguousStride(shape), 0, arena);
@@ -116,7 +116,7 @@ public class AccelTensor implements AutoCloseable {
      */
     public static AccelTensor ones(long... shape) {
         long n = numelOf(shape);
-        Arena arena = Arena.ofShared();
+        Arena arena = Arena.ofAuto();
         MemorySegment seg = arena.allocate(n * Float.BYTES, 16);
         for (long i = 0; i < n; i++) {
             seg.setAtIndex(ValueLayout.JAVA_FLOAT, i, 1.0f);
@@ -133,7 +133,7 @@ public class AccelTensor implements AutoCloseable {
             throw new IllegalArgumentException(
                 "Data length " + data.length + " != shape numel " + n);
         }
-        Arena arena = Arena.ofShared();
+        Arena arena = Arena.ofAuto();
         MemorySegment seg = arena.allocateFrom(ValueLayout.JAVA_FLOAT, data);
         return new AccelTensor(seg, shape, contiguousStride(shape), 0, arena);
     }
@@ -145,7 +145,7 @@ public class AccelTensor implements AutoCloseable {
     public static AccelTensor fromByteArray(byte[] data, long... shape) {
         // For byte arrays, the element size depends on the quantType,
         // but the factory just allocates the raw bytes.
-        Arena arena = Arena.ofShared();
+        Arena arena = Arena.ofAuto();
         MemorySegment seg = arena.allocateFrom(ValueLayout.JAVA_BYTE, data);
         return new AccelTensor(seg, shape, contiguousStride(shape), 0, arena);
     }
@@ -180,7 +180,7 @@ public class AccelTensor implements AutoCloseable {
      */
     public static AccelTensor copyOf(MemorySegment source, long[] shape) {
         long n = numelOf(shape);
-        Arena arena = Arena.ofShared();
+        Arena arena = Arena.ofAuto();
         MemorySegment seg = arena.allocate(n * Float.BYTES, 16);
         MemorySegment.copy(source, 0, seg, 0, n * Float.BYTES);
         return new AccelTensor(seg, shape, contiguousStride(shape), 0, arena);
@@ -562,9 +562,9 @@ public class AccelTensor implements AutoCloseable {
     public void close() {
         if (!closed) {
             closed = true;
-            if (arena != null) {
-                arena.close();
-            }
+            // if (arena != null) {
+            //     arena.close();
+            // }
         }
     }
 
@@ -592,7 +592,7 @@ public class AccelTensor implements AutoCloseable {
      */
     private AccelTensor materialize(long[] srcShape, long[] srcStride) {
         long n = numelOf(srcShape);
-        Arena newArena = Arena.ofShared();
+        Arena newArena = Arena.ofAuto();
         MemorySegment newSeg = newArena.allocate(n * Float.BYTES, 16);
 
         if (srcShape.length > 0 && srcStride[srcShape.length - 1] == 1) {

@@ -24,10 +24,22 @@ import tech.kayys.gollek.ml.multimodal.VideoBuilder;
 import tech.kayys.gollek.ml.multimodal.AudioBuilder;
 import tech.kayys.gollek.sdk.api.GollekSdk;
 
+import tech.kayys.gollek.ml.optim.*;
+import tech.kayys.gollek.ml.nn.Parameter;
+import tech.kayys.gollek.ml.ensemble.*;
+import tech.kayys.gollek.ml.svm.*;
+import tech.kayys.gollek.ml.naive_bayes.*;
+import tech.kayys.gollek.ml.linear_model.*;
+import tech.kayys.gollek.ml.clustering.*;
+import tech.kayys.gollek.ml.pipeline.*;
+import tech.kayys.gollek.ml.model_selection.*;
+import tech.kayys.gollek.ml.base.BaseEstimator;
+import tech.kayys.gollek.ml.base.BaseTransformer;
+import tech.kayys.gollek.ml.util.*;
+
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Main entry point for the Gollek ML framework.
@@ -35,39 +47,8 @@ import java.util.Map;
  * <p>
  * Provides static factory methods for creating tensors, building neural
  * networks, and querying device availability — mirroring the top-level
- * {@code torch} namespace in PyTorch.
- *
- * <h3>Quick Start — Tensors &amp; Neural Networks</h3>
- * 
- * <pre>{@code
- * var x = Gollek.tensor(new float[] { 1, 2, 3, 4 }, 2, 2);
- * var w = Gollek.randn(2, 3).requiresGrad(true);
- * var y = x.matmul(w).relu().sum();
- * y.backward();
- *
- * var model = new Sequential(
- *         new Linear(784, 256),
- *         new ReLU(),
- *         new Linear(256, 10));
- * }</pre>
- *
- * <h3>Quick Start — Training</h3>
- * 
- * <pre>{@code
- * var model = new Sequential(
- *         new Linear(784, 128), new ReLU(), new Dropout(0.1), new Linear(128, 10));
- *
- * var optimizer = new Adam(model.parameters(), 1e-3);
- * var lossFn = new CrossEntropyLoss();
- *
- * for (int epoch = 0; epoch < 10; epoch++) {
- *     optimizer.zeroGrad();
- *     var pred = model.forward(batch);
- *     var loss = lossFn.compute(pred, target);
- *     loss.backward();
- *     optimizer.step();
- * }
- * }</pre>
+ * {@code torch} namespace in PyTorch, while {@code Gollek.ML} provides
+ * a scikit-learn style API for traditional machine learning.
  */
 public final class Gollek {
 
@@ -75,6 +56,126 @@ public final class Gollek {
     public static final String VERSION = "0.1.1";
 
     private Gollek() {
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Deep Learning (PyTorch Style)
+    // ══════════════════════════════════════════════════════════════════════
+
+    public static class DL {
+        public static GradTensor tensor(float[] data, long... shape) {
+            return Gollek.tensor(data, shape);
+        }
+
+        public static NNModule sequential(NNModule... layers) {
+            return new Sequential(layers);
+        }
+
+        public static Optimizer adamW(List<Parameter> params, float lr) {
+            return AdamW.builder(params, lr).build();
+        }
+
+        public static CrossEntropyLoss crossEntropy() {
+            return new CrossEntropyLoss();
+        }
+
+        public static MSELoss mseLoss() {
+            return new MSELoss();
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Traditional ML (Scikit-Learn Style)
+    // ══════════════════════════════════════════════════════════════════════
+
+    public static class ML {
+        // Classification
+        public static RandomForestClassifier randomForest() {
+            return new RandomForestClassifier();
+        }
+
+        public static GradientBoostingClassifier gradientBoosting() {
+            return new GradientBoostingClassifier();
+        }
+
+        public static SVC svm() {
+            return new SVC();
+        }
+
+        public static GaussianNB naiveBayes() {
+            return new GaussianNB();
+        }
+
+        public static VotingClassifier voting(List<BaseEstimator> estimators, String voting) {
+            return new VotingClassifier(estimators, voting, null);
+        }
+
+        // Regression
+        public static LinearModel linearRegression() {
+            return new LinearModel("none", 0, 0, 1e-4, 1000, 0.01);
+        }
+
+        public static LinearModel ridge(double alpha) {
+            return new LinearModel("l2", alpha, 0, 1e-4, 1000, 0.01);
+        }
+
+        public static LinearModel lasso(double alpha) {
+            return new LinearModel("l1", alpha, 1, 1e-4, 1000, 0.01);
+        }
+
+        // Clustering
+        public static KMeans kMeans(int nClusters) {
+            return new KMeans(nClusters);
+        }
+
+        public static DBSCAN dbscan(double eps, int minSamples) {
+            return new DBSCAN(eps, minSamples, "euclidean", -1);
+        }
+
+        // Preprocessing
+        public static StandardScaler standardScaler() {
+            return new StandardScaler();
+        }
+
+        public static PCA pca(int nComponents) {
+            return new PCA(nComponents);
+        }
+
+        public static PolynomialFeatures polynomialFeatures(int degree) {
+            return new PolynomialFeatures(degree);
+        }
+
+        public static Pipeline pipeline(BaseEstimator... steps) {
+            if (steps.length == 0) throw new IllegalArgumentException("Pipeline must have at least one step");
+            List<BaseTransformer> transformers = new ArrayList<>();
+            for (int i = 0; i < steps.length - 1; i++) {
+                if (!(steps[i] instanceof BaseTransformer)) {
+                    throw new IllegalArgumentException("All steps except the last must be transformers");
+                }
+                transformers.add((BaseTransformer) steps[i]);
+            }
+            return new Pipeline(transformers, steps[steps.length - 1]);
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Model Selection & Utilities
+    // ══════════════════════════════════════════════════════════════════════
+
+    public static class Selection {
+        public static double crossValScore(BaseEstimator estimator, float[][] X, int[] y, int nFolds) {
+            return CrossValidation.crossValScore(estimator, X, y, nFolds, "accuracy");
+        }
+
+        public static CrossValidation.GridSearchResult gridSearch(BaseEstimator estimator,
+                Map<String, Object[]> paramGrid,
+                float[][] X, int[] y) {
+            return CrossValidation.gridSearch(estimator, paramGrid, X, y, 5);
+        }
+
+        public static ModelSelection.TrainTestSplit trainTestSplit(float[][] X, int[] y, double testSize, int randomState) {
+            return ModelSelection.trainTestSplit(X, y, testSize, randomState);
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════

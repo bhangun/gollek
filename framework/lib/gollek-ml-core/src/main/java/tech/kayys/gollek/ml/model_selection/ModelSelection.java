@@ -3,6 +3,7 @@ package tech.kayys.gollek.ml.model_selection;
 import tech.kayys.gollek.ml.base.*;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 /**
  * Cross-validation and model selection utilities.
@@ -94,9 +95,11 @@ public class ModelSelection {
             }
 
             // Split each class proportionally
-            List<Fold> folds = new ArrayList<>();
+            List<List<Integer>> trainFolds = new ArrayList<>();
+            List<List<Integer>> valFolds = new ArrayList<>();
             for (int i = 0; i < nSplits; i++) {
-                folds.add(new Fold(new int[0], new int[0]));
+                trainFolds.add(new ArrayList<>());
+                valFolds.add(new ArrayList<>());
             }
 
             for (List<Integer> classIdx : classIndices) {
@@ -105,25 +108,24 @@ public class ModelSelection {
                     int start = fold * foldSize;
                     int end = (fold == nSplits - 1) ? classIdx.size() : start + foldSize;
 
-                    Fold current = folds.get(fold);
-                    for (int j = start; j < end; j++) {
-                        current.valIndices.add(classIdx.get(j));
-                    }
-                    for (int j = 0; j < start; j++) {
-                        current.trainIndices.add(classIdx.get(j));
-                    }
-                    for (int j = end; j < classIdx.size(); j++) {
-                        current.trainIndices.add(classIdx.get(j));
+                    for (int j = 0; j < classIdx.size(); j++) {
+                        if (j >= start && j < end) {
+                            valFolds.get(fold).add(classIdx.get(j));
+                        } else {
+                            trainFolds.get(fold).add(classIdx.get(j));
+                        }
                     }
                 }
             }
 
-            // Convert to arrays
-            return folds.stream()
-                    .map(f -> new Fold(
-                            f.trainIndices.stream().mapToInt(i -> i).toArray(),
-                            f.valIndices.stream().mapToInt(i -> i).toArray()))
-                    .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+            List<Fold> result = new ArrayList<>();
+            for (int i = 0; i < nSplits; i++) {
+                result.add(new Fold(
+                    trainFolds.get(i).stream().mapToInt(idx -> idx).toArray(),
+                    valFolds.get(i).stream().mapToInt(idx -> idx).toArray()
+                ));
+            }
+            return result;
         }
     }
 
@@ -176,18 +178,9 @@ public class ModelSelection {
         public final int[] trainIndices;
         public final int[] valIndices;
 
-        // For building
-        private List<Integer> trainIndicesList = new ArrayList<>();
-        private List<Integer> valIndicesList = new ArrayList<>();
-
         public Fold(int[] trainIndices, int[] valIndices) {
             this.trainIndices = trainIndices;
             this.valIndices = valIndices;
-        }
-
-        private Fold() {
-            this.trainIndices = null;
-            this.valIndices = null;
         }
     }
 }

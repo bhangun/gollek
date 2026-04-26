@@ -66,13 +66,11 @@
             <artifactId>gollek-runner-llamacpp</artifactId>
         </dependency>
 -->
-<!--
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-gguf-converter</artifactId>
+            <artifactId>gollek-gguf-converter-java</artifactId>
             <version>${project.version}</version>
         </dependency>
--->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-runner-onnx</artifactId>

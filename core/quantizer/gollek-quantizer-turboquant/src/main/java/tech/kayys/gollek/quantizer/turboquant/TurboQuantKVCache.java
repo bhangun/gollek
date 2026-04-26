@@ -118,7 +118,7 @@ public class TurboQuantKVCache implements AutoCloseable {
             : new int[0];
 
         // Allocate off-heap storage via FFM Arena
-        this.arena = Arena.ofShared();
+        this.arena = Arena.ofAuto();
         long kvBytes = (long) maxSeqLen * headDim;
 
         mseIndicesKeys    = arena.allocate(kvBytes * Integer.BYTES, 64L);

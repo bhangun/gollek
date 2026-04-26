@@ -19,7 +19,7 @@ public class BlockManager implements AutoCloseable {
 
     private static final Logger log = Logger.getLogger(BlockManager.class);
 
-    private final Arena poolArena = Arena.ofShared();
+    private final Arena poolArena = Arena.ofAuto();
     private final ConcurrentLinkedQueue<Integer> freeBlockIndices = new ConcurrentLinkedQueue<>();
     private final List<MemorySegment> blocks = new ArrayList<>();
     private final AtomicInteger totalAllocated = new AtomicInteger(0);

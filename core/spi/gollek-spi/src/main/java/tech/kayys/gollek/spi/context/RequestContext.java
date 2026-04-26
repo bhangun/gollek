@@ -120,7 +120,7 @@ public interface RequestContext {
      */
     static RequestContext forTenant(String tenantId, String modelScope) {
         return new RequestContext() {
-            @Override public String apiKey()       { return null; }
+            @Override public String apiKey()       { return COMMUNITY_API_KEY; }
             @Override public String getTenantId()  { return tenantId; }
             @Override public String getModelScope(){ return modelScope; }
         };

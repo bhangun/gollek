@@ -1,5 +1,6 @@
 package tech.kayys.gollek.ml.base;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -7,9 +8,8 @@ import java.util.List;
  * Base class for all transformers (preprocessing, feature extraction).
  * Extends BaseEstimator with transformation capabilities.
  */
+@RegisterForReflection(registerFullHierarchy = true)
 public abstract class BaseTransformer extends BaseEstimator {
-
-    private boolean isFitted = false;
 
     /**
      * Fit transformer to data (computes statistics like mean, std).
@@ -53,14 +53,13 @@ public abstract class BaseTransformer extends BaseEstimator {
         return new ArrayList<>(inputFeatures);
     }
 
-    @Override
-    public boolean isFitted() {
-        return isFitted;
+    /**
+     * Get number of features produced by this transformer.
+     */
+    public int getNFeaturesOut() {
+        return -1; // Default -1 means unknown or same as input
     }
 
-    protected void setFitted(boolean fitted) {
-        this.isFitted = fitted;
-    }
 
     @Override
     public void fit(float[][] X, int[] y) {

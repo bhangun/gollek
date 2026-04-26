@@ -1,7 +1,8 @@
 package tech.kayys.gollek.ml.calibration;
 
 import tech.kayys.gollek.ml.base.*;
-import tech.kayys.gollek.ml.model_selection.*;
+import tech.kayys.gollek.ml.model_selection.ModelSelection.KFold;
+import tech.kayys.gollek.ml.model_selection.ModelSelection.Fold;
 import java.util.*;
 
 /**
@@ -222,8 +223,8 @@ public class CalibratedClassifierCV extends BaseEstimator {
             // Generate points for interpolation
             points = new ArrayList<>();
             for (Block block : blocks) {
-                points.add(new Point(block.xStart, block.mean));
-                points.add(new Point(block.xEnd, block.mean));
+                points.add(new Point((float) block.xStart, block.mean));
+                points.add(new Point((float) block.xEnd, block.mean));
             }
         }
 

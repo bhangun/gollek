@@ -55,22 +55,9 @@
                 <version>${langchain4j.version}</version>
             </dependency>
 
-            <!-- Jakarta EE APIs -->
-            <dependency>
-                <groupId>jakarta.enterprise</groupId>
-                <artifactId>jakarta.enterprise.cdi-api</artifactId>
-                <version>4.0.1</version>
-            </dependency>
-            <dependency>
-                <groupId>jakarta.inject</groupId>
-                <artifactId>jakarta.inject-api</artifactId>
-                <version>2.0.1</version>
-            </dependency>
-            <dependency>
-                <groupId>jakarta.validation</groupId>
-                <artifactId>jakarta.validation-api</artifactId>
-                <version>3.0.2</version>
-            </dependency>
+            <!-- Jakarta EE APIs — versions managed by Quarkus BOM above.
+                 Do NOT pin CDI, inject, or validation versions here;
+                 Quarkus 3.32+ requires CDI 4.1 (jakarta.enterprise.invoke.Invoker). -->
 
 
             <!-- Internal Project Dependencies -->
@@ -348,6 +335,11 @@
             </dependency>
             <dependency>
                 <groupId>tech.kayys.gollek</groupId>
+                <artifactId>gollek-gguf-converter-java</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>tech.kayys.gollek</groupId>
                 <artifactId>gollek-runner-libtorch</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -448,6 +440,7 @@
                 <artifactId>quarkus-rest-client-jackson</artifactId>
                 <version>${quarkus.platform.version}</version>
             </dependency>
+            <!-- Mutiny version managed by Quarkus BOM -->
             <dependency>
                 <groupId>io.smallrye.reactive</groupId>
                 <artifactId>smallrye-mutiny-vertx-web-client</artifactId>

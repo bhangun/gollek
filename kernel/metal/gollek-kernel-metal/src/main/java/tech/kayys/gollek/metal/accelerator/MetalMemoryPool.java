@@ -42,7 +42,7 @@ public class MetalMemoryPool {
         this.totalFrees = new AtomicLong(0);
         this.poolHits = new AtomicLong(0);
         this.poolMisses = new AtomicLong(0);
-        this.arena = Arena.ofShared();
+        this.arena = Arena.ofAuto();
         this.isUnifiedMemory = isUnifiedMemory;
         
         log.infof("Metal Memory Pool created: blockSize=%d bytes, maxBlocks=%d, unified=%s", 

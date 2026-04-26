@@ -24,7 +24,7 @@ import java.io.IOException;
 public final class GGUFLoader {
 
     public static GGUFModel loadModel(Path path) throws IOException {
-        Arena arena = Arena.ofShared();
+        Arena arena = Arena.ofAuto();
         try (GGUFReader reader = new GGUFReader(path, arena)) {
             return new GGUFParser().parse(reader.segment(), arena);
         } catch (Throwable t) {

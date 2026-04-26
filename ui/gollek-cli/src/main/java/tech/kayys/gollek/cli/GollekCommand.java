@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import picocli.CommandLine.Command;
 import tech.kayys.gollek.cli.commands.ChatCommand;
-import tech.kayys.gollek.cli.commands.ConvertCommand;
+import tech.kayys.gollek.cli.commands.PrepareCommand;
 import tech.kayys.gollek.cli.commands.DeleteCommand;
 import tech.kayys.gollek.cli.commands.ExtensionsCommand;
 import tech.kayys.gollek.cli.commands.InfoCommand;
@@ -39,7 +39,7 @@ import picocli.CommandLine.Option;
         RunCommand.class,
         ChatCommand.class,
         PullCommand.class,
-        ConvertCommand.class,
+        PrepareCommand.class,
         ListCommand.class,
         McpCommand.class,
         ShowCommand.class,

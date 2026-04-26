@@ -242,7 +242,7 @@ public class MetalRunner extends AbstractGollekRunner {
         vocabSize  = config.getIntParameter("vocab_size",   vocabSize);
 
         // Memory-map model into unified DRAM — zero copy to Metal
-        weightsArena  = Arena.ofShared();
+        weightsArena  = Arena.ofAuto();
         Path modelPath = resolveModelPath(modelManifest);
         weightsMapped  = mmapModel(modelPath, weightsArena);
         layerSlices    = sliceLayerWeights(weightsMapped, numLayers);

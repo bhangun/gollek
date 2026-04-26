@@ -184,7 +184,7 @@ public class DirectInferenceEngine implements SafetensorEngine {
 
             log.infof("DirectInferenceEngine: loading model [%s]", resolved.getFileName());
 
-            Arena weightArena = Arena.ofShared();
+            Arena weightArena = Arena.ofAuto();
             Map<String, AccelTensor> weights = loadWeights(resolved);
 
             Tokenizer tokenizer;

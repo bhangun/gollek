@@ -54,7 +54,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *     .numHeads(32)
  *     .headDim(128)
  *     .dtype(DType.FLOAT16)
- *     .arena(Arena.ofShared())
+ *     .arena(Arena.ofAuto())
  *     .build();
  *
  * // Per-sequence cache
@@ -818,7 +818,7 @@ public final class PagedKVCache implements KVCache {
         private int numHeads = 32;
         private int headDim = 128;
         private DType dtype = DType.FLOAT16;
-        private Arena arena = Arena.ofShared();
+        private Arena arena = Arena.ofAuto();
 
         private ConfigBuilder() {}
 

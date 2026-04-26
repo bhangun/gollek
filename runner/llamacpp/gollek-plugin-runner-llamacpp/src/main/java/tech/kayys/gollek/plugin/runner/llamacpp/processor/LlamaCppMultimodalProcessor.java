@@ -177,7 +177,7 @@ public class LlamaCppMultimodalProcessor implements MultimodalProcessor {
                     case IMAGE -> itemEmbeddings.add(encodeImage(item.rawData, item.mimeType));
                     case AUDIO -> itemEmbeddings.add(encodeAudio(item.rawData, item.mimeType));
                     case EMBEDDING -> {
-                        MemorySegment seg = Arena.ofShared().allocateFrom(ValueLayout.JAVA_FLOAT, item.embedding);
+                        MemorySegment seg = Arena.ofAuto().allocateFrom(ValueLayout.JAVA_FLOAT, item.embedding);
                         itemEmbeddings.add(seg);
                     }
                     default -> {

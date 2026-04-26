@@ -221,7 +221,7 @@ public class MetalWeightOffloadingRunner extends AbstractGollekRunner {
                 metal.deviceName(), caps.unifiedMemoryGb(), caps.gpuCores());
 
         // Memory-map model weights into unified DRAM — zero copy to Metal
-        weightsArena  = Arena.ofShared();
+        weightsArena  = Arena.ofAuto();
         Path modelPath = resolveModelPath(modelManifest);
         weightsMapped  = mmapUnified(modelPath, weightsArena);
         layerSlices    = sliceLayers(weightsMapped, numLayers);
@@ -470,7 +470,7 @@ public class MetalWeightOffloadingRunner extends AbstractGollekRunner {
      */
     private void advisePinHotLayers(int n) {
         // The JVM's mmap implementation calls madvise internally via
-        // Arena.ofShared(). On macOS we can explicitly call madvise via FFM,
+        // Arena.ofAuto(). On macOS we can explicitly call madvise via FFM,
         // but the OS already handles this through Metal's residency mechanism.
         // Metal marks SharedBuffers as GPU-resident automatically on first use.
         log.debugf("[MetalOffload] Advised OS to pre-fault first %d layers into DRAM", n);

@@ -29,7 +29,7 @@ public final class NativeInferenceSession implements AutoCloseable {
 
     public NativeInferenceSession(NativeInferenceEngine engine, int maxContext) {
         this.engine = engine;
-        this.arena = Arena.ofShared();
+        this.arena = Arena.ofAuto();
         
         long kvBytes = (long) engine.getNLayers() * engine.getNHeadsKv() * engine.getHeadDim() * maxContext * Float.BYTES;
         MemorySegment kSeg = arena.allocate(kvBytes, 64);

@@ -2,9 +2,10 @@ package tech.kayys.gollek.ml.converter;
 
 import tech.kayys.gollek.ml.autograd.*;
 import tech.kayys.gollek.ml.nn.*;
-import tech.kollek.ml.nn.layer.*;
+import tech.kayys.gollek.ml.nn.layer.*;
 import tech.kayys.gollek.ml.pickle.*;
 
+import java.io.IOException;
 import java.util.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

@@ -202,7 +202,7 @@ public class CudaBinding {
      */
     public MemorySegment mallocManaged(long bytes, int flags) {
         if (!nativeAvailable) {
-            return Arena.ofShared().allocate(bytes, 64);
+            return Arena.ofAuto().allocate(bytes, 64);
         }
         return (MemorySegment) invoke(FN_ALLOC_MANAGED, bytes, flags);
     }

@@ -46,7 +46,7 @@ public class LiteRTInferenceRunner implements AutoCloseable {
 
     private LiteRTGemmaMetalRunner gemmaMetalRunner;
 
-    private final Arena arena = Arena.ofShared();
+    private final Arena arena = Arena.ofAuto();
 
     private int maxSeqLen = 2048;
 

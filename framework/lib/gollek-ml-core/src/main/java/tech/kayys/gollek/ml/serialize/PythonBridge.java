@@ -3,6 +3,9 @@ package tech.kayys.gollek.ml.serialize;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
+import tech.kayys.gollek.ml.base.*;
+import tech.kayys.gollek.ml.ensemble.*;
+import tech.kayys.gollek.ml.persistence.ModelPersistence;
 
 /**
  * Bridge for loading Gollek models in Python.

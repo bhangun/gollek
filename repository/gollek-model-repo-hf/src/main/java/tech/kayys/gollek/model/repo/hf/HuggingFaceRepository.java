@@ -93,7 +93,7 @@ public final class HuggingFaceRepository implements ModelRepository {
         String repoId = descriptor.id();
         String revision = descriptor.metadata().get("revision");
         String manifestName = GollekManifest.computeName(repoId, revision);
-        return ManifestStore.resolveBlobDir(manifestName);
+        return ManifestStore.resolveBlobDir(repoId, manifestName);
     }
 
     @Override
@@ -116,7 +116,7 @@ public final class HuggingFaceRepository implements ModelRepository {
                 // 2. Trigger auto-download if enabled
                 if (isAutoDownloadEnabled() && !"community".equals(requestId)) {
                     String manifestName = GollekManifest.computeName(repoId, revision);
-                    Path targetFolder = ManifestStore.resolveBlobDir(manifestName);
+                    Path targetFolder = ManifestStore.resolveBlobDir(repoId, manifestName);
                     
                     Path downloaded = downloadBestArtifact(repoId, targetFolder, tech.kayys.gollek.spi.model.PullOptions.DEFAULT);
                     if (downloaded != null) {
@@ -205,7 +205,7 @@ public final class HuggingFaceRepository implements ModelRepository {
                 String revision = options.getRevision() != null ? options.getRevision() : (config != null ? config.revision() : DEFAULT_REVISION);
                 String manifestName = GollekManifest.computeName(repoId, revision);
                 
-                Path targetFolder = ManifestStore.resolveBlobDir(manifestName);
+                Path targetFolder = ManifestStore.resolveBlobDir(repoId, manifestName);
                 
                 Path downloaded = downloadBestArtifact(repoId, targetFolder, options);
                 ModelFormat format = detectFormat(downloaded);
@@ -262,7 +262,7 @@ public final class HuggingFaceRepository implements ModelRepository {
     }
 
     private boolean isHuggingFaceModelId(String modelId) {
-        return modelId != null && (modelId.startsWith("hf:") || modelId.contains("/"));
+        return modelId != null && modelId.startsWith("hf:");
     }
 
     private String normalizeRepoId(String modelId) {

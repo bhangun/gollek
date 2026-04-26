@@ -1,10 +1,12 @@
 package tech.kayys.gollek.tool.dto;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import java.util.Map;
 
 /**
  * Tool execution result
  */
+@RegisterForReflection
 public record ToolExecutionResult(
         String toolCallId,
         String toolName,

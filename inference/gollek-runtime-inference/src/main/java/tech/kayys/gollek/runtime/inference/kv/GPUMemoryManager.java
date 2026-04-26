@@ -150,9 +150,9 @@ public final class GPUMemoryManager implements AutoCloseable {
 
         // Allocate arenas (in production, these would be GPU memory via FFM)
         // For now, we use off-heap native memory as a proxy
-        this.kvCacheArena = Arena.ofShared();
-        this.tensorArena = Arena.ofShared();
-        this.scratchArena = Arena.ofShared();
+        this.kvCacheArena = Arena.ofAuto();
+        this.tensorArena = Arena.ofAuto();
+        this.scratchArena = Arena.ofAuto();
 
         // Pre-allocate memory pools
         kvCacheArena.allocate(kvCacheMemory);

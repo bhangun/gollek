@@ -54,7 +54,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *     .numHeads(32)
  *     .headDim(128)
  *     .storageMode(KVCacheStorageMode.TURBOQUANT_3BIT)
- *     .arena(Arena.ofShared())
+ *     .arena(Arena.ofAuto())
  *     .build();
  *
  * // Per-sequence compressed cache
@@ -689,7 +689,7 @@ public final class TurboQuantKVCacheAdapter implements AutoCloseable {
         private int numLayers = 32;
         private int numHeads = 32;
         private int headDim = 128;
-        private Arena arena = Arena.ofShared();
+        private Arena arena = Arena.ofAuto();
 
         private ConfigBuilder() {}
 

@@ -26,7 +26,7 @@ public class SafetensorParser implements AutoCloseable {
 
     public SafetensorParser(Path filePath) throws IOException {
         this.filePath = filePath;
-        this.arena = Arena.ofShared();
+        this.arena = Arena.ofAuto();
         
         try (RandomAccessFile raf = new RandomAccessFile(filePath.toFile(), "r")) {
             FileChannel channel = raf.getChannel();

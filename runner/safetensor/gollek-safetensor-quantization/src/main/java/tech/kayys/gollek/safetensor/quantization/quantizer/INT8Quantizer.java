@@ -240,7 +240,7 @@ public class INT8Quantizer implements Quantizer {
         for (int i = 0; i < shape.length; i++) lShape[i] = shape[i];
         
         // Allocate arena for quantized data
-        java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofShared();
+        java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofAuto();
         MemorySegment dataSeg = arena.allocateFrom(ValueLayout.JAVA_BYTE, data);
         MemorySegment scalesSeg = arena.allocateFrom(ValueLayout.JAVA_FLOAT, scales);
         

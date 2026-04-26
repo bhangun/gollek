@@ -23,7 +23,7 @@ public class PickleParser {
     private static final byte INT = (byte) 0x49;
     private static final byte BININT = (byte) 0x4A;
     private static final byte BININT1 = (byte) 0x4B;
-    private static final byte BININT2 = (byte) 0x4C;
+    private static final byte BININT2 = (byte) 0x4D;
     private static final byte LONG = (byte) 0x4C;
     private static final byte STRING = (byte) 0x53;
     private static final byte BINSTRING = (byte) 0x54;
@@ -35,7 +35,7 @@ public class PickleParser {
     private static final byte NEWTRUE = (byte) 0x88;
     private static final byte NEWFALSE = (byte) 0x89;
     private static final byte EMPTY_TUPLE = (byte) 0x29;
-    private static final byte TUPLE = (byte) 0x28;
+    private static final byte TUPLE = (byte) 0x74;
     private static final byte EMPTY_LIST = (byte) 0x5D;
     private static final byte LIST = (byte) 0x5B;
     private static final byte APPEND = (byte) 0x61;
@@ -208,7 +208,7 @@ public class PickleParser {
         List<Object> items = new ArrayList<>();
         while (true) {
             Object item = stack.pop();
-            if (item == MARK)
+            if (item instanceof Byte && (Byte) item == MARK)
                 break;
             items.add(0, item);
         }
@@ -232,7 +232,7 @@ public class PickleParser {
     }
 
     private void readBinInt() throws IOException {
-        int value = readInt();
+        int value = readInt32();
         stack.push(value);
     }
 
@@ -252,7 +252,7 @@ public class PickleParser {
     }
 
     private void readBinString() throws IOException {
-        int len = readInt();
+        int len = readInt32();
         byte[] bytes = new byte[len];
         readFully(bytes);
         stack.push(new String(bytes, StandardCharsets.US_ASCII));
@@ -271,7 +271,7 @@ public class PickleParser {
     }
 
     private void readBinUnicode() throws IOException {
-        int len = readInt();
+        int len = readInt32();
         byte[] bytes = new byte[len];
         readFully(bytes);
         stack.push(new String(bytes, StandardCharsets.UTF_8));
@@ -398,7 +398,7 @@ public class PickleParser {
     }
 
     private void readBinBytes() throws IOException {
-        int len = readInt();
+        int len = readInt32();
         byte[] bytes = new byte[len];
         readFully(bytes);
         stack.push(bytes);
@@ -431,7 +431,7 @@ public class PickleParser {
         return (short) ((data[pos++] & 0xFF) | ((data[pos++] & 0xFF) << 8));
     }
 
-    private int readInt() throws IOException {
+    private int readInt32() throws IOException {
         if (pos + 3 >= data.length)
             throw new EOFException();
         return (data[pos++] & 0xFF) | ((data[pos++] & 0xFF) << 8) |
@@ -464,16 +464,16 @@ public class PickleParser {
     /**
      * Class representing a Python class in pickle.
      */
-    static class PickleClass {
+    public static class PickleClass {
         private final String module;
         private final String name;
 
-        PickleClass(String module, String name) {
+        public PickleClass(String module, String name) {
             this.module = module;
             this.name = name;
         }
 
-        PickleObject newInstance(Object... args) {
+        public PickleObject newInstance(Object... args) {
             return new PickleObject(this, args);
         }
 
@@ -494,17 +494,17 @@ public class PickleParser {
     /**
      * Generic pickle object that can hold state.
      */
-    static class PickleObject {
+    public static class PickleObject {
         private final PickleClass type;
         private final Object[] args;
         private Object state;
 
-        PickleObject(PickleClass type, Object... args) {
+        public PickleObject(PickleClass type, Object... args) {
             this.type = type;
             this.args = args;
         }
 
-        void setState(Object state) {
+        public void setState(Object state) {
             this.state = state;
         }
 

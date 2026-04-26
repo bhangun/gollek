@@ -414,7 +414,7 @@ class SafetensorFFMLoaderTest {
         float[] floats = { 1.5f, 2.5f };
         byte[] payload = buildSafetensors(json, floatsToBytes(floats));
 
-        try (Arena arena = Arena.ofShared()) {
+        try (Arena arena = Arena.ofAuto()) {
             MemorySegment seg = toSegment(payload, arena);
             SafetensorHeader header = PARSER.parse(seg, Path.of("r.safetensors"));
 
@@ -437,7 +437,7 @@ class SafetensorFFMLoaderTest {
                 {"w": {"dtype":"F32","shape":[1],"data_offsets":[0,4]}}""";
         byte[] payload = buildSafetensors(json, new byte[4]);
 
-        Arena arena = Arena.ofShared();
+        Arena arena = Arena.ofAuto();
         MemorySegment seg = toSegment(payload, arena);
         SafetensorHeader header = PARSER.parse(seg, Path.of("c.safetensors"));
 
@@ -530,7 +530,7 @@ class SafetensorFFMLoaderTest {
         Files.write(filePath, payload);
 
         // Use header parser directly with a file-based loader
-        try (Arena arena = Arena.ofShared()) {
+        try (Arena arena = Arena.ofAuto()) {
             java.nio.channels.FileChannel ch = java.nio.channels.FileChannel.open(filePath,
                     java.nio.file.StandardOpenOption.READ);
             long size = ch.size();

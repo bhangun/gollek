@@ -1,8 +1,10 @@
 package tech.kayys.gollek.ml.clustering;
 
+import tech.kayys.gollek.ml.base.BaseEstimator;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
+import java.util.stream.IntStream;
 
 /**
  * K-Means clustering with K-Means++ initialization and parallel execution.
@@ -35,6 +37,10 @@ public class KMeans extends BaseEstimator {
     }
 
     @Override
+    public void fit(float[][] X, int[] y) {
+        fit(X);
+    }
+
     public void fit(float[][] X) {
         int nSamples = X.length;
         int nFeatures = X[0].length;

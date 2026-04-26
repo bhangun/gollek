@@ -77,7 +77,7 @@ public class AutoRoundQuantizerAdapter implements Quantizer {
         
         AccelTensor quantized = AccelTensor.fromByteArray(packedBytes, tensor.shape());
         
-        Arena arena = Arena.ofShared();
+        Arena arena = Arena.ofAuto();
         MemorySegment scaleSeg = arena.allocateFrom(ValueLayout.JAVA_FLOAT, scales);
         MemorySegment zeroSeg = arena.allocateFrom(ValueLayout.JAVA_INT, zp);
         

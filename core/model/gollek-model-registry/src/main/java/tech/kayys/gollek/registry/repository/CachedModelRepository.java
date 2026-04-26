@@ -31,26 +31,49 @@ public class CachedModelRepository {
     @Inject
     ModelRepositoryRegistry registry;
 
-    @CacheResult(cacheName = "model-manifests")
-    public Uni<ModelManifest> findById(String modelId, String requestId) {
-        List<Uni<ModelManifest>> repositoryLookups = new ArrayList<>();
+    /**
+     * Get repositories in prioritized order: Local > HuggingFace > Others (Kaggle, etc.)
+     */
+    private List<tech.kayys.gollek.model.core.ModelRepository> getPrioritizedRepositories() {
+        List<tech.kayys.gollek.model.core.ModelRepository> local = new ArrayList<>();
+        List<tech.kayys.gollek.model.core.ModelRepository> hf = new ArrayList<>();
+        List<tech.kayys.gollek.model.core.ModelRepository> others = new ArrayList<>();
+
         for (var repo : repositories) {
-            repositoryLookups.add(repo.findById(modelId, requestId)
-                    .onFailure().recoverWithNull());
+            String className = repo.getClass().getSimpleName();
+            if (className.contains("LocalModelRepository")) {
+                local.add(repo);
+            } else if (className.contains("HuggingFaceRepository")) {
+                hf.add(repo);
+            } else {
+                others.add(repo);
+            }
         }
 
-        return Uni.combine().all().unis(repositoryLookups).with(results -> {
-            for (Object result : results) {
-                if (result != null)
-                    return (ModelManifest) result;
-            }
-            return null;
-        });
+        List<tech.kayys.gollek.model.core.ModelRepository> prioritized = new ArrayList<>();
+        prioritized.addAll(local);
+        prioritized.addAll(hf);
+        prioritized.addAll(others);
+        return prioritized;
+    }
+
+    @CacheResult(cacheName = "model-manifests")
+    public Uni<ModelManifest> findById(String modelId, String requestId) {
+        // Try sequentially in prioritized order to avoid unnecessary remote calls
+        Uni<ModelManifest> resultChain = Uni.createFrom().nullItem();
+        
+        for (var repo : getPrioritizedRepositories()) {
+            resultChain = resultChain.onItem().ifNull().switchTo(() -> 
+                repo.findById(modelId, requestId).onFailure().recoverWithNull()
+            );
+        }
+        
+        return resultChain;
     }
 
     public Uni<List<ModelManifest>> list(String requestId, Pageable pageable) {
         List<Uni<List<ModelManifest>>> repositoryLists = new ArrayList<>();
-        for (var repo : repositories) {
+        for (var repo : getPrioritizedRepositories()) {
             repositoryLists.add(repo.list(requestId, pageable)
                     .onFailure().recoverWithItem(List.of()));
         }
@@ -84,7 +107,7 @@ public class CachedModelRepository {
 
     public Uni<Void> delete(String modelId, String requestId) {
         List<Uni<Void>> deletions = new ArrayList<>();
-        for (var repo : repositories) {
+        for (var repo : getPrioritizedRepositories()) {
             deletions.add(repo.delete(modelId, requestId).onFailure().recoverWithNull());
         }
 
@@ -93,7 +116,7 @@ public class CachedModelRepository {
 
     public Path downloadArtifact(ModelManifest manifest, ModelFormat format)
             throws tech.kayys.gollek.model.exception.ArtifactDownloadException {
-        for (var repo : repositories) {
+        for (var repo : getPrioritizedRepositories()) {
             try {
                 if (repo.isCached(manifest.modelId(), format)) {
                     return repo.downloadArtifact(manifest, format);
@@ -106,7 +129,7 @@ public class CachedModelRepository {
     }
 
     public boolean isCached(String modelId, ModelFormat format) {
-        for (var repo : repositories) {
+        for (var repo : getPrioritizedRepositories()) {
             try {
                 if (repo.isCached(modelId, format))
                     return true;
@@ -118,7 +141,7 @@ public class CachedModelRepository {
     }
 
     public void evictCache(String modelId, ModelFormat format) {
-        for (var repo : repositories) {
+        for (var repo : getPrioritizedRepositories()) {
             try {
                 repo.evictCache(modelId, format);
             } catch (Exception e) {
@@ -128,7 +151,7 @@ public class CachedModelRepository {
     }
 
     public ModelDescriptor resolve(ModelRef ref) {
-        for (var repo : repositories) {
+        for (var repo : getPrioritizedRepositories()) {
             try {
                 if (repo.supports(ref)) {
                     return repo.resolve(ref);
@@ -141,7 +164,7 @@ public class CachedModelRepository {
     }
 
     public ModelArtifact fetch(ModelDescriptor descriptor) {
-        for (var repo : repositories) {
+        for (var repo : getPrioritizedRepositories()) {
             try {
                 var artifact = repo.fetch(descriptor);
                 if (artifact != null)
@@ -154,7 +177,7 @@ public class CachedModelRepository {
     }
 
     public boolean supports(ModelRef ref) {
-        for (var repo : repositories) {
+        for (var repo : getPrioritizedRepositories()) {
             if (repo.supports(ref))
                 return true;
         }

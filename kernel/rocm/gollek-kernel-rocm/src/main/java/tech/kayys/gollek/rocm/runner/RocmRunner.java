@@ -258,7 +258,7 @@ public class RocmRunner extends AbstractGollekRunner {
         }
 
         // Memory-map model weights into pinned host memory
-        weightsArena = Arena.ofShared();
+        weightsArena = Arena.ofAuto();
         Path modelPath = modelManifest.artifacts().values().stream().findFirst()
                 .map(loc -> Path.of(loc.uri()))
                 .orElseThrow(() -> new RunnerInitializationException(

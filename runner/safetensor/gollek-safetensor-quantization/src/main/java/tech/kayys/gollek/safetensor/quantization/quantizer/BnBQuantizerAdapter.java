@@ -32,7 +32,7 @@ public class BnBQuantizerAdapter implements Quantizer {
         AccelTensor quantized = AccelTensor.fromByteArray(packedOut, tensor.shape());
         
         // Attach scales (absmax) as a secondary MemorySegment
-        java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofShared();
+        java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofAuto();
         java.lang.foreign.MemorySegment scaleSeg = arena.allocateFrom(
             java.lang.foreign.ValueLayout.JAVA_FLOAT, absmaxOut);
             

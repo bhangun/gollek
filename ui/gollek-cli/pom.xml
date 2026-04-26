@@ -13,7 +13,7 @@
     <artifactId>gollek-cli</artifactId>
 
     <properties>
-        <quarkus.package.type>uber-jar</quarkus.package.type>
+        <quarkus.package.jar.type>uber-jar</quarkus.package.jar.type>
     </properties>
 
     <dependencyManagement>
@@ -47,12 +47,7 @@
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
-        <dependency>
-            <groupId>jakarta.enterprise</groupId>
-            <artifactId>jakarta.enterprise.cdi-api</artifactId>
-            <version>4.1.0</version>
-        </dependency>
-
+        <!-- CDI API is transitively provided by quarkus-arc -->
         <!-- Gollek Dependencies -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
@@ -95,18 +90,21 @@
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-runner-llamacpp</artifactId>
+            <version>${project.version}</version>
         </dependency>
--->
+        -->
 <!--
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-runner-libtorch</artifactId>
         </dependency>
+-->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-plugin-runner-safetensor</artifactId>
             <version>${project.version}</version>
         </dependency>
+<!--
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-runner-onnx</artifactId>

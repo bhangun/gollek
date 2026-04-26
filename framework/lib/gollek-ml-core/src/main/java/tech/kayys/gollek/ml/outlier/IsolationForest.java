@@ -27,7 +27,7 @@ public class IsolationForest extends BaseEstimator {
 
     @Override
     public void fit(float[][] X, int[] y) {
-        // Unsupervised - ignore y
+        validateData(X, y);
         int nSamples = Math.min(maxSamples, X.length);
         int nFeatures = maxFeatures <= 0 ? X[0].length : Math.min(maxFeatures, X[0].length);
 
@@ -61,11 +61,11 @@ public class IsolationForest extends BaseEstimator {
         // Use median as threshold
         Arrays.sort(scores);
         offset = scores[(int) (scores.length * 0.95)]; // 95th percentile
-        setFitted(true);
     }
 
     @Override
     public int[] predict(float[][] X) {
+        validateInput(X);
         int[] predictions = new int[X.length];
         for (int i = 0; i < X.length; i++) {
             double score = anomalyScore(X[i]);
@@ -75,6 +75,7 @@ public class IsolationForest extends BaseEstimator {
     }
 
     public double[] scoreSamples(float[][] X) {
+        validateInput(X);
         double[] scores = new double[X.length];
         for (int i = 0; i < X.length; i++) {
             scores[i] = anomalyScore(X[i]);
@@ -94,12 +95,12 @@ public class IsolationForest extends BaseEstimator {
         return Math.pow(2, -avgDepth / expected);
     }
 
-    private double expectedPathLength(int n) {
+    static double expectedPathLength(int n) {
         if (n <= 1)
             return 0;
         if (n == 2)
             return 1;
-        return 2 * (Math.log(n - 1) + 0.5772156649) - 2 * (n - 1) / n;
+        return 2 * (Math.log(n - 1) + 0.5772156649) - 2 * (n - 1.0) / n;
     }
 
     static class IsolationTree {
@@ -116,7 +117,7 @@ public class IsolationForest extends BaseEstimator {
 
             // Randomly select feature and split value
             int featureIdx = features.get(rng.nextInt(features.size()));
-            float min = Float.MAX_VALUE, max = Float.MIN_VALUE;
+            float min = Float.MAX_VALUE, max = -Float.MAX_VALUE;
             for (float[] point : data) {
                 min = Math.min(min, point[featureIdx]);
                 max = Math.max(max, point[featureIdx]);
@@ -149,11 +150,11 @@ public class IsolationForest extends BaseEstimator {
             return new SplitNode(featureIdx, split, leftChild, rightChild);
         }
 
-        int pathLength(float[] point) {
+        double pathLength(float[] point) {
             return pathLength(root, point, 0);
         }
 
-        private int pathLength(Node node, float[] point, int depth) {
+        private double pathLength(Node node, float[] point, int depth) {
             if (node instanceof LeafNode) {
                 return depth + expectedPathLength(((LeafNode) node).size);
             }

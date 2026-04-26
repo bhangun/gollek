@@ -784,7 +784,7 @@ public class RunCommand implements Runnable {
         }
 
         return switch (normalized) {
-            case "GGUF" -> "native";
+            case "GGUF" -> "gguf";
             case "TORCHSCRIPT" -> "libtorch";
             case "PYTORCH" -> "libtorch";
             case "SAFETENSOR" -> "safetensor";

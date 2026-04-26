@@ -3,6 +3,10 @@ package tech.kayys.gollek.ml.persistence;
 import java.io.*;
 import java.util.*;
 import java.util.zip.*;
+import tech.kayys.gollek.ml.base.*;
+import tech.kayys.gollek.ml.tree.*;
+import tech.kayys.gollek.ml.ensemble.*;
+import tech.kayys.gollek.ml.linear_model.*;
 
 /**
  * Save and load scikit-learn compatible models.

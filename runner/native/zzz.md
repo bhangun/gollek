@@ -1084,7 +1084,7 @@ public final class TFModelLoader implements AutoCloseable {
     private final TFSavedModelParser savedModelParser;
     
     public TFModelLoader() {
-        this.arena = Arena.ofShared();
+        this.arena = Arena.ofAuto();
         this.graphParser = new TFGraphParser();
         this.savedModelParser = new TFSavedModelParser();
     }
@@ -1726,7 +1726,7 @@ public final class TFInferenceEngine implements AutoCloseable {
     private TFInferenceEngine(Builder builder) {
         this.model = builder.model;
         this.executor = Executors.newFixedThreadPool(builder.numThreads);
-        this.arena = Arena.ofShared();
+        this.arena = Arena.ofAuto();
         
         // Build execution plan (topologically sorted nodes)
         this.executionPlan = buildExecutionPlan();
@@ -3896,7 +3896,7 @@ public final class SafeTensorsLoader implements AutoCloseable {
     private final Map<String, SafeTensorsModel> loadedModels = new ConcurrentHashMap<>();
     
     public SafeTensorsLoader() {
-        this.arena = Arena.ofShared();
+        this.arena = Arena.ofAuto();
         this.parser = new SafeTensorsParser();
     }
     
@@ -5085,7 +5085,7 @@ public final class LiteRTModelLoader implements AutoCloseable {
     private final Map<String, LiteRTModel> loadedModels = new ConcurrentHashMap<>();
     
     public LiteRTModelLoader() {
-        this.arena = Arena.ofShared();
+        this.arena = Arena.ofAuto();
         this.parser = new LiteRTParser();
     }
     
@@ -5866,7 +5866,7 @@ public final class LiteRTInferenceEngine implements AutoCloseable {
         ExecutionPlan executionPlan;
         
         ExecutionContext(Builder builder) {
-            this.arena = Arena.ofShared();
+            this.arena = Arena.ofAuto();
             this.numThreads = builder.numThreads;
             this.enableCaching = builder.enableCaching;
         }

@@ -263,7 +263,7 @@ public class ModelRouterService {
                                                 .name(modelId)
                                                 .version("latest")
                                                 .path("virtual")
-                                                .apiKey(request.getApiKey())
+                                                .apiKey(request.getApiKey() != null ? request.getApiKey() : "community")
                                                 .requestId(request.getRequestId())
                                                 .metadata(Map.of("source", "virtual-provider", "provider", preferred))
                                                 .artifacts(Map.of())
@@ -300,7 +300,7 @@ public class ModelRouterService {
                                         .name(modelPath.getFileName().toString())
                                         .version("local")
                                         .path(modelPath.toString())
-                                        .apiKey(request.getApiKey())
+                                        .apiKey(request.getApiKey() != null ? request.getApiKey() : "community")
                                         .requestId(request.getRequestId())
                                         .artifacts(Map.of(format,
                                                         new tech.kayys.gollek.spi.model.ArtifactLocation(

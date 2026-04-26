@@ -4,6 +4,7 @@ import tech.kayys.gollek.ml.base.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
+import tech.kayys.gollek.ml.metrics.Metrics;
 
 /**
  * Randomized search for hyperparameter optimization.
@@ -86,13 +87,13 @@ public class RandomizedSearchCV {
         BaseEstimator clone = estimator.clone();
         clone.setParams(params);
 
-        KFold kfold = new KFold(cv, true, randomState + params.hashCode());
-        List<Fold> folds = kfold.split(X.length);
+        ModelSelection.KFold kfold = new ModelSelection.KFold(cv, true, randomState + params.hashCode());
+        List<ModelSelection.Fold> folds = kfold.split(X.length);
 
         double[] scores = new double[cv];
 
         for (int foldIdx = 0; foldIdx < folds.size(); foldIdx++) {
-            Fold fold = folds.get(foldIdx);
+            ModelSelection.Fold fold = folds.get(foldIdx);
 
             // Split data
             float[][] XTrain = new float[fold.trainIndices.length][];

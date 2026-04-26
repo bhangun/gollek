@@ -1,5 +1,7 @@
 package tech.kayys.gollek.ml.metrics;
 
+import java.util.*;
+
 /**
  * Comprehensive evaluation metrics for classification and regression.
  */
@@ -48,6 +50,10 @@ public class Metrics {
         return p + r > 0 ? 2 * p * r / (p + r) : 0.0;
     }
 
+    public static double f1Score(int[] yTrue, int[] yPred) {
+        return f1Score(yTrue, yPred, 1);
+    }
+
     public static double[] confusionMatrix(int[] yTrue, int[] yPred, int numClasses) {
         double[] cm = new double[numClasses * numClasses];
         for (int i = 0; i < yTrue.length; i++) {
@@ -57,17 +63,19 @@ public class Metrics {
     }
 
     public static double rocAuc(float[] scores, int[] labels) {
-        // Simplified ROC AUC - would need proper implementation
         List<Pair> pairs = new ArrayList<>();
+        int posCount = 0;
         for (int i = 0; i < scores.length; i++) {
             pairs.add(new Pair(scores[i], labels[i]));
+            if (labels[i] == 1) posCount++;
         }
         pairs.sort((a, b) -> Float.compare(b.score, a.score));
 
         double auc = 0;
         int tp = 0, fp = 0;
-        int posCount = (int) Arrays.stream(labels).filter(l -> l == 1).count();
         int negCount = labels.length - posCount;
+
+        if (posCount == 0 || negCount == 0) return 0.5;
 
         for (Pair p : pairs) {
             if (p.label == 1) {
@@ -105,13 +113,16 @@ public class Metrics {
     }
 
     public static double r2Score(float[] yTrue, float[] yPred) {
-        double mean = Arrays.stream(yTrue).average().orElse(0);
+        double sum = 0;
+        for (float v : yTrue) sum += v;
+        double mean = sum / yTrue.length;
+        
         double ssRes = 0, ssTot = 0;
         for (int i = 0; i < yTrue.length; i++) {
             ssRes += Math.pow(yTrue[i] - yPred[i], 2);
             ssTot += Math.pow(yTrue[i] - mean, 2);
         }
-        return 1 - ssRes / ssTot;
+        return ssTot > 0 ? 1 - ssRes / ssTot : 0.0;
     }
 
     // ==================== Clustering Metrics ====================
@@ -121,15 +132,18 @@ public class Metrics {
         double total = 0;
 
         for (int i = 0; i < n; i++) {
-            // Mean distance to samples in same cluster
             double a = meanDistanceToCluster(X[i], X, labels, labels[i], true);
 
-            // Mean distance to nearest other cluster
             double b = Double.MAX_VALUE;
             Set<Integer> otherClusters = new HashSet<>();
             for (int label : labels)
                 otherClusters.add(label);
             otherClusters.remove(labels[i]);
+
+            if (otherClusters.isEmpty()) {
+                total += 0;
+                continue;
+            }
 
             for (int cluster : otherClusters) {
                 double dist = meanDistanceToCluster(X[i], X, labels, cluster, false);
