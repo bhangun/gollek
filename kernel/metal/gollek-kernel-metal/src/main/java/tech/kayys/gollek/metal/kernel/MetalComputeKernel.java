@@ -2,7 +2,6 @@ package tech.kayys.gollek.metal.kernel;
 
 import tech.kayys.gollek.spi.model.DeviceType;
 import tech.kayys.gollek.spi.tensor.ComputeKernel;
-import tech.kayys.gollek.spi.tensor.ComputeKernel.KernelStream;
 import tech.kayys.gollek.metal.binding.MetalBinding;
 import tech.kayys.gollek.metal.binding.MetalFlashAttentionBinding;
 
@@ -16,8 +15,8 @@ import java.lang.foreign.MemorySegment;
  * This adapter translates between the ComputeKernel interface and the
  * existing MetalBinding implementation. Metal has advantages:
  * <ul>
- *   <li>Unified memory architecture (no explicit copies needed)</li>
- *   <li>Rich elementwise math operations (add, mul, relu, etc.)</li>
+ * <li>Unified memory architecture (no explicit copies needed)</li>
+ * <li>Rich elementwise math operations (add, mul, relu, etc.)</li>
  * </ul>
  * 
  * @since 0.1.0
@@ -53,7 +52,7 @@ public class MetalComputeKernel implements ComputeKernel {
         // Metal unified memory = system RAM + GPU VRAM
         // Estimate from available unified memory
         long available = binding.availableMemory();
-        return (long) (available / 0.7);  // Assume 70% is usable
+        return (long) (available / 0.7); // Assume 70% is usable
     }
 
     @Override
@@ -123,26 +122,27 @@ public class MetalComputeKernel implements ComputeKernel {
 
     @Override
     public void attention(MemorySegment output, MemorySegment query, MemorySegment key,
-                         MemorySegment value, int seqLen, int numHeads, int headDim) {
+            MemorySegment value, int seqLen, int numHeads, int headDim) {
         int blockSize = 16;
         int numBlocks = (seqLen + blockSize - 1) / blockSize;
         int[] blockTable = new int[numBlocks];
-        for (int i = 0; i < numBlocks; i++) blockTable[i] = i;
-        
+        for (int i = 0; i < numBlocks; i++)
+            blockTable[i] = i;
+
         MemorySegment blockTableSeg = MemorySegment.ofArray(blockTable);
-        int[] contextLens = {seqLen};
+        int[] contextLens = { seqLen };
         MemorySegment contextLensSeg = MemorySegment.ofArray(contextLens);
-        
+
         float scale = 1.0f / (float) Math.sqrt(headDim);
-        
+
         int result = binding.attention(
-            output, query, key, value,
-            blockTableSeg, contextLensSeg,
-            1, seqLen, numHeads, headDim,
-            blockSize, numBlocks,
-            scale, 0  // isCausal: 0=false, 1=true
+                output, query, key, value,
+                blockTableSeg, contextLensSeg,
+                1, seqLen, numHeads, headDim,
+                blockSize, numBlocks,
+                scale, 0, 0.0f // isCausal: 0=false, 1=true, softCap: 0.0f (disabled)
         );
-        
+
         if (result != 0) {
             throw new RuntimeException("Metal attention failed with error code: " + result);
         }
@@ -150,19 +150,19 @@ public class MetalComputeKernel implements ComputeKernel {
 
     @Override
     public void flashAttention(MemorySegment output, MemorySegment query, MemorySegment key,
-                              MemorySegment value, int seqLen, int numHeads, int headDim) {
+            MemorySegment value, int seqLen, int numHeads, int headDim) {
         // Metal FA4 equivalent via MetalFlashAttentionBinding
         MetalFlashAttentionBinding faBinding = MetalFlashAttentionBinding.getInstance();
         if (faBinding.isNativeAvailable()) {
             float scale = 1.0f / (float) Math.sqrt(headDim);
             int result = faBinding.fa4Attention(
-                output, query, key, value,
-                1, seqLen, seqLen, numHeads, numHeads, headDim,
-                scale, false, false
-            );
-            if (result == 0) return;  // Success
+                    output, query, key, value,
+                    1, seqLen, seqLen, numHeads, numHeads, headDim,
+                    scale, false, false);
+            if (result == 0)
+                return; // Success
         }
-        
+
         // Fallback to standard attention
         attention(output, query, key, value, seqLen, numHeads, headDim);
     }
@@ -171,8 +171,8 @@ public class MetalComputeKernel implements ComputeKernel {
 
     @Override
     public void rmsNorm(MemorySegment output, MemorySegment input, MemorySegment weight,
-                       int hiddenSize, float eps) {
-        int result = binding.rmsNorm(output, input, weight, hiddenSize, eps);
+            int hiddenSize, float eps, boolean addOne) {
+        int result = binding.rmsNorm(output, input, weight, hiddenSize, eps, addOne);
         if (result != 0) {
             throw new RuntimeException("Metal rmsNorm failed with error code: " + result);
         }
@@ -188,10 +188,12 @@ public class MetalComputeKernel implements ComputeKernel {
         MemorySegment sigmoidOut = allocate((int) size * Float.BYTES);
         try {
             int result = binding.sigmoid(sigmoidOut, input, (int) size);
-            if (result != 0) throw new RuntimeException("Metal sigmoid failed: " + result);
-            
+            if (result != 0)
+                throw new RuntimeException("Metal sigmoid failed: " + result);
+
             result = binding.mul(output, input, sigmoidOut, (int) size);
-            if (result != 0) throw new RuntimeException("Metal mul failed: " + result);
+            if (result != 0)
+                throw new RuntimeException("Metal mul failed: " + result);
         } finally {
             free(sigmoidOut);
         }
@@ -233,9 +235,10 @@ public class MetalComputeKernel implements ComputeKernel {
     public void elementwiseScale(MemorySegment A, float scale, long size) {
         // Create scale factor array and multiply
         float[] scaleArr = new float[(int) size];
-        for (int i = 0; i < size; i++) scaleArr[i] = scale;
+        for (int i = 0; i < size; i++)
+            scaleArr[i] = scale;
         MemorySegment scaleSeg = MemorySegment.ofArray(scaleArr);
-        
+
         int result = binding.mul(A, A, scaleSeg, (int) size);
         if (result != 0) {
             throw new RuntimeException("Metal scale failed with error code: " + result);

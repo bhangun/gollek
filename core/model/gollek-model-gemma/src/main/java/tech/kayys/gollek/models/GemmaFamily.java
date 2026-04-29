@@ -76,20 +76,24 @@ public class GemmaFamily implements ModelArchitecture {
     }
 
     // QK-norms (Gemma-3/4 apply RMSNorm to Q and K before attention)
-    public String layerQNorm(int i) {
+    @Override
+    public String layerQueryNormWeight(int i) {
         return "model.layers.%d.self_attn.q_norm.weight".formatted(i);
     }
 
-    public String layerKNorm(int i) {
+    @Override
+    public String layerKeyNormWeight(int i) {
         return "model.layers.%d.self_attn.k_norm.weight".formatted(i);
     }
 
     // Post-attention norm (Gemma-2/3/4)
-    public String layerPostAttnNorm(int i) {
+    @Override
+    public String layerPostAttnNormWeight(int i) {
         return "model.layers.%d.post_attention_layernorm.weight".formatted(i);
     }
 
     // Pre-FFN norm (Gemma-2/4)
+    @Override
     public String layerPreFfnNormWeight(int i) {
         return "model.layers.%d.pre_feedforward_layernorm.weight".formatted(i);
     }
@@ -138,5 +142,15 @@ public class GemmaFamily implements ModelArchitecture {
     @Override
     public boolean addOneToRmsNormWeight() {
         return true;
+    }
+
+    @Override
+    public float defaultAttnSoftCap() {
+        return 50.0f;
+    }
+
+    @Override
+    public float defaultFinalSoftCap() {
+        return 30.0f;
     }
 }

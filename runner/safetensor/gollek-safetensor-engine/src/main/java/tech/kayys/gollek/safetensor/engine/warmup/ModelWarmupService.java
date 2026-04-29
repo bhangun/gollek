@@ -59,7 +59,7 @@ public class ModelWarmupService {
                     .build();
 
             try (KVCacheManager.KVCacheSession kvCache = kvCacheManager.createSession(warmupCfg.maxKvCacheTokens())) {
-                kvCache.allocate(model.config());
+                kvCache.allocate(model.config(), warmupCfg);
                 log.debugf("Warm-up forward pass stub executed (Accelerate backend)");
             }
 

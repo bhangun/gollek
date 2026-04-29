@@ -23,7 +23,7 @@ class KVCacheAllocationTest {
         config.overrideNumKeyValueHeads(1);
         config.overrideHeadDim(64);
         
-        session.allocate(config);
+        session.allocate(config, tech.kayys.gollek.safetensor.generation.GenerationConfig.defaults());
         
         // Initially 1 block allocated per layer (tokens 0-15)
         assertEquals(1, session.getBlockTable(0).size());

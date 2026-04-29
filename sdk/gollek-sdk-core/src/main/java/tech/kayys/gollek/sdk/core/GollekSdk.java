@@ -231,6 +231,16 @@ public interface GollekSdk {
     }
 
     /**
+     * Get quantization suggestion for a model based on its size.
+     * NEW in v1.2.5.
+     */
+    default Optional<tech.kayys.gollek.sdk.util.QuantSuggestionDetector.QuantSuggestion> suggestQuantization(String modelId) throws SdkException {
+        return getModelInfo(modelId).flatMap(info -> 
+            tech.kayys.gollek.sdk.util.QuantSuggestionDetector.detect(info.getModelId(), info.getSizeBytes())
+        );
+    }
+
+    /**
      * Resolve a default model if none specified. NEW in v1.2.1.
      */
     default Optional<String> resolveDefaultModel() throws SdkException {
@@ -273,6 +283,14 @@ public interface GollekSdk {
     Optional<ModelInfo> getModelInfo(String modelId) throws SdkException;
 
     void pullModel(String modelSpec, Consumer<PullProgress> progressCallback) throws SdkException;
+
+    /**
+     * Import a local model file or directory into the SDK's managed repository.
+     * NEW in v1.2.5.
+     */
+    default ModelResolution importModel(java.nio.file.Path source, boolean move) throws SdkException {
+        throw new UnsupportedOperationException("Importing models not supported by this SDK implementation");
+    }
 
     /**
      * Pull a model with explicit revision and force options. NEW in v1.2.2.

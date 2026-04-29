@@ -111,15 +111,18 @@ final class MetalCpuFallback {
     // ── RMS Norm ──────────────────────────────────────────────────────────────
 
     static int rmsNorm(MemorySegment out, MemorySegment x,
-            MemorySegment weight, int N, float eps) {
+            MemorySegment weight, int N, float eps, boolean addOne) {
         float ss = 0f;
         for (int i = 0; i < N; i++) {
             float v = get(x, i);
             ss += v * v;
         }
         float inv = 1f / (float) Math.sqrt(ss / N + eps);
-        for (int i = 0; i < N; i++)
-            set(out, i, get(x, i) * inv * get(weight, i));
+        for (int i = 0; i < N; i++) {
+            float w = get(weight, i);
+            if (addOne) w += 1.0f;
+            set(out, i, get(x, i) * inv * w);
+        }
         return 0;
     }
 

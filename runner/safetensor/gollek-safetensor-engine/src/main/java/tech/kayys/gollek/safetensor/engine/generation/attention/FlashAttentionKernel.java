@@ -1,217 +1,209 @@
-/*
- * Gollek Inference Engine — SafeTensor Module
- * Copyright (c) 2026 Kayys.tech
- * SPDX-License-Identifier: Apache-2.0
- */
 package tech.kayys.gollek.safetensor.engine.generation.attention;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.jboss.logging.Logger;
-import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
-import tech.kayys.gollek.safetensor.core.tensor.AccelOps;
-import tech.kayys.gollek.spi.model.ModelConfig;
-import tech.kayys.gollek.safetensor.engine.generation.kv.KVCacheManager;
+import tech.kayys.gollek.metal.MetalComputeBackend;
 import tech.kayys.gollek.safetensor.engine.generation.kv.BlockManager;
-import tech.kayys.gollek.safetensor.mask.CausalMaskKernel;
-import jakarta.inject.Inject;
-import java.util.List;
+import tech.kayys.gollek.safetensor.engine.generation.kv.KVCacheManager;
+import tech.kayys.gollek.safetensor.core.tensor.AccelOps;
+import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
+import tech.kayys.gollek.spi.model.ModelArchitecture;
+import tech.kayys.gollek.spi.model.ModelConfig;
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.util.List;
+import jakarta.enterprise.inject.Instance;
 
-/**
- * Attention kernel using AccelTensor + Apple Accelerate.
- * No LibTorch dependency.
- */
 @ApplicationScoped
 public class FlashAttentionKernel {
 
-    private static final Logger log = Logger.getLogger(FlashAttentionKernel.class);
-
+    @Inject
+    Instance<MetalComputeBackend> metalBackend;
     @Inject
     RopeFrequencyCache ropeCache;
 
-    @Inject
-    BlockManager blockManager;
+    public static class AttentionInput {
+        public final AccelTensor x;
+        public final AccelTensor qW, kW, vW, oW;
+        public final AccelTensor qB, kB, vB, oB;
+        public final ModelArchitecture arch;
+        public final ModelConfig config;
+        public final KVCacheManager.KVCacheSession kvCache;
+        public final int layerIdx;
+        public final int startPos;
+        public final boolean isCausal;
+        public final AccelTensor qNormW, kNormW;
+        public final AccelTensor postAttnNormW;
 
-    public record AttentionInput(
-            AccelTensor hiddenState,
-            AccelTensor qWeight, AccelTensor kWeight, AccelTensor vWeight, AccelTensor oWeight,
-            AccelTensor qBias, AccelTensor kBias, AccelTensor vBias, AccelTensor oBias,
-            ModelConfig config,
-            KVCacheManager.KVCacheSession kvCache,
-            int layerIdx,
-            int startPos,
-            boolean isCausal,
-            AccelTensor qNormWeight,
-            AccelTensor kNormWeight,
-            AccelTensor postAttnNorm
-    ) {
+        public AttentionInput(AccelTensor x, AccelTensor qW, AccelTensor kW, AccelTensor vW, AccelTensor oW,
+                AccelTensor qB, AccelTensor kB, AccelTensor vB, AccelTensor oB,
+                ModelArchitecture arch, ModelConfig config, KVCacheManager.KVCacheSession kvCache,
+                int layerIdx, int startPos, boolean isCausal,
+                AccelTensor qNormW, AccelTensor kNormW, AccelTensor postAttnNormW) {
+            this.x = x;
+            this.qW = qW;
+            this.kW = kW;
+            this.vW = vW;
+            this.oW = oW;
+            this.qB = qB;
+            this.kB = kB;
+            this.vB = vB;
+            this.oB = oB;
+            this.arch = arch;
+            this.config = config;
+            this.kvCache = kvCache;
+            this.layerIdx = layerIdx;
+            this.startPos = startPos;
+            this.isCausal = isCausal;
+            this.qNormW = qNormW;
+            this.kNormW = kNormW;
+            this.postAttnNormW = postAttnNormW;
+        }
     }
 
     public AccelTensor compute(AttentionInput in) {
-        ModelConfig config = in.config();
+        ModelConfig config = in.config;
+        int layerIdx = in.layerIdx;
+        int startPos = in.startPos;
+        int seqLen = (int) in.x.size(1);
+        int headDim = config.resolvedMaxHeadDim();
         int numQHeads = config.numAttentionHeads();
         int numKVHeads = config.resolvedNumKvHeads();
-        int headDim = config.resolvedHeadDim();
-        int groupSize = numKVHeads > 0 ? (numQHeads / numKVHeads) : 1;
         float scale = (float) (1.0 / Math.sqrt(headDim));
 
-        // Projections
-        AccelTensor q = linear(in.hiddenState(), in.qWeight(), in.qBias());
-        AccelTensor k = linear(in.hiddenState(), in.kWeight(), in.kBias());
-        AccelTensor v = linear(in.hiddenState(), in.vWeight(), in.vBias());
+        // 1. Projections
+        AccelTensor q = AccelOps.linear(in.x, in.qW, in.qB);
+        AccelTensor k = AccelOps.linear(in.x, in.kW, in.kB);
+        AccelTensor v = AccelOps.linear(in.x, in.vW, in.vB);
 
-        try {
-            long batch = in.hiddenState().size(0);
-            long seqLen = in.hiddenState().size(1);
-
-            // Attention Norms (Q-Norm / K-Norm) - Critical for Qwen 2.5
-            if (in.qNormWeight() != null) {
-                AccelTensor qNormed = AccelOps.rmsNorm(q, in.qNormWeight(), config.rmsNormEps());
-                q.close();
-                q = qNormed;
-            }
-            if (in.kNormWeight() != null) {
-                AccelTensor kNormed = AccelOps.rmsNorm(k, in.kNormWeight(), config.rmsNormEps());
-                k.close();
-                k = kNormed;
-            }
-
-            AccelTensor qReshaped = q.reshape(batch, (int)seqLen, numQHeads, headDim).transpose(1, 2).contiguous();
-            AccelTensor kReshaped = k.reshape(batch, (int)seqLen, numKVHeads, headDim).transpose(1, 2).contiguous();
-            AccelTensor vReshaped = v.reshape(batch, (int)seqLen, numKVHeads, headDim).transpose(1, 2).contiguous();
-
-            // RoPE
-            double theta = config.ropeThetaForLayer(in.layerIdx());
-            int rotaryDim = (int) (headDim * config.partialRotaryFactorForLayer(in.layerIdx()));
-            if (rotaryDim > 0) {
-                RopeFrequencyCache.RopeFrequencies rope = ropeCache.get(rotaryDim, config.maxPositionEmbeddings(), theta, config.ropeScaling());
-                
-                // Optimized RoPE: Process in-place on continuous segments
-                applyRopeToSegment(qReshaped.dataSegment(), (int)batch, numQHeads, (int)seqLen, headDim, in.startPos(), rope);
-                applyRopeToSegment(kReshaped.dataSegment(), (int)batch, numKVHeads, (int)seqLen, headDim, in.startPos(), rope);
-            }
-
-            // KV Cache: Update with current block [B, H, S, D]
-            updateKVCache(in.kvCache(), in.layerIdx(), qReshaped, kReshaped, vReshaped, in.startPos());
-
-            // Read full context views: [B, H, cacheLen, D]
-            int cacheLen = in.startPos() + (int) seqLen;
-            // Compute Multi-Head Attention
-            AccelTensor attnOut = tiledAttention(qReshaped, in.kvCache(), scale, in.isCausal(), config, in.startPos(), in.layerIdx());
-
-            // Merge heads: [B, H, S, D] -> [B, S, H, D] -> [B, S, Hidden]
-            AccelTensor attnTrans = attnOut.transpose(1, 2).contiguous();
-            AccelTensor attnFlat = attnTrans.reshape(batch, seqLen, (long) numQHeads * headDim);
-
-            AccelTensor proj = linear(attnFlat, in.oWeight(), in.oBias());
-
-            // Cleanup local tensors
-            qReshaped.close(); kReshaped.close(); vReshaped.close();
-            attnOut.close(); attnTrans.close(); attnFlat.close();
-
-            return proj;
-        } finally {
-            q.close(); k.close(); v.close();
+        // 2. QK-Norm (Gemma-3/4)
+        if (in.qNormW != null) {
+            AccelTensor qNormed = rmsNorm(q, in.qNormW, config.rmsNormEps(), in.arch.addOneToRmsNormWeight());
+            q.close();
+            q = qNormed;
         }
+        if (in.kNormW != null) {
+            AccelTensor kNormed = rmsNorm(k, in.kNormW, config.rmsNormEps(), in.arch.addOneToRmsNormWeight());
+            k.close();
+            k = kNormed;
+        }
+
+        // 3. RoPE
+        RopeFrequencyCache.RopeFrequencies freqs = ropeCache.get(headDim, config.maxPositionEmbeddings(), 10000.0,
+                config.ropeScaling());
+        applyRope(q, k, startPos, freqs, !in.arch.usesNeoxRope());
+
+        // 4. Update Cache
+        KVCacheManager.KVCacheSession kvSession = in.kvCache;
+        updateKVCache(k, v, kvSession, layerIdx, startPos, seqLen, numKVHeads, headDim);
+
+        // 5. Attention
+        AccelTensor attnOut;
+        if (metalBackend.isResolvable() && metalBackend.get().deviceName() != null
+                && !metalBackend.get().deviceName().contains("CPU")) {
+            attnOut = tiledAttention(q, kvSession, layerIdx, startPos, numQHeads, headDim, scale, in.isCausal,
+                    in.arch.defaultAttnSoftCap());
+        } else {
+            attnOut = PagedAttentionVectorAPI.compute(q, kvSession, layerIdx, startPos, numQHeads, headDim, scale,
+                    in.isCausal, in.arch.defaultAttnSoftCap());
+        }
+        q.close();
+        k.close();
+        v.close();
+
+        // 6. Post-Attention Norm (Gemma-2/4)
+        AccelTensor projectedIn = attnOut;
+        if (in.postAttnNormW != null) {
+            projectedIn = rmsNorm(attnOut, in.postAttnNormW, config.rmsNormEps(), in.arch.addOneToRmsNormWeight());
+            attnOut.close();
+        }
+
+        // 7. Output Projection
+        AccelTensor out = AccelOps.linear(projectedIn, in.oW, in.oB);
+        projectedIn.close();
+
+        return out;
     }
 
-    private AccelTensor tiledAttention(AccelTensor q, KVCacheManager.KVCacheSession kvSession, float scale, boolean causal, ModelConfig config, int startPos, int layerIdx) {
-        List<Integer> blockTable = kvSession.getBlockTable(layerIdx);
-        int totalTokens = startPos + (int) q.size(2);
-        
-        return PagedAttentionVectorAPI.compute(
-                q, 
-                blockTable, 
-                blockManager, 
-                scale, 
-                causal, 
-                kvSession.tokensPerBlock(), 
-                totalTokens,
-                config.resolvedNumKvHeads());
+    private AccelTensor rmsNorm(AccelTensor x, AccelTensor w, double eps, boolean addOne) {
+        return AccelOps.rmsNorm(x, w, eps, addOne);
     }
 
-    private void applyRopeToSegment(MemorySegment seg, int batch, int numHeads, int seqLen, int headDim, int startPos, RopeFrequencyCache.RopeFrequencies rope) {
-        for (int b = 0; b < batch; b++) {
-            for (int h = 0; h < numHeads; h++) {
-                for (int s = 0; s < seqLen; s++) {
-                    int pos = startPos + s;
-                    // Correct layout: [batch, heads, seq, dim]
-                    // Index = (b * numHeads * seqLen * headDim) + (h * seqLen * headDim) + (s * headDim)
-                    long elementOffset = (((long)b * numHeads + h) * seqLen + s) * headDim;
-                    rope.rotateInPlace(seg, elementOffset, pos);
-                }
+    private void applyRope(AccelTensor q, AccelTensor k, int startPos, RopeFrequencyCache.RopeFrequencies freqs,
+            boolean interleaved) {
+        int seqLen = (int) q.size(1);
+        int numQHeads = (int) q.size(2);
+        int numKVHeads = (int) k.size(2);
+        int headDim = (int) q.size(3);
+
+        for (int s = 0; s < seqLen; s++) {
+            int pos = startPos + s;
+            for (int h = 0; h < numQHeads; h++) {
+                freqs.rotateInPlace(q.dataSegment(), ((long) s * numQHeads + h) * headDim, pos, interleaved);
+            }
+            for (int h = 0; h < numKVHeads; h++) {
+                freqs.rotateInPlace(k.dataSegment(), ((long) s * numKVHeads + h) * headDim, pos, interleaved);
             }
         }
     }
 
-    private void updateKVCache(KVCacheManager.KVCacheSession cache, int layer, AccelTensor q, AccelTensor k, AccelTensor v, int startPos) {
-        int seqLen = (int) k.size(2); // shape [1, H, S, D]
-        int numHeads = (int) k.size(1);
-        int headDim = (int) k.size(3);
-        int tokensPerBlock = cache.tokensPerBlock();
-        List<Integer> blockTable = cache.getBlockTable(layer);
-
+    private void updateKVCache(AccelTensor k, AccelTensor v, KVCacheManager.KVCacheSession kvSession, int layerIdx,
+            int startPos, int seqLen, int numHeads, int headDim) {
+        BlockManager blockManager = kvSession.blockManager();
         MemorySegment kSeg = k.dataSegment();
         MemorySegment vSeg = v.dataSegment();
 
-        // Write each token into its corresponding block
-        for (int s = 0; s < seqLen; s++) {
-            int absPos = startPos + s;
-            int blockIdxInTable = absPos / tokensPerBlock;
-            int tokenIdxInBlock = absPos % tokensPerBlock;
-            
-            int physicalBlock = blockTable.get(blockIdxInTable);
-            MemorySegment blockSeg = blockManager.getBlock(physicalBlock);
+        int tokensPerBlock = kvSession.tokensPerBlock();
+        long headStride = blockManager.getHeadStride();
+        long tokenStride = blockManager.getTokenStride();
 
-            // Layout in PagedAttentionVectorAPI: [tokensPerBlock, numHeads, headDim, 2 (K, V)]
-            long headStride = (long) headDim * 2;
-            long tokStride = (long) numHeads * headStride;
+        for (int s = 0; s < seqLen; s++) {
+            int absolutePos = startPos + s;
+            int blockIdx = kvSession.getBlockForToken(layerIdx, absolutePos);
+            int tokenIdxInBlock = absolutePos % tokensPerBlock;
+
+            MemorySegment kBlock = blockManager.getKBlock(blockIdx);
+            MemorySegment vBlock = blockManager.getVBlock(blockIdx);
 
             for (int h = 0; h < numHeads; h++) {
-                long srcOff = ((long) h * seqLen + s) * headDim;
-                long dstOffBase = ((long) tokenIdxInBlock * tokStride + (long) h * headStride);
-                
-                // Copy K
-                MemorySegment.copy(kSeg, ValueLayout.JAVA_FLOAT, srcOff * 4, blockSeg, ValueLayout.JAVA_FLOAT, dstOffBase * 4, headDim);
-                // Copy V
-                MemorySegment.copy(vSeg, ValueLayout.JAVA_FLOAT, srcOff * 4, blockSeg, ValueLayout.JAVA_FLOAT, (dstOffBase + headDim) * 4, headDim);
+                long srcOff = ((long) s * numHeads + h) * headDim;
+                long hDstOff = ((long) h * headStride + (long) tokenIdxInBlock * tokenStride);
+
+                MemorySegment.copy(kSeg, ValueLayout.JAVA_FLOAT, srcOff * 4, kBlock, ValueLayout.JAVA_FLOAT,
+                        hDstOff * 4, headDim);
+                MemorySegment.copy(vSeg, ValueLayout.JAVA_FLOAT, srcOff * 4, vBlock, ValueLayout.JAVA_FLOAT,
+                        hDstOff * 4, headDim);
             }
         }
     }
 
+    private AccelTensor tiledAttention(AccelTensor q, KVCacheManager.KVCacheSession kvSession, int layerIdx,
+            int startPos, int numHeads, int headDim, float scale, boolean causal, float softCap) {
+        BlockManager blockManager = kvSession.blockManager();
+        long batch = q.size(0);
+        long seqLen = q.size(1);
+        int totalTokens = startPos + (int) seqLen;
 
-    private AccelTensor repeatKV(AccelTensor kv, int groupSize) {
-        long[] sh = kv.shape();
-        int b = (int) sh[0], numKVHeads = (int) sh[1], seqLen = (int) sh[2], headDim = (int) sh[3];
-        int numQHeads = numKVHeads * groupSize;
-        
-        AccelTensor exp = AccelTensor.zeros(b, numQHeads, seqLen, headDim);
-        MemorySegment src = kv.dataSegment();
-        MemorySegment dst = exp.dataSegment();
-        
-        // Optimized repeatKV using bulk MemorySegment copies for [B, H, S, D]
-        for (int i = 0; i < b; i++) {
-            for (int hk = 0; hk < numKVHeads; hk++) {
-                for (int g = 0; g < groupSize; g++) {
-                    int hq = hk * groupSize + g;
-                    long srcOff = ((long) i * numKVHeads + hk) * seqLen * headDim;
-                    long dstOff = ((long) i * numQHeads + hq) * seqLen * headDim;
-                    MemorySegment.copy(src, ValueLayout.JAVA_FLOAT, srcOff * ValueLayout.JAVA_FLOAT.byteSize(), dst, ValueLayout.JAVA_FLOAT, dstOff * ValueLayout.JAVA_FLOAT.byteSize(), (long) seqLen * headDim);
-                }
-            }
-        }
-        return exp;
-    }
+        try (Arena arena = Arena.ofConfined()) {
+            List<Integer> blocks = kvSession.getBlockIndices(layerIdx);
+            MemorySegment btSeg = arena.allocate(ValueLayout.JAVA_INT, blocks.size());
+            for (int i = 0; i < blocks.size(); i++)
+                btSeg.setAtIndex(ValueLayout.JAVA_INT, i, blocks.get(i));
 
-    private AccelTensor linear(AccelTensor x, AccelTensor w, AccelTensor b) {
-        AccelTensor out = AccelOps.linear(x, w);
-        if (b != null) {
-            AccelTensor biased = AccelOps.add(out, b);
-            out.close();
-            return biased;
+            MemorySegment clSeg = arena.allocate(ValueLayout.JAVA_INT, batch);
+            for (int i = 0; i < batch; i++)
+                clSeg.setAtIndex(ValueLayout.JAVA_INT, i, totalTokens);
+
+            AccelTensor out = AccelTensor.zeros(q.shape());
+            metalBackend.get().pagedAttention(
+                    out.dataSegment(), q.dataSegment(),
+                    blockManager.getRawKPool(), blockManager.getRawVPool(),
+                    btSeg, clSeg,
+                    (int) batch, (int) seqLen, numHeads, headDim,
+                    kvSession.tokensPerBlock(), blocks.size(),
+                    scale, causal, softCap);
+            return out;
         }
-        return out;
     }
 }

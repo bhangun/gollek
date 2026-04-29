@@ -184,7 +184,13 @@ public class SafetensorProvider implements StreamingProvider {
     public boolean supports(String modelId, ProviderRequest request) {
         if (!config.enabled() || modelId == null || modelId.isBlank())
             return false;
-        Path modelPath = resolveModelPath(modelId);
+        String modelRef = modelId;
+        if (request != null) {
+            modelRef = request.getParameter("model_path", String.class)
+                .or(() -> Optional.ofNullable((String) request.getMetadata().get("model_path")))
+                .orElse(modelId);
+        }
+        Path modelPath = resolveModelPath(modelRef);
         if (modelPath == null)
             return false;
         // Support directories (Hub-downloaded models) for DIRECT backend

@@ -142,7 +142,7 @@ public class MetalOptimizationManager {
         int err = metal.attention(
                 output, query, kPool, vPool,
                 null, null, batchSize, seqLen, numHeads, headDim,
-                64, seqLen / 64 + 1, scale, causal ? 1 : 0);
+                64, seqLen / 64 + 1, scale, causal ? 1 : 0, 0.0f);
 
         if (err == 0) {
             LOG.debug("Executed separate matmuls (QK^T → Softmax → ×V)");

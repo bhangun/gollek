@@ -15,6 +15,8 @@ import tech.kayys.gollek.spi.model.ModelConfig;
 import tech.kayys.gollek.safetensor.engine.generation.kv.KVCacheManager;
 import tech.kayys.gollek.safetensor.engine.generation.attention.FlashAttentionKernel;
 import tech.kayys.gollek.safetensor.engine.generation.moe.MoeForwardPass;
+import tech.kayys.gollek.metal.MetalComputeBackend;
+import jakarta.enterprise.inject.Instance;
 
 import java.util.Map;
 import java.util.List;
@@ -32,34 +34,66 @@ public class DirectForwardPass {
     FlashAttentionKernel attentionKernel;
     @Inject
     MoeForwardPass moeForwardPass;
+    @Inject
+    Instance<MetalComputeBackend> metalBackend;
 
-    public float[] prefill(long[] inputIds, Map<String, AccelTensor> weights, ModelConfig config, ModelArchitecture arch, KVCacheManager.KVCacheSession kvCache) {
+    public float[] prefill(long[] inputIds, Map<String, AccelTensor> weights, ModelConfig config,
+            ModelArchitecture arch, KVCacheManager.KVCacheSession kvCache) {
         AccelTensor embedTable = weights.get(arch.embedTokensWeight());
-        if (embedTable == null) throw new IllegalStateException("Missing embed tokens weight: " + arch.embedTokensWeight());
-        AccelTensor hidden = embeddingLookup(embedTable, inputIds);
+        if (embedTable == null)
+            throw new IllegalStateException("Missing embed tokens weight: " + arch.embedTokensWeight());
+        AccelTensor embedded = embeddingLookup(embedTable, inputIds);
+        float scale = arch.embeddingScaleFactor((int) embedded.size(-1));
+        AccelTensor hidden = scale != 1.0f ? AccelOps.mulScalar(embedded, scale) : embedded;
         try {
+            if (scale != 1.0f)
+                embedded.close();
             return prefill(hidden, inputIds, weights, config, arch, kvCache);
         } finally {
             hidden.closeWithParent();
         }
     }
 
-    public float[] prefill(AccelTensor embeddings, long[] inputIds, Map<String, AccelTensor> weights, ModelConfig config, ModelArchitecture arch, KVCacheManager.KVCacheSession kvCache) {
+    public float[] prefill(AccelTensor embeddings, long[] inputIds, Map<String, AccelTensor> weights,
+            ModelConfig config, ModelArchitecture arch, KVCacheManager.KVCacheSession kvCache) {
         long seqLen = embeddings.size(1);
         AccelTensor hidden = embeddings;
-        
+
         // Ensure KV cache has enough space for the entire prefill sequence
         kvCache.ensureCapacity((int) seqLen);
 
+        boolean verbose = "true".equals(System.getProperty("gollek.verbose"));
         for (int i = 0; i < config.numHiddenLayers(); i++) {
-            AccelTensor nextHidden = transformerLayer(hidden, inputIds, weights, config, arch, kvCache, i, 0, (int) seqLen);
-            if (hidden != embeddings) hidden.close();
+            if (verbose) {
+                System.err.printf("[DEBUG] Prefill Layer %d/%d start\n", i, config.numHiddenLayers());
+                System.err.flush();
+            }
+            AccelTensor nextHidden = transformerLayer(hidden, inputIds, weights, config, arch, kvCache, i, 0,
+                    (int) seqLen);
+            if (verbose) {
+                System.err.printf("[DEBUG] Prefill Layer %d/%d end\n", i, config.numHiddenLayers());
+                System.err.flush();
+            }
+
+            if (hidden != embeddings)
+                hidden.close();
             hidden = nextHidden;
         }
         kvCache.advance((int) seqLen);
 
-        AccelTensor normed = AccelOps.rmsNorm(hidden, weights.get(arch.finalNormWeight()), config.rmsNormEps());
-        if (hidden != embeddings) hidden.close();
+        AccelTensor normed;
+        if (metalBackend.isResolvable() && metalBackend.get().deviceName() != null
+                && !metalBackend.get().deviceName().contains("CPU")) {
+            normed = AccelTensor.zeros(hidden.shape());
+            metalBackend.get().rmsNorm(normed.dataSegment(), hidden.dataSegment(),
+                    weights.get(arch.finalNormWeight()).dataSegment(), (int) hidden.size(-1),
+                    (float) config.rmsNormEps(), arch.addOneToRmsNormWeight());
+        } else {
+            normed = AccelOps.rmsNorm(hidden, weights.get(arch.finalNormWeight()), config.rmsNormEps(),
+                    arch.addOneToRmsNormWeight());
+        }
+        if (hidden != embeddings)
+            hidden.close();
 
         AccelTensor lastPos = selectLastToken(normed, (int) seqLen);
         normed.close();
@@ -69,10 +103,22 @@ public class DirectForwardPass {
             lmHeadW = weights.get(arch.embedTokensWeight()); // weight tying
         }
         if (lmHeadW == null) {
-            throw new IllegalStateException("Missing lm_head weight. Safetensor file might be incomplete or config.tie_word_embeddings is missing.");
+            throw new IllegalStateException(
+                    "Missing lm_head weight. Safetensor file might be incomplete or config.tie_word_embeddings is missing.");
         }
         AccelTensor logits = AccelOps.linear(lastPos, lmHeadW);
         lastPos.close();
+
+        float finalSoftCap = arch.defaultFinalSoftCap();
+        if (finalSoftCap > 0.0f) {
+            AccelTensor scaled = AccelOps.mulScalar(logits, 1.0f / finalSoftCap);
+            AccelTensor tanhed = AccelOps.tanh(scaled);
+            AccelTensor capped = AccelOps.mulScalar(tanhed, finalSoftCap);
+            logits.close();
+            scaled.close();
+            tanhed.close();
+            logits = capped;
+        }
 
         float[] result = logits.toFloatArray();
         logits.close();
@@ -81,69 +127,116 @@ public class DirectForwardPass {
         double sum = 0, min = Double.MAX_VALUE, max = Double.MIN_VALUE;
         for (float f : result) {
             sum += f;
-            if (f < min) min = f;
-            if (f > max) max = f;
+            if (f < min)
+                min = f;
+            if (f > max)
+                max = f;
         }
-        if (config.numAttentionHeads() > 0) { // Just a dummy condition to keep it quiet usually
-             System.err.printf("[DEBUG] Logits stats: min=%f, max=%f, sum=%f, size=%d\n", min, max, sum, result.length);
-        
-        // Print top 5 IDs for debugging
-        List<Integer> topIndices = new ArrayList<>();
-        for (int i = 0; i < result.length; i++) topIndices.add(i);
-        topIndices.sort((a, b) -> Float.compare(result[b], result[a]));
-        for (int k = 0; k < Math.min(5, topIndices.size()); k++) {
-            int id = topIndices.get(k);
-            System.err.printf("  Top %d: ID=%d, val=%f\n", k, id, result[id]);
+        if (verbose && config.numAttentionHeads() > 0) { // Just a dummy condition to keep it quiet usually
+            System.err.printf("[DEBUG] Logits stats: min=%f, max=%f, sum=%f, size=%d\n", min, max, sum, result.length);
+
+            // Print top 5 IDs for debugging
+            List<Integer> topIndices = new ArrayList<>();
+            for (int i = 0; i < result.length; i++)
+                topIndices.add(i);
+            topIndices.sort((a, b) -> Float.compare(result[b], result[a]));
+            for (int k = 0; k < Math.min(5, topIndices.size()); k++) {
+                int id = topIndices.get(k);
+                System.err.printf("  Top %d: ID=%d, val=%f\n", k, id, result[id]);
+            }
         }
-    }
 
         return result;
     }
 
-    public float[] decode(long tokenId, int startPos, Map<String, AccelTensor> weights, ModelConfig config, ModelArchitecture arch, KVCacheManager.KVCacheSession kvCache) {
+    public float[] decode(long tokenId, int startPos, Map<String, AccelTensor> weights, ModelConfig config,
+            ModelArchitecture arch, KVCacheManager.KVCacheSession kvCache) {
         AccelTensor embedTable = weights.get(arch.embedTokensWeight());
-        if (embedTable == null) throw new IllegalStateException("Missing embed tokens weight.");
-        AccelTensor hidden = embeddingLookup(embedTable, new long[] { tokenId });
+        if (embedTable == null)
+            throw new IllegalStateException("Missing embed tokens weight.");
+        AccelTensor embedded = embeddingLookup(embedTable, new long[] { tokenId });
+        float scale = arch.embeddingScaleFactor((int) embedded.size(-1));
+        AccelTensor hidden = scale != 1.0f ? AccelOps.mulScalar(embedded, scale) : embedded;
         try {
+            if (scale != 1.0f)
+                embedded.close();
             long[] tokenIds = new long[] { tokenId };
-            
+
             // Ensure KV cache has space for the next generated token
             kvCache.ensureCapacity(startPos + 1);
 
             for (int i = 0; i < config.numHiddenLayers(); i++) {
-                AccelTensor nextHidden = transformerLayer(hidden, tokenIds, weights, config, arch, kvCache, i, startPos, 1);
+                AccelTensor nextHidden = transformerLayer(hidden, tokenIds, weights, config, arch, kvCache, i, startPos,
+                        1);
                 hidden.close();
                 hidden = nextHidden;
             }
             kvCache.advance(1);
 
-            AccelTensor normed = AccelOps.rmsNorm(hidden, weights.get(arch.finalNormWeight()), config.rmsNormEps());
+            AccelTensor normed;
+            if (metalBackend.isResolvable() && metalBackend.get().deviceName() != null
+                    && !metalBackend.get().deviceName().contains("CPU")) {
+                normed = AccelTensor.zeros(hidden.shape());
+                metalBackend.get().rmsNorm(normed.dataSegment(), hidden.dataSegment(),
+                        weights.get(arch.finalNormWeight()).dataSegment(), (int) hidden.size(-1),
+                        (float) config.rmsNormEps(), arch.addOneToRmsNormWeight());
+            } else {
+                normed = AccelOps.rmsNorm(hidden, weights.get(arch.finalNormWeight()), config.rmsNormEps(),
+                        arch.addOneToRmsNormWeight());
+            }
             hidden.close();
 
             AccelTensor lmHeadW = weights.get(arch.lmHeadWeight());
             if (lmHeadW == null && config.tieWordEmbeddings()) {
-                 lmHeadW = weights.get(arch.embedTokensWeight());
+                lmHeadW = weights.get(arch.embedTokensWeight());
             }
             if (lmHeadW == null) {
-                 throw new IllegalStateException("Missing lm_head weight. Safetensor file might be incomplete or config.tie_word_embeddings is missing.");
+                throw new IllegalStateException(
+                        "Missing lm_head weight. Safetensor file might be incomplete or config.tie_word_embeddings is missing.");
             }
             AccelTensor logits = AccelOps.linear(normed, lmHeadW);
             normed.close();
+
+            // Logit Soft-capping (Gemma-2)
+            float finalCap = arch.defaultFinalSoftCap();
+            if (finalCap > 0) {
+                AccelTensor scaledIn = AccelOps.mulScalar(logits, 1.0f / finalCap);
+                AccelTensor capped = AccelOps.tanh(scaledIn);
+                AccelTensor scaledOut = AccelOps.mulScalar(capped, finalCap);
+                logits.close();
+                scaledIn.close();
+                capped.close();
+                logits = scaledOut;
+            }
 
             float[] result = logits.toFloatArray();
             logits.close();
             return result;
         } finally {
-            if (!hidden.isClosed()) hidden.closeWithParent();
+            if (!hidden.isClosed())
+                hidden.closeWithParent();
         }
     }
 
-    private AccelTensor transformerLayer(AccelTensor hidden, long[] inputIds, Map<String, AccelTensor> weights, ModelConfig config, ModelArchitecture arch, KVCacheManager.KVCacheSession kvCache, int layerIdx, int startPos, int seqLen) {
+    private AccelTensor transformerLayer(AccelTensor hidden, long[] inputIds, Map<String, AccelTensor> weights,
+            ModelConfig config, ModelArchitecture arch, KVCacheManager.KVCacheSession kvCache, int layerIdx,
+            int startPos, int seqLen) {
         AccelTensor residual = hidden;
 
+        boolean verbose = "true".equals(System.getProperty("gollek.verbose"));
         // Attention norm
-        AccelTensor normedAttn = AccelOps.rmsNorm(residual, weights.get(arch.layerAttentionNormWeight(layerIdx)), config.rmsNormEps());
-        
+        AccelTensor normedAttn;
+        if (metalBackend.isResolvable() && metalBackend.get().deviceName() != null
+                && !metalBackend.get().deviceName().contains("CPU")) {
+            normedAttn = AccelTensor.zeros(residual.shape());
+            metalBackend.get().rmsNorm(normedAttn.dataSegment(), residual.dataSegment(),
+                    weights.get(arch.layerAttentionNormWeight(layerIdx)).dataSegment(), (int) residual.size(-1),
+                    (float) config.rmsNormEps(), arch.addOneToRmsNormWeight());
+        } else {
+            normedAttn = AccelOps.rmsNorm(residual, weights.get(arch.layerAttentionNormWeight(layerIdx)),
+                    config.rmsNormEps(), arch.addOneToRmsNormWeight());
+        }
+
         FlashAttentionKernel.AttentionInput attnIn = new FlashAttentionKernel.AttentionInput(
                 normedAttn,
                 weights.get(arch.layerQueryWeight(layerIdx)),
@@ -154,22 +247,46 @@ public class DirectForwardPass {
                 resolveBias(weights, arch.layerKeyBias(layerIdx)),
                 resolveBias(weights, arch.layerValueBias(layerIdx)),
                 weights.get(arch.layerOutputBias(layerIdx)),
-                config, kvCache, layerIdx, startPos,
+                arch, config, kvCache, layerIdx, startPos,
                 /* isCausal= */ true,
                 weights.get(arch.layerQueryNormWeight(layerIdx)),
                 weights.get(arch.layerKeyNormWeight(layerIdx)),
-                null);
+                weights.get(arch.layerPostAttnNormWeight(layerIdx)));
 
+        if (verbose) {
+            System.err.printf("[DEBUG] Layer %d Attention start\n", layerIdx);
+            System.err.flush();
+        }
         AccelTensor attnOut = attentionKernel.compute(attnIn);
+        if (verbose) {
+            System.err.printf("[DEBUG] Layer %d Attention end\n", layerIdx);
+            System.err.flush();
+        }
         normedAttn.close();
 
-        AccelTensor nextResidual = AccelOps.add(residual, attnOut);
-        AccelTensor normedFfn = AccelOps.rmsNorm(nextResidual, weights.get(arch.layerFfnNormWeight(layerIdx)), config.rmsNormEps());
+        AccelTensor nextResidual = AccelOps.add(hidden, attnOut);
+
+        AccelTensor normedFfn;
+        AccelTensor preFfnNormW = weights.get(arch.layerPreFfnNormWeight(layerIdx));
+        if (preFfnNormW == null)
+            preFfnNormW = weights.get(arch.layerFfnNormWeight(layerIdx)); // Fallback for older Gemma
+
+        if (metalBackend.isResolvable() && metalBackend.get().deviceName() != null
+                && !metalBackend.get().deviceName().contains("CPU")) {
+            normedFfn = AccelTensor.zeros(nextResidual.shape());
+            metalBackend.get().rmsNorm(normedFfn.dataSegment(), nextResidual.dataSegment(), preFfnNormW.dataSegment(),
+                    (int) nextResidual.size(-1), (float) config.rmsNormEps(), arch.addOneToRmsNormWeight());
+        } else {
+            normedFfn = AccelOps.rmsNorm(nextResidual, preFfnNormW, config.rmsNormEps(), arch.addOneToRmsNormWeight());
+        }
         attnOut.close();
-        if (residual != hidden) residual.close();
         residual = nextResidual;
-        
+
         AccelTensor ffnOut;
+        if (verbose) {
+            System.err.printf("[DEBUG] Layer %d FFN start\n", layerIdx);
+            System.err.flush();
+        }
         if (config.isMoeLayer(layerIdx)) {
             ffnOut = moeForwardPass.computeAccel(normedFfn, weights, config, layerIdx);
         } else {
@@ -180,10 +297,25 @@ public class DirectForwardPass {
                     ? ffnNonGated(normedFfn, uW, dW)
                     : swigluFfn(normedFfn, gW, null, uW, null, dW, null);
         }
+        if (verbose) {
+            System.err.printf("[DEBUG] Layer %d FFN end\n", layerIdx);
+            System.err.flush();
+        }
+
         normedFfn.close();
 
-        AccelTensor output = AccelOps.add(residual, ffnOut);
-        ffnOut.close();
+        // Optional post-FFN norm (Gemma-2)
+        AccelTensor ffnFinal = ffnOut;
+        AccelTensor postFfnNormW = weights.get(arch.layerFfnNormWeight(layerIdx));
+        if (weights.get(arch.layerPreFfnNormWeight(layerIdx)) != null) {
+            // If we had a pre-norm, then layerFfnNormWeight is the post-norm
+            ffnFinal = AccelOps.rmsNorm(ffnOut, postFfnNormW, config.rmsNormEps(), arch.addOneToRmsNormWeight());
+            ffnOut.close();
+        }
+
+        AccelTensor output = AccelOps.add(residual, ffnFinal);
+        ffnFinal.close();
+        residual.close(); // residual is nextResidual
 
         return output;
     }
@@ -193,8 +325,10 @@ public class DirectForwardPass {
         int nan = 0;
         int inf = 0;
         for (float f : arr) {
-            if (Float.isNaN(f)) nan++;
-            if (Float.isInfinite(f)) inf++;
+            if (Float.isNaN(f))
+                nan++;
+            if (Float.isInfinite(f))
+                inf++;
         }
         if (nan > 0 || inf > 0) {
         }
@@ -209,10 +343,21 @@ public class DirectForwardPass {
         return out;
     }
 
-    public AccelTensor swigluFfn(AccelTensor x, AccelTensor gateW, AccelTensor gateB, AccelTensor upW, AccelTensor upB, AccelTensor downW, AccelTensor downB) {
+    public AccelTensor swigluFfn(AccelTensor x, AccelTensor gateW, AccelTensor gateB, AccelTensor upW, AccelTensor upB,
+            AccelTensor downW, AccelTensor downB) {
         AccelTensor gate = AccelOps.linear(x, gateW);
         AccelTensor up = AccelOps.linear(x, upW);
-        AccelTensor combined = AccelOps.swiglu(gate, up);
+
+        AccelTensor combined;
+        if (metalBackend.isResolvable() && metalBackend.get().deviceName() != null
+                && !metalBackend.get().deviceName().contains("CPU")) {
+            combined = AccelTensor.zeros(gate.shape());
+            metalBackend.get().siluFfn(combined.dataSegment(), gate.dataSegment(), up.dataSegment(),
+                    (int) gate.numel());
+        } else {
+            combined = AccelOps.swiglu(gate, up);
+        }
+
         gate.close();
         up.close();
         AccelTensor out = AccelOps.linear(combined, downW);

@@ -17,6 +17,7 @@ public record ModelManifest(
         String path,
         String apiKey,
         String requestId,
+        String architecture,
         Map<ModelFormat, ArtifactLocation> artifacts,
         List<SupportedDevice> supportedDevices,
         ResourceRequirements resourceRequirements,
@@ -65,6 +66,7 @@ public record ModelManifest(
         private String path;
         private String requestId;
         private String apiKey;
+        private String architecture;
         private Map<ModelFormat, ArtifactLocation> artifacts;
         private List<SupportedDevice> supportedDevices;
         private ResourceRequirements resourceRequirements;
@@ -105,6 +107,11 @@ public record ModelManifest(
             return this;
         }
 
+        public Builder architecture(String architecture) {
+            this.architecture = architecture;
+            return this;
+        }
+
         public Builder artifacts(Map<ModelFormat, ArtifactLocation> artifacts) {
             this.artifacts = artifacts;
             return this;
@@ -136,7 +143,7 @@ public record ModelManifest(
         }
 
         public ModelManifest build() {
-            return new ModelManifest(modelId, name, version, path, apiKey, requestId, artifacts, supportedDevices,
+            return new ModelManifest(modelId, name, version, path, apiKey, requestId, architecture, artifacts, supportedDevices,
                     resourceRequirements,
                     metadata, createdAt, updatedAt);
         }

@@ -13,6 +13,7 @@ import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
+import jakarta.enterprise.inject.Instance;
 import tech.kayys.gollek.kvcache.PagedKVCacheManager;
 import tech.kayys.gollek.kvcache.PhysicalBlockPool;
 import tech.kayys.gollek.kernel.paged.PagedAttentionBinding;
@@ -114,7 +115,7 @@ public class PrefillDecodeDisaggService {
     int decodeBatchSize;
 
     @Inject
-    PagedKVCacheManager kvCacheManager;
+    Instance<PagedKVCacheManager> kvCacheManagerInstance;
 
     private PagedAttentionBinding paBinding;
     private volatile boolean active = false;
@@ -201,7 +202,10 @@ public class PrefillDecodeDisaggService {
     @GET
     @Path("/status")
     public Response status() {
-        var stats = kvCacheManager.getStats();
+        if (!active) {
+            return Response.ok(Map.of("active", false)).build();
+        }
+        var stats = kvCacheManagerInstance.get().getStats();
         return Response.ok(Map.of(
                 "active", active,
                 "kv_backend", kvBackend,
@@ -285,8 +289,8 @@ public class PrefillDecodeDisaggService {
         int[] prompt = estimateTokens(request);
         int promptLen = prompt.length == 0 ? 1 : prompt.length;
 
-        kvCacheManager.allocateForPrefill(reqId, promptLen);
-        List<Integer> prefillBlocks = kvCacheManager.getBlockTable(reqId);
+        kvCacheManagerInstance.get().allocateForPrefill(reqId, promptLen);
+        List<Integer> prefillBlocks = kvCacheManagerInstance.get().getBlockTable(reqId);
 
         try (Arena arena = Arena.ofConfined()) {
             runPrefillAttention(arena, reqId, promptLen, prefillBlocks);
@@ -298,7 +302,7 @@ public class PrefillDecodeDisaggService {
         CompletableFuture.runAsync(() -> {
             List<Integer> decodeBlocks = transferKvToDecodePartition(reqId, prefillBlocks, kvTransferId);
             pendingDecodes.put(kvTransferId, new PendingDecode(kvTransferId, request.getModel(), decodeBlocks, System.nanoTime()));
-            kvCacheManager.freeRequest(reqId);
+            kvCacheManagerInstance.get().freeRequest(reqId);
         }, transferExecutor);
 
         totalPrefills.incrementAndGet();
@@ -318,7 +322,7 @@ public class PrefillDecodeDisaggService {
         String reqId = request.getRequestId();
         int maxTokens = getMaxTokens(request);
         java.util.concurrent.atomic.AtomicInteger seqLenRef = new java.util.concurrent.atomic.AtomicInteger(
-                pending.decodedBlocks().size() * kvCacheManager.getConfig().getBlockSize());
+                pending.decodedBlocks().size() * kvCacheManagerInstance.get().getConfig().getBlockSize());
         int[] blockArr = pending.decodedBlocks().stream().mapToInt(Integer::intValue).toArray();
 
         return Multi.createFrom().emitter(emitter -> {
@@ -338,7 +342,7 @@ public class PrefillDecodeDisaggService {
                     emitter.emit(StreamingInferenceChunk.of(reqId, step, delta));
                     
                     // Extend in decode partition
-                    kvCacheManager.appendToken(kvTransferId + "-decode");
+                    kvCacheManagerInstance.get().appendToken(kvTransferId + "-decode");
                 }
                 emitter.complete();
             } catch (Exception e) {
@@ -356,12 +360,12 @@ public class PrefillDecodeDisaggService {
         int numH = 32;
         int hDim = 128;
         float scale = (float) (1.0 / Math.sqrt(hDim));
-        int blockSz = kvCacheManager.getConfig().getBlockSize();
+        int blockSz = kvCacheManagerInstance.get().getConfig().getBlockSize();
         MemorySegment output = arena.allocate((long) numH * hDim * 4L, 64);
         MemorySegment query = arena.allocate((long) numH * hDim * 4L, 64);
-        MemorySegment kCache = kvCacheManager.getBlockPool().rawKPool();
-        MemorySegment vCache = kvCacheManager.getBlockPool().rawVPool();
-        MemorySegment btSeg = kvCacheManager.getBlockTableNative(reqId);
+        MemorySegment kCache = kvCacheManagerInstance.get().getBlockPool().rawKPool();
+        MemorySegment vCache = kvCacheManagerInstance.get().getBlockPool().rawVPool();
+        MemorySegment btSeg = kvCacheManagerInstance.get().getBlockTableNative(reqId);
         MemorySegment ctx = arena.allocate(4L, 4);
         ctx.setAtIndex(ValueLayout.JAVA_INT, 0, seqLen);
         paBinding.pagedAttentionLaunch(output, query, kCache, vCache,
@@ -372,11 +376,11 @@ public class PrefillDecodeDisaggService {
         int numH = 32;
         int hDim = 128;
         float scale = (float) (1.0 / Math.sqrt(hDim));
-        int blockSz = kvCacheManager.getConfig().getBlockSize();
+        int blockSz = kvCacheManagerInstance.get().getConfig().getBlockSize();
         MemorySegment output = arena.allocate((long) numH * hDim * 4L, 64);
         MemorySegment query = arena.allocate((long) numH * hDim * 4L, 64);
-        MemorySegment kCache = kvCacheManager.getBlockPool().rawKPool();
-        MemorySegment vCache = kvCacheManager.getBlockPool().rawVPool();
+        MemorySegment kCache = kvCacheManagerInstance.get().getBlockPool().rawKPool();
+        MemorySegment vCache = kvCacheManagerInstance.get().getBlockPool().rawVPool();
         MemorySegment btSeg = packBlockTable(arena, blockArr);
         MemorySegment ctx = arena.allocate(4L, 4);
         ctx.setAtIndex(ValueLayout.JAVA_INT, 0, seqLen);
@@ -397,8 +401,8 @@ public class PrefillDecodeDisaggService {
     private List<Integer> transferKvToDecodePartition(String reqId,
             List<Integer> prefillBlocks,
             String kvTransferId) {
-        PhysicalBlockPool pool = kvCacheManager.getBlockPool();
-        int numLayers = kvCacheManager.getConfig().getNumLayers();
+        PhysicalBlockPool pool = kvCacheManagerInstance.get().getBlockPool();
+        int numLayers = kvCacheManagerInstance.get().getConfig().getNumLayers();
         int numDecodeBlocks = prefillBlocks.size();
 
         List<Integer> decodeBlocks = allocateDecodeBlocks(numDecodeBlocks);
@@ -434,13 +438,13 @@ public class PrefillDecodeDisaggService {
         // Production implementation would use NIXL FFM binding to trigger
         // a RDMA/NVLink DMA transfer between nodes/GPUs.
         LOG.debugf("[PD] Simulating NIXL DMA transfer for %d blocks", src.size());
-        return src.size() * kvCacheManager.getBlockPool().getBytesPerBlock();
+        return src.size() * kvCacheManagerInstance.get().getBlockPool().getBytesPerBlock();
     }
 
     // ── Partition init ────────────────────────────────────────────────────────
 
     private void initPartitions() {
-        int total = kvCacheManager.getConfig().getTotalBlocks();
+        int total = kvCacheManagerInstance.get().getConfig().getTotalBlocks();
         prefillBlockStart = 0;
         prefillBlockEnd = (int) (total * prefillBlockFraction);
         decodeBlockStart = prefillBlockEnd;

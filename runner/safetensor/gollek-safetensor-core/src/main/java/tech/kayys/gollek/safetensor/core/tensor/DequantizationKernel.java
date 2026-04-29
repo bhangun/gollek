@@ -68,4 +68,52 @@ public class DequantizationKernel {
             }
         }
     }
+
+    /**
+     * Dequantize F16 weights to Float32.
+     */
+    public static void dequantizeF16(MemorySegment src, MemorySegment dst, long numel) {
+        for (long i = 0; i < numel; i++) {
+            short raw = src.getAtIndex(ValueLayout.JAVA_SHORT, i);
+            dst.setAtIndex(ValueLayout.JAVA_FLOAT, i, float16ToFloat32(raw));
+        }
+    }
+
+    /**
+     * Dequantize BF16 weights to Float32.
+     */
+    public static void dequantizeBf16(MemorySegment src, MemorySegment dst, long numel) {
+        for (long i = 0; i < numel; i++) {
+            short raw = src.getAtIndex(ValueLayout.JAVA_SHORT, i);
+            int floatBits = (raw & 0xFFFF) << 16;
+            dst.setAtIndex(ValueLayout.JAVA_FLOAT, i, Float.intBitsToFloat(floatBits));
+        }
+    }
+
+    private static float float16ToFloat32(short half) {
+        int h = half & 0xFFFF;
+        int sign = (h >> 15) & 0x1;
+        int exponent = (h >> 10) & 0x1F;
+        int mantissa = h & 0x3FF;
+
+        int f32;
+        if (exponent == 0) {
+            if (mantissa == 0) {
+                f32 = sign << 31;
+            } else {
+                exponent = 1;
+                while ((mantissa & 0x400) == 0) {
+                    mantissa <<= 1;
+                    exponent--;
+                }
+                mantissa &= ~0x400;
+                f32 = (sign << 31) | ((exponent + 112) << 23) | (mantissa << 13);
+            }
+        } else if (exponent == 31) {
+            f32 = (sign << 31) | (0xFF << 23) | (mantissa << 13);
+        } else {
+            f32 = (sign << 31) | ((exponent + 112) << 23) | (mantissa << 13);
+        }
+        return Float.intBitsToFloat(f32);
+    }
 }

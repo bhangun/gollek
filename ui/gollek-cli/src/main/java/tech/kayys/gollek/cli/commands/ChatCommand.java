@@ -60,7 +60,7 @@ public class ChatCommand implements Runnable {
     @Option(names = { "--modelDir" }, description = "Path to a local model directory (Safetensors)")
     public String modelDir;
 
-    @Option(names = { "-p", "--provider" }, description = "Provider ID (default: native). Options: native, gguf, cerebras, mistral, openai, gemini", defaultValue = "native")
+    @Option(names = { "-p", "--provider" }, description = "Provider ID (default: auto). Options: native, safetensor, gguf, cerebras, mistral, openai, gemini")
     public String providerId;
 
     @Option(names = { "--import" }, description = "Import (move) the model file/dir into the gollek model repository (~/.gollek/models/)")
@@ -122,8 +122,6 @@ public class ChatCommand implements Runnable {
     @Option(names = { "--no-color" }, description = "Disable ANSI color output (also respects NO_COLOR env var)")
     public boolean noColor = false;
 
-    @Option(names = { "-v", "--verbose" }, description = "Verbose mode: show detailed internal logs")
-    public boolean verbose = false;
 
     @Option(names = { "-o", "--output" }, description = "Save the whole conversation to a file")
     public java.io.File outputFile;
@@ -163,7 +161,7 @@ public class ChatCommand implements Runnable {
             }
 
             // Auto-detect and display kernel platform
-            if (verbose) System.out.println("Starting platform detection...");
+            if (parentCommand != null && parentCommand.verbose) System.out.println("Starting platform detection...");
             KernelPlatform detectedPlatform;
             try {
                 detectedPlatform = KernelPlatformDetector.detect();
@@ -251,7 +249,7 @@ public class ChatCommand implements Runnable {
                     }
                 }
 
-                if (verbose) System.out.println("[ChatCommand] forceGguf=" + forceGguf + ", quantization=" + quantization + ", modelId=" + modelId);
+                if (parentCommand != null && parentCommand.verbose) System.out.println("[ChatCommand] forceGguf=" + forceGguf + ", quantization=" + quantization + ", modelId=" + modelId);
                 var resolution = sdk.ensureModelAvailable(modelId, forceGguf, quantization, progress -> {
                     if (!quiet)
                         System.out.print(
@@ -264,7 +262,7 @@ public class ChatCommand implements Runnable {
 
                 modelId = resolution.getModelId();
                 modelPathOverride = resolution.getLocalPath();
-                if (verbose) System.out.println("[ChatCommand] resolution: localPath=" + modelPathOverride + ", format=" + resolution.getInfo().getFormat());
+                if (parentCommand != null && parentCommand.verbose) System.out.println("[ChatCommand] resolution: localPath=" + modelPathOverride + ", format=" + resolution.getInfo().getFormat());
 
                 // Auto-select provider for downloaded models if not forced
                 if (providerId == null) {
@@ -273,7 +271,7 @@ public class ChatCommand implements Runnable {
                     } else if ("litert".equalsIgnoreCase(resolution.getInfo().getFormat())) {
                         providerId = "litert";
                     } else {
-                        providerId = sdk.getPreferredProvider().orElse(providerId);
+                        providerId = sdk.getPreferredProvider().orElse("native");
                     }
                 }
             }
@@ -302,7 +300,7 @@ public class ChatCommand implements Runnable {
 
 
     private void configureLogging() {
-        if (verbose) {
+        if (parentCommand != null && parentCommand.verbose) {
             System.setProperty("quarkus.log.console.level", "DEBUG");
             System.setProperty("quarkus.log.level", "DEBUG");
             System.setProperty("quarkus.log.category.\"tech.kayys.gollek\".level", "DEBUG");

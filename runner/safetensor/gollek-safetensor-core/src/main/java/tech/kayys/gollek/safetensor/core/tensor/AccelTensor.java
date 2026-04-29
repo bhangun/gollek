@@ -42,7 +42,9 @@ public class AccelTensor implements AutoCloseable {
         F32,     // 32-bit float
         INT8,    // 8-bit integer quantized
         INT4,    // 4-bit integer quantized (packed)
-        FP8      // 8-bit float quantized (E4M3/E5M2)
+        FP8,     // 8-bit float quantized (E4M3/E5M2)
+        F16,     // 16-bit float (IEEE 754 half-precision)
+        BF16     // 16-bit bfloat16
     }
 
     private final MemorySegment data;
@@ -106,7 +108,10 @@ public class AccelTensor implements AutoCloseable {
     public static AccelTensor zeros(long... shape) {
         long n = numelOf(shape);
         Arena arena = Arena.ofAuto();
-        MemorySegment seg = arena.allocate(n * Float.BYTES, 64);
+        // Force page alignment (4096) to prevent SIMD/page-boundary SEGV
+        long size = n * Float.BYTES;
+        long paddedSize = (size + 4095) & ~4095;
+        MemorySegment seg = arena.allocate(paddedSize + 4096, 4096);
         seg.fill((byte) 0);
         return new AccelTensor(seg, shape, contiguousStride(shape), 0, arena);
     }
@@ -537,6 +542,16 @@ public class AccelTensor implements AutoCloseable {
     }
 
     private void dequantizeRow(long row, MemorySegment dst, int embDim) {
+        if (quantType == QuantType.F16) {
+            long srcRowByteOff = (offset + row * stride[0]) * 2L;
+            DequantizationKernel.dequantizeF16(data.asSlice(srcRowByteOff, embDim * 2L), dst, embDim);
+            return;
+        } else if (quantType == QuantType.BF16) {
+            long srcRowByteOff = (offset + row * stride[0]) * 2L;
+            DequantizationKernel.dequantizeBf16(data.asSlice(srcRowByteOff, embDim * 2L), dst, embDim);
+            return;
+        }
+
         // row is the row index in the quantized segment
         long groupIdx = (row * embDim) / groupSize;
         float scale = scales.getAtIndex(ValueLayout.JAVA_FLOAT, groupIdx);
@@ -562,9 +577,12 @@ public class AccelTensor implements AutoCloseable {
     public void close() {
         if (!closed) {
             closed = true;
-            // if (arena != null) {
-            //     arena.close();
-            // }
+            if (arena != null) {
+                try {
+                    arena.close();
+                } catch (UnsupportedOperationException ignored) {
+                }
+            }
         }
     }
 

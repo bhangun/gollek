@@ -60,31 +60,37 @@
             <artifactId>gollek-model-repo-local</artifactId>
         </dependency>
 
-<!--
-        <dependency>
-            <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-runner-llamacpp</artifactId>
-        </dependency>
--->
-        <dependency>
-            <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-gguf-converter-java</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-runner-onnx</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.gollek</groupId>
-            <artifactId>gollek-plugin-mcp</artifactId>
-        </dependency>
 
-        <!-- Reactive Programming -->
+<!-- Gollek GGUF Tokenizer -->
+<dependency>
+    <groupId>tech.kayys.gollek</groupId>
+    <artifactId>gollek-gguf-tokenizer</artifactId>
+    <version>${project.version}</version>
+</dependency>
+
+<dependency>
+    <groupId>tech.kayys.gollek</groupId>
+    <artifactId>gollek-gguf-converter</artifactId>
+    <version>${project.version}</version>
+</dependency>
+<dependency>
+    <groupId>tech.kayys.gollek</groupId>
+    <artifactId>gollek-runner-onnx</artifactId>
+</dependency>
+<dependency>
+    <groupId>tech.kayys.gollek</groupId>
+    <artifactId>gollek-plugin-mcp</artifactId>
+</dependency>
+
         <dependency>
             <groupId>io.smallrye.reactive</groupId>
             <artifactId>mutiny</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+        </dependency>
+
 
         <!-- CDI/Jakarta EE -->
         <dependency>
@@ -199,6 +205,46 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>0.10.4</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                                <phase>package</phase>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <imageName>gollek_sdk_local</imageName>
+                            <sharedLibrary>true</sharedLibrary>
+                            <mainClass>tech.kayys.gollek.sdk.local.nativeinterop.GollekNativeEntrypoints</mainClass>
+                            <metadataRepository>
+                                <enabled>false</enabled>
+                            </metadataRepository>
+                            <buildArgs>
+                                <buildArg>--no-fallback</buildArg>
+                                <buildArg>--enable-preview</buildArg>
+                                <buildArg>--add-modules=jdk.incubator.vector</buildArg>
+                                <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
+                                <buildArg>--initialize-at-build-time=org.slf4j,io.quarkus,tech.kayys.gollek,com.fasterxml.jackson,org.jboss,org.apache.commons.logging,io.smallrye,org.yaml.snakeyaml</buildArg>
+
+                                <buildArg>--initialize-at-run-time=org.slf4j.impl.StaticLoggerBinder</buildArg>
+
+                            </buildArgs>
+
+                        </configuration>
+
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>ext-cloud-gemini</id>
             <dependencies>

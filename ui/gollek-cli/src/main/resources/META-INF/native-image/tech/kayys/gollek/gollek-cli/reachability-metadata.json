@@ -379,6 +379,74 @@
                     "int",
                     "long"
                 ]
+            },
+            {
+                "returnType": "void",
+                "parameterTypes": [
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "void",
+                "parameterTypes": [
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "void",
+                "parameterTypes": [
+                    "long",
+                    "long",
+                    "long",
+                    "long"
+                ]
+            },
+            {
+                "returnType": "void",
+                "parameterTypes": [
+                    "int",
+                    "int",
+                    "int",
+                    "int",
+                    "int",
+                    "int",
+                    "float",
+                    "long",
+                    "int",
+                    "long",
+                    "int",
+                    "float",
+                    "long",
+                    "int"
+                ]
+            },
+            {
+                "returnType": "void",
+                "parameterTypes": [
+                    "int",
+                    "int",
+                    "int",
+                    "int",
+                    "float",
+                    "long",
+                    "int",
+                    "long",
+                    "int",
+                    "float",
+                    "long",
+                    "int"
+                ]
             }
         ]
     }

@@ -427,7 +427,7 @@ public class MetalRunner extends AbstractGollekRunner {
             MemorySegment wDown  = w.asSlice(off, (long) ffnDim * modelDim * 4L);
 
             // ── 1. Pre-attention RMS Norm ────────────────────────────────────
-            metal.rmsNorm(normed, residual, normW, modelDim, 1e-6f);
+            metal.rmsNorm(normed, residual, normW, modelDim, 1e-6f, false);
 
             // ── 2. QKV projection via MPS (AMX blocks) ───────────────────────
             metal.matmul(qkv, normed, wQkv, T, modelDim, qkvDim, 1.0f, 0.0f);
@@ -452,7 +452,7 @@ public class MetalRunner extends AbstractGollekRunner {
             addResidual(residual, proj, T * modelDim);
 
             // ── 5. Pre-FFN RMS Norm ──────────────────────────────────────────
-            metal.rmsNorm(normed, residual, fnormW, modelDim, 1e-6f);
+            metal.rmsNorm(normed, residual, fnormW, modelDim, 1e-6f, false);
 
             // ── 6. FFN gate + up projections ─────────────────────────────────
             metal.matmul(ffnGate, normed, wGate, T, modelDim, ffnDim, 1.0f, 0.0f);

@@ -76,21 +76,33 @@ public class RopeFrequencyCache {
 
         /**
          * Rotates a segment slice in place.
-         * Qwen 2.5 uses INTERLEAVED RoPE: (x0, x1) paired.
+         * @param interleaved if true, uses [x1, x2, x3, x4] -> [x1*c-x2*s, x1*s+x2*c, ...] (Gemma/Llama)
+         *                    if false, uses [x1...xn/2, xn/2+1...xn] -> [x1*c-xn/2+1*s, ...] (GPT-NeoX)
          */
-        public void rotateInPlace(MemorySegment seg, long elementOffset, int pos) {
+        public void rotateInPlace(MemorySegment seg, long elementOffset, int pos, boolean interleaved) {
             int half = rotaryDim / 2;
             int freqOffset = pos * half;
             
-            // Vectorized Split-Half RoPE (Llama/Qwen Style)
-            // x1 = x[0...half], x2 = x[half...d]
-            for (int i = 0; i < half; i++) {
-                float xv1 = seg.getAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i);
-                float xv2 = seg.getAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i + half);
-                float cv = cos[freqOffset + i];
-                float sv = sin[freqOffset + i];
-                seg.setAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i, xv1 * cv - xv2 * sv);
-                seg.setAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i + half, xv1 * sv + xv2 * cv);
+            if (interleaved) {
+                // Interleaved RoPE (Llama/Gemma Style)
+                for (int i = 0; i < half; i++) {
+                    float xv1 = seg.getAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i * 2);
+                    float xv2 = seg.getAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i * 2 + 1);
+                    float cv = cos[freqOffset + i];
+                    float sv = sin[freqOffset + i];
+                    seg.setAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i * 2, xv1 * cv - xv2 * sv);
+                    seg.setAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i * 2 + 1, xv1 * sv + xv2 * cv);
+                }
+            } else {
+                // Split-Half RoPE (GPT-NeoX Style)
+                for (int i = 0; i < half; i++) {
+                    float xv1 = seg.getAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i);
+                    float xv2 = seg.getAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i + half);
+                    float cv = cos[freqOffset + i];
+                    float sv = sin[freqOffset + i];
+                    seg.setAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i, xv1 * cv - xv2 * sv);
+                    seg.setAtIndex(ValueLayout.JAVA_FLOAT, elementOffset + i + half, xv1 * sv + xv2 * cv);
+                }
             }
         }
 

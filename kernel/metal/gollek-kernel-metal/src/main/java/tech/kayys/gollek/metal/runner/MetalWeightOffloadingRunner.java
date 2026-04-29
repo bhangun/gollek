@@ -16,7 +16,6 @@ import tech.kayys.gollek.metal.detection.AppleSiliconDetector;
 import tech.kayys.gollek.metal.detection.MetalCapabilities;
 import tech.kayys.gollek.kvcache.PagedKVCacheManager;
 import tech.kayys.gollek.error.ErrorCode;
-import tech.kayys.gollek.spi.exception.InferenceException;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
@@ -427,7 +426,7 @@ public class MetalWeightOffloadingRunner extends AbstractGollekRunner {
             MemorySegment wDown = w.asSlice(off, (long) ffnDim * modelDim * 4L);
 
             // 1. Pre-attention norm
-            metal.rmsNorm(normed, residual, normW, modelDim, 1e-6f);
+            metal.rmsNorm(normed, residual, normW, modelDim, 1e-6f, false);
 
             // 2. QKV projection — AMX-accelerated via MPS
             metal.matmul(qkv, normed, wQkv, T, modelDim, qkvDim, 1.0f, 0.0f);
@@ -435,7 +434,7 @@ public class MetalWeightOffloadingRunner extends AbstractGollekRunner {
             // 3. Paged attention — K/V slabs already in unified DRAM, zero copy
             metal.attention(attnOut, qkv, kPool, vPool,
                     btSeg, ctxSeg,
-                    1, T, numHeads, headDim, blockSz, bt.length, scale, 1);
+                    1, T, numHeads, headDim, blockSz, bt.length, scale, 1, 0.0f);
 
             // 4. Output projection + residual
             MemorySegment proj = arena.allocate((long) T * modelDim * 4L, 64);
@@ -443,7 +442,7 @@ public class MetalWeightOffloadingRunner extends AbstractGollekRunner {
             addResidual(residual, proj, T * modelDim);
 
             // 5. Pre-FFN norm
-            metal.rmsNorm(normed, residual, ffnNormW, modelDim, 1e-6f);
+            metal.rmsNorm(normed, residual, ffnNormW, modelDim, 1e-6f, false);
 
             // 6. FFN gate + up
             MemorySegment ffnGate = ffnBuf.asSlice(0L,            (long) T * ffnDim * 4L);

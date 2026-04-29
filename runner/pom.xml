@@ -47,7 +47,7 @@
         <module>native</module>
         <module>gguf</module>
         <module>litert</module>
-        <!-- <module>safetensor</module> -->
+        <module>safetensor</module>
         <!-- <module>torch</module> -->
         <module>onnx</module>
         <module>tensorrt</module>

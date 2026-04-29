@@ -267,14 +267,14 @@ public class MetalBinding {
             MemorySegment blockTable, MemorySegment contextLens,
             int B, int T, int H, int D,
             int blockSize, int maxBlocks,
-            float scale, int isCausal) {
+            float scale, int isCausal, float softCap) {
         if (!nativeAvailable) {
             return MetalCpuFallback.attention(out, Q, K_cache, V_cache,
                     blockTable, contextLens, B, T, H, D, blockSize, maxBlocks, scale, isCausal);
         }
         return (int) invoke(FN_ATTENTION,
                 out, Q, K_cache, V_cache, blockTable, contextLens,
-                B, T, H, D, blockSize, maxBlocks, scale, isCausal);
+                B, T, H, D, blockSize, maxBlocks, scale, isCausal, softCap);
     }
 
     /**
@@ -283,10 +283,10 @@ public class MetalBinding {
      * @return 0 on success
      */
     public int rmsNorm(MemorySegment out, MemorySegment x,
-            MemorySegment weight, int N, float eps) {
+            MemorySegment weight, int N, float eps, boolean addOne) {
         if (!nativeAvailable)
-            return MetalCpuFallback.rmsNorm(out, x, weight, N, eps);
-        return (int) invoke(FN_RMSNORM, out, x, weight, N, eps);
+            return MetalCpuFallback.rmsNorm(out, x, weight, N, eps, addOne);
+        return (int) invoke(FN_RMSNORM, out, x, weight, N, eps, addOne ? 1 : 0);
     }
 
     /**
@@ -400,19 +400,18 @@ public class MetalBinding {
                 ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
                 ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT));
 
-        // int gollek_metal_attention(out, Q, K, V, bt, ctx, B, T, H, D, bs, mb, scale,
-        // causal)
+        // causal, soft_cap)
         bind(FN_ATTENTION, FunctionDescriptor.of(ValueLayout.JAVA_INT,
                 ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
                 ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
                 ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
                 ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
-                ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_INT));
+                ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_INT, ValueLayout.JAVA_FLOAT));
 
-        // int gollek_metal_rmsnorm(out, x, weight, N, eps)
+        // int gollek_metal_rmsnorm(out, x, weight, N, eps, add_one)
         bind(FN_RMSNORM, FunctionDescriptor.of(ValueLayout.JAVA_INT,
                 ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
-                ValueLayout.JAVA_INT, ValueLayout.JAVA_FLOAT));
+                ValueLayout.JAVA_INT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_INT));
 
         // int gollek_metal_silu_ffn(out, gate, up, N)
         bind(FN_SILU_FFN, FunctionDescriptor.of(ValueLayout.JAVA_INT,

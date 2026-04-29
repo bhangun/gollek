@@ -145,6 +145,12 @@ public interface ModelArchitecture {
     /** Full tensor name of the K-norm weight (null if none, e.g. Qwen 2.5). */
     default String layerKeyNormWeight(int i) { return null; }
 
+    /** Full tensor name of the post-attention norm weight (Gemma-2). */
+    default String layerPostAttnNormWeight(int i) { return null; }
+
+    /** Full tensor name of the pre-FFN norm weight (Gemma-2). */
+    default String layerPreFfnNormWeight(int i) { return null; }
+
     // ── Architecture properties ───────────────────────────────────────────────
     
     /** The activation function used in the FFN (e.g. SiLU, GELU). */

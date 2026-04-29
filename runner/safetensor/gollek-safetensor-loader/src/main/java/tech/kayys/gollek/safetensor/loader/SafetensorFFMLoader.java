@@ -56,12 +56,15 @@ import org.jboss.logging.Logger;
 import java.io.IOException;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -286,8 +289,9 @@ public class SafetensorFFMLoader {
                 currentOffset = newEnd;
             }
 
-            // 3. Allocate the realigned native buffer
-            MemorySegment nativeBuffer = arena.allocate(currentOffset, 64);
+            // 3. Allocate the realigned native buffer with page alignment and extra page padding
+            long paddedTotalSize = (currentOffset + 4095) & ~4095;
+            MemorySegment nativeBuffer = arena.allocate(paddedTotalSize + 4096, 4096);
 
             // 4. Copy each tensor from the file into its new aligned location
             for (Map.Entry<String, SafetensorTensorInfo> entry : originalHeader.tensors().entrySet()) {

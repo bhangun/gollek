@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -181,6 +182,12 @@ public class RunCommand implements Runnable {
     @Option(names = {
             "--height" }, description = "Output image height in pixels (default: 512, must be multiple of 64)")
     Integer height;
+
+    @Option(names = { "--ext" }, description = "Explicit output file extension (mp3, wav, flac, png, jpg, mp4). Overrides extension in --output if provided.")
+    String extension;
+
+    @Option(names = { "--quantize-kv" }, description = "Enable KV cache quantization (none, int8, int4, turbo)", defaultValue = "none")
+    String quantizeKv;
 
     @Override
     public void run() {
@@ -412,6 +419,10 @@ public class RunCommand implements Runnable {
                 requestBuilder.parameter("quantize_bits", quantizeBits);
             }
 
+            if (quantizeKv != null && !quantizeKv.equalsIgnoreCase("none")) {
+                requestBuilder.parameter("kv_cache_quant", quantizeKv);
+            }
+
             // Stable Diffusion parameters
             if (seed != null) {
                 requestBuilder.parameter("seed", seed);
@@ -443,11 +454,12 @@ public class RunCommand implements Runnable {
                 requestBuilder.parameter("height", height);
             }
 
+            if (extension != null && !extension.isBlank()) {
+                requestBuilder.parameter("output_format", extension.toLowerCase());
+            }
+
             if (systemPrompt != null && !systemPrompt.isEmpty()) {
                 requestBuilder.message(Message.system(systemPrompt));
-            } else {
-                // Default system prompt to establish identity and language without triggering negative prompting hallucinations
-                requestBuilder.message(Message.system("I'm gollek, and you are using model " + modelId + " to serve you."));
             }
             requestBuilder.message(Message.user(prompt));
 
@@ -465,13 +477,20 @@ public class RunCommand implements Runnable {
             }
 
             if (directProviderBypass) {
+                if (parentCommand != null && parentCommand.verbose) {
+                    System.out.println("[DEBUG] RunCommand: calling inferDirectWithProvider");
+                }
                 InferenceResponse response = inferDirectWithProvider(providerId, request);
+                if (parentCommand != null && parentCommand.verbose) {
+                    System.out.println("[DEBUG] RunCommand: inferDirectWithProvider returned");
+                }
                 printResponse(response, startTime);
                 return;
             }
 
             if (stream) {
                 java.io.ByteArrayOutputStream imageBuffer = new java.io.ByteArrayOutputStream();
+                java.io.ByteArrayOutputStream audioBuffer = new java.io.ByteArrayOutputStream();
                 CountDownLatch latch = new CountDownLatch(1);
                 // Streaming mode
                 java.util.concurrent.atomic.AtomicReference<String> lastProgress = new java.util.concurrent.atomic.AtomicReference<>();
@@ -512,6 +531,18 @@ public class RunCommand implements Runnable {
                                         return;
                                     }
 
+                                    if (chunk.modality() == tech.kayys.gollek.spi.model.ModalityType.AUDIO) {
+                                        if (chunk.getDelta() != null) {
+                                            try {
+                                                byte[] decoded = java.util.Base64.getDecoder().decode(chunk.getDelta());
+                                                audioBuffer.write(decoded);
+                                            } catch (Exception e) {
+                                                System.err.println("\nFailed to decode audio chunk: " + e.getMessage());
+                                            }
+                                        }
+                                        return;
+                                    }
+
                                     String delta = chunk.getDelta();
                                     if (delta != null) {
                                         // Check if this is a progress message (SD-style)
@@ -544,9 +575,19 @@ public class RunCommand implements Runnable {
                                     
                                     if (imageBuffer.size() > 0) {
                                         try {
-                                            Path outPath = (outputPath != null && !outputPath.isEmpty()) 
-                                                ? Path.of(outputPath) 
-                                                : Path.of("output.png");
+                                            String ext = (extension != null && !extension.isEmpty()) ? extension : "png";
+                                            if (ext.startsWith(".")) ext = ext.substring(1);
+
+                                            Path outPath;
+                                            if (outputPath != null && !outputPath.isEmpty()) {
+                                                outPath = Path.of(outputPath);
+                                                if (extension != null) {
+                                                    outPath = replaceExtension(outPath, ext);
+                                                }
+                                            } else {
+                                                outPath = Path.of("output." + ext);
+                                            }
+
                                             Files.write(outPath, imageBuffer.toByteArray());
                                             System.out.println("\n" + ChatUIRenderer.GREEN + ChatUIRenderer.BOLD + "✓ Image saved to: " + ChatUIRenderer.RESET + outPath.toAbsolutePath());
                                             
@@ -554,6 +595,31 @@ public class RunCommand implements Runnable {
                                             autoOpenImage(outPath);
                                         } catch (Exception e) {
                                             System.err.println("\nFailed to save image: " + e.getMessage());
+                                        }
+                                    }
+                                    
+                                    if (audioBuffer.size() > 0) {
+                                        try {
+                                            String ext = (extension != null && !extension.isEmpty()) ? extension : "flac";
+                                            if (ext.startsWith(".")) ext = ext.substring(1);
+
+                                            Path outPath;
+                                            if (outputPath != null && !outputPath.isEmpty()) {
+                                                outPath = Path.of(outputPath);
+                                                if (extension != null) {
+                                                    outPath = replaceExtension(outPath, ext);
+                                                }
+                                            } else {
+                                                outPath = Path.of("output." + ext);
+                                            }
+
+                                            Files.write(outPath, audioBuffer.toByteArray());
+                                            System.out.println("\n" + ChatUIRenderer.GREEN + ChatUIRenderer.BOLD + "✓ Audio saved to: " + ChatUIRenderer.RESET + outPath.toAbsolutePath());
+                                            
+                                            // Auto-play audio
+                                            autoOpenAudio(outPath);
+                                        } catch (Exception e) {
+                                            System.err.println("\nFailed to save audio: " + e.getMessage());
                                         }
                                     }
 
@@ -605,10 +671,77 @@ public class RunCommand implements Runnable {
     private void printResponse(InferenceResponse response, long startTime) {
         System.out.println();
         System.out.println(ChatUIRenderer.GREEN + response.getContent() + ChatUIRenderer.RESET);
+        
+        // Handle audio/image in metadata (synchronous mode)
+        Map<String, Object> metadata = response.getMetadata();
+        if (metadata.containsKey("audio")) {
+            saveAudio(metadata.get("audio").toString());
+        } else if (metadata.containsKey("image")) {
+            saveImage(metadata.get("image").toString());
+        }
+
         double seconds = Math.max(response.getDurationMs() / 1000.0, 0.001);
         double tps = response.getTokensUsed() / seconds;
         uiRenderer.printStats(response.getTokensUsed(), response.getDurationMs() / 1000.0, tps, false);
     }
+
+    private void saveAudio(String base64) {
+        try {
+            byte[] decoded = java.util.Base64.getDecoder().decode(base64);
+            String ext = (extension != null && !extension.isEmpty()) ? extension : "flac";
+            if (ext.startsWith(".")) ext = ext.substring(1);
+
+            Path outPath;
+            if (outputPath != null && !outputPath.isEmpty()) {
+                outPath = Path.of(outputPath);
+                if (extension != null) {
+                    outPath = replaceExtension(outPath, ext);
+                }
+            } else {
+                outPath = Path.of("output." + ext);
+            }
+
+            Files.write(outPath, decoded);
+            System.out.println("\n" + ChatUIRenderer.GREEN + ChatUIRenderer.BOLD + "✓ Audio saved to: " + ChatUIRenderer.RESET + outPath.toAbsolutePath());
+            autoOpenAudio(outPath);
+        } catch (Exception e) {
+            System.err.println("\nFailed to save audio: " + e.getMessage());
+        }
+    }
+
+    private void saveImage(String base64) {
+        try {
+            byte[] decoded = java.util.Base64.getDecoder().decode(base64);
+            String ext = (extension != null && !extension.isEmpty()) ? extension : "png";
+            if (ext.startsWith(".")) ext = ext.substring(1);
+
+            Path outPath;
+            if (outputPath != null && !outputPath.isEmpty()) {
+                outPath = Path.of(outputPath);
+                if (extension != null) {
+                    outPath = replaceExtension(outPath, ext);
+                }
+            } else {
+                outPath = Path.of("output." + ext);
+            }
+
+            Files.write(outPath, decoded);
+            System.out.println("\n" + ChatUIRenderer.GREEN + ChatUIRenderer.BOLD + "✓ Image saved to: " + ChatUIRenderer.RESET + outPath.toAbsolutePath());
+            autoOpenImage(outPath);
+        } catch (Exception e) {
+            System.err.println("\nFailed to save image: " + e.getMessage());
+        }
+    }
+
+    private Path replaceExtension(Path path, String newExt) {
+        String filename = path.getFileName().toString();
+        int lastDot = filename.lastIndexOf('.');
+        if (lastDot == -1) {
+            return path.resolveSibling(filename + "." + newExt);
+        }
+        return path.resolveSibling(filename.substring(0, lastDot) + "." + newExt);
+    }
+
 
     private void printOpenAiSseDelta(String requestId, String model, String delta) {
         long created = System.currentTimeMillis() / 1000L;
@@ -698,7 +831,8 @@ public class RunCommand implements Runnable {
         LLMProvider provider = providerOpt.get();
         return provider.infer(providerRequest)
                 .await()
-                .atMost(Duration.ofSeconds(180));
+                .atMost(Duration.ofSeconds(300));
+
     }
 
     private ProviderRequest buildDirectProviderRequest(InferenceRequest request, String providerModel) {
@@ -1104,15 +1238,31 @@ public class RunCommand implements Runnable {
             }
 
             if (pb != null) {
-                pb.inheritIO();
-                Process process = pb.start();
-                // Don't wait for viewer to finish
+                pb.start();
             }
         } catch (Exception e) {
-            // Silently fail - opening viewer is optional
-            if (parentCommand != null && parentCommand.verbose) {
-                System.err.println("Debug: Failed to auto-open image: " + e.getMessage());
+            System.err.println("[DEBUG] Failed to auto-open image: " + e.getMessage());
+        }
+    }
+
+    private void autoOpenAudio(Path audioPath) {
+        try {
+            String os = System.getProperty("os.name").toLowerCase();
+            ProcessBuilder pb = null;
+
+            if (os.contains("mac")) {
+                pb = new ProcessBuilder("afplay", audioPath.toAbsolutePath().toString());
+            } else if (os.contains("linux")) {
+                pb = new ProcessBuilder("paplay", audioPath.toAbsolutePath().toString());
+            } else if (os.contains("windows")) {
+                pb = new ProcessBuilder("cmd", "/c", "start", audioPath.toAbsolutePath().toString());
             }
+
+            if (pb != null) {
+                pb.start();
+            }
+        } catch (Exception e) {
+            System.err.println("[DEBUG] Failed to auto-play audio: " + e.getMessage());
         }
     }
 }

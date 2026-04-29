@@ -1,0 +1,17 @@
+{
+  "foreign": [
+    { "leaf_type": "()int" },
+    { "leaf_type": "()long" },
+    { "leaf_type": "(long)int" },
+    { "leaf_type": "(long)long" },
+    { "leaf_type": "(long,int)int" },
+    { "leaf_type": "(long,long)int" },
+    { "leaf_type": "(long,long)long" },
+    { "leaf_type": "(long,long,long)int" },
+    { "leaf_type": "(long,long,long)long" },
+    { "leaf_type": "(long,long,long,int)int" },
+    { "leaf_type": "(long,long,long,int,float,int)int" },
+    { "leaf_type": "(long,long,long,int,int,int,float,float)int" },
+    { "leaf_type": "(long,long,long,long,long,long,int,int,int,int,int,int,float,int,float)int" }
+  ]
+}

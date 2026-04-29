@@ -25,7 +25,7 @@ public class KVCacheBeanProducer {
         // Default configuration — will be overridden by Quarkus config in production
         KVCacheConfig config = KVCacheConfig.builder()
                 .blockSize(16)
-                .totalBlocks(1024)
+                .totalBlocks(256)
                 .numLayers(32)
                 .numHeads(32)
                 .headDim(128)

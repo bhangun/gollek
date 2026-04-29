@@ -61,6 +61,7 @@ public final class AccelOps {
     private static volatile MethodHandle VSUB;
     private static volatile MethodHandle VSADD;
     private static volatile MethodHandle VSMUL;
+    private static volatile MethodHandle SVESQ;
     private static volatile MethodHandle SVE; // sum
     private static volatile MethodHandle VSSQ; // sum of squares
 
@@ -206,6 +207,26 @@ public final class AccelOps {
         return VSMUL;
     }
 
+    private static MethodHandle svesq() {
+        if (SVESQ == null) {
+            synchronized (AccelOps.class) {
+                if (SVESQ == null) {
+                    // void vDSP_svesq(const float *A, long strideA, float *C, unsigned long N)
+                    SVESQ = LINKER.downcallHandle(
+                        accelerate().find("vDSP_svesq").orElseThrow(),
+                        FunctionDescriptor.ofVoid(
+                            ValueLayout.ADDRESS,     // A
+                            ValueLayout.JAVA_LONG,   // strideA
+                            ValueLayout.ADDRESS,     // C (result pointer)
+                            ValueLayout.JAVA_LONG    // N
+                        )
+                    );
+                }
+            }
+        }
+        return SVESQ;
+    }
+
     private static MethodHandle sgemv() {
         if (SGEMV == null) {
             synchronized (AccelOps.class) {
@@ -289,85 +310,54 @@ public final class AccelOps {
      * → output: [batch, seq, out_features]
      */
     public static AccelTensor linear(AccelTensor input, AccelTensor weight) {
+        return linear(input, weight, null);
+    }
+
+    /**
+     * Linear layer with optional bias: out = input @ weight^T + bias
+     */
+    public static AccelTensor linear(AccelTensor input, AccelTensor weight, AccelTensor bias) {
         // Just-in-time dequantization if weight is quantized
         if (weight.isQuantized()) {
             try (AccelTensor dequantizedWeight = dequantize(weight)) {
-                return linear(input, dequantizedWeight);
+                return linear(input, dequantizedWeight, bias);
             }
         }
 
-        // We no longer call input.contiguous() here! Stride awareness is handled below.
-        
-        if (input.rank() == 3 && weight.rank() == 2) {
-            long batch = input.size(0);
-            long seq = input.size(1);
-            long inF = input.size(2);
-            long outF = weight.size(0);
-            if (weight.size(1) != inF) {
-                throw new IllegalArgumentException(
-                    "linear: input features " + inF + " != weight cols " + weight.size(1));
-            }
+        input = input.contiguous();
+        weight = weight.contiguous();
 
-            AccelTensor out = AccelTensor.zeros(batch, seq, outF);
-            try {
-                for (long b = 0; b < batch; b++) {
-                    long aOff = b * seq * inF;
-                    long cOff = b * seq * outF;
-                    
-                    MemorySegment aPtr = input.dataPtr().asSlice(aOff * Float.BYTES);
-                    MemorySegment cPtr = out.dataPtr().asSlice(cOff * Float.BYTES);
+        long[] inputShape = input.shape();
+        long K = inputShape[inputShape.length - 1];
+        long M = input.numel() / K;
+        long N = weight.shape()[0];
 
-                    if (seq == 1) {
-                        // Optimized for decoding: Matrix-Vector multiplication
-                        // Weight is [outF, inF], Input A is [1, inF] -> Output C is [1, outF]
-                        // y = alpha * A * x + beta * y
-                        sgemv().invokeExact(
-                            CblasRowMajor, CblasNoTrans,
-                            (int) outF, (int) inF,
-                            1.0f, weight.dataPtr(), (int) inF,
-                            aPtr, 1,
-                            0.0f, cPtr, 1
-                        );
-                    } else {
-                        // Standard sgemm for prompt processing
-                        sgemm().invokeExact(
-                            CblasRowMajor, CblasNoTrans, CblasTrans,
-                            (int) seq, (int) outF, (int) inF,
-                            1.0f,
-                            aPtr, (int) inF,
-                            weight.dataPtr(), (int) inF, // B is [outF, inF], transposed
-                            0.0f,
-                            cPtr, (int) outF
-                        );
-                    }
+        // Output shape matches input shape except for the last dimension
+        long[] outputShape = inputShape.clone();
+        outputShape[outputShape.length - 1] = N;
+
+        AccelTensor out = AccelTensor.zeros(outputShape);
+        MemorySegment inputSeg = input.dataSegment();
+        MemorySegment weightSeg = weight.dataSegment();
+        MemorySegment outSeg = out.dataSegment();
+
+        try {
+            // void cblas_sgemm(ORDER, TRANSA, TRANSB, M, N, K, alpha, A, lda, B, ldb, beta, C, ldc)
+            sgemm().invokeExact(CblasRowMajor, CblasNoTrans, CblasTrans, (int) M, (int) N, (int) K, 1.0f, inputSeg, (int) K, weightSeg, (int) K, 0.0f, outSeg, (int) N);
+            
+            if (bias != null) {
+                bias = bias.contiguous();
+                MemorySegment biasSeg = bias.dataSegment();
+                int hidden = (int) bias.numel();
+                int batches = (int) (out.numel() / hidden);
+                for (int bIdx = 0; bIdx < batches; bIdx++) {
+                    vadd().invokeExact(outSeg.asSlice((long) bIdx * hidden * 4), 1L, biasSeg, 1L, outSeg.asSlice((long) bIdx * hidden * 4), 1L, (long) hidden);
                 }
-            } catch (Throwable t) {
-                throw new RuntimeException("Linear/GEMV failed", t);
             }
-            return out;
-        } else if (input.rank() == 2 && weight.rank() == 2) {
-            long M = input.size(0);
-            long K = input.size(1);
-            long N = weight.size(0);
-            AccelTensor out = AccelTensor.zeros(M, N);
-            try {
-                sgemm().invokeExact(
-                    CblasRowMajor, CblasNoTrans, CblasTrans,
-                    (int) M, (int) N, (int) K,
-                    1.0f,
-                    input.dataPtr(), (int) K,
-                    weight.dataPtr(), (int) K,
-                    0.0f,
-                    out.dataPtr(), (int) N
-                );
-            } catch (Throwable t) {
-                out.close();
-                throw new RuntimeException("cblas_sgemm failed in linear 2D", t);
-            }
-            return out;
+        } catch (Throwable t) {
+            throw new RuntimeException("Linear/sgemm failed", t);
         }
-        throw new UnsupportedOperationException(
-            "linear not supported for input rank " + input.rank());
+        return out;
     }
 
     private static AccelTensor matmul2D(AccelTensor a, AccelTensor b) {
@@ -545,7 +535,7 @@ public final class AccelOps {
                     // vDSP doesn't have vssub, so we do A + (-B)
                     float negB = -b.item();
                     try (Arena arena = Arena.ofConfined()) {
-                        MemorySegment pNegB = arena.allocate(ValueLayout.JAVA_FLOAT, negB);
+                        MemorySegment pNegB = arena.allocateFrom(ValueLayout.JAVA_FLOAT, negB);
                         vsadd().invokeExact(aSeg, 1L, pNegB, oSeg, 1L, n);
                     }
                 } else {
@@ -584,7 +574,7 @@ public final class AccelOps {
             } else if (b.numel() == 1) {
                 float val = b.item();
                 try (Arena arena = Arena.ofConfined()) {
-                    MemorySegment pVal = arena.allocate(ValueLayout.JAVA_FLOAT, val);
+                    MemorySegment pVal = arena.allocateFrom(ValueLayout.JAVA_FLOAT, val);
                     // vDSP_vsdiv(A, strideA, B_scalar, C, strideC, N) -> C = A / B
                     MethodHandle vsdiv = LINKER.downcallHandle(
                         accelerate().find("vDSP_vsdiv").orElseThrow(),
@@ -611,8 +601,8 @@ public final class AccelOps {
     /**
      * RMS Normalization using Optimized Vector API.
      */
-    public static AccelTensor rmsNorm(AccelTensor x, AccelTensor weight, double eps) {
-        return addRmsNorm(null, x, weight, eps);
+    public static AccelTensor rmsNorm(AccelTensor x, AccelTensor weight, double eps, boolean addOne) {
+        return addRmsNorm(null, x, weight, eps, addOne);
     }
 
     /**
@@ -620,7 +610,7 @@ public final class AccelOps {
      * out = rmsNorm(residual + x)
      * If residual is null, it's a standard rmsNorm.
      */
-    public static AccelTensor addRmsNorm(AccelTensor residual, AccelTensor x, AccelTensor weight, double eps) {
+    public static AccelTensor addRmsNorm(AccelTensor residual, AccelTensor x, AccelTensor weight, double eps, boolean addOne) {
         if (weight == null) return x.contiguous();
         x = x.contiguous();
         if (residual != null) residual = residual.contiguous();
@@ -639,31 +629,22 @@ public final class AccelOps {
             long base = (long) row * hidden;
             float sumSq = 0.0f;
             
-            // Pass 1: Add (if residual exists) and Sum Squares (Scalar fallback for stability)
+            // Pass 1: Add (if residual exists) and Sum Squares
             for (int i = 0; i < hidden; i++) {
                 float val = xSeg.getAtIndex(ValueLayout.JAVA_FLOAT, base + i);
                 if (rSeg != null) val += rSeg.getAtIndex(ValueLayout.JAVA_FLOAT, base + i);
+                oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, base + i, val);
                 sumSq += val * val;
             }
 
             float rms = (float) (1.0 / Math.sqrt(sumSq / hidden + eps));
             
-            // Pass 2: Normalize and Weight (Using vDSP_vsmul + vDSP_vmul)
-            try {
-                MemorySegment oPart = oSeg.asSlice(base * 4);
-                if (rSeg != null) {
-                    vadd().invokeExact(xSeg.asSlice(base * 4), 1L, rSeg.asSlice(base * 4), 1L, oPart, 1L, (long) hidden);
-                } else {
-                    MemorySegment.copy(xSeg, base * 4, oPart, 0, (long) hidden * 4);
-                }
-                
-                try (Arena arena = Arena.ofConfined()) {
-                    MemorySegment pRms = arena.allocate(ValueLayout.JAVA_FLOAT, rms);
-                    vsmul().invokeExact(oPart, 1L, pRms, oPart, 1L, (long) hidden);
-                }
-                vmul().invokeExact(oPart, 1L, wSeg, 1L, oPart, 1L, (long) hidden);
-            } catch (Throwable t) {
-                throw new RuntimeException("vDSP rmsNorm pass 2 failed", t);
+            // Pass 2: Normalize and Weight
+            for (int j = 0; j < hidden; j++) {
+                float val = oSeg.getAtIndex(ValueLayout.JAVA_FLOAT, base + j);
+                float weightVal = wSeg.getAtIndex(ValueLayout.JAVA_FLOAT, (long) j);
+                if (addOne) weightVal += 1.0f;
+                oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, base + j, val * rms * weightVal);
             }
         }
         return out;
@@ -703,7 +684,7 @@ public final class AccelOps {
             float invSum = 1.0f / sum;
             try {
                 try (Arena arena = Arena.ofConfined()) {
-                    MemorySegment pInvSum = arena.allocate(ValueLayout.JAVA_FLOAT, invSum);
+                    MemorySegment pInvSum = arena.allocateFrom(ValueLayout.JAVA_FLOAT, invSum);
                     vsmul().invokeExact(oSeg.asSlice(base * 4), 1L, pInvSum, oSeg.asSlice(base * 4), 1L, (long) lastDim);
                 }
             } catch (Throwable t) {
@@ -749,6 +730,23 @@ public final class AccelOps {
             float u = uSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i);
             float silu = (float) (g / (1.0 + Math.exp(-g)));
             oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, i, silu * u);
+        }
+        return out;
+    }
+
+    /**
+     * Tanh activation.
+     */
+    public static AccelTensor tanh(AccelTensor x) {
+        x = x.contiguous();
+        AccelTensor out = AccelTensor.zeros(x.shape());
+        MemorySegment xSeg = x.dataSegment();
+        MemorySegment oSeg = out.dataSegment();
+        long n = x.numel();
+
+        for (int i = 0; i < n; i++) {
+            float val = xSeg.getAtIndex(ValueLayout.JAVA_FLOAT, i);
+            oSeg.setAtIndex(ValueLayout.JAVA_FLOAT, i, (float) Math.tanh(val));
         }
         return out;
     }
@@ -832,8 +830,8 @@ public final class AccelOps {
                 try (Arena arena = Arena.ofConfined()) {
                     float negMean = -mean;
                     float invVar = 1.0f / var;
-                    MemorySegment pNegMean = arena.allocate(ValueLayout.JAVA_FLOAT, negMean);
-                    MemorySegment pInvVar = arena.allocate(ValueLayout.JAVA_FLOAT, invVar);
+                    MemorySegment pNegMean = arena.allocateFrom(ValueLayout.JAVA_FLOAT, negMean);
+                    MemorySegment pInvVar = arena.allocateFrom(ValueLayout.JAVA_FLOAT, invVar);
                     
                     vsadd().invokeExact(oPart, 1L, pNegMean, oPart, 1L, (long) dim);
                     vsmul().invokeExact(oPart, 1L, pInvVar, oPart, 1L, (long) dim);
@@ -933,6 +931,10 @@ public final class AccelOps {
                     qWeight.dataSegment(), f32.dataSegment(), qWeight.scales(), qWeight.numel());
             case INT4 -> DequantizationKernel.dequantizeInt4(
                     qWeight.dataSegment(), f32.dataSegment(), qWeight.scales(), qWeight.zeros(), qWeight.numel(), qWeight.groupSize());
+            case F16 -> DequantizationKernel.dequantizeF16(
+                    qWeight.dataSegment(), f32.dataSegment(), qWeight.numel());
+            case BF16 -> DequantizationKernel.dequantizeBf16(
+                    qWeight.dataSegment(), f32.dataSegment(), qWeight.numel());
             default -> throw new UnsupportedOperationException("Unsupported quantization type: " + qWeight.quantType());
         }
         

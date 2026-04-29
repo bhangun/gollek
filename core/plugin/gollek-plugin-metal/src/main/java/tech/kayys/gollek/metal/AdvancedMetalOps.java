@@ -15,13 +15,15 @@ public interface AdvancedMetalOps {
     /**
      * Executes fused RMS Normalization: out = x / rms(x) * weight
      */
-    void rmsNorm(float[] out, float[] x, float[] weight, int n, float eps);
+    void rmsNorm(float[] out, float[] x, float[] weight, int n, float eps, boolean addOne);
+    void rmsNorm(MemorySegment out, MemorySegment x, MemorySegment weight, int n, float eps, boolean addOne);
 
     /**
      * Executes SiLU-gated Feed Forward Network (often found in Llama, Qwen):
      * out = silu(gate) * up
      */
     void siluFfn(float[] out, float[] gate, float[] up, int n);
+    void siluFfn(MemorySegment out, MemorySegment gate, MemorySegment up, int n);
 
     /**
      * Executes full scaled-dot product attention natively on the MPS tensor cores,
@@ -36,6 +38,6 @@ public interface AdvancedMetalOps {
             MemorySegment contextLens,
             int b, int t, int h, int d,
             int blockSize, int maxBlocks,
-            float scale, boolean isCausal);
+            float scale, boolean isCausal, float softCap);
 
 }

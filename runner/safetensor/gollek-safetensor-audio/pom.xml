@@ -88,6 +88,13 @@
             <version>0.1.0</version>
         </dependency>
 
+        <!-- Jump3r for MP3 encoding -->
+        <dependency>
+            <groupId>de.sciss</groupId>
+            <artifactId>jump3r</artifactId>
+            <version>1.0.5</version>
+        </dependency>
+
         <!-- JLayer remains for MP3 decoding -->
         <dependency>
             <groupId>com.googlecode.soundlibs</groupId>

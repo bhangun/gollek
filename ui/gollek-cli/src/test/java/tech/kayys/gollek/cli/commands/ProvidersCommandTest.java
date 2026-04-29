@@ -12,14 +12,20 @@ public class ProvidersCommandTest {
 
     @Test
     public void testProvidersCommandEmpty() {
-        providersCommand.verbose = false;
+        if (providersCommand.parentCommand == null) {
+            providersCommand.parentCommand = new tech.kayys.gollek.cli.GollekCommand();
+        }
+        providersCommand.parentCommand.verbose = false;
         // Just verify it runs without exception
         providersCommand.run();
     }
 
     @Test
     public void testProvidersCommandVerbose() {
-        providersCommand.verbose = true;
+        if (providersCommand.parentCommand == null) {
+            providersCommand.parentCommand = new tech.kayys.gollek.cli.GollekCommand();
+        }
+        providersCommand.parentCommand.verbose = true;
         // Just verify it runs without exception
         providersCommand.run();
     }

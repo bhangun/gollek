@@ -217,8 +217,11 @@ public class DirectInferenceEngine implements SafetensorEngine {
             int inputLen = 0;
 
             try {
+                boolean verbose = "true".equals(System.getProperty("gollek.verbose"));
+                if (verbose) { System.out.println("[DEBUG] 1: getLoadedModel"); System.out.flush(); }
                 LoadedModel model = (LoadedModel) getLoadedModel(modelPath);
                 if (model == null) {
+                    if (verbose) { System.out.println("[DEBUG] 2: loadModel"); System.out.flush(); }
                     loadModel(modelPath);
                     model = (LoadedModel) getLoadedModel(modelPath);
                 }
@@ -226,18 +229,26 @@ public class DirectInferenceEngine implements SafetensorEngine {
                 if (model == null)
                     throw new RuntimeException("Model failed to load");
 
+                if (verbose) { System.out.println("[DEBUG] 3: get tokenizer/config"); System.out.flush(); }
                 Tokenizer tokenizer = model.tokenizer();
                 ModelConfig config = model.config();
+                if (verbose) { System.out.println("[DEBUG] 4: arch resolve"); System.out.flush(); }
                 ModelArchitecture arch = archRegistry.resolve(config);
 
+                if (verbose) { System.out.println("[DEBUG] 5: tokenize"); System.out.flush(); }
                 long[] inputIds = tokenizer.encode(prompt, EncodeOptions.defaultOptions());
                 inputLen = inputIds.length;
+                if (verbose) { System.out.printf("[DEBUG] 6: tokens=%d\n", inputLen); System.out.flush(); }
 
                 try (KVCacheManager.KVCacheSession session = kvCacheManager.createSession(cfg.maxKvCacheTokens())) {
-                    session.allocate(config);
+                    if (verbose) { System.out.println("[DEBUG] 7: allocate session"); System.out.flush(); }
+                    session.allocate(config, cfg);
 
+                    if (verbose) { System.out.println("[DEBUG] 8: prefill"); System.out.flush(); }
                     float[] logits = forwardPass.prefill(inputIds, model.weights(), config, arch, session);
+                    if (verbose) { System.out.println("[DEBUG] 9: prefill done"); System.out.flush(); }
                     applyLogitSoftcap(logits, config);
+
 
                     int[] freq = new int[config.vocabSize()];
                     Random rng = new Random();
@@ -293,19 +304,23 @@ public class DirectInferenceEngine implements SafetensorEngine {
                 log.error("Generation failed", e);
                 throw new RuntimeException("Direct generation failed: " + e.getMessage(), e);
             }
-        }).runSubscriptionOn(Executors.newVirtualThreadPerTaskExecutor());
+        });
     }
 
     public Multi<InferenceResponse> generateStream(String prompt, Path modelPath, GenerationConfig cfg) {
         return Multi.createFrom().emitter(emitter -> {
-            Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
+            java.util.concurrent.ExecutorService executor = Executors.newSingleThreadExecutor();
+            executor.submit(() -> {
                 Instant t0 = Instant.now();
                 String requestId = UUID.randomUUID().toString();
                 int inputLen = 0;
 
                 try {
+                    boolean verbose = "true".equals(System.getProperty("gollek.verbose"));
+                    if (verbose) { System.out.println("[DEBUG-S] 1: getLoadedModel"); System.out.flush(); }
                     LoadedModel model = (LoadedModel) getLoadedModel(modelPath);
                     if (model == null) {
+                        if (verbose) { System.out.println("[DEBUG-S] 2: loadModel"); System.out.flush(); }
                         loadModel(modelPath);
                         model = (LoadedModel) getLoadedModel(modelPath);
                     }
@@ -313,20 +328,26 @@ public class DirectInferenceEngine implements SafetensorEngine {
                     if (model == null)
                         throw new RuntimeException("Model failed to load");
 
+                    if (verbose) { System.out.println("[DEBUG-S] 3: get tokenizer/config"); System.out.flush(); }
                     Tokenizer tokenizer = model.tokenizer();
                     ModelConfig config = model.config();
+                    if (verbose) { System.out.println("[DEBUG-S] 4: arch resolve"); System.out.flush(); }
                     ModelArchitecture arch = archRegistry.resolve(config);
 
-                    // Runtime metadata logging for stability verification
-
+                    if (verbose) { System.out.println("[DEBUG-S] 5: tokenize"); System.out.flush(); }
                     long[] inputIds = tokenizer.encode(prompt, EncodeOptions.defaultOptions());
                     inputLen = inputIds.length;
+                    if (verbose) { System.out.printf("[DEBUG-S] 6: tokens=%d\n", inputLen); System.out.flush(); }
 
                     try (KVCacheManager.KVCacheSession session = kvCacheManager.createSession(cfg.maxKvCacheTokens())) {
-                        session.allocate(config);
+                        if (verbose) { System.out.println("[DEBUG-S] 7: allocate session"); System.out.flush(); }
+                        session.allocate(config, cfg);
 
+                        if (verbose) { System.out.println("[DEBUG-S] 8: prefill"); System.out.flush(); }
                         float[] logits = forwardPass.prefill(inputIds, model.weights(), config, arch, session);
+                        if (verbose) { System.out.println("[DEBUG-S] 9: prefill done"); System.out.flush(); }
                         applyLogitSoftcap(logits, config);
+
 
                         int[] freq = new int[config.vocabSize()];
 
@@ -382,7 +403,7 @@ public class DirectInferenceEngine implements SafetensorEngine {
                             applyLogitSoftcap(logits, config);
 
                             // Step-level diagnostics for first 20 tokens
-                            if (step < 20) {
+                            if (verbose && step < 20) {
                                 int topId = 0;
                                 float topVal = logits[0];
                                 int top2Id = 0;
@@ -413,6 +434,7 @@ public class DirectInferenceEngine implements SafetensorEngine {
                                         top2Val, top3Id, top3Val);
                             }
 
+
                             next = tokenSampler.sample(logits, cfg, freq, rng);
                         }
                     }
@@ -432,6 +454,7 @@ public class DirectInferenceEngine implements SafetensorEngine {
                     emitter.fail(t);
                 } finally {
                     emitter.complete();
+                    executor.shutdown();
                 }
             });
         });

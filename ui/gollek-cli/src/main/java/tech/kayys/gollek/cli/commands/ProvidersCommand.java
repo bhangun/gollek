@@ -22,8 +22,9 @@ public class ProvidersCommand implements Runnable {
     @Inject
     GollekSdk sdk;
 
-    @Option(names = { "-v", "--verbose" }, description = "Show detailed health checks", defaultValue = "false")
-    public boolean verbose;
+    @picocli.CommandLine.ParentCommand
+    tech.kayys.gollek.cli.GollekCommand parentCommand;
+
 
     @Override
     public void run() {
@@ -49,7 +50,7 @@ public class ProvidersCommand implements Runnable {
                         provider.version() != null ? provider.version() : "N/A",
                         status);
 
-                if (verbose && provider.capabilities() != null) {
+                if (parentCommand != null && parentCommand.verbose && provider.capabilities() != null) {
                     printCapabilities(provider);
                 }
             }

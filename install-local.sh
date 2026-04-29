@@ -8,7 +8,9 @@ set -e
 # --- Default Options ---
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLI_MODULE="ui/gollek-cli"
+SDK_MODULE="sdk/gollek-sdk-java-local"
 BIN_DIR="${HOME}/.local/bin"
+LIB_DIR="${HOME}/.gollek/libs"
 GOLLEK_CLI_BIN="${BIN_DIR}/gollek"
 NATIVE_MODE=false
 BUILD_ARGS="-c"
@@ -50,26 +52,26 @@ fi
 echo -e "${BLUE}--------------------------------------------------${NC}"
 
 # 1. Build the project
-echo -e "${BLUE}>>> Building Gollek CLI...${NC}"
-MVN_ARGS="-pl ${CLI_MODULE} -am clean install"
+echo -e "${BLUE}>>> Building Gollek...${NC}"
+MVN_ARGS="-pl ${CLI_MODULE},${SDK_MODULE} -am clean install"
 
 if [[ "$BUILD_ARGS" != *"-t"* ]]; then
     MVN_ARGS="$MVN_ARGS -DskipTests"
 fi
 
 if [ "$NATIVE_MODE" = true ]; then
-    echo -e "${YELLOW}ℹ Building native image (this may take a while)...${NC}"
-    MVN_ARGS="$MVN_ARGS -Pnative -Dquarkus.native.container-build=false"
+    echo -e "${YELLOW}ℹ Building native image and shared library (this may take a while)...${NC}"
+    MVN_ARGS="$MVN_ARGS -Pnative -Dquarkus.native.container-build=false -Dgraalvm.metadataRepository.enabled=false"
 fi
 
 echo -e "${BLUE}>>> Running: mvn $MVN_ARGS${NC}"
 mvn $MVN_ARGS
 
 # 2. Locate Artifacts
-echo -e "${BLUE}>>> Locating CLI artifacts...${NC}"
+echo -e "${BLUE}>>> Locating artifacts...${NC}"
 
 if [ "$NATIVE_MODE" = true ]; then
-    # Locate Native Executable
+    # 2a. Locate Native Executable
     NATIVE_PATH="${PROJECT_ROOT}/${CLI_MODULE}/target/gollek"
     if [ ! -f "$NATIVE_PATH" ]; then
         # Try alternate location or final name variation
@@ -81,6 +83,27 @@ if [ "$NATIVE_MODE" = true ]; then
         exit 1
     fi
     echo -e "${GREEN}✓ Found Native Binary: $(basename "$NATIVE_PATH")${NC}"
+
+    # 2b. Locate SDK Shared Library
+    echo -e "${BLUE}>>> Locating SDK Shared Library...${NC}"
+    LIB_NAME="libgollek_sdk_local.dylib"
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then LIB_NAME="libgollek_sdk_local.so"; fi
+    if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then LIB_NAME="gollek_sdk_local.dll"; fi
+    
+    SDK_LIB_PATH="${PROJECT_ROOT}/${SDK_MODULE}/target/${LIB_NAME}"
+    if [ ! -f "$SDK_LIB_PATH" ]; then
+        # Fallback search
+        SDK_LIB_PATH=$(find "${PROJECT_ROOT}/${SDK_MODULE}/target" -name "*gollek_sdk_local*" -not -name "*.jar" -maxdepth 1 | head -n 1)
+    fi
+    
+    if [ -n "$SDK_LIB_PATH" ] && [ -f "$SDK_LIB_PATH" ]; then
+        echo -e "${GREEN}✓ Found SDK Library: $(basename "$SDK_LIB_PATH")${NC}"
+        mkdir -p "$LIB_DIR"
+        cp "$SDK_LIB_PATH" "$LIB_DIR/"
+        echo -e "${GREEN}✓ Installed SDK Library to ${LIB_DIR}/${NC}"
+    else
+        echo -e "${YELLOW}⚠ Could not find SDK shared library. Native SDK features might be unavailable.${NC}"
+    fi
 else
     # Locate JAR
     JAR_PATH="${PROJECT_ROOT}/${CLI_MODULE}/target/gollek.jar"

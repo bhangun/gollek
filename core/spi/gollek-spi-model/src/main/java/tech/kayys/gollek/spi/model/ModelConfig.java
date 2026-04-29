@@ -171,6 +171,10 @@ public class ModelConfig {
     @JsonProperty("head_dim")
     private Integer headDim; // null = hiddenSize / numAttentionHeads
 
+    @JsonProperty("global_head_dim")
+    private Integer globalHeadDim;
+
+
     // ── MoE fields ──────────────────────────────────────────────────────────
 
     @JsonProperty("num_local_experts")
@@ -258,6 +262,11 @@ public class ModelConfig {
                     Integer v = intValue(textCfg, "head_dim");
                     if (v != null) cfg.headDim = v;
                 }
+                if (!root.has("global_head_dim")) {
+                    Integer v = intValue(textCfg, "global_head_dim");
+                    if (v != null) cfg.globalHeadDim = v;
+                }
+
                 if (!root.has("final_logit_softcapping")) {
                     Double v = doubleValue(textCfg, "final_logit_softcapping");
                     if (v != null) cfg.finalLogitSoftcapping = v;
@@ -476,8 +485,15 @@ public class ModelConfig {
 
     /** Per-head dimension: {@code hiddenSize / numAttentionHeads}. */
     public int resolvedHeadDim() {
-        return headDim != null ? headDim : hiddenSize / numAttentionHeads;
+        return headDim != null ? headDim : (numAttentionHeads > 0 ? hiddenSize / numAttentionHeads : 0);
     }
+
+    /** Maximum head dimension across all layers (for heterogeneous architectures like Gemma 4). */
+    public int resolvedMaxHeadDim() {
+        int base = resolvedHeadDim();
+        return globalHeadDim != null ? Math.max(base, globalHeadDim) : base;
+    }
+
 
     /**
      * GQA group size: number of query heads sharing one KV head.

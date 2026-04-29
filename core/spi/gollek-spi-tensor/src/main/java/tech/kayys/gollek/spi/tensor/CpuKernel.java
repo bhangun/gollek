@@ -147,7 +147,7 @@ public class CpuKernel implements ComputeKernel {
 
     @Override
     public void rmsNorm(MemorySegment output, MemorySegment input, MemorySegment weight,
-                       int hiddenSize, float eps) {
+                       int hiddenSize, float eps, boolean addOne) {
         // Compute RMS
         float sumSq = 0.0f;
         for (int i = 0; i < hiddenSize; i++) {
@@ -160,6 +160,7 @@ public class CpuKernel implements ComputeKernel {
         for (int i = 0; i < hiddenSize; i++) {
             float x = input.getAtIndex(ValueLayout.JAVA_FLOAT, i);
             float w = weight.getAtIndex(ValueLayout.JAVA_FLOAT, i);
+            if (addOne) w += 1.0f;
             output.setAtIndex(ValueLayout.JAVA_FLOAT, i, (x / rms) * w);
         }
     }

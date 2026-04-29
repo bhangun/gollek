@@ -263,8 +263,11 @@ jobs:
           TAG="__TAG__"
           INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
           WAYANG_HOME="${WAYANG_HOME:-$HOME/.wayang}"
-          GOLLEK_HOME="${GOLLEK_HOME:-$WAYANG_HOME/gollek}"
-          if [ ! -d "$GOLLEK_HOME" ] && [ -d "$HOME/.gollek" ]; then
+          if [ -n "${GOLLEK_HOME:-}" ]; then
+            GOLLEK_HOME="$GOLLEK_HOME"
+          elif [ -d "$WAYANG_HOME/gollek" ] || [ ! -d "$HOME/.gollek" ]; then
+            GOLLEK_HOME="$WAYANG_HOME/gollek"
+          else
             GOLLEK_HOME="$HOME/.gollek"
           fi
           TMP_DIR="$(mktemp -d)"
@@ -291,12 +294,13 @@ jobs:
             sudo cp "${TMP_DIR}/gollek" "${INSTALL_DIR}/gollek"
           fi
 
+          mkdir -p "$WAYANG_HOME"/{config,logs,models,mcp,run}
           mkdir -p "$GOLLEK_HOME"/{config,logs,models,mcp,libs,source/vendor}
 
           cat > "${GOLLEK_HOME}/config/environment" <<'ENVFILE'
           WAYANG_HOME=${WAYANG_HOME:-$HOME/.wayang}
           GOLLEK_HOME=${GOLLEK_HOME:-$WAYANG_HOME/gollek}
-          GOLLEK_CLI_LOG_FILE=${GOLLEK_CLI_LOG_FILE:-$GOLLEK_HOME/logs/cli.log}
+          GOLLEK_CLI_LOG_FILE=${GOLLEK_CLI_LOG_FILE:-$WAYANG_HOME/logs/gollek-cli.log}
           WAYANG_SERVICE_CMD=${WAYANG_SERVICE_CMD:-/usr/local/bin/gollek --version}
           ENVFILE
 
@@ -315,11 +319,15 @@ jobs:
           fi
 
           WAYANG_HOME="${WAYANG_HOME:-$HOME/.wayang}"
-          GOLLEK_HOME="${GOLLEK_HOME:-$WAYANG_HOME/gollek}"
-          if [ ! -d "$GOLLEK_HOME" ] && [ -d "$HOME/.gollek" ]; then
+          if [ -n "${GOLLEK_HOME:-}" ]; then
+            GOLLEK_HOME="$GOLLEK_HOME"
+          elif [ -d "$WAYANG_HOME/gollek" ] || [ ! -d "$HOME/.gollek" ]; then
+            GOLLEK_HOME="$WAYANG_HOME/gollek"
+          else
             GOLLEK_HOME="$HOME/.gollek"
           fi
 
+          mkdir -p "$WAYANG_HOME"/{config,logs,models,mcp,run}
           mkdir -p "$GOLLEK_HOME"/{config,logs,models,mcp,run}
           SERVICE_FILE="$HOME/.config/systemd/user/wayang-gollek.service"
           mkdir -p "$(dirname "$SERVICE_FILE")"
@@ -332,9 +340,10 @@ jobs:
           [Service]
           Type=oneshot
           RemainAfterExit=yes
+          EnvironmentFile=-$GOLLEK_HOME/config/environment
           Environment=WAYANG_HOME=$WAYANG_HOME
           Environment=GOLLEK_HOME=$GOLLEK_HOME
-          Environment=GOLLEK_CLI_LOG_FILE=$GOLLEK_HOME/logs/cli.log
+          Environment=GOLLEK_CLI_LOG_FILE=$WAYANG_HOME/logs/gollek-cli.log
           Environment=WAYANG_SERVICE_CMD=\${WAYANG_SERVICE_CMD:-/usr/local/bin/gollek --version}
           ExecStart=/bin/sh -lc '\$WAYANG_SERVICE_CMD'
           WorkingDirectory=$GOLLEK_HOME

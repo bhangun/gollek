@@ -17,6 +17,10 @@ public final class GenerationConfig {
         GREEDY, TOP_K, TOP_P, TOP_K_TOP_P, BEAM
     }
 
+    public enum KvCacheQuantization {
+        NONE, INT8, INT4, TURBO
+    }
+
     private final SamplingStrategy strategy;
     private final float temperature;
     private final int topK;
@@ -31,6 +35,7 @@ public final class GenerationConfig {
     private final float frequencyPenalty;
     private final boolean useKvCache;
     private final int maxKvCacheTokens;
+    private final KvCacheQuantization kvCacheQuant;
     private final long seed;
 
     private GenerationConfig(Builder b) {
@@ -48,6 +53,7 @@ public final class GenerationConfig {
         this.frequencyPenalty = b.frequencyPenalty;
         this.useKvCache = b.useKvCache;
         this.maxKvCacheTokens = b.maxKvCacheTokens;
+        this.kvCacheQuant = b.kvCacheQuant;
         this.seed = b.seed;
     }
 
@@ -97,6 +103,8 @@ public final class GenerationConfig {
     public boolean useKvCache() { return useKvCache; }
     /** @return maximum number of tokens the KV cache can hold (default: 8192) */
     public int maxKvCacheTokens() { return maxKvCacheTokens; }
+    /** @return KV cache quantization strategy (default: NONE) */
+    public KvCacheQuantization kvCacheQuant() { return kvCacheQuant; }
     /** @return RNG seed; {@code -1} means random (default: -1) */
     public long seed() { return seed; }
 
@@ -126,7 +134,8 @@ public final class GenerationConfig {
         private float repetitionPenalty = 1.0f;
         private float frequencyPenalty = 0.0f;
         private boolean useKvCache = true;
-        private int maxKvCacheTokens = 8192;
+        private int maxKvCacheTokens = 2048;
+        private KvCacheQuantization kvCacheQuant = KvCacheQuantization.NONE;
         private long seed = -1L;
 
         /** @param v sampling strategy */
@@ -157,6 +166,8 @@ public final class GenerationConfig {
         public Builder useKvCache(boolean v) { this.useKvCache = v; return this; }
         /** @param v maximum KV cache capacity in tokens */
         public Builder maxKvCacheTokens(int v) { this.maxKvCacheTokens = v; return this; }
+        /** @param v KV cache quantization strategy */
+        public Builder kvCacheQuant(KvCacheQuantization v) { this.kvCacheQuant = v; return this; }
         /** @param v RNG seed; {@code -1} for random */
         public Builder seed(long v) { this.seed = v; return this; }
 

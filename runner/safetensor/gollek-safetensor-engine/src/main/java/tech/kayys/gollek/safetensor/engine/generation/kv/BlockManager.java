@@ -3,91 +3,100 @@ package tech.kayys.gollek.safetensor.engine.generation.kv;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.jboss.logging.Logger;
 
 /**
- * Manages a global pool of memory blocks for Paged Attention.
- * Blocks are recycled across sessions to minimize GC pressure and fragmentation.
+ * Manages physical memory blocks for KV cache.
+ * Refactored to use contiguous memory slabs for Metal compatibility.
+ * 
+ * Layout in slab: [maxBlocks, numHeads, tokensPerBlock, headDim]
+ * This matches the expectation of the native Metal/MPS attention kernels.
  */
 @ApplicationScoped
-public class BlockManager implements AutoCloseable {
-
-    private static final Logger log = Logger.getLogger(BlockManager.class);
+public class BlockManager {
+    private MemorySegment kPoolSlab;
+    private MemorySegment vPoolSlab;
+    private int blockSizeBytes = 0;
+    private int tokensPerBlock = 0;
+    private int numHeads = 0;
+    private int headDim = 0;
+    private long headStride = 0;
+    private long tokenStride = 0;
+    private boolean initialized = false;
 
     private final Arena poolArena = Arena.ofAuto();
     private final ConcurrentLinkedQueue<Integer> freeBlockIndices = new ConcurrentLinkedQueue<>();
-    private final List<MemorySegment> blocks = new ArrayList<>();
-    private final AtomicInteger totalAllocated = new AtomicInteger(0);
+    private final AtomicInteger totalAllocatedBlocks = new AtomicInteger(0);
 
-    private int blockSizeBytes = 0;
-    private boolean initialized = false;
+    public void initialize(int tokensPerBlock, int numHeads, int headDim, int maxBlocks) {
+        if (initialized)
+            return;
 
-    /**
-     * Initialize the block manager with specific dimensions.
-     * 
-     * @param tokensPerBlock number of tokens per block (e.g. 16)
-     * @param numHeads number of KV heads
-     * @param headDim dimension per head
-     * @param maxBlocks total blocks to pre-allocate or allow
-     */
-    public synchronized void init(int tokensPerBlock, int numHeads, int headDim, int maxBlocks) {
-        if (initialized) return;
-        
-        // One block stores [blockSize, numHeads, headDim] for both K and V
-        // Actually, we store K and V in separate segments or back-to-back.
-        // Let's store them back-to-back: [blockSize, numHeads, headDim, 2]
-        this.blockSizeBytes = tokensPerBlock * numHeads * headDim * 2 * (int)ValueLayout.JAVA_FLOAT.byteSize();
-        
-        log.infof("Initializing BlockManager: %d blocks of %d KB each (Total: %.2f MB)", 
-                maxBlocks, blockSizeBytes / 1024, (long)maxBlocks * blockSizeBytes / (1024.0 * 1024.0));
+        this.tokensPerBlock = tokensPerBlock;
+        this.numHeads = numHeads;
+        this.headDim = headDim;
+
+        // Layout: [head, token, dim] per block
+        this.tokenStride = headDim;
+        this.headStride = (long) tokensPerBlock * tokenStride;
+        this.blockSizeBytes = (int) (numHeads * headStride * 4);
+
+        long totalBytes = (long) maxBlocks * blockSizeBytes;
+
+        // Allocate contiguous slabs for K and V
+        this.kPoolSlab = poolArena.allocate(totalBytes, 64);
+        this.vPoolSlab = poolArena.allocate(totalBytes, 64);
 
         for (int i = 0; i < maxBlocks; i++) {
-            blocks.add(poolArena.allocate(blockSizeBytes, 64)); // 64-byte alignment
             freeBlockIndices.add(i);
         }
-        
-        totalAllocated.set(maxBlocks);
+
         this.initialized = true;
     }
 
-    /**
-     * Allocate a block index.
-     * @return block index or -1 if full
-     */
-    public int allocateBlock() {
-        Integer idx = freeBlockIndices.poll();
-        return (idx != null) ? idx : -1;
-    }
-
-    /**
-     * Return a block to the pool.
-     */
-    public void freeBlock(int index) {
-        if (index >= 0 && index < blocks.size()) {
-            freeBlockIndices.add(index);
+    public Integer allocateBlock() {
+        Integer index = freeBlockIndices.poll();
+        if (index != null) {
+            totalAllocatedBlocks.incrementAndGet();
         }
+        return index;
     }
 
-    /**
-     * Get the segment for a physical block index.
-     */
-    public MemorySegment getBlock(int index) {
-        return blocks.get(index);
+    public void freeBlock(int index) {
+        freeBlockIndices.add(index);
+        totalAllocatedBlocks.decrementAndGet();
     }
 
-    public int getFreeCount() {
-        return freeBlockIndices.size();
+    public MemorySegment getKBlock(int blockIndex) {
+        return kPoolSlab.asSlice((long) blockIndex * blockSizeBytes, blockSizeBytes);
     }
 
-    @Override
-    public void close() {
-        poolArena.close();
-        blocks.clear();
-        freeBlockIndices.clear();
+    public MemorySegment getVBlock(int blockIndex) {
+        return vPoolSlab.asSlice((long) blockIndex * blockSizeBytes, blockSizeBytes);
+    }
+
+    public MemorySegment getRawKPool() {
+        return kPoolSlab;
+    }
+
+    public MemorySegment getRawVPool() {
+        return vPoolSlab;
+    }
+
+    public int getBlockSizeBytes() {
+        return blockSizeBytes;
+    }
+
+    public int getTokensPerBlock() {
+        return tokensPerBlock;
+    }
+
+    public long getHeadStride() {
+        return headStride;
+    }
+
+    public long getTokenStride() {
+        return tokenStride;
     }
 }

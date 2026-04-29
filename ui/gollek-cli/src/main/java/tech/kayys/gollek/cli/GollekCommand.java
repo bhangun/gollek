@@ -90,7 +90,7 @@ public class GollekCommand implements Runnable {
             "HUGGING_FACE_HUB_TOKEN",
             HF_TOKEN_PROPERTY);
 
-    @Option(names = { "--log" }, description = "Enable verbose logging", scope = CommandLine.ScopeType.INHERIT)
+    @Option(names = { "--log", "--verbose", "-v" }, description = "Enable verbose logging", scope = CommandLine.ScopeType.INHERIT)
     public boolean verbose;
 
     @Option(names = {
@@ -161,6 +161,8 @@ public class GollekCommand implements Runnable {
             System.setProperty("quarkus.log.category.\"tech.kayys.gollek\".level", "DEBUG");
             System.setProperty("quarkus.log.category.\"tech.kayys.gollek.inference.libtorch\".level", "DEBUG");
             System.setProperty("gguf.provider.verbose-logging", "true");
+            System.setProperty("gollek.verbose", "true");
+
         }
     }
 

@@ -216,9 +216,10 @@ public interface ComputeKernel {
      * @param weight weight tensor
      * @param hiddenSize hidden dimension size
      * @param eps epsilon for numerical stability
+     * @param addOne whether to add 1.0 to the weight (Gemma-style)
      */
     void rmsNorm(MemorySegment output, MemorySegment input, MemorySegment weight, 
-                 int hiddenSize, float eps);
+                 int hiddenSize, float eps, boolean addOne);
 
     // ── Activation Functions ────────────────────────────────────────────
 

@@ -12,6 +12,12 @@ import tech.kayys.gollek.safetensor.audio.model.AudioResult;
 import tech.kayys.gollek.safetensor.spi.SafetensorEngine;
 import tech.kayys.gollek.tokenizer.spi.EncodeOptions;
 import tech.kayys.gollek.tokenizer.spi.Tokenizer;
+import tech.kayys.gollek.safetensor.audio.processing.Mp3Encoder;
+import tech.kayys.suling.FlacAudioFormat;
+import tech.kayys.suling.encoder.FlacStreamEncoder;
+import tech.kayys.suling.encoder.StreamEncoderH;
+
+import java.lang.foreign.MemorySegment;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -72,6 +78,9 @@ public class SpeechT5Engine {
                         text.length(), voice, config != null ? config.getTemperature() : 1.0f);
 
                 SafetensorEngine.LoadedModel model = requireModel(modelPath);
+                @SuppressWarnings("unchecked") Map<String, AccelTensor> weights = (Map<String, AccelTensor>) (Map<?, ?>) model.weights();
+                String pfx = detectPrefix(weights);
+                log.infof("SpeechT5: detected weight prefix: '%s'", pfx);
 
                 // 1. Normalize and tokenize text
                 String normalizedText = normalizeText(text);
@@ -81,14 +90,14 @@ public class SpeechT5Engine {
                     tokenIds[i] = (int) encoded[i];
 
                 // 2. Encode text
-                AccelTensor encoderOut = runTextEncoder(tokenIds, model);
+                AccelTensor encoderOut = runTextEncoder(tokenIds, model, pfx);
 
                 // 3. Get speaker embedding
                 float[] speakerEmb = getSpeakerEmbedding(voice != null ? voice : defaultVoice);
                 AccelTensor speakerTensor = AccelTensor.fromFloatArray(speakerEmb, new long[] { 1, SPEAKER_EMB_DIM });
 
                 // 4. Decode to mel spectrogram
-                float[][] melFrames = runDecoder(encoderOut, speakerTensor, model, config);
+                float[][] melFrames = runDecoder(encoderOut, speakerTensor, model, config, pfx);
                 encoderOut.close();
                 speakerTensor.close();
 
@@ -103,13 +112,34 @@ public class SpeechT5Engine {
                     pcm = adjustSpeed(pcm, config.getTemperature());
                 }
 
-                // 7. Encode to WAV
-                byte[] wav = encodeWav(pcm, SAMPLE_RATE);
+                // 7. Encode to requested format
+                byte[] audioOut;
+                AudioConfig.Format requestedFormat = config != null ? config.getFormat() : AudioConfig.Format.FLAC;
+                
+                try {
+                    switch (requestedFormat) {
+                        case FLAC -> audioOut = encodeFlac(pcm, SAMPLE_RATE);
+                        case MP3 -> {
+                            log.info("SpeechT5: Encoding output to MP3 using Jump3r...");
+                            try {
+                                Mp3Encoder encoder = new Mp3Encoder(SAMPLE_RATE);
+                                audioOut = encoder.encode(pcm);
+                            } catch (Exception e) {
+                                log.warn("SpeechT5: MP3 encoding failed, falling back to WAV: " + e.getMessage());
+                                audioOut = encodeWav(pcm, SAMPLE_RATE);
+                            }
+                        }
+                        default -> audioOut = encodeWav(pcm, SAMPLE_RATE);
+                    }
+                } catch (Throwable t) {
+                    log.warn("SpeechT5: Encoding to " + requestedFormat + " failed, falling back to WAV: " + t.getMessage());
+                    audioOut = encodeWav(pcm, SAMPLE_RATE);
+                }
 
                 long durationMs = java.time.Duration.between(startTime, Instant.now()).toMillis();
-                log.infof("SpeechT5: generated %.1fs audio (%d bytes) in %dms",
-                        pcm.length / (double) SAMPLE_RATE, wav.length, durationMs);
-                em.complete(wav);
+                log.infof("SpeechT5: generated %.1fs audio (%d bytes, FLAC) in %dms",
+                        pcm.length / (double) SAMPLE_RATE, audioOut.length, durationMs);
+                em.complete(audioOut);
 
             } catch (Exception e) {
                 log.errorf(e, "SpeechT5 synthesis failed");
@@ -124,9 +154,9 @@ public class SpeechT5Engine {
 
     public Uni<AudioResult> synthesizeWithResult(String text, String voice, Path modelPath, AudioConfig config) {
         return synthesize(text, voice, modelPath, config)
-                .map(wav -> {
-                    double duration = wav.length > 44 ? (wav.length - 44) / 2.0 / SAMPLE_RATE : 0;
-                    return AudioResult.speechSynthesis(wav, modelPath.getFileName().toString(), duration);
+                .map(flac -> {
+                    double duration = flac.length > 0 ? -1.0 : 0; // We don't have exact duration easily from raw FLAC without parsing, but the frontend can parse it.
+                    return AudioResult.speechSynthesis(flac, modelPath.getFileName().toString(), duration);
                 });
     }
 
@@ -188,13 +218,22 @@ public class SpeechT5Engine {
         return res;
     }
 
-    private AccelTensor runTextEncoder(int[] tokenIds, SafetensorEngine.LoadedModel model) {
+    private String detectPrefix(Map<String, AccelTensor> weights) {
+        if (weights.containsKey("speecht5.encoder.embed_tokens.weight")) return "speecht5.";
+        if (weights.containsKey("model.encoder.embed_tokens.weight") || weights.containsKey("model.decoder.embed_tokens.weight")) return "model.";
+        if (weights.containsKey("encoder.embed_tokens.weight") || weights.containsKey("decoder.embed_tokens.weight")) return "";
+        return "speecht5.";
+    }
+
+    private AccelTensor runTextEncoder(int[] tokenIds, SafetensorEngine.LoadedModel model, String pfx) {
         @SuppressWarnings("unchecked") Map<String, AccelTensor> w = (Map<String, AccelTensor>) (Map<?, ?>) model.weights();
-        AccelTensor embedW = w.get("speecht5.encoder.embed_tokens.weight");
+        AccelTensor embedW = w.get(pfx + "encoder.embed_tokens.weight");
+        if (embedW == null) embedW = w.get(pfx + "decoder.embed_tokens.weight");
+        if (embedW == null) embedW = w.get(pfx + "embed_tokens.weight");
         int hiddenSize = embedW != null ? (int) embedW.shape()[1] : 768;
 
         if (embedW == null) {
-            log.warn("SpeechT5: encoder embed_tokens not found — using zeros");
+            log.warnf("SpeechT5: encoder embed_tokens not found with prefix '%s' — using zeros", pfx);
             return AccelTensor.fromFloatArray(new float[tokenIds.length * hiddenSize],
                     new long[] { 1, tokenIds.length, hiddenSize });
         }
@@ -207,41 +246,44 @@ public class SpeechT5Engine {
         }
         AccelTensor hidden = AccelTensor.fromFloatArray(tokenEmbeds, new long[] { 1, tokenIds.length, hiddenSize });
 
-        int numLayers = countEncoderLayers(w);
+        int numLayers = countEncoderLayers(w, pfx);
         for (int i = 0; i < numLayers; i++) {
-            AccelTensor layerOut = encoderLayer(hidden, w, i, hiddenSize);
-            hidden.close();
+            AccelTensor layerOut = encoderLayer(hidden, w, i, hiddenSize, pfx);
+            if (layerOut != hidden) {
+                hidden.close();
+            }
             hidden = layerOut;
         }
         return hidden;
     }
 
-    private AccelTensor encoderLayer(AccelTensor x, Map<String, AccelTensor> w, int i, int d) {
-        String pfx = "speecht5.encoder.layers.%d.".formatted(i);
-        AccelTensor qW = w.get(pfx + "attention.q_proj.weight");
+
+    private AccelTensor encoderLayer(AccelTensor x, Map<String, AccelTensor> w, int i, int d, String pfx) {
+        String layerPfx = pfx + "encoder.layers.%d.".formatted(i);
+        AccelTensor qW = w.get(layerPfx + "attention.q_proj.weight");
         if (qW == null)
             return x;
 
-        AccelTensor kW = w.get(pfx + "attention.k_proj.weight");
-        AccelTensor vW = w.get(pfx + "attention.v_proj.weight");
-        AccelTensor oW = w.get(pfx + "attention.out_proj.weight");
-        AccelTensor n1W = w.get(pfx + "layer_norm.weight");
-        AccelTensor fc1W = w.get(pfx + "feed_forward.intermediate_dense.weight");
-        AccelTensor fc2W = w.get(pfx + "feed_forward.output_dense.weight");
+        AccelTensor kW = w.get(layerPfx + "attention.k_proj.weight");
+        AccelTensor vW = w.get(layerPfx + "attention.v_proj.weight");
+        AccelTensor oW = w.get(layerPfx + "attention.out_proj.weight");
+        AccelTensor n1W = w.get(layerPfx + "layer_norm.weight");
+        AccelTensor fc1W = w.get(layerPfx + "feed_forward.intermediate_dense.weight");
+        AccelTensor fc2W = w.get(layerPfx + "feed_forward.output_dense.weight");
 
         AccelTensor normed = layerNorm(x, n1W, 1e-5);
         AccelTensor attnOut = selfAttention(normed, qW, kW, vW, oW, d);
-        normed.close();
+        if (normed != x) normed.close();
         AccelTensor h = AccelOps.add(x, attnOut);
-        attnOut.close();
+        if (attnOut != x) attnOut.close();
 
         if (fc1W != null && fc2W != null) {
-            AccelTensor n2W = w.get(pfx + "final_layer_norm.weight");
+            AccelTensor n2W = w.get(layerPfx + "final_layer_norm.weight");
             AccelTensor normed2 = layerNorm(h, n2W, 1e-5);
             AccelTensor ffnOut = reluFfn(normed2, fc1W, fc2W);
-            normed2.close();
+            if (normed2 != h) normed2.close();
             AccelTensor h2 = AccelOps.add(h, ffnOut);
-            ffnOut.close();
+            if (ffnOut != h) ffnOut.close();
             h.close();
             return h2;
         }
@@ -249,7 +291,7 @@ public class SpeechT5Engine {
     }
 
     private float[][] runDecoder(AccelTensor encoderOut, AccelTensor speakerTensor,
-            SafetensorEngine.LoadedModel model, AudioConfig config) {
+            SafetensorEngine.LoadedModel model, AudioConfig config, String pfx) {
         @SuppressWarnings("unchecked") Map<String, AccelTensor> w = (Map<String, AccelTensor>) (Map<?, ?>) model.weights();
         int hiddenSize = (int) encoderOut.shape()[2];
         List<float[]> melFrames = new ArrayList<>();
@@ -257,22 +299,26 @@ public class SpeechT5Engine {
         AccelTensor decoderHidden = AccelTensor.fromFloatArray(prevMelFrame, new long[] { 1, 1, N_MEL });
 
         for (int step = 0; step < MAX_MEL_FRAMES; step++) {
-            AccelTensor prenetW = w.get("speecht5.decoder.prenet.layers.0.weight");
+            AccelTensor prenetW = w.get(pfx + "decoder.prenet.layers.0.weight");
             AccelTensor projected = prenetW != null ? linear(decoderHidden, prenetW) : decoderHidden;
 
-            AccelTensor withSpk = addSpeakerEmbedding(projected, speakerTensor, hiddenSize, w);
-            if (projected != decoderHidden)
+            AccelTensor withSpk = addSpeakerEmbedding(projected, speakerTensor, hiddenSize, w, pfx);
+            if (projected != decoderHidden && projected != withSpk)
                 projected.close();
 
-            int numDecLayers = countDecoderLayers(w);
+            int numDecLayers = countDecoderLayers(w, pfx);
             AccelTensor decOut = withSpk;
             for (int i = 0; i < numDecLayers; i++) {
-                AccelTensor layerOut = decoderLayer(decOut, encoderOut, w, i, hiddenSize);
-                decOut.close();
+                AccelTensor layerOut = decoderLayer(decOut, encoderOut, w, i, hiddenSize, pfx);
+                if (layerOut != decOut) {
+                    decOut.close();
+                }
                 decOut = layerOut;
             }
 
-            AccelTensor featW = w.get("speech_decoder_postnet.feat_out.weight");
+            AccelTensor featW = w.get(pfx.replace("speecht5.", "speech_") + "decoder_postnet.feat_out.weight");
+            if (featW == null) featW = w.get(pfx + "decoder_postnet.feat_out.weight");
+            
             AccelTensor melOut = featW != null ? linear(decOut, featW) : decOut;
             float[] frame = melOut.toFloatArray();
             if (melOut != decOut)
@@ -283,36 +329,36 @@ public class SpeechT5Engine {
             float[] melFrame = Arrays.copyOf(frame, N_MEL);
             melFrames.add(melFrame);
 
-            if (detectStop(frame, w))
+            if (detectStop(frame, w, pfx))
                 break;
             decoderHidden = AccelTensor.fromFloatArray(melFrame, new long[] { 1, 1, N_MEL });
         }
         return melFrames.toArray(float[][]::new);
     }
 
-    private AccelTensor decoderLayer(AccelTensor x, AccelTensor encOut, Map<String, AccelTensor> w, int i, int d) {
-        String pfx = "speecht5.decoder.layers.%d.".formatted(i);
-        AccelTensor qW = w.get(pfx + "self_attn.q_proj.weight");
+    private AccelTensor decoderLayer(AccelTensor x, AccelTensor encOut, Map<String, AccelTensor> w, int i, int d, String pfx) {
+        String layerPfx = pfx + "decoder.layers.%d.".formatted(i);
+        AccelTensor qW = w.get(layerPfx + "self_attn.q_proj.weight");
         if (qW == null)
             return x;
 
-        AccelTensor kW = w.get(pfx + "self_attn.k_proj.weight");
-        AccelTensor vW = w.get(pfx + "self_attn.v_proj.weight");
-        AccelTensor oW = w.get(pfx + "self_attn.out_proj.weight");
-        AccelTensor n1W = w.get(pfx + "self_attn_layer_norm.weight");
+        AccelTensor kW = w.get(layerPfx + "self_attn.k_proj.weight");
+        AccelTensor vW = w.get(layerPfx + "self_attn.v_proj.weight");
+        AccelTensor oW = w.get(layerPfx + "self_attn.out_proj.weight");
+        AccelTensor n1W = w.get(layerPfx + "self_attn_layer_norm.weight");
 
         AccelTensor normed = layerNorm(x, n1W, 1e-5);
         AccelTensor attn = selfAttention(normed, qW, kW, vW, oW, d);
-        normed.close();
+        if (normed != x) normed.close();
         AccelTensor h = AccelOps.add(x, attn);
-        attn.close();
+        if (attn != x) attn.close();
 
-        AccelTensor cqW = w.get(pfx + "encoder_attn.q_proj.weight");
+        AccelTensor cqW = w.get(layerPfx + "encoder_attn.q_proj.weight");
         if (cqW != null) {
-            AccelTensor ckW = w.get(pfx + "encoder_attn.k_proj.weight");
-            AccelTensor cvW = w.get(pfx + "encoder_attn.v_proj.weight");
-            AccelTensor coW = w.get(pfx + "encoder_attn.out_proj.weight");
-            AccelTensor n2W = w.get(pfx + "encoder_attn_layer_norm.weight");
+            AccelTensor ckW = w.get(layerPfx + "encoder_attn.k_proj.weight");
+            AccelTensor cvW = w.get(layerPfx + "encoder_attn.v_proj.weight");
+            AccelTensor coW = w.get(layerPfx + "encoder_attn.out_proj.weight");
+            AccelTensor n2W = w.get(layerPfx + "encoder_attn_layer_norm.weight");
 
             AccelTensor normed2 = layerNorm(h, n2W, 1e-5);
             AccelTensor q = linear(normed2, cqW);
@@ -326,17 +372,20 @@ public class SpeechT5Engine {
             AccelTensor attnW = AccelOps.softmax(scores, -1);
             AccelTensor crossOut = AccelOps.matmul(attnW, v);
             scores.close();
-                        attnW.close();
-            q.close();
-            k.close();
-            v.close();
-            normed2.close();
+                        if (attnW != null) attnW.close();
+            if (q != x) q.close();
+            if (k != encOut && k != x) k.close();
+            if (v != encOut && v != x) v.close();
+            if (normed2 != h) normed2.close();
 
             AccelTensor projOut = coW != null ? linear(crossOut, coW) : crossOut;
-            if (projOut != crossOut)
-                crossOut.close();
+            if (projOut != crossOut) {
+                if (crossOut != encOut && crossOut != h && crossOut != x) {
+                    crossOut.close();
+                }
+            }
             AccelTensor h2 = AccelOps.add(h, projOut);
-            projOut.close();
+            if (projOut != h && projOut != h2) projOut.close();
             h.close();
             h = h2;
         }
@@ -351,14 +400,15 @@ public class SpeechT5Engine {
         scTemp.close();
         AccelTensor aw = AccelOps.softmax(sc, -1);
         AccelTensor out = AccelOps.matmul(aw, v);
-        sc.close();
-        aw.close();
-        q.close();
-        k.close();
-        v.close();
+        if (sc != null) sc.close();
+        if (aw != null) aw.close();
+        if (q != x) q.close();
+        if (k != x) k.close();
+        if (v != x) v.close();
         AccelTensor proj = oW != null ? linear(out, oW) : out;
-        if (proj != out)
-            out.close();
+        if (proj != out) {
+             if (out != x && out != q && out != k && v != out) out.close();
+        }
         return proj;
     }
 
@@ -404,13 +454,16 @@ public class SpeechT5Engine {
         return AccelTensor.fromFloatArray(out, sh);
     }
 
-    private AccelTensor addSpeakerEmbedding(AccelTensor x, AccelTensor spkEmb, int d, Map<String, AccelTensor> w) {
-        AccelTensor projW = w.get("speecht5.decoder.speaker_embeddings_layer_norm.weight");
+    private AccelTensor addSpeakerEmbedding(AccelTensor x, AccelTensor spkEmb, int d, Map<String, AccelTensor> w, String pfx) {
+        AccelTensor projW = w.get(pfx + "decoder.speaker_embeddings_layer_norm.weight");
         return projW != null ? layerNorm(AccelOps.add(x, spkEmb), projW, 1e-5) : x;
     }
 
-    private boolean detectStop(float[] frame, Map<String, AccelTensor> weights) {
-        AccelTensor stopW = weights.get("speech_decoder_postnet.prob_out.weight");
+    private boolean detectStop(float[] frame, Map<String, AccelTensor> weights, String pfx) {
+        String stopPfx = pfx.replace("speecht5.", "speech_");
+        AccelTensor stopW = weights.get(stopPfx + "decoder_postnet.prob_out.weight");
+        if (stopW == null) stopW = weights.get(pfx + "decoder_postnet.prob_out.weight");
+        
         if (stopW == null)
             return false;
         float[] sw = stopW.toFloatArray();
@@ -420,16 +473,16 @@ public class SpeechT5Engine {
         return (float) (1.0 / (1.0 + Math.exp(-prob))) > 0.5f;
     }
 
-    private int countEncoderLayers(Map<String, AccelTensor> w) {
+    private int countEncoderLayers(Map<String, AccelTensor> w, String pfx) {
         int n = 0;
-        while (w.containsKey("speecht5.encoder.layers.%d.attention.q_proj.weight".formatted(n)))
+        while (w.containsKey((pfx + "encoder.layers.%d.attention.q_proj.weight").formatted(n)))
             n++;
         return Math.max(n, 12);
     }
 
-    private int countDecoderLayers(Map<String, AccelTensor> w) {
+    private int countDecoderLayers(Map<String, AccelTensor> w, String pfx) {
         int n = 0;
-        while (w.containsKey("speecht5.decoder.layers.%d.self_attn.q_proj.weight".formatted(n)))
+        while (w.containsKey((pfx + "decoder.layers.%d.self_attn.q_proj.weight").formatted(n)))
             n++;
         return Math.max(n, 12);
     }
@@ -452,28 +505,45 @@ public class SpeechT5Engine {
         return adjusted;
     }
 
-    private static byte[] encodeWav(float[] pcm, int sampleRate) {
-        int dataLen = pcm.length * 2;
-        int totalLen = 44 + dataLen;
-        ByteBuffer buf = ByteBuffer.allocate(totalLen).order(ByteOrder.LITTLE_ENDIAN);
-        buf.put("RIFF".getBytes());
-        buf.putInt(totalLen - 8);
-        buf.put("WAVE".getBytes());
-        buf.put("fmt ".getBytes());
-        buf.putInt(16);
-        buf.putShort((short) 1);
-        buf.putShort((short) 1);
-        buf.putInt(sampleRate);
-        buf.putInt(sampleRate * 2);
-        buf.putShort((short) 2);
-        buf.putShort((short) 16);
-        buf.put("data".getBytes());
-        buf.putInt(dataLen);
-        for (float s : pcm) {
-            short sample = (short) Math.max(-32768, Math.min(32767, (int) (s * 32767)));
-            buf.putShort(sample);
+    private static byte[] encodeFlac(float[] pcm, int sampleRate) {
+        int[] interleavedPcm = new int[pcm.length];
+        for (int i = 0; i < pcm.length; i++) {
+            interleavedPcm[i] = (short) Math.max(-32768, Math.min(32767, (int) (pcm[i] * 32767)));
         }
-        return buf.array();
+
+        FlacAudioFormat fmt = FlacAudioFormat.builder()
+                .channels(1)
+                .bitsPerSample(16)
+                .sampleRate(sampleRate)
+                .totalSamples(pcm.length)
+                .build();
+
+        List<byte[]> chunks = new ArrayList<>();
+        try (FlacStreamEncoder encoder = new FlacStreamEncoder()) {
+            encoder.applyFormat(fmt).setCompressionLevel(5);
+
+            encoder.initStream(
+                    (buf, size, samples, frame) -> {
+                        byte[] chunk = new byte[(int) size];
+                        MemorySegment.ofArray(chunk).copyFrom(buf.reinterpret(size));
+                        chunks.add(chunk);
+                        return StreamEncoderH.WRITE_STATUS_OK;
+                    },
+                    null, null, null
+            );
+
+            encoder.processInterleaved(interleavedPcm);
+            encoder.finish();
+        }
+
+        int total = chunks.stream().mapToInt(c -> c.length).sum();
+        byte[] result = new byte[total];
+        int pos = 0;
+        for (byte[] chunk : chunks) {
+            System.arraycopy(chunk, 0, result, pos, chunk.length);
+            pos += chunk.length;
+        }
+        return result;
     }
 
     private SafetensorEngine.LoadedModel requireModel(Path path) {
@@ -489,6 +559,52 @@ public class SpeechT5Engine {
 
     private static String normalizeText(String text) {
         return text.replaceAll("\\s+", " ").trim();
+    }
+
+    private static byte[] encodeWav(float[] pcm, int sampleRate) {
+        int dataSize = pcm.length * 2;
+        int totalSize = 36 + dataSize;
+        byte[] wav = new byte[44 + dataSize];
+        
+        // RIFF header
+        wav[0] = 'R'; wav[1] = 'I'; wav[2] = 'F'; wav[3] = 'F';
+        wav[4] = (byte) (totalSize & 0xff);
+        wav[5] = (byte) ((totalSize >> 8) & 0xff);
+        wav[6] = (byte) ((totalSize >> 16) & 0xff);
+        wav[7] = (byte) ((totalSize >> 24) & 0xff);
+        wav[8] = 'W'; wav[9] = 'A'; wav[10] = 'V'; wav[11] = 'E';
+        
+        // fmt chunk
+        wav[12] = 'f'; wav[13] = 'm'; wav[14] = 't'; wav[15] = ' ';
+        wav[16] = 16; wav[17] = 0; wav[18] = 0; wav[19] = 0; // Subchunk1Size (16 for PCM)
+        wav[20] = 1; wav[21] = 0; // AudioFormat (1 for PCM)
+        wav[22] = 1; wav[23] = 0; // NumChannels (1)
+        wav[24] = (byte) (sampleRate & 0xff);
+        wav[25] = (byte) ((sampleRate >> 8) & 0xff);
+        wav[26] = (byte) ((sampleRate >> 16) & 0xff);
+        wav[27] = (byte) ((sampleRate >> 24) & 0xff);
+        int byteRate = sampleRate * 2;
+        wav[28] = (byte) (byteRate & 0xff);
+        wav[29] = (byte) ((byteRate >> 8) & 0xff);
+        wav[30] = (byte) ((byteRate >> 16) & 0xff);
+        wav[31] = (byte) ((byteRate >> 24) & 0xff);
+        wav[32] = 2; wav[33] = 0; // BlockAlign (2)
+        wav[34] = 16; wav[35] = 0; // BitsPerSample (16)
+        
+        // data chunk
+        wav[36] = 'd'; wav[37] = 'a'; wav[38] = 't'; wav[39] = 'a';
+        wav[40] = (byte) (dataSize & 0xff);
+        wav[41] = (byte) ((dataSize >> 8) & 0xff);
+        wav[42] = (byte) ((dataSize >> 16) & 0xff);
+        wav[43] = (byte) ((dataSize >> 24) & 0xff);
+        
+        // PCM data
+        for (int i = 0; i < pcm.length; i++) {
+            short s = (short) Math.max(-32768, Math.min(32767, (int) (pcm[i] * 32767)));
+            wav[44 + i * 2] = (byte) (s & 0xff);
+            wav[44 + i * 2 + 1] = (byte) ((s >> 8) & 0xff);
+        }
+        return wav;
     }
 
     private static class HiFiGANVocoder {

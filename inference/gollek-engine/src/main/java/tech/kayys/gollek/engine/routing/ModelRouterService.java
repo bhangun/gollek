@@ -362,6 +362,8 @@ public class ModelRouterService {
                                                 .fallbackProviders(java.util.List.of())
                                                 .build();
                         }
+                        LOG.warnf("Preferred provider '%s' not compatible with model %s — falling back to scored selection",
+                                preferred, manifest.modelId());
                 }
 
                 // Filter compatible providers
@@ -715,7 +717,10 @@ public class ModelRouterService {
                                 ? request.getMetadata().getOrDefault("tenantId", "community").toString()
                                 : "community";
 
-                return ProviderRequest.builder()
+                Optional<ModelEntry> entry = localModelRegistry.resolve(modelId);
+                String physicalPath = entry.map(e -> e.physicalPath().toString()).orElse(null);
+
+                ProviderRequest.Builder builder = ProviderRequest.builder()
                                 .requestId(request.getRequestId())
                                 .model(modelId)
                                 .messages(request.getMessages())
@@ -725,8 +730,15 @@ public class ModelRouterService {
                                 .streaming(request.isStreaming())
                                 .timeout(request.getTimeout().orElse(null))
                                 .preferredProvider(request.getPreferredProvider().orElse(null))
-                                .metadata("tenantId", tenantId)
-                                .build();
+                                .metadata("tenantId", tenantId);
+                                
+                if (physicalPath != null) {
+                    builder.metadata("model_path", physicalPath);
+                } else if (request.getMetadata() != null && request.getMetadata().containsKey("model_path")) {
+                    builder.metadata("model_path", request.getMetadata().get("model_path"));
+                }
+                
+                return builder.build();
         }
 
         /**

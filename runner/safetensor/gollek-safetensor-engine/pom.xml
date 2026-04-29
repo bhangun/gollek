@@ -68,6 +68,11 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
+            <artifactId>gollek-plugin-metal</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys.gollek</groupId>
             <artifactId>gollek-spi-model</artifactId>
             <version>${project.version}</version>
         </dependency>

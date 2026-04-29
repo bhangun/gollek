@@ -169,7 +169,7 @@ class ComputeKernelRegistryTest {
         MemorySegment weightSeg = MemorySegment.ofArray(weight);
         MemorySegment outputSeg = MemorySegment.ofArray(output);
         
-        kernel.rmsNorm(outputSeg, inputSeg, weightSeg, 2, 1e-5f);
+        kernel.rmsNorm(outputSeg, inputSeg, weightSeg, 2, 1e-5f, false);
         
         // RMS = sqrt((9 + 16) / 2) = sqrt(12.5) ≈ 3.536
         // output[0] = 3 / 3.536 ≈ 0.848

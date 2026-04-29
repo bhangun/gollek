@@ -90,8 +90,7 @@ public class NativeLLMProvider implements StreamingProvider {
         return ProviderCapabilities.builder()
                 .streaming(true)
                 .supportedFormats(java.util.Set.of(
-                        tech.kayys.gollek.spi.model.ModelFormat.GGUF,
-                        tech.kayys.gollek.spi.model.ModelFormat.SAFETENSORS))
+                        tech.kayys.gollek.spi.model.ModelFormat.GGUF))
                 .supportedDevices(java.util.Set.of(tech.kayys.gollek.spi.model.DeviceType.CPU)) // Extension handles
                                                                                                 // acceleration if
                                                                                                 // available
@@ -133,21 +132,14 @@ public class NativeLLMProvider implements StreamingProvider {
 
         // 3. Extension check
         String lowerId = modelId.toLowerCase();
-        if (lowerId.endsWith(".gguf") || lowerId.endsWith(".safetensors") || lowerId.endsWith(".safetensor")) {
-            return true;
-        }
-
-        // 3b. Directory containing safetensor files
-        if (containsSafetensorFiles(modelId)) {
+        if (lowerId.endsWith(".gguf")) {
             return true;
         }
 
         // 4. Metadata check for format
         if (request != null) {
             Object format = request.getMetadata().get("format");
-            if ("GGUF".equalsIgnoreCase(String.valueOf(format))
-                    || "SAFETENSORS".equalsIgnoreCase(String.valueOf(format))
-                    || "SAFETENSOR".equalsIgnoreCase(String.valueOf(format))) {
+            if ("GGUF".equalsIgnoreCase(String.valueOf(format))) {
                 return true;
             }
 
@@ -156,11 +148,7 @@ public class NativeLLMProvider implements StreamingProvider {
             if (path != null) {
                 String pathStr = String.valueOf(path);
                 String lowerPathStr = pathStr.toLowerCase();
-                if (lowerPathStr.endsWith(".gguf") || lowerPathStr.endsWith(".safetensors")
-                        || lowerPathStr.endsWith(".safetensor")) {
-                    return true;
-                }
-                if (containsSafetensorFiles(pathStr)) {
+                if (lowerPathStr.endsWith(".gguf")) {
                     return true;
                 }
             }
@@ -189,41 +177,7 @@ public class NativeLLMProvider implements StreamingProvider {
     // Simple cache for engine instances
     private final Map<String, NativeInferenceEngine> engineCache = new HashMap<>();
 
-    private boolean isSafetensorModel(ProviderRequest request) {
-        String modelPath = request.getParameter("model_path", String.class)
-                .or(() -> Optional.ofNullable((String) request.getMetadata().get("model_path")))
-                .orElse(request.getModel());
-        if (modelPath == null)
-            return false;
-        String lowerPath = modelPath.toLowerCase();
-        if (lowerPath.endsWith(".safetensors") || lowerPath.endsWith(".safetensor")) {
-            return true;
-        }
-        return containsSafetensorFiles(modelPath);
-    }
 
-    /**
-     * Checks if a given path is a directory containing .safetensors model files.
-     * This handles the common case where the SDK resolves a model to a blob
-     * directory
-     * (e.g. ~/.gollek/models/blobs/UUID/) containing model.safetensors and
-     * config.json.
-     */
-    private static boolean containsSafetensorFiles(String pathStr) {
-        try {
-            Path dir = Path.of(pathStr);
-            if (!Files.isDirectory(dir))
-                return false;
-            try (var stream = Files.list(dir)) {
-                return stream.anyMatch(f -> {
-                    String name = f.getFileName().toString().toLowerCase();
-                    return name.endsWith(".safetensors") || name.endsWith(".safetensor");
-                });
-            }
-        } catch (Exception e) {
-            return false;
-        }
-    }
 
     /**
      * Creates a new ProviderRequest with the model field set to the resolved
@@ -254,9 +208,6 @@ public class NativeLLMProvider implements StreamingProvider {
 
     @Override
     public Uni<InferenceResponse> infer(ProviderRequest request) {
-        if (isSafetensorModel(request)) {
-            throw new UnsupportedOperationException("Safetensor support is currently disabled in the native engine");
-        }
 
         return inferStream(request)
                 .onItem().transform(StreamingInferenceChunk::getDelta)
@@ -273,9 +224,6 @@ public class NativeLLMProvider implements StreamingProvider {
 
     @Override
     public Multi<StreamingInferenceChunk> inferStream(ProviderRequest request) {
-        if (isSafetensorModel(request)) {
-            throw new UnsupportedOperationException("Safetensor support is currently disabled in the native engine");
-        }
 
         return Multi.createFrom().emitter(emitter -> {
             try {

@@ -68,18 +68,19 @@ class LocalModelRepositoryTest {
     }
 
     private ModelManifest createManifest(String modelId, String path) {
-        return new ModelManifest(
-                modelId,
-                modelId + " Name",
-                "1.0.0",
-                path,
-                "",
-                "",
-                Map.of(),
-                List.of(),
-                null,
-                Map.of(),
-                Instant.now(),
-                Instant.now());
+        return ModelManifest.builder()
+                .modelId(modelId)
+                .name(modelId + " Name")
+                .version("1.0.0")
+                .path(path)
+                .apiKey("")
+                .requestId("")
+                .architecture("llama")
+                .artifacts(Map.of())
+                .supportedDevices(List.of())
+                .metadata(Map.of())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
     }
 }

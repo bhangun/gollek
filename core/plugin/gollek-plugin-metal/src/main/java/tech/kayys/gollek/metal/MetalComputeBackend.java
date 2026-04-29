@@ -11,6 +11,7 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.file.Path;
+import jakarta.enterprise.context.ApplicationScoped;
 
 /**
  * Metal hardware-accelerated computation backend.
@@ -22,6 +23,7 @@ import java.nio.file.Path;
  * <p>For mathematical operations not supported natively by the Metal bridge yet (like
  * exp, log, sigmoid), it gracefully falls back to the {@link CpuBackend}.
  */
+@ApplicationScoped
 public class MetalComputeBackend implements ComputeBackend, AdvancedMetalOps {
 
     private static final Logger LOG = LoggerFactory.getLogger(MetalComputeBackend.class);
@@ -294,22 +296,39 @@ public class MetalComputeBackend implements ComputeBackend, AdvancedMetalOps {
     // ── Advanced Fused Operations (AdvancedMetalOps) ──────────────────────
 
     @Override
-    public void rmsNorm(float[] out, float[] x, float[] weight, int n, float eps) {
+    public void rmsNorm(float[] out, float[] x, float[] weight, int n, float eps, boolean addOne) {
         if (!isNative) {
             // Usually falling back isn't fully 1:1 if a pure CPU node didn't cast to AdvancedMetalOps.
             // But if triggered, we simulate simple iteration.
             float ss = 0.f; for(int i=0; i<n; i++) ss += x[i]*x[i];
             float rms = (float) Math.sqrt(ss / n + eps);
-            for(int i=0; i<n; i++) out[i] = x[i] / rms * weight[i];
+            for(int i=0; i<n; i++) {
+                float w = weight[i];
+                if (addOne) w += 1.0f;
+                out[i] = x[i] / rms * w;
+            }
             return;
         }
 
         ScratchBuffers bfr = ensureBuffers(n * 4L, n * 4L, n * 4L);
         copyToMem(x, weight, bfr.memA, bfr.memB);
-        metalBinding.rmsNorm(bfr.memC, bfr.memA, bfr.memB, n, eps);
+        metalBinding.rmsNorm(bfr.memC, bfr.memA, bfr.memB, n, eps, addOne);
         // In-place or output
         MemorySegment heapOut = MemorySegment.ofArray(out);
-        MemorySegment.copy(bfr.memC, 0, heapOut, 0, n * 4L);
+        MemorySegment.copy(bfr.memC, 0, heapOut, 0, (long) n * 4L);
+    }
+
+    @Override
+    public void rmsNorm(MemorySegment out, MemorySegment x, MemorySegment weight, int n, float eps, boolean addOne) {
+        if (!isNative) {
+            float[] xArr = x.toArray(ValueLayout.JAVA_FLOAT);
+            float[] wArr = weight.toArray(ValueLayout.JAVA_FLOAT);
+            float[] oArr = new float[n];
+            rmsNorm(oArr, xArr, wArr, n, eps, addOne);
+            out.copyFrom(MemorySegment.ofArray(oArr));
+            return;
+        }
+        metalBinding.rmsNorm(out, x, weight, n, eps, addOne);
     }
 
     @Override
@@ -326,7 +345,20 @@ public class MetalComputeBackend implements ComputeBackend, AdvancedMetalOps {
         copyToMem(gate, up, bfr.memA, bfr.memB);
         metalBinding.siluFfn(bfr.memC, bfr.memA, bfr.memB, n);
         MemorySegment heapOut = MemorySegment.ofArray(out);
-        MemorySegment.copy(bfr.memC, 0, heapOut, 0, n * 4L);
+        MemorySegment.copy(bfr.memC, 0, heapOut, 0, (long) n * 4L);
+    }
+
+    @Override
+    public void siluFfn(MemorySegment out, MemorySegment gate, MemorySegment up, int n) {
+        if (!isNative) {
+            float[] gArr = gate.toArray(ValueLayout.JAVA_FLOAT);
+            float[] uArr = up.toArray(ValueLayout.JAVA_FLOAT);
+            float[] oArr = new float[n];
+            siluFfn(oArr, gArr, uArr, n);
+            out.copyFrom(MemorySegment.ofArray(oArr));
+            return;
+        }
+        metalBinding.siluFfn(out, gate, up, n);
     }
 
     @Override
@@ -339,7 +371,7 @@ public class MetalComputeBackend implements ComputeBackend, AdvancedMetalOps {
             MemorySegment contextLens,
             int b, int t, int h, int d,
             int blockSize, int maxBlocks,
-            float scale, boolean isCausal) {
+            float scale, boolean isCausal, float softCap) {
         
         if (!isNative) {
             throw new UnsupportedOperationException("CPU Fallback for Paged Attention MemorySegments is not supported directly in the Metal adapter. Caller must handle.");
@@ -347,7 +379,7 @@ public class MetalComputeBackend implements ComputeBackend, AdvancedMetalOps {
 
         metalBinding.attention(
                 out, q, kCache, vCache, blockTable, contextLens,
-                b, t, h, d, blockSize, maxBlocks, scale, isCausal ? 1 : 0
+                b, t, h, d, blockSize, maxBlocks, scale, isCausal ? 1 : 0, softCap
         );
     }
 
