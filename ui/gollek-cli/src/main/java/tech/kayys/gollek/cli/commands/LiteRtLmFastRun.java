@@ -1,6 +1,10 @@
 package tech.kayys.gollek.cli.commands;
 import tech.kayys.gollek.sdk.route.*;
 import tech.kayys.gollek.safetensor.engine.route.*;
+import tech.kayys.gollek.observability.ObservabilityManager;
+import tech.kayys.gollek.metrics.MetricsRegistry;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributesBuilder;
 
 import com.google.ai.edge.litertlm.Backend;
 import com.google.ai.edge.litertlm.Conversation;
@@ -904,6 +908,27 @@ public final class LiteRtLmFastRun {
             out.printf("  engine ttft    = %9.2f ms (model-ready)%n", engineTtftMs);
         }
         out.printf("  token latency  = %9.2f ms/token%n%n", tokenLatencyMs);
+
+        try {
+            ObservabilityManager obs = ObservabilityManager.global();
+            if (obs != null) {
+                MetricsRegistry reg = obs.getMetricsRegistry();
+                AttributesBuilder attrs = Attributes.builder()
+                        .put("engine", "litert")
+                        .put("fast_path", true);
+
+                Attributes finalAttrs = attrs.build();
+                reg.record("gollek.llm.generation.duration", durationMs, finalAttrs);
+                reg.record("gollek.llm.generation.speed", speed, finalAttrs);
+                reg.record("gollek.llm.generation.token_latency", tokenLatencyMs, finalAttrs);
+                reg.record("gollek.llm.model.open_time", loadMs, finalAttrs);
+                if (hasTtft) {
+                    reg.record("gollek.llm.native.prefill", ttftMs, finalAttrs);
+                }
+            }
+        } catch (Exception e) {
+            // Ignore telemetry exceptions
+        }
     }
 
     private static double nanosToMillis(long nanos) {

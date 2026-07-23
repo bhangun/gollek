@@ -22,7 +22,7 @@ done
 source "$ROOT_DIR/scripts/module-selection-current.env"
 ARCHITECTURE_VALUE="${ARCHITECTURE_TARGETS:-${ARCHITECTURE_TARGET:-native-java,binding}}"
 
-if command -v /usr/libexec/java_home >/dev/null 2>&1; then
+if [[ -z "${JAVA_HOME:-}" ]] && command -v /usr/libexec/java_home >/dev/null 2>&1; then
   JAVA_25_HOME="$(/usr/libexec/java_home -v 25 2>/dev/null || true)"
   if [[ -n "${JAVA_25_HOME}" ]]; then
     export JAVA_HOME="${JAVA_25_HOME}"

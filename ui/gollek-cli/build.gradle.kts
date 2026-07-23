@@ -39,6 +39,8 @@ dependencies {
     implementation(project(":core:gollek-runtime-config"))
     implementation(project(":core:gollek-provider-routing"))
     implementation(project(":core:gollek-tokenizer-core"))
+    implementation(project(":core:gollek-observability"))
+    implementation("io.opentelemetry:opentelemetry-api")
     implementation(project(":core:plugin:gollek-plugin-core"))
     implementation(project(":core:plugin:gollek-plugin-kernel-core"))
     implementation(project(":core:plugin:gollek-plugin-runner-core"))

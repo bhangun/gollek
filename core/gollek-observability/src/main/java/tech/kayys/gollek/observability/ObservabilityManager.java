@@ -24,6 +24,7 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.context.Scope;
+import io.opentelemetry.api.GlobalOpenTelemetry;
 import tech.kayys.gollek.metrics.MetricsRegistry;
 
 import java.util.Objects;
@@ -52,6 +53,23 @@ public class ObservabilityManager implements AutoCloseable {
     private final MetricsRegistry metricsRegistry;
     private final LogAggregator logAggregator;
     private final AtomicBoolean closed = new AtomicBoolean(false);
+
+    private static volatile ObservabilityManager GLOBAL_INSTANCE;
+
+    /**
+     * Get the global ObservabilityManager instance (lazily initialized).
+     * @return the global instance using GlobalOpenTelemetry.
+     */
+    public static ObservabilityManager global() {
+        if (GLOBAL_INSTANCE == null) {
+            synchronized (ObservabilityManager.class) {
+                if (GLOBAL_INSTANCE == null) {
+                    GLOBAL_INSTANCE = new ObservabilityManager(GlobalOpenTelemetry.get());
+                }
+            }
+        }
+        return GLOBAL_INSTANCE;
+    }
 
     /**
      * Creates a new ObservabilityManager with default configuration.

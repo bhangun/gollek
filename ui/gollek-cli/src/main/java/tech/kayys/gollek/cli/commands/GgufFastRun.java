@@ -1,6 +1,11 @@
 package tech.kayys.gollek.cli.commands;
 import tech.kayys.gollek.sdk.route.*;
 import tech.kayys.gollek.safetensor.engine.route.*;
+import tech.kayys.gollek.observability.ObservabilityManager;
+import tech.kayys.gollek.metrics.MetricsRegistry;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributesBuilder;
+import io.opentelemetry.api.common.AttributeKey;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -905,6 +910,42 @@ public final class GgufFastRun {
         out.printf("  token latency  = %9.2f ms/token%n", tokenLatencyMs);
         printNativeMetrics(out, nativeMetrics);
         out.println();
+
+        try {
+            ObservabilityManager obs = ObservabilityManager.global();
+            if (obs != null) {
+                MetricsRegistry reg = obs.getMetricsRegistry();
+                AttributesBuilder attrs = Attributes.builder()
+                        .put("engine", "gguf")
+                        .put("fast_path", true);
+
+                if (nativeMetrics.isPresent()) {
+                    Map<String, String> m = parseNativeMetrics(nativeMetrics.get());
+                    String backend = m.get("backend");
+                    if (backend != null && !backend.isBlank()) {
+                        attrs.put("native_backend", backend);
+                    }
+                    if (m.containsKey("gpuLayers")) attrs.put("gpuLayers", Long.parseLong(m.get("gpuLayers")));
+                    if (m.containsKey("threads")) attrs.put("threads", Long.parseLong(m.get("threads")));
+                    if (m.containsKey("context")) attrs.put("context", Long.parseLong(m.get("context")));
+                    if (m.containsKey("batch")) attrs.put("batch", Long.parseLong(m.get("batch")));
+                    
+                    if (m.containsKey("modelLoad")) reg.record("gollek.llm.native.load", Double.parseDouble(m.get("modelLoad")), attrs.build());
+                    if (m.containsKey("contextInit")) reg.record("gollek.llm.native.context_init", Double.parseDouble(m.get("contextInit")), attrs.build());
+                    if (m.containsKey("tokenize")) reg.record("gollek.llm.native.tokenize", Double.parseDouble(m.get("tokenize")), attrs.build());
+                    if (m.containsKey("prefill")) reg.record("gollek.llm.native.prefill", Double.parseDouble(m.get("prefill")), attrs.build());
+                    if (m.containsKey("decode")) reg.record("gollek.llm.native.decode", Double.parseDouble(m.get("decode")), attrs.build());
+                }
+
+                Attributes finalAttrs = attrs.build();
+                reg.record("gollek.llm.generation.duration", durationMs, finalAttrs);
+                reg.record("gollek.llm.generation.speed", totalSpeed, finalAttrs);
+                reg.record("gollek.llm.generation.token_latency", tokenLatencyMs, finalAttrs);
+                reg.record("gollek.llm.model.open_time", openOrGenerateMillis(openNanos), finalAttrs);
+            }
+        } catch (Exception e) {
+            // Ignore telemetry exceptions
+        }
     }
 
     private static double openOrGenerateMillis(long nanos) {

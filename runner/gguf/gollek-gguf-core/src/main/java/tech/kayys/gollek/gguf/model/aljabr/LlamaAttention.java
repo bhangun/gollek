@@ -11,6 +11,8 @@ public class LlamaAttention extends Module {
     private final int nHeads;
     private final int nKVHeads;
     private final int headDim;
+    private final int layerIdx;
+    private final ModelConfig cfg;
     
     private final Linear qProj;
     private final Linear kProj;
@@ -18,6 +20,8 @@ public class LlamaAttention extends Module {
     private final Linear oProj;
     
     public LlamaAttention(ModelConfig cfg, WeightAdapter weights, int layerIdx) {
+        this.cfg = cfg;
+        this.layerIdx = layerIdx;
         this.nHeads = cfg.nHeads();
         // Load weights from adapter
         Tensor wQ = weights.getWeight("blk." + layerIdx + ".attn_q.weight");
@@ -70,12 +74,16 @@ public class LlamaAttention extends Module {
         k = k.reshape(batch, seqLen, nKVHeads, headDim); // [B, S, nKVH, D]
         v = v.reshape(batch, seqLen, nKVHeads, headDim); // [B, S, nKVH, D]
         
-        // Apply RoPE here (TODO: Implement RoPE as a Tensor Op)
+        // Apply RoPE
+        q = q.applyRoPE(cfg.ropeFreqBase());
+        k = k.applyRoPE(cfg.ropeFreqBase());
         
-        // K/V cache should be updated here (TODO)
+        // K/V cache update
+        Tensor cachedK = k.updateKVCache(layerIdx, "k");
+        Tensor cachedV = v.updateKVCache(layerIdx, "v");
         
         // Native attention execution
-        Tensor out = q.attention(k, v);
+        Tensor out = q.attention(cachedK, cachedV);
         
         // Flatten heads for output projection: [B, S, H * D]
         out = out.reshape(batch, seqLen, (long) nHeads * headDim);

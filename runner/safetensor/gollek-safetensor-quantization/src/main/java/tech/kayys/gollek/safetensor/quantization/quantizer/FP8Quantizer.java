@@ -326,38 +326,47 @@ public class FP8Quantizer implements Quantizer {
     // ─────────────────────────────────────────────────────────────────────────
 
     private float[] getTensorData(AccelTensor tensor) {
-        // TODO: Implement based on actual AccelTensor API
-        return new float[1024]; // Placeholder
+        return tensor.dequantize().dataSegment().toArray(java.lang.foreign.ValueLayout.JAVA_FLOAT);
     }
 
     private int[] getTensorShape(AccelTensor tensor) {
-        // TODO: Implement based on actual AccelTensor API
-        return new int[] { 1, 1024 }; // Placeholder
+        long[] shape = tensor.shape();
+        int[] intShape = new int[shape.length];
+        for (int i = 0; i < shape.length; i++) {
+            intShape[i] = (int) shape[i];
+        }
+        return intShape;
     }
 
     private byte[] getQuantizedData(AccelTensor tensor) {
-        // TODO: Extract quantized data from tensor
-        return new byte[1024]; // Placeholder
+        return tensor.dataSegment().toArray(java.lang.foreign.ValueLayout.JAVA_BYTE);
     }
 
     private float[] getScales(AccelTensor tensor) {
-        // TODO: Extract scales from tensor metadata
-        return new float[] { 1.0f }; // Placeholder
+        if (tensor.scales() != null) {
+            return tensor.scales().toArray(java.lang.foreign.ValueLayout.JAVA_FLOAT);
+        }
+        return new float[] { 1.0f };
     }
 
     private FP8Format getFormat(AccelTensor tensor) {
-        // TODO: Extract format from tensor metadata
-        return DEFAULT_FORMAT; // Placeholder
+        // For now, default to DEFAULT_FORMAT as Safetensors doesn't store FP8 format metadata universally yet
+        return DEFAULT_FORMAT;
     }
 
     private AccelTensor createQuantizedTensor(byte[] data, float[] scales, int[] shape, QuantConfig config,
             FP8Format format) {
-        // TODO: Create tensor with quantized data and metadata
-        return null; // Placeholder
+        long[] longShape = new long[shape.length];
+        for (int i = 0; i < shape.length; i++) longShape[i] = shape[i];
+        
+        AccelTensor t = AccelTensor.fromByteArray(data, longShape);
+        AccelTensor scaleT = AccelTensor.fromFloatArray(scales, scales.length);
+        return t.withQuantization(AccelTensor.QuantType.FP8, scaleT.dataSegment(), null, -1);
     }
 
     private AccelTensor createDequantizedTensor(float[] data, int[] shape) {
-        // TODO: Create tensor with dequantized data
-        return null; // Placeholder
+        long[] longShape = new long[shape.length];
+        for (int i = 0; i < shape.length; i++) longShape[i] = shape[i];
+        return AccelTensor.fromFloatArray(data, longShape);
     }
 }
