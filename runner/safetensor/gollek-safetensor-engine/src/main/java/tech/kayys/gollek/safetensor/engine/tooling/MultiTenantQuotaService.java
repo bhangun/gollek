@@ -27,7 +27,7 @@
  *
  * Tenant resolution
  * ════════════════
- * Tenant ID comes from ProviderRequest in this priority order:
+ * Tenant ID comes from InferenceRequest in this priority order:
  *   metadata["tenantId"] → userId → apiKey → "community"
  *
  * Per-tenant limits are configured via:

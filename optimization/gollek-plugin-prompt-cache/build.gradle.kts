@@ -26,7 +26,6 @@ dependencies {
     implementation(project(":spi:gollek-spi-inference"))
     implementation(project(":optimization:gollek-plugin-kv-cache"))
     
-    implementation(project(":spi:gollek-spi-provider"))
     implementation(group = "io.quarkus", name = "quarkus-arc")
     implementation(group = "io.quarkus", name = "quarkus-config-yaml")
     implementation(group = "io.smallrye.config", name = "smallrye-config")

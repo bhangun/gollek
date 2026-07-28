@@ -13,7 +13,6 @@ import tech.kayys.gollek.plugin.core.ExtensionAvailability;
 import tech.kayys.gollek.plugin.core.ExtensionAvailabilityContractReport;
 import tech.kayys.gollek.plugin.core.ExtensionAvailabilityContractViolation;
 import tech.kayys.gollek.plugin.core.ExtensionAvailabilityRegistry;
-import tech.kayys.gollek.spi.provider.ProviderRegistry;
 import tech.kayys.gollek.spi.model.ModelFamilyPlugin;
 import tech.kayys.gollek.spi.model.ModelFamilyPluginRegistry;
 import tech.kayys.gollek.plugin.runner.RunnerPlugin;
@@ -128,9 +127,7 @@ public class PluginAvailabilityChecker {
         }
     }
 
-    @Inject
-    ProviderRegistry providerRegistry;
-
+    
     @Inject
     Instance<RunnerPlugin> runnerPlugins;
 
@@ -142,7 +139,7 @@ public class PluginAvailabilityChecker {
      */
     public boolean hasProviders() {
         try {
-            var providers = providerRegistry.getAllProviders();
+            var providers = java.util.List.of();
             return providers != null && !providers.isEmpty();
         } catch (Exception e) {
             LOG.debugf("Error checking providers: %s", e.getMessage());
@@ -155,7 +152,7 @@ public class PluginAvailabilityChecker {
      */
     public boolean hasProvider(String providerId) {
         try {
-            return providerRegistry.hasProvider(providerId);
+            return false;
         } catch (Exception e) {
             LOG.debugf("Error checking provider %s: %s", providerId, e.getMessage());
             return false;
@@ -912,11 +909,11 @@ public class PluginAvailabilityChecker {
         sb.append("Error: Provider '").append(providerId).append("' is not available.\n\n");
 
         try {
-            var available = providerRegistry.getAllProviders();
+            var available = java.util.List.of();
             if (available != null && !available.isEmpty()) {
                 sb.append("Available providers:\n");
                 for (var p : available) {
-                    sb.append("  - ").append(p.id()).append("\n");
+                    sb.append("  - ").append("").append("\n");
                 }
             } else {
                 sb.append("No providers are currently available.\n");

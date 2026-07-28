@@ -19,13 +19,12 @@ repositories {
 
 dependencies {
     implementation(project(":core:plugin:gollek-plugin-runner-core"))
-    implementation(project(":spi:gollek-spi-provider"))
+    implementation(project(":spi:gollek-spi-inference"))
     implementation(project(":runner:safetensor:gollek-safetensor-spi"))
     implementation(project(":runner:safetensor:gollek-safetensor-engine"))
     implementation(project(":runner:safetensor:gollek-safetensor-core"))
     implementation(project(":runner:safetensor:gollek-safetensor-api"))
     implementation(project(":runner:safetensor:gollek-safetensor-quantization"))
-    implementation(project(":spi:gollek-spi-inference"))
     implementation(project(":spi:gollek-spi-model"))
     implementation(project(":spi:gollek-spi-multimodal"))
     implementation(project(":core:gollek-runtime-config"))

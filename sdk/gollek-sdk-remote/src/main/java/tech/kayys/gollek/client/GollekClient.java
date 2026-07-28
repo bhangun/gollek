@@ -11,7 +11,6 @@ import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
 import tech.kayys.gollek.client.exception.*;
-import tech.kayys.gollek.spi.provider.ProviderInfo;
 import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.gollek.sdk.exception.SdkException;
 import tech.kayys.gollek.spi.model.ModelInfo;
@@ -436,84 +435,6 @@ public class GollekClient implements GollekSdk {
     }
 
     /**
-     * Lists all available inference providers.
-     *
-     * @return List of provider information
-     * @throws SdkException if the request fails
-     */
-    @Override
-    public List<ProviderInfo> listAvailableProviders() throws SdkException {
-        try {
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/v1/providers"))
-                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
-                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
-                    .timeout(Duration.ofSeconds(10))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-
-            return handleResponse(response,
-                    objectMapper.getTypeFactory().constructCollectionType(java.util.List.class, ProviderInfo.class));
-        } catch (GollekClientException e) {
-            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
-        } catch (Exception e) {
-            throw new SdkException("SDK_ERR_PROVIDER_LIST", "Failed to list providers", e);
-        }
-    }
-
-    /**
-     * Gets detailed information about a specific provider.
-     *
-     * @param providerId The provider ID
-     * @return Provider information
-     * @throws SdkException if the provider is not found
-     */
-    @Override
-    public ProviderInfo getProviderInfo(String providerId) throws SdkException {
-        try {
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/v1/providers/" + URLEncoder.encode(providerId, StandardCharsets.UTF_8)))
-                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
-                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
-                    .timeout(Duration.ofSeconds(10))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-
-            return handleResponse(response, ProviderInfo.class);
-        } catch (GollekClientException e) {
-            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
-        } catch (Exception e) {
-            throw new SdkException("SDK_ERR_PROVIDER_INFO", "Failed to get provider info", e);
-        }
-    }
-
-    /**
-     * Sets the preferred provider for subsequent requests.
-     *
-     * @param providerId The provider ID
-     * @throws SdkException if the provider is not available
-     */
-    @Override
-    public void setPreferredProvider(String providerId) throws SdkException {
-        // Validate provider exists by fetching its info
-        getProviderInfo(providerId);
-        this.preferredProvider = providerId;
-    }
-
-    /**
-     * Gets the currently preferred provider ID.
-     *
-     * @return The preferred provider ID, or empty if none is set
-     */
-    @Override
-    public java.util.Optional<String> getPreferredProvider() {
-        return java.util.Optional.ofNullable(preferredProvider);
-    }
-
     /**
      * Creates a new builder for {@link GollekClient}.
      *

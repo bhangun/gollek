@@ -14,4 +14,8 @@ public final class FlacLibraryCheck {
     public static String getVersion() {
         return "unavailable";
     }
+
+    public static String getDiagnostics() {
+        return "Suling fallback stub";
+    }
 }

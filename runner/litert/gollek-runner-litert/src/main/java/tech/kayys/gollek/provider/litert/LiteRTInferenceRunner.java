@@ -28,9 +28,6 @@ import static java.lang.foreign.ValueLayout.*;
 import tech.kayys.gollek.spi.Message;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
-import tech.kayys.gollek.spi.provider.ProviderRegistry;
-import tech.kayys.gollek.spi.provider.ProviderRequest;
-import tech.kayys.gollek.spi.provider.ProviderRequests;
 
 /**
  * Specialized runner for LLM models (like Gemma) using LiteRT 2.0 CompiledModel API.
@@ -764,77 +761,27 @@ public class LiteRTInferenceRunner implements AutoCloseable {
                 "companion safetensor direct provider");
     }
 
-    private boolean tryGenerateWithCompanionGgufFallback(
+        private boolean tryGenerateWithCompanionGgufFallback(
             InferenceRequest request,
             Consumer<String> tokenCallback) {
-        try {
-            Path ggufPath = ensureCompanionGgufModel();
-            if (ggufPath == null) {
-                return false;
-            }
-
-            Object registryBean = resolveArcBean("tech.kayys.gollek.spi.provider.ProviderRegistry");
-            if (!(registryBean instanceof ProviderRegistry registry)) {
-                log.info("Companion GGUF provider fallback unavailable: ProviderRegistry bean not available");
-                return false;
-            }
-
-            Object provider = resolveProviderFromRegistry(registry, "native", "gguf", "llamacpp");
-            if (provider == null) {
-                log.info("Companion GGUF provider fallback unavailable: no GGUF-capable provider registered");
-                return false;
-            }
-
-            ProviderRequest providerRequest = buildProviderRequestForModel(
-                    request,
-                    ggufPath.toString(),
-                    true,
-                    "native",
-                    Map.of(),
-                    Map.of("converted_from", safetensorFallbackModelPath.toString()));
-            return streamWithProvider(provider, providerRequest, request, tokenCallback, "companion GGUF provider fallback");
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.warn("Companion GGUF provider fallback interrupted: {}", e.getMessage());
-            return false;
-        } catch (Exception e) {
-            log.warn("Companion GGUF provider fallback failed: {}", rootCauseMessage(e));
-            return false;
-        }
+        return false;
     }
 
-    private boolean tryGenerateWithNamedSafetensorProviderFallback(
+        private boolean tryGenerateWithNamedSafetensorProviderFallback(
             InferenceRequest request,
             Consumer<String> tokenCallback,
             String providerClassName,
             String providerLabel) {
-        try {
-            enableGemma4SafetensorFastPath();
-            Object provider = resolveArcBean(providerClassName);
-            if (provider == null) {
-                log.info("{} unavailable: bean not present", providerLabel);
-                return false;
-            }
-
-            ProviderRequest providerRequest = buildSafetensorProviderRequest(request, true);
-            return streamWithProvider(provider, providerRequest, request, tokenCallback, providerLabel);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.warn("{} interrupted: {}", providerLabel, e.getMessage());
-            return false;
-        } catch (Exception e) {
-            log.warn("{} failed: {}", providerLabel, rootCauseMessage(e));
-            return false;
-        }
+        return false;
     }
 
     private boolean streamWithProvider(
             Object provider,
-            ProviderRequest providerRequest,
+            InferenceRequest providerRequest,
             InferenceRequest request,
             Consumer<String> tokenCallback,
             String providerLabel) throws Exception {
-        Method inferStreamMethod = provider.getClass().getMethod("inferStream", ProviderRequest.class);
+        Method inferStreamMethod = provider.getClass().getMethod("inferStream", InferenceRequest.class);
         @SuppressWarnings("unchecked")
         Multi<StreamingInferenceChunk> stream =
                 (Multi<StreamingInferenceChunk>) inferStreamMethod.invoke(provider, providerRequest);
@@ -981,44 +928,13 @@ public class LiteRTInferenceRunner implements AutoCloseable {
         return builderClass.getMethod("build").invoke(builder);
     }
 
-    private ProviderRequest buildSafetensorProviderRequest(
+        private InferenceRequest buildSafetensorInferenceRequest(
             InferenceRequest request,
             boolean streaming) {
-        String modelRef = safetensorFallbackModelPath.getParent() != null
-                ? safetensorFallbackModelPath.getParent().toString()
-                : safetensorFallbackModelPath.toString();
-
-        Map<String, Object> parameterOverrides = new HashMap<>();
-        parameterOverrides.put("model_path", modelRef);
-        Map<String, Object> metadataOverrides = new HashMap<>();
-        metadataOverrides.put("model_path", modelRef);
-        maybeEnableSafetensorFallbackQuantization(parameterOverrides, metadataOverrides, request);
-        return buildProviderRequestForModel(
-                request,
-                modelRef,
-                streaming,
-                "safetensor",
-                parameterOverrides,
-                metadataOverrides);
+        return request;
     }
 
-    private ProviderRequest buildProviderRequestForModel(
-            InferenceRequest request,
-            String modelRef,
-            boolean streaming,
-            String preferredProvider,
-            Map<String, Object> parameterOverrides,
-            Map<String, Object> metadataOverrides) {
-        InferenceRequest normalizedRequest = normalizeSafetensorFallbackRequest(request);
-        return ProviderRequests.fromInferenceRequest(
-                normalizedRequest,
-                modelRef,
-                streaming,
-                Duration.ofMinutes(5),
-                preferredProvider,
-                parameterOverrides,
-                metadataOverrides);
-    }
+    
 
     private InferenceRequest normalizeSafetensorFallbackRequest(InferenceRequest request) {
         if (request == null) {
@@ -1121,25 +1037,6 @@ public class LiteRTInferenceRunner implements AutoCloseable {
         return outputPath;
     }
 
-    private Object resolveProviderFromRegistry(ProviderRegistry registry, String... providerIds) {
-        if (registry == null || providerIds == null) {
-            return null;
-        }
-        for (String providerId : providerIds) {
-            if (providerId == null || providerId.isBlank()) {
-                continue;
-            }
-            try {
-                var provider = registry.getProvider(providerId);
-                if (provider.isPresent()) {
-                    return provider.get();
-                }
-            } catch (Exception e) {
-                log.debug("Failed to resolve provider {} from registry: {}", providerId, e.getMessage());
-            }
-        }
-        return null;
-    }
 
     private String normalizeCompanionGgufName(Path sourceDir) {
         String raw = sourceDir.getFileName() != null ? sourceDir.getFileName().toString() : "model";

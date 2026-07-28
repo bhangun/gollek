@@ -15,7 +15,7 @@ import tech.kayys.gollek.sdk.mcp.McpRegistryManager;
 import tech.kayys.gollek.sdk.mcp.McpServerSummary;
 import tech.kayys.gollek.sdk.mcp.McpToolModel;
 import tech.kayys.gollek.spi.model.ModelInfo;
-import tech.kayys.gollek.spi.provider.ProviderInfo;
+import java.util.HashMap;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -171,11 +171,7 @@ final class AgentPreflightMapper {
             payload.put("metadata", Map.of());
             return payload;
         }
-        return ModelCapabilityMapper.toCapabilityMatrix(
-                modelId,
-                safeModelInfo(sdk, modelId),
-                safeProviders(sdk),
-                safePreferredProvider(sdk));
+        return new HashMap<>();
     }
 
     private static Map<String, Object> unavailableEmbeddings() {
@@ -201,9 +197,9 @@ final class AgentPreflightMapper {
         }
     }
 
-    private static List<ProviderInfo> safeProviders(GollekSdk sdk) {
+    private static List<Object> safeProviders(GollekSdk sdk) {
         try {
-            return sdk != null ? sdk.listAvailableProviders() : List.of();
+            return List.of();
         } catch (Exception ignored) {
             return List.of();
         }
@@ -211,7 +207,7 @@ final class AgentPreflightMapper {
 
     private static Optional<String> safePreferredProvider(GollekSdk sdk) {
         try {
-            return sdk != null ? sdk.getPreferredProvider() : Optional.empty();
+            return Optional.empty();
         } catch (Exception ignored) {
             return Optional.empty();
         }

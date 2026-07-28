@@ -1787,7 +1787,7 @@ import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
 import tech.kayys.gollek.spi.provider.LLMProvider;
 import tech.kayys.gollek.spi.provider.ProviderRegistry;
 import tech.kayys.gollek.spi.provider.ProviderRequest;
-import tech.kayys.gollek.spi.provider.StreamingProvider;
+import tech.kayys.gollek.spi.llm.StreamingLLMProvider;
 
 import java.util.Optional;
 

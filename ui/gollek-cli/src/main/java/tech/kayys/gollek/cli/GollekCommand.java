@@ -17,7 +17,6 @@ import tech.kayys.gollek.cli.commands.FeaturesCommand;
 import tech.kayys.gollek.cli.commands.InfoCommand;
 import tech.kayys.gollek.cli.commands.ListCommand;
 import tech.kayys.gollek.cli.commands.McpCommand;
-import tech.kayys.gollek.cli.commands.ProvidersCommand;
 import tech.kayys.gollek.cli.commands.PullCommand;
 import tech.kayys.gollek.cli.commands.ModelCommand;
 import tech.kayys.gollek.cli.commands.PrewarmCommand;
@@ -57,7 +56,6 @@ import picocli.CommandLine.Option;
         McpCommand.class,
         ShowCommand.class,
         DeleteCommand.class,
-        ProvidersCommand.class,
         ExtensionsCommand.class,
         FeaturesCommand.class,
         InfoCommand.class,

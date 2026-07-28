@@ -17,8 +17,6 @@ public class ChatCommandHandler {
     @Inject
     ListCommand listCommand;
     @Inject
-    ProvidersCommand providersCommand;
-    @Inject
     InfoCommand infoCommand;
     @Inject
     ExtensionsCommand extensionsCommand;
@@ -55,7 +53,7 @@ public class ChatCommandHandler {
         }
 
         if (cmd.equals("/providers")) {
-            providersCommand.run();
+            
             return true;
         }
 

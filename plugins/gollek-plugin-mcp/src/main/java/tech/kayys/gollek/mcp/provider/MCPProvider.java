@@ -13,25 +13,28 @@ import tech.kayys.gollek.mcp.resource.MCPResourceProvider;
 import tech.kayys.gollek.mcp.tool.MCPToolExecutor;
 import tech.kayys.gollek.mcp.tool.MCPToolRegistry;
 import tech.kayys.gollek.spi.exception.ProviderException;
-import tech.kayys.gollek.spi.provider.LLMProvider;
-import tech.kayys.gollek.spi.provider.ProviderCapabilities;
-import tech.kayys.gollek.spi.provider.ProviderHealth;
-import tech.kayys.gollek.spi.provider.ProviderMetadata;
-import tech.kayys.gollek.spi.provider.ProviderRequest;
 import tech.kayys.gollek.mcp.dto.MCPPromptResult;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
+import tech.kayys.gollek.spi.inference.InferenceRequest;
+import tech.kayys.gollek.spi.model.HealthStatus;
+import tech.kayys.gollek.spi.inference.LocalInferenceEngine;
 
 import org.jboss.logging.Logger;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import jakarta.enterprise.inject.Alternative;
+import jakarta.annotation.Priority;
+
 /**
  * MCP-based LLM provider that supports tools, resources, and prompts.
  * Integrates with the inference kernel's provider abstraction.
  */
 @ApplicationScoped
-public class MCPProvider implements LLMProvider {
+@Alternative
+@Priority(1)
+public class MCPProvider implements LocalInferenceEngine {
 
     private static final Logger LOG = Logger.getLogger(MCPProvider.class);
     private static final String PROVIDER_ID = "mcp";
@@ -54,20 +57,8 @@ public class MCPProvider implements LLMProvider {
     private final Map<String, MCPProviderConfig> configurations = new ConcurrentHashMap<>();
     private volatile boolean initialized = false;
 
-    @Override
     public String id() {
         return PROVIDER_ID;
-    }
-
-    @Override
-    public ProviderCapabilities capabilities() {
-        return ProviderCapabilities.builder()
-                .streaming(false) // MCP typically doesn't support streaming
-                .toolCalling(true)
-                .multimodal(true) // Via resources
-                .maxContextTokens(128000) // Depends on underlying model
-                .functionCalling(true)
-                .build();
     }
 
     /**
@@ -99,39 +90,17 @@ public class MCPProvider implements LLMProvider {
                 });
     }
 
-    @Override
     public String name() {
         return "MCP Provider";
     }
 
     @Override
-    public ProviderMetadata metadata() {
-        return ProviderMetadata.builder()
-                .providerId(PROVIDER_ID)
-                .name(name())
-                .vendor("Gollek")
-                .version("1.0.0")
-                .homepage("https://github.com/kayys/gollek")
-                .build();
+    public io.smallrye.mutiny.Multi<tech.kayys.gollek.spi.inference.StreamingInferenceChunk> stream(InferenceRequest request) {
+        return io.smallrye.mutiny.Multi.createFrom().failure(new UnsupportedOperationException("MCP provider does not support streaming"));
     }
 
     @Override
-    public void initialize(tech.kayys.gollek.spi.provider.ProviderConfig config)
-            throws ProviderException.ProviderInitializationException {
-        // Already handled by MCPProviderInitializer, but we can add additional config
-        // here if needed
-        LOG.info("MCP Provider initialized with config");
-    }
-
-    @Override
-    public boolean supports(String modelId, ProviderRequest request) {
-        // MCP provider can support any model that the connected MCP servers support
-        // For now, we'll return true if we have at least one active connection
-        return initialized && !mcpClient.getActiveConnections().isEmpty();
-    }
-
-    @Override
-    public Uni<InferenceResponse> infer(ProviderRequest request) {
+    public Uni<InferenceResponse> infer(InferenceRequest request) {
         if (!initialized) {
             return Uni.createFrom().failure(
                     new IllegalStateException("MCP provider not initialized"));
@@ -147,27 +116,16 @@ public class MCPProvider implements LLMProvider {
                     return buildErrorResponse(request, error, startTime);
                 });
     }
-
     @Override
-    public Uni<ProviderHealth> health() {
+    public HealthStatus health() {
         boolean hasActiveConnections = !mcpClient.getActiveConnections().isEmpty();
-
-        ProviderHealth.Status status = hasActiveConnections ? ProviderHealth.Status.HEALTHY
-                : ProviderHealth.Status.UNHEALTHY;
-
-        return Uni.createFrom().item(ProviderHealth.builder()
-                .status(status)
-                .timestamp(java.time.Instant.now())
-                .details(Map.of(
-                        "active_connections", mcpClient.getActiveConnections().size(),
-                        "initialized", initialized))
-                .build());
+        return hasActiveConnections ? HealthStatus.healthy("MCP active") : HealthStatus.unhealthy("MCP inactive");
     }
 
     /**
      * Process inference request through MCP workflow
      */
-    private Uni<MCPInferenceResult> processRequest(ProviderRequest request) {
+    private Uni<MCPInferenceResult> processRequest(InferenceRequest request) {
         var context = MCPInferenceContext.builder()
                 .requestId(request.getRequestId())
                 .model(request.getModel())
@@ -364,7 +322,7 @@ public class MCPProvider implements LLMProvider {
      * Build successful inference response
      */
     private InferenceResponse buildResponse(
-            ProviderRequest request,
+            InferenceRequest request,
             MCPInferenceResult result,
             long startTime) {
         long duration = System.currentTimeMillis() - startTime;
@@ -384,7 +342,7 @@ public class MCPProvider implements LLMProvider {
      * Build error response
      */
     private InferenceResponse buildErrorResponse(
-            ProviderRequest request,
+            InferenceRequest request,
             Throwable error,
             long startTime) {
         long duration = System.currentTimeMillis() - startTime;

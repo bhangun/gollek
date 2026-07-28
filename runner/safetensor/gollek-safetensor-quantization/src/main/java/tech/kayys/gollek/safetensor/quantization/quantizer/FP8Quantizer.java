@@ -236,8 +236,8 @@ public class FP8Quantizer implements Quantizer {
         }
 
         // Pack FP8 value
-        int fp8 = (sign << 7) | (exp << format.getMantissaBits()) | (mantissa & ((1 << format.getMantissaBits()) - 1));
-        return (byte) (fp8 & 0xFF);
+        int fp8 = sign | (exp << format.getMantissaBits()) | (mantissa & ((1 << format.getMantissaBits()) - 1));
+        return (byte) fp8;
     }
 
     /**

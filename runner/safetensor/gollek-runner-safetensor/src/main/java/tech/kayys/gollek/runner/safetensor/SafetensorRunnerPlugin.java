@@ -186,7 +186,7 @@ public class SafetensorRunnerPlugin implements RunnerPlugin {
 
         try {
             // Retrieve health from the reactive backend
-            tech.kayys.gollek.spi.provider.ProviderHealth backendHealth = backend.health().await().indefinitely();
+            tech.kayys.gollek.spi.model.HealthStatus backendHealth = backend.health();
             
             Map<String, Object> details = new HashMap<>();
             details.put("backend", config.backend());
@@ -194,7 +194,7 @@ public class SafetensorRunnerPlugin implements RunnerPlugin {
             details.put("backend_status", backendHealth.status());
             details.put("backend_message", backendHealth.message());
 
-            boolean isHealthy = backendHealth.status() == tech.kayys.gollek.spi.provider.ProviderHealth.Status.HEALTHY;
+            boolean isHealthy = backendHealth.isHealthy();
             this.healthy = isHealthy;
 
             return isHealthy ? RunnerHealth.healthy(details)

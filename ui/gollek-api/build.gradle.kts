@@ -27,7 +27,6 @@ dependencies {
     implementation(project(":spi:gollek-spi"))
     implementation(project(":spi:gollek-spi-inference"))
     implementation(project(":spi:gollek-spi-model"))
-    implementation(project(":spi:gollek-spi-provider"))
 
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")

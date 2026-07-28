@@ -27,7 +27,6 @@ import tech.kayys.tafkir.quantizer.gptq.GPTQQuantizerService;
 import tech.kayys.gollek.safetensor.SafetensorProviderConfig;
 import tech.kayys.gollek.safetensor.engine.warmup.DirectSafetensorBackend;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
-import tech.kayys.gollek.spi.provider.ProviderRequest;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 
@@ -438,24 +437,11 @@ public class SafetensorRunnerSession implements RunnerSession {
     }
 
     private Uni<InferenceResponse> executeInference(InferenceRequest request) {
-        ProviderRequest providerRequest = convertToProviderRequest(request);
-        return backend.infer(providerRequest);
+        return backend.infer(request);
     }
 
     private Multi<StreamingInferenceChunk> executeStreamingInference(InferenceRequest request) {
-        ProviderRequest providerRequest = convertToProviderRequest(request);
-        return backend.inferStream(providerRequest);
-    }
-
-    private ProviderRequest convertToProviderRequest(InferenceRequest request) {
-        return ProviderRequest.builder()
-                .requestId(request.getRequestId())
-                .model(modelPath)
-                .messages(request.getMessages())
-                .parameters(request.getParameters())
-                .metadata("safetensor.backend", providerConfig.backend())
-                .metadata("safetensor.basePath", providerConfig.basePath())
-                .build();
+        return backend.inferStream(request);
     }
 
     private void releaseModel() {

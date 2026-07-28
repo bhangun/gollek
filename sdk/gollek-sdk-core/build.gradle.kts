@@ -8,7 +8,6 @@ dependencies {
     implementation(project(":core:gollek-model-repository"))
     implementation(project(":core:plugin:gollek-plugin-kernel-core"))
     implementation(project(":spi:gollek-spi"))
-    implementation(project(":spi:gollek-spi-provider"))
     implementation(project(":spi:gollek-spi-inference"))
     implementation(project(":spi:gollek-spi-model"))
     implementation(project(":spi:gollek-spi-multimodal"))

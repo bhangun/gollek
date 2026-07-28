@@ -1,7 +1,7 @@
 package tech.kayys.gollek.sdk.core;
 
 import io.smallrye.mutiny.Multi;
-import tech.kayys.gollek.spi.provider.ProviderInfo;
+
 import tech.kayys.gollek.sdk.exception.SdkException;
 import tech.kayys.gollek.sdk.feature.GollekFeatureKit;
 import tech.kayys.gollek.sdk.mcp.McpRegistryManager;
@@ -152,15 +152,6 @@ public interface GollekSdk {
         throw new UnsupportedOperationException("Quantization service not supported by this SDK implementation");
     }
 
-    // ==================== Provider Operations ====================
-
-    List<ProviderInfo> listAvailableProviders() throws SdkException;
-
-    ProviderInfo getProviderInfo(String providerId) throws SdkException;
-
-    void setPreferredProvider(String providerId) throws SdkException;
-
-    Optional<String> getPreferredProvider();
 
     // ==================== Model Operations ====================
 
@@ -222,75 +213,6 @@ public interface GollekSdk {
     }
 
     /**
-     * Automatically select a provider for a model based on its format. NEW in
-     * v1.2.1.
-     */
-    default Optional<String> autoSelectProvider(String modelId, boolean forceGguf) throws SdkException {
-        return autoSelectProvider(modelId, forceGguf, "Q4_K_M");
-    }
-
-    /**
-     * Automatically select a provider for a model based on its format with
-     * quantization.
-     */
-    default Optional<String> autoSelectProvider(String modelId, boolean forceGguf, String quantization)
-            throws SdkException {
-        return Optional.empty();
-    }
-
-    /**
-     * Resolve, pull, and auto-select provider for a model. NEW in v1.2.1.
-     */
-    default ModelResolution ensureModelAvailable(String modelId, boolean forceGguf,
-            Consumer<PullProgress> progressCallback)
-            throws SdkException {
-        return ensureModelAvailable(modelId, forceGguf, "Q4_K_M", progressCallback);
-    }
-
-    /**
-     * Resolve, pull, and auto-select provider for a model with quantization
-     * control.
-     */
-    default ModelResolution ensureModelAvailable(String modelId, boolean forceGguf, String quantization,
-            Consumer<PullProgress> progressCallback)
-            throws SdkException {
-        return ensureModelAvailable(modelId, null, null, forceGguf, quantization, java.util.List.of(), progressCallback);
-    }
-
-    /**
-     * Resolve, pull, and auto-select provider for a model with explicit format and
-     * quantization.
-     * NEW in v1.2.4.
-     */
-    default ModelResolution ensureModelAvailable(String modelId, String format, String plugin, boolean forceGguf,
-            String quantization, Consumer<PullProgress> progressCallback)
-            throws SdkException {
-        return ensureModelAvailable(modelId, format, plugin, forceGguf, quantization, java.util.List.of(), progressCallback);
-    }
-
-    /**
-     * Resolve, pull, and auto-select provider for a model with explicit fallback
-     * candidates.
-     */
-    default ModelResolution ensureModelAvailable(String modelId, String format, String plugin, boolean forceGguf,
-            String quantization, java.util.List<String> fallbackModelIds, Consumer<PullProgress> progressCallback)
-            throws SdkException {
-        ModelResolution resolution = prepareModel(modelId, format, plugin, forceGguf, quantization, fallbackModelIds, progressCallback);
-        if (getPreferredProvider().isEmpty()) {
-            String resolvedProvider = resolution.getProviderId();
-            if (resolvedProvider != null && !resolvedProvider.isBlank()) {
-                setPreferredProvider(resolvedProvider);
-            } else {
-                Optional<String> autoProvider = autoSelectProvider(resolution.getModelId(), forceGguf, quantization);
-                if (autoProvider.isPresent()) {
-                    setPreferredProvider(autoProvider.get());
-                }
-            }
-        }
-        return resolution;
-    }
-
-    /**
      * Get quantization suggestion for a model based on its size.
      * NEW in v1.2.5.
      */
@@ -305,24 +227,6 @@ public interface GollekSdk {
      */
     default Optional<String> resolveDefaultModel() throws SdkException {
         return listModels(0, 1).stream().findFirst().map(ModelInfo::getModelId);
-    }
-
-    /**
-     * Check if a provider is a cloud provider. NEW in v1.2.1.
-     */
-    default boolean isCloudProvider(String providerId) {
-        if (providerId == null)
-            return false;
-        String p = providerId.toLowerCase();
-        return p.equals("openai") || p.equals("mistral") || p.equals("anthropic") || p.equals("gemini")
-                || p.equals("cerebras") || p.equals("deepseek") || p.equals("ollama");
-    }
-
-    /**
-     * Check if a provider is an MCP tool provider. NEW in v1.2.1.
-     */
-    default boolean isMcpProvider(String providerId) {
-        return "mcp".equalsIgnoreCase(providerId);
     }
 
     List<ModelInfo> listModels() throws SdkException;

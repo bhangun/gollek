@@ -28,7 +28,6 @@ dependencies {
     api(project(":spi:gollek-spi-inference"))
     api(project(":spi:gollek-spi-model"))
     api(project(":spi:gollek-spi-multimodal"))
-    api(project(":spi:gollek-spi-provider"))
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-databind", version = jacksonVersion)
     implementation(group = "io.smallrye.reactive", name = "mutiny", version = mutinyVersion)
     implementation(group = "io.reactivex.rxjava3", name = "rxjava", version = "3.1.8")

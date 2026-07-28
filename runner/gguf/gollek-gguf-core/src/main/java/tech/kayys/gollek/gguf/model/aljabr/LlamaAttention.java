@@ -75,8 +75,8 @@ public class LlamaAttention extends Module {
         v = v.reshape(batch, seqLen, nKVHeads, headDim); // [B, S, nKVH, D]
         
         // Apply RoPE
-        q = q.applyRoPE(cfg.ropeFreqBase());
-        k = k.applyRoPE(cfg.ropeFreqBase());
+        q = q.applyRoPE(headDim, cfg.ropeFreqBase(), true);
+        k = k.applyRoPE(headDim, cfg.ropeFreqBase(), true);
         
         // K/V cache update
         Tensor cachedK = k.updateKVCache(layerIdx, "k");

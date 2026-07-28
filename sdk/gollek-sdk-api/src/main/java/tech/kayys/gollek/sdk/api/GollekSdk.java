@@ -22,13 +22,13 @@ import java.util.concurrent.Flow;
  *
  * <h3>Backward Compatibility</h3>
  * New methods are provided with {@code default} implementations that throw
- * {@link UnsupportedOperationException}, so existing {@code GollekSdkProvider}
+ * {@link UnsupportedOperationException}, so existing {@code GollekSdkEngine}
  * implementations continue to compile without modification.
  *
  * <h3>Example</h3>
  * <pre>{@code
  * GollekSdk sdk = GollekSdk.builder()
- *     .provider("gemini")
+ *     .engine("gguf")
  *     .apiKey(System.getenv("GEMINI_API_KEY"))
  *     .model("gemini-2.0-flash")
  *     .build();
@@ -77,12 +77,12 @@ public interface GollekSdk {
      *
      * @param request the multimodal request with one or more content parts
      * @return the multimodal response
-     * @throws UnsupportedOperationException if the provider does not support multimodal
+     * @throws UnsupportedOperationException if the engine does not support multimodal
      */
     default MultimodalResponse processMultimodal(MultimodalRequest request) {
         throw new UnsupportedOperationException(
-                "This provider does not support multimodal processing. " +
-                "Use a multimodal-capable provider (e.g., gemini, openai, anthropic).");
+                "This engine does not support multimodal processing. " +
+                "Use a multimodal-capable engine.");
     }
 
     /**
@@ -93,11 +93,11 @@ public interface GollekSdk {
      *
      * @param request the multimodal request
      * @return a reactive publisher of streaming response chunks
-     * @throws UnsupportedOperationException if the provider does not support multimodal streaming
+     * @throws UnsupportedOperationException if the engine does not support multimodal streaming
      */
     default Flow.Publisher<MultimodalResponse> processMultimodalStream(MultimodalRequest request) {
         throw new UnsupportedOperationException(
-                "This provider does not support multimodal streaming.");
+                "This engine does not support multimodal streaming.");
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -109,11 +109,11 @@ public interface GollekSdk {
      *
      * @param request the embedding request with model and input texts
      * @return the embedding response containing vector representations
-     * @throws UnsupportedOperationException if the provider does not support embeddings
+     * @throws UnsupportedOperationException if the engine does not support embeddings
      */
     default EmbeddingResponse createEmbedding(EmbeddingRequest request) {
         throw new UnsupportedOperationException(
-                "This provider does not support embeddings.");
+                "This engine does not support embeddings.");
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -154,16 +154,6 @@ public interface GollekSdk {
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
-    /**
-     * Returns the provider identifier for this SDK instance
-     * (e.g., "gollek-local", "openai", "gemini").
-     *
-     * @return the provider name, or "unknown" if not set
-     */
-    default String provider() {
-        return "unknown";
-    }
-
     // ═══════════════════════════════════════════════════════════════════════
     // Builder
     // ═══════════════════════════════════════════════════════════════════════
@@ -173,7 +163,7 @@ public interface GollekSdk {
      * <p>
      * The builder uses {@link java.util.ServiceLoader} to discover available
      * {@link GollekSdkProvider} implementations on the classpath and resolves
-     * the best match based on the configured provider preference.
+     * the best match based on the configured engine preference.
      *
      * @return a new SDK builder
      */

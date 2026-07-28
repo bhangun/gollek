@@ -235,4 +235,6 @@ public final class DefaultTensor implements Tensor {
     @Override public Tensor dropout(float p, boolean training) { throw new UnsupportedOperationException("Not implemented yet"); }
     @Override public Tensor attention(Tensor K, Tensor V) { throw new UnsupportedOperationException("Not implemented yet"); }
     @Override public Tensor embedding(Tensor weight, long paddingIdx) { throw new UnsupportedOperationException("Not implemented yet"); }
+
+    @Override public Tensor applyRoPE(int dim, float base, boolean useNeox) { throw new UnsupportedOperationException("Not implemented yet"); }
 }

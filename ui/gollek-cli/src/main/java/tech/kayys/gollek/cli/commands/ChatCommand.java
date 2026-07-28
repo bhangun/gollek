@@ -10,8 +10,6 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 import tech.kayys.gollek.cli.GollekCommand;
 import tech.kayys.gollek.cli.chat.*;
-import tech.kayys.gollek.spi.provider.ProviderHealth;
-import tech.kayys.gollek.spi.provider.ProviderInfo;
 import tech.kayys.gollek.sdk.model.ModelResolver;
 import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.gollek.sdk.exception.SdkException;
@@ -250,7 +248,7 @@ public class ChatCommand implements Runnable {
             configureLogging();
 
             if (providerId != null && !providerId.isEmpty()) {
-                sdk.setPreferredProvider(providerId);
+                
             }
 
             // --- Model Resolution Strategy ---
@@ -297,8 +295,8 @@ public class ChatCommand implements Runnable {
             }
 
             if (!isLocal
-                    && !sdk.isMcpProvider(providerId)
-                    && !sdk.isCloudProvider(providerId)
+                    
+                    
                     && modelId != null
                     && !modelId.isBlank()) {
                 try {
@@ -333,7 +331,7 @@ public class ChatCommand implements Runnable {
                 }
             }
 
-            if (!isLocal && !sdk.isMcpProvider(providerId) && !sdk.isCloudProvider(providerId)) {
+            if (!isLocal) {
                 if (modelId == null || modelId.isBlank()) {
                     modelId = sdk.resolveDefaultModel().orElse(null);
                     if (modelId == null || modelId.isBlank()) {
@@ -344,13 +342,13 @@ public class ChatCommand implements Runnable {
                 }
 
                 if (parentCommand != null && parentCommand.verbose) System.out.println("[ChatCommand] forceGguf=" + forceGguf + ", quantization=" + quantization + ", modelId=" + modelId);
-                var resolution = sdk.ensureModelAvailable(modelId, null, pluginId, forceGguf, quantization, fallbackModelIds, progress -> {
+                var resolution = sdk.prepareModel(modelId, null, pluginId, forceGguf, quantization, fallbackModelIds, progress -> {
                     if (!quiet)
                         System.out.print(
                                 "\rPulling/Converting: " + progress.getPercentComplete() + "% " + progress.getProgressBar(20));
                 });
 
-                if (!quiet && resolution.getLocalPath() == null && !sdk.isCloudProvider(providerId)) {
+                if (!quiet && resolution.getLocalPath() == null) {
                     System.out.println();
                 }
 
@@ -366,13 +364,11 @@ public class ChatCommand implements Runnable {
                     providerId = resolution.getProviderId();
                 }
                 if (providerId == null) {
-                    providerId = sdk.autoSelectProvider(modelId, forceGguf, quantization).orElse(null);
+                    providerId = null;
                 }
             }
 
-            if (providerId != null) {
-                sdk.setPreferredProvider(providerId);
-            }
+            
 
             if (!ensureProviderReady()) {
                 return;
@@ -581,21 +577,7 @@ public class ChatCommand implements Runnable {
         return help;
     }
 
-    private boolean ensureProviderReady() {
-        if (providerId == null)
-            return true;
-        try {
-            Optional<ProviderInfo> info = sdk.listAvailableProviders().stream()
-                    .filter(p -> providerId.equalsIgnoreCase(p.id())).findFirst();
-            if (info.isEmpty()) {
-                System.err.println("Provider not available: " + providerId);
-                return false;
-            }
-            return info.get().healthStatus() != ProviderHealth.Status.UNHEALTHY;
-        } catch (Exception e) {
-            return true;
-        }
-    }
+    private boolean ensureProviderReady() { return true; }
 
     private void printStartupCatalog() {
         if (quiet)

@@ -22,7 +22,6 @@ dependencies {
     implementation(project(":core:gollek-runtime-config"))
     implementation(project(":spi:gollek-spi"))
     implementation(project(":spi:gollek-spi-inference"))
-    implementation(project(":spi:gollek-spi-provider"))
     implementation(project(":runner:litert:gollek-runner-litert"))
     implementation("io.smallrye.reactive:mutiny:2.5.5")
     compileOnly(group = "org.jboss.logging", name = "jboss-logging")

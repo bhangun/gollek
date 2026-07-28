@@ -26,13 +26,13 @@ package tech.kayys.gollek.plugin.runner.litert;
 
 import org.jboss.logging.Logger;
 import tech.kayys.gollek.plugin.runner.*;
-import tech.kayys.gollek.provider.litert.LiteRTProvider;
+import tech.kayys.gollek.provider.litert.LiteRTEngine;
 import tech.kayys.gollek.provider.litert.LiteRTProviderConfig;
 import tech.kayys.gollek.provider.litert.LiteRTRuntimeDiagnostics;
 import tech.kayys.gollek.spi.Message;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
-import tech.kayys.gollek.spi.provider.ProviderRequest;
+
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -192,7 +192,7 @@ public class LiteRTRunnerPlugin implements RunnerPlugin {
         metadata.put("quantization_support", true);
         metadata.put("runner_initialized", initialized);
         metadata.put("runner_healthy", healthy);
-        metadata.put("provider", LiteRTProvider.class.getName());
+        metadata.put("provider", LiteRTEngine.class.getName());
         metadata.putAll(diagnostics.asMap());
         return metadata;
     }
@@ -232,10 +232,10 @@ public class LiteRTRunnerPlugin implements RunnerPlugin {
                 .or(() -> durationParam(request, effectiveContext, "timeout", "timeout_seconds"))
                 .orElse(defaultTimeout(effectiveContext));
 
-        ProviderRequest providerRequest = toProviderRequest(inferenceRequest, parameters, timeout, request);
-        LiteRTProvider provider = new LiteRTProvider(providerConfig(request, effectiveContext, timeout));
+        InferenceRequest providerRequest = toProviderRequest(inferenceRequest, parameters, timeout, request);
+        LiteRTEngine provider = new LiteRTEngine(providerConfig(request, effectiveContext, timeout));
         try {
-            provider.initialize(null);
+            provider.initialize();
             InferenceResponse response = provider.infer(providerRequest).await().atMost(timeout);
             Map<String, Object> resultMetadata = new LinkedHashMap<>(metadata());
             resultMetadata.put("request_id", response.getRequestId());
@@ -283,27 +283,18 @@ public class LiteRTRunnerPlugin implements RunnerPlugin {
                 .build();
     }
 
-    private ProviderRequest toProviderRequest(
+    private InferenceRequest toProviderRequest(
             InferenceRequest inferenceRequest,
             Map<String, Object> parameters,
             Duration timeout,
             RunnerRequest runnerRequest) {
-        ProviderRequest.Builder builder = ProviderRequest.builder()
-                .requestId(inferenceRequest.getRequestId())
-                .model(inferenceRequest.getModel())
-                .messages(inferenceRequest.getMessages())
+        var builder = inferenceRequest.toBuilder()
                 .parameters(parameters)
-                .streaming(inferenceRequest.isStreaming())
-                .timeout(timeout)
-                .metadata(inferenceRequest.getMetadata());
+                .timeout(timeout);
 
         if (runnerRequest.metadata() != null) {
             builder.metadata(runnerRequest.metadata());
         }
-
-        inferenceRequest.getUserId().ifPresent(builder::userId);
-        inferenceRequest.getSessionId().ifPresent(builder::sessionId);
-        inferenceRequest.getTraceId().ifPresent(builder::traceId);
         return builder.build();
     }
 

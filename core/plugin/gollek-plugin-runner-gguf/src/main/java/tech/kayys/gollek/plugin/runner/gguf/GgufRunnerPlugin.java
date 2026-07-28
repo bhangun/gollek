@@ -191,7 +191,7 @@ public final class GgufRunnerPlugin implements RunnerPlugin {
 
     private static boolean hasInferenceMethod(Object value) {
         try {
-            value.getClass().getMethod("infer", tech.kayys.gollek.spi.provider.ProviderRequest.class);
+            value.getClass().getMethod("infer", tech.kayys.gollek.spi.inference.InferenceRequest.class);
             return true;
         } catch (NoSuchMethodException ignored) {
             return false;

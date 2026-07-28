@@ -19,9 +19,8 @@ repositories {
 
 dependencies {
     implementation(project(":spi:gollek-spi-model"))
-    implementation(project(":spi:gollek-spi-provider"))
-    implementation(project(":spi:gollek-spi"))
     implementation(project(":spi:gollek-spi-inference"))
+    implementation(project(":spi:gollek-spi"))
     implementation(project(":core:gollek-error-code"))
     implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
     implementation(project(":core:gollek-model-repository"))

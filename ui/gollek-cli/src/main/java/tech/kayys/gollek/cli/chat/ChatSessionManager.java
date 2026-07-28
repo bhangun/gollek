@@ -13,11 +13,6 @@ import tech.kayys.gollek.spi.Message;
 import tech.kayys.gollek.sdk.session.ChatSession;
 import tech.kayys.gollek.sdk.session.ChatSessionImpl;
 import tech.kayys.gollek.sdk.session.ChatSessionFactory;
-import tech.kayys.gollek.spi.provider.LLMProvider;
-import tech.kayys.gollek.spi.provider.ProviderRegistry;
-import tech.kayys.gollek.spi.provider.ProviderRequest;
-import tech.kayys.gollek.spi.provider.ProviderRequests;
-import tech.kayys.gollek.spi.provider.StreamingProvider;
 
 import java.io.PrintWriter;
 import java.time.Duration;
@@ -37,9 +32,6 @@ public class ChatSessionManager {
 
     private ChatSession sdkSession;
     private final ChatSessionFactory sessionFactory;
-    @Inject
-    ProviderRegistry providerRegistry;
-    
     private String modelId;
     private String providerId;
     private String modelPathOverride;
@@ -85,7 +77,7 @@ public class ChatSessionManager {
 
     public void switchProvider(String providerId) throws SdkException {
         this.providerId = providerId;
-        sdk.setPreferredProvider(providerId);
+        
     }
 
     public void switchModel(String newModelId) {
@@ -213,25 +205,14 @@ public class ChatSessionManager {
             boolean stream,
             boolean enableJsonSse,
             boolean replaceLastAssistantResponse) throws InterruptedException, SdkException {
-        boolean directProviderPath = shouldUseDirectProviderPath(preparedRequest);
-        String plannedRoute = directProviderPath
-                ? (stream ? "provider-direct-stream" : "provider-direct-sync")
-                : (stream ? "sdk-session-stream" : "sdk-session-sync");
+        String plannedRoute = stream ? "sdk-session-stream" : "sdk-session-sync";
         recordExecutionSnapshot(
                 plannedRoute,
-                directProviderPath ? describeDirectProvider() : (providerId != null ? providerId : "sdk"),
+                providerId != null ? providerId : "sdk",
                 Map.of(
                         "execution_stage", "planned",
                         "retry", replaceLastAssistantResponse));
 
-        if (directProviderPath) {
-            if (stream) {
-                executeStreamingDirect(preparedRequest, enableJsonSse, replaceLastAssistantResponse);
-            } else {
-                executeNonStreamingDirect(preparedRequest, replaceLastAssistantResponse);
-            }
-            return;
-        }
         if (stream) {
             executeStreaming(preparedRequest, enableJsonSse);
         } else {
@@ -331,110 +312,6 @@ public class ChatSessionManager {
         latch.await();
     }
 
-    private void executeStreamingDirect(
-            InferenceRequest request,
-            boolean enableJsonSse,
-            boolean replaceLastAssistantResponse) throws InterruptedException, SdkException {
-        CountDownLatch latch = new CountDownLatch(1);
-        AtomicInteger tokenCount = new AtomicInteger(0);
-        long startTime = System.currentTimeMillis();
-        AtomicLong firstTokenTime = new AtomicLong(0);
-        AtomicLong lastTokenTime = new AtomicLong(0);
-        AtomicLong sumItl = new AtomicLong(0);
-        java.util.concurrent.atomic.AtomicReference<Map<String, Object>> metadataRef = new java.util.concurrent.atomic.AtomicReference<>(Map.of());
-        StringBuilder fullResponse = new StringBuilder();
-        boolean[] quantCachePrinted = { false };
-        boolean jsonMode = request.getParameters().getOrDefault("json_mode", false) instanceof Boolean jm && jm;
-
-        CliSpinner spinner = new CliSpinner(System.out, "Thinking…");
-        if (!quiet && !enableJsonSse && !jsonMode) {
-            spinner.start();
-        }
-
-        try {
-            StreamingProvider provider = requireStreamingProvider();
-            provider.inferStream(buildDirectProviderRequest(request, true))
-                    .subscribe().with(
-                            chunk -> {
-                                if (chunk.metadata() != null && !chunk.metadata().isEmpty()) {
-                                    metadataRef.set(Map.copyOf(chunk.metadata()));
-                                }
-                                if (!quantCachePrinted[0] && chunk.metadata() != null && !chunk.metadata().isEmpty()) {
-                                    printQuantCacheInfo(chunk.metadata(), enableJsonSse || jsonMode);
-                                    quantCachePrinted[0] = true;
-                                }
-                                String delta = chunk.getDelta();
-                                if (delta == null) {
-                                    return;
-                                }
-
-                                fullResponse.append(delta);
-                                tokenCount.incrementAndGet();
-
-                                if (delta.isEmpty()) {
-                                    return;
-                                }
-
-                                long now = System.currentTimeMillis();
-                                if (firstTokenTime.compareAndSet(0, now)) {
-                                    spinner.stop();
-                                    if (!enableJsonSse && !jsonMode) {
-                                        uiRenderer.printAssistantPrefix(quiet, true);
-                                    }
-                                } else {
-                                    sumItl.addAndGet(now - lastTokenTime.get());
-                                }
-                                lastTokenTime.set(now);
-
-                                if (fileWriter != null) {
-                                    fileWriter.print(delta);
-                                    fileWriter.flush();
-                                } else if (enableJsonSse) {
-                                    printOpenAiSseDelta(request.getRequestId(), request.getModel(), delta);
-                                } else if (!jsonMode) {
-                                    System.out.print(delta);
-                                    System.out.flush();
-                                }
-                            },
-                            error -> {
-                                spinner.stop();
-                                activeSession().recordExternalError(System.currentTimeMillis() - startTime);
-                                recordExecutionFailure("provider-direct-stream", describeDirectProvider(), summarizeThrowable(error));
-                                uiRenderer.printError("Stream error: " + error.getMessage(), quiet);
-                                latch.countDown();
-                            },
-                            () -> {
-                                spinner.stop();
-                                long duration = System.currentTimeMillis() - startTime;
-                                double tps = (tokenCount.get() / (Math.max(1, duration) / 1000.0));
-                                activeSession().recordExternalAssistantResponse(
-                                        fullResponse.toString(),
-                                        tokenCount.get(),
-                                        duration,
-                                        replaceLastAssistantResponse);
-                                recordExecutionSnapshot("provider-direct-stream", describeDirectProvider(), metadataRef.get());
-
-                                if (enableJsonSse) {
-                                    printOpenAiSseFinal(request.getRequestId(), request.getModel());
-                                } else if (jsonMode) {
-                                    System.out.println();
-                                    printJsonModeResponse(request, fullResponse.toString(), tokenCount.get(), duration / 1000.0, tps);
-                                } else {
-                                    System.out.println();
-                                    uiRenderer.printStats(tokenCount.get(), duration / 1000.0, tps,
-                                            ttftMillis(metadataRef.get(), startTime, firstTokenTime), quiet);
-                                }
-                                latch.countDown();
-                            });
-        } catch (RuntimeException e) {
-            spinner.stop();
-            activeSession().recordExternalError(System.currentTimeMillis() - startTime);
-            recordExecutionFailure("provider-direct-stream", describeDirectProvider(), summarizeThrowable(e));
-            throw directProviderFailure("streaming", e);
-        }
-
-        latch.await();
-    }
 
     private void executeNonStreaming(InferenceRequest request) throws SdkException {
         CliSpinner spinner = new CliSpinner(System.out, "Thinking…");
@@ -466,46 +343,6 @@ public class ChatSessionManager {
         }
     }
 
-    private void executeNonStreamingDirect(InferenceRequest request, boolean replaceLastAssistantResponse) throws SdkException {
-        CliSpinner spinner = new CliSpinner(System.out, "Thinking…");
-        if (!quiet) spinner.start();
-        long startTime = System.currentTimeMillis();
-
-        try {
-            String providerDescriptor = describeDirectProvider();
-            InferenceResponse response = requireProvider()
-                    .infer(buildDirectProviderRequest(request, false))
-                    .await()
-                    .atMost(Duration.ofSeconds(300));
-            long duration = System.currentTimeMillis() - startTime;
-            int tokens = response.getTokensUsed() > 0 ? response.getTokensUsed()
-                    : (response.getOutputTokens() > 0 ? response.getOutputTokens() : 0);
-            double tps = tokens / (Math.max(1, duration) / 1000.0);
-            activeSession().recordExternalAssistantResponse(
-                    response.getContent(),
-                    tokens,
-                    duration,
-                    replaceLastAssistantResponse);
-            recordExecutionSnapshot("provider-direct-sync", providerDescriptor, response.getMetadata());
-
-            boolean jsonMode = request.getParameters().getOrDefault("json_mode", false) instanceof Boolean jm && jm;
-            if (jsonMode) {
-                printJsonModeResponse(request, response.getContent(), tokens, duration / 1000.0, tps);
-            } else {
-                printQuantCacheInfo(response.getMetadata(), false);
-                uiRenderer.printAssistantPrefix(quiet, false);
-                System.out.println(response.getContent());
-                uiRenderer.printStats(tokens, duration / 1000.0, tps,
-                        ttftMillis(response.getMetadata()), quiet);
-            }
-        } catch (RuntimeException e) {
-            activeSession().recordExternalError(System.currentTimeMillis() - startTime);
-            recordExecutionFailure("provider-direct-sync", describeDirectProvider(), summarizeThrowable(e));
-            throw directProviderFailure("sync", e);
-        } finally {
-            spinner.stop();
-        }
-    }
 
     private static Double ttftMillis(Map<String, Object> metadata) {
         return metadataDouble(metadata, "bench.ttft_ms");
@@ -605,14 +442,14 @@ public class ChatSessionManager {
     }
 
     public ExecutionDiagnostics getExecutionDiagnostics() {
-        ProviderRegistry registry = providerRegistry();
+        Object registry = null;
         return new ExecutionDiagnostics(
                 lastExecutionRoute,
                 lastProviderDescriptor,
                 lastExecutionError,
                 lastExecutionMetadata,
-                registry != null,
-                registry != null && providerId != null && !providerId.isBlank() && registry.hasProvider(providerId));
+                false,
+                false);
     }
 
     public record SessionStats(
@@ -653,54 +490,12 @@ public class ChatSessionManager {
         return val.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
 
-    private boolean shouldUseDirectProviderPath(InferenceRequest request) {
-        if (providerId == null || providerId.isBlank()) {
-            return false;
-        }
-        if (sdk.isCloudProvider(providerId) || sdk.isMcpProvider(providerId)) {
-            return false;
-        }
-        ProviderRegistry registry = providerRegistry();
-        return registry != null && registry.hasProvider(providerId);
-    }
+    private boolean shouldUseDirectProviderPath(InferenceRequest request) { return false; }
 
-    private ProviderRequest buildDirectProviderRequest(InferenceRequest request, boolean streaming) {
-        InferenceRequest sessionBoundRequest = ensureSessionBinding(request);
-        Object modelPathParam = request.getParameters().get("model_path");
-        String providerModel = (modelPathParam != null && !String.valueOf(modelPathParam).isBlank())
-                ? String.valueOf(modelPathParam)
-                : sessionBoundRequest.getModel();
-        return ProviderRequests.fromInferenceRequest(
-                sessionBoundRequest,
-                providerModel,
-                streaming,
-                Duration.ofSeconds(120),
-                providerId,
-                Map.of(),
-                Map.of(
-                        "request_id", sessionBoundRequest.getRequestId(),
-                        "tenantId", "community",
-                        "execution_entrypoint", "cli_chat_direct",
-                        "chat_session_id", sessionBoundRequest.getSessionId(),
-                        "persistent_session_enabled", sessionEnabledForExecution()));
-    }
 
-    private LLMProvider requireProvider() {
-        ProviderRegistry registry = providerRegistry();
-        if (registry == null || providerId == null) {
-            throw new IllegalStateException("Provider registry is not available for local chat execution");
-        }
-        return registry.getProvider(providerId)
-                .orElseThrow(() -> new IllegalStateException("Provider not available: " + providerId));
-    }
+    private Object requireProvider() { return null; }
 
-    private StreamingProvider requireStreamingProvider() {
-        LLMProvider provider = requireProvider();
-        if (!(provider instanceof StreamingProvider streamingProvider)) {
-            throw new IllegalStateException("Provider does not support streaming: " + providerId);
-        }
-        return streamingProvider;
-    }
+    private Object requireStreamingProvider() { return null; }
 
     private ChatSessionImpl activeSession() {
         if (sdkSession instanceof ChatSessionImpl impl) {
@@ -744,26 +539,9 @@ public class ChatSessionManager {
         return builder.build();
     }
 
-    private SdkException directProviderFailure(String mode, RuntimeException error) {
-        String providerDescriptor = describeDirectProvider();
-        String summary = summarizeThrowable(error);
-        return new SdkException(
-                "Local inference failed via " + providerDescriptor + " during " + mode + ": " + summary,
-                error);
-    }
+    private SdkException directProviderFailure(String mode, RuntimeException error) { return new SdkException("error", error); }
 
-    private String describeDirectProvider() {
-        ProviderRegistry registry = providerRegistry();
-        if (registry == null) {
-            return providerId != null ? providerId + " [provider-registry-unavailable]" : "unknown-provider";
-        }
-        if (providerId == null || providerId.isBlank()) {
-            return "unknown-provider";
-        }
-        return registry.getProvider(providerId)
-                .map(provider -> providerId + " [" + provider.getClass().getName() + "]")
-                .orElse(providerId + " [not-registered]");
-    }
+    private String describeDirectProvider() { return "sdk"; }
 
     private String summarizeThrowable(Throwable error) {
         if (error == null) {
@@ -800,21 +578,5 @@ public class ChatSessionManager {
         this.lastExecutionError = errorSummary;
     }
 
-    private ProviderRegistry providerRegistry() {
-        if (providerRegistry != null) {
-            return providerRegistry;
-        }
-        try {
-            if (Arc.container() == null) {
-                return null;
-            }
-            var instance = Arc.container().instance(ProviderRegistry.class);
-            if (instance.isAvailable()) {
-                providerRegistry = instance.get();
-            }
-        } catch (Exception ignored) {
-            // Fall through and let callers handle the missing registry path.
-        }
-        return providerRegistry;
-    }
+    private Object providerRegistry() { return null; }
 }

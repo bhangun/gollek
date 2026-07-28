@@ -48,7 +48,6 @@ dependencies {
     implementation(project(":spi:gollek-spi-inference"))
     implementation(project(":spi:gollek-spi-model"))
     implementation(project(":spi:gollek-spi-multimodal"))
-    implementation(project(":spi:gollek-spi-provider"))
     implementation(project(":runner:safetensor:gollek-safetensor-api"))
     implementation(project(":runner:safetensor:gollek-safetensor-core"))
     implementation(project(":runner:safetensor:gollek-safetensor-spi"))

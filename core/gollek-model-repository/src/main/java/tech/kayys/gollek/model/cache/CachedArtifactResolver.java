@@ -3,7 +3,7 @@ package tech.kayys.gollek.model.cache;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.smallrye.mutiny.Uni;
-import tech.kayys.gollek.provider.core.loader.ArtifactResolver;
+import tech.kayys.gollek.spi.model.ArtifactResolver;
 
 import org.jboss.logging.Logger;
 

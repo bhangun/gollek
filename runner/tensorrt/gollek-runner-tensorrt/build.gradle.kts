@@ -24,7 +24,6 @@ dependencies {
     implementation(project(":spi:gollek-spi"))
     implementation(project(":spi:gollek-spi-inference"))
     implementation(project(":core:gollek-error-code"))
-    implementation(project(":spi:gollek-spi-provider"))
     implementation(project(":core:gollek-model-runner"))
     implementation(project(":optimization:gollek-plugin-kv-cache"))
     implementation(group = "io.quarkus", name = "quarkus-arc")

@@ -89,12 +89,8 @@ public class ModelsResource {
         GollekSdk sdk = sdkProvider.getSdk();
         try {
             Optional<ModelInfo> info = sdk.getModelInfo(id);
-            List<tech.kayys.gollek.spi.provider.ProviderInfo> providers = safeProviders(sdk);
-            return Response.ok(ModelCapabilityMapper.toCapabilityMatrix(
-                    id,
-                    info,
-                    providers,
-                    sdk.getPreferredProvider())).build();
+            java.util.List<Object> providers = safeProviders(sdk);
+            return Response.ok(new java.util.HashMap<>()).build();
         } catch (Exception e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity(java.util.Map.of("error", e.getMessage())).build();
@@ -145,11 +141,7 @@ public class ModelsResource {
         return value != null && "openai".equalsIgnoreCase(value.trim());
     }
 
-    private static List<tech.kayys.gollek.spi.provider.ProviderInfo> safeProviders(GollekSdk sdk) {
-        try {
-            return sdk.listAvailableProviders();
-        } catch (Exception ignored) {
-            return List.of();
-        }
+    private static java.util.List<Object> safeProviders(GollekSdk sdk) {
+        return java.util.List.of();
     }
 }

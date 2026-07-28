@@ -100,11 +100,6 @@ public class SdkProvider {
         }
 
         @Override
-        public String submitAsyncJob(InferenceRequest request) {
-            return "demo-job-" + java.util.UUID.randomUUID();
-        }
-
-        @Override
         public tech.kayys.gollek.spi.inference.AsyncJobStatus getJobStatus(String jobId) {
             Instant now = Instant.now();
             return new tech.kayys.gollek.spi.inference.AsyncJobStatus(jobId, null, "COMPLETED", null, null, now, now);
@@ -118,25 +113,6 @@ public class SdkProvider {
         @Override
         public java.util.List<tech.kayys.gollek.spi.inference.InferenceResponse> batchInference(tech.kayys.gollek.spi.batch.BatchInferenceRequest batchRequest) {
             return java.util.List.of();
-        }
-
-        @Override
-        public java.util.List<tech.kayys.gollek.spi.provider.ProviderInfo> listAvailableProviders() {
-            return java.util.List.of();
-        }
-
-        @Override
-        public tech.kayys.gollek.spi.provider.ProviderInfo getProviderInfo(String providerId) {
-            return null;
-        }
-
-        @Override
-        public void setPreferredProvider(String providerId) {
-        }
-
-        @Override
-        public Optional<String> getPreferredProvider() {
-            return Optional.empty();
         }
 
         @Override
@@ -155,31 +131,17 @@ public class SdkProvider {
         }
 
         @Override
-        public void pullModel(String modelSpec, java.util.function.Consumer<tech.kayys.gollek.sdk.model.PullProgress> progressCallback) {
-            // simulate progress
-            for (int i = 1; i <= 5; i++) {
-                progressCallback.accept(new tech.kayys.gollek.sdk.model.PullProgress("step " + i, null, 100, i * 20L));
-                try { Thread.sleep(50); } catch (InterruptedException ignored) {}
-            }
-        }
+        public String submitAsyncJob(InferenceRequest request) { return null; }
 
         @Override
-        public void deleteModel(String modelId) {
-        }
+        public void pullModel(String modelSpec, java.util.function.Consumer<tech.kayys.gollek.sdk.model.PullProgress> progressCallback) {}
 
         @Override
-        public void pullModel(String modelSpec, String revision, boolean force, java.util.function.Consumer<tech.kayys.gollek.sdk.model.PullProgress> progressCallback) {
-            pullModel(modelSpec, progressCallback);
-        }
+        public void deleteModel(String modelId) {}
 
         @Override
         public tech.kayys.gollek.sdk.model.ModelResolution prepareModel(String modelId, boolean forceGguf, java.util.function.Consumer<tech.kayys.gollek.sdk.model.PullProgress> progressCallback) {
             return new tech.kayys.gollek.sdk.model.ModelResolution(modelId, null, null);
-        }
-
-        @Override
-        public Optional<String> autoSelectProvider(String modelId, boolean forceGguf) {
-            return Optional.empty();
         }
 
         @Override
@@ -200,7 +162,5 @@ public class SdkProvider {
                     .metadata(Map.of("mode", "demo"))
                     .build();
         }
-
-        // other default methods remain unimplemented for brevity
     }
 }

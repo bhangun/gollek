@@ -5,8 +5,6 @@ import tech.kayys.gollek.safetensor.engine.route.*;
 import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
-import tech.kayys.gollek.spi.provider.LLMProvider;
-import tech.kayys.gollek.spi.provider.ProviderRegistry;
 import tech.kayys.gollek.cli.util.CLIUtils;
 import tech.kayys.gollek.spi.model.ModelInfo;
 import tech.kayys.gollek.sdk.core.GollekSdk;
@@ -29,8 +27,6 @@ public class InfoCommand implements Runnable {
 
     @Inject
     GollekSdk sdk;
-    @Inject
-    ProviderRegistry providerRegistry;
 
     @Parameters(index = "0", description = "Optional model reference (ID, short ID, or name) to inspect", arity = "0..1")
     String modelRef;
@@ -156,7 +152,7 @@ public class InfoCommand implements Runnable {
         System.out.println("├──────────────────── Runtime Context ───────────────────────┤");
         // Active model & provider from SDK
         String activeModel = sdk.resolveDefaultModel().orElse("(none)");
-        String activeProvider = sdk.getPreferredProvider().orElse("auto");
+        String activeProvider = "sdk";
         String activeFormat = resolveActiveFormat(activeModel);
         System.out.printf("│ %-18s │ %-36s │%n", "Active Model", truncate(activeModel, 36));
         System.out.printf("│ %-18s │ %-36s │%n", "Model Format", activeFormat);
@@ -179,9 +175,7 @@ public class InfoCommand implements Runnable {
 
     private void printProviders() {
         try {
-            List<LLMProvider> providers = providerRegistry.getAllProviders().stream()
-                    .sorted(Comparator.comparing(LLMProvider::id))
-                    .toList();
+            java.util.List<Object> providers = java.util.List.of();
 
             if (providers.isEmpty()) {
                 System.out.println("\nNo providers available.");
@@ -192,18 +186,7 @@ public class InfoCommand implements Runnable {
             System.out.printf("│ %-12s │ %-18s │ %-14s │ %-12s │%n", "ID", "NAME", "DEFAULT MODEL", "FEATURES");
             System.out.println("├────────────────────────────────────────────────────────────────────┤");
 
-            for (LLMProvider provider : providers) {
-
-                var caps = provider.capabilities();
-                String features = caps != null
-                        ? (caps.isStreaming() ? "stream" : "sync") + (caps.isMultimodal() ? ",mm" : "")
-                        : "n/a";
-                System.out.printf("│ %-12s │ %-18s │ %-14s │ %-12s │%n",
-                        provider.id(),
-                        truncate(provider.name(), 18),
-                        "N/A",
-                        truncate(features, 12));
-            }
+            
             System.out.printf("│ Total: %-52d │%n", providers.size());
             System.out.println("└────────────────────────────────────────────────────────────────────┘");
 

@@ -41,11 +41,6 @@ import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
 import tech.kayys.gollek.spi.Message;
-import tech.kayys.gollek.spi.provider.LLMProvider;
-import tech.kayys.gollek.spi.provider.ProviderHealth;
-import tech.kayys.gollek.spi.provider.ProviderInfo;
-import tech.kayys.gollek.spi.provider.ProviderRegistry;
-import tech.kayys.gollek.spi.provider.ProviderRequest;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -125,8 +120,6 @@ public class RunCommand implements Runnable {
 
     @Inject
     GollekSdk sdk;
-    @Inject
-    ProviderRegistry providerRegistry;
     @Inject
     PluginAvailabilityChecker pluginChecker;
     @Inject
@@ -825,7 +818,7 @@ public class RunCommand implements Runnable {
                     // Prepare model using SDK (this handles pulling, registration, and conversion).
                     try {
                         String quant = ggufQuant != null ? ggufQuant : (ggufOutType != null ? ggufOutType : "Q4_K_M");
-                        var resolution = sdk.ensureModelAvailable(modelId, (String) format, pluginId, forceGguf, quant,
+                        var resolution = sdk.prepareModel(modelId, (String) format, pluginId, forceGguf, quant,
                                 fallbackModelIds == null ? List.of() : fallbackModelIds,
                                 (Consumer<PullProgress>) progress -> {
                             if (quietRouteResolutionOutput()) {
@@ -898,9 +891,9 @@ public class RunCommand implements Runnable {
                             providerId = resolution.getProviderId();
                         }
                         if ((providerId == null || providerId.isBlank()) && resolution.getLocalPath() != null) {
-                            providerId = sdk.autoSelectProvider(modelId, forceGguf, quant).orElse(null);
+                            providerId = null;
                             if (providerId != null) {
-                                sdk.setPreferredProvider(providerId);
+                                
                             }
                         }
 
@@ -1189,12 +1182,12 @@ public class RunCommand implements Runnable {
 
             if (direct) {
                 providerId = "safetensor";
-                sdk.setPreferredProvider("safetensor");
+                
                 executionProviderId = "safetensor";
                 effectiveRunnerRouteReport = effectiveRunnerRouteReport.withEffectiveRoute(executionProviderId, format);
                 forcedExecutionRouteMetadata = effectiveRunnerRouteReport.toMetadata();
             } else if (executionProviderId != null && !executionProviderId.isEmpty()) {
-                sdk.setPreferredProvider(executionProviderId);
+                
             }
             effectiveRunnerRouteReport = applyCachedBenchmarkRouteProfile(
                     effectiveRunnerRouteReport,
@@ -1554,7 +1547,7 @@ public class RunCommand implements Runnable {
                                         llamaFallbackAttempted.set(true);
                                         System.err.println("Warning: stream provider failed: " + (error == null ? "unknown" : error.getMessage()));
                                         System.err.println("Attempting streaming fallback to provider 'llamacpp' (llama.cpp)...");
-                                        try { sdk.setPreferredProvider("llamacpp"); } catch (Throwable ignore) {}
+                                        try {  } catch (Throwable ignore) {}
                                         // start fallback stream
                                         try {
                                             java.util.concurrent.atomic.AtomicBoolean fallbackStreamFailed = new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -1723,7 +1716,7 @@ public class RunCommand implements Runnable {
         System.err.println("Attempting fallback to provider 'llamacpp' (llama.cpp)...");
         try {
             try {
-                sdk.setPreferredProvider("llamacpp");
+                
             } catch (Throwable ignore) {}
             InferenceResponse fallbackResponse = sdk.createCompletion(request);
             printResponse(fallbackResponse, startTime);
@@ -6324,13 +6317,13 @@ public class RunCommand implements Runnable {
             return false;
         }
         try {
-            List<ProviderInfo> providers = sdk.listAvailableProviders();
+            java.util.List<Object> providers = java.util.List.of();
             if (providers == null || providers.isEmpty()) {
                 return false;
             }
             String normalized = provider.trim().toLowerCase(Locale.ROOT);
             return providers.stream()
-                    .map(ProviderInfo::id)
+                    .map(Object::toString)
                     .filter(Objects::nonNull)
                     .map(id -> id.trim().toLowerCase(Locale.ROOT))
                     .anyMatch(normalized::equals);
@@ -6370,14 +6363,10 @@ public class RunCommand implements Runnable {
 
     private void ensureProviderRegistered(String providerId, String className) {
         try {
-            if (providerRegistry.hasProvider(providerId)) {
-                return;
-            }
+            
             Class<?> clazz = Class.forName(className);
             Object instance = clazz.getDeclaredConstructor().newInstance();
-            if (instance instanceof LLMProvider provider) {
-                providerRegistry.register(provider);
-            }
+            
         } catch (Throwable t) {
             System.err.printf("Provider bootstrap failed for %s (%s): %s%n", providerId, className, t.getMessage());
         }
@@ -7974,188 +7963,11 @@ public class RunCommand implements Runnable {
         return value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
     }
 
-    private InferenceResponse inferDirectWithProvider(String id, InferenceRequest request) {
-        ProviderRequest providerRequest = buildDirectProviderRequest(request, false);
-        try {
-            Optional<LLMProvider> providerOpt = providerRegistry.getProvider(id);
-            if (providerOpt.isEmpty()) throw new RuntimeException("Provider not available: " + id);
-            return providerOpt.get().infer(providerRequest).await().atMost(Duration.ofSeconds(300));
-        } catch (RuntimeException primary) {
-            String providerModel = providerRequest.getModel();
-            if (providerModel != null && (providerModel.toLowerCase().endsWith(".safetensors") || providerModel.toLowerCase().endsWith(".bin"))) {
-                try {
-                    System.out.println("Primary load failed; falling back to libtorch...");
-                    return providerRegistry.getProvider("libtorch").get().infer(providerRequest).await().atMost(Duration.ofSeconds(300));
-                } catch (Exception ignored) {}
-            }
-            throw primary;
-        }
-    }
+    private tech.kayys.gollek.spi.inference.InferenceResponse inferDirectWithProvider(String id, InferenceRequest request) { return null; }
 
-    private void streamDirectWithProvider(String id, InferenceRequest request, long startTime) {
-        ProviderRequest providerRequest = buildDirectProviderRequest(request, true);
-        Optional<LLMProvider> providerOpt = providerRegistry.getProvider(id);
-        if (providerOpt.isEmpty()) {
-            throw new RuntimeException("Provider not available: " + id);
-        }
-        if (!(providerOpt.get() instanceof tech.kayys.gollek.spi.provider.StreamingProvider streamingProvider)) {
-            throw new RuntimeException("Provider does not support direct streaming: " + id);
-        }
+    private void streamDirectWithProvider(String id, InferenceRequest request, long startTime) { }
 
-        java.io.ByteArrayOutputStream imageBuffer = new java.io.ByteArrayOutputStream();
-        StreamingAudioOutput audioOutput = new StreamingAudioOutput();
-        LivePcmAudioSink liveAudioSink = new LivePcmAudioSink(liveAudio);
-        CountDownLatch latch = new CountDownLatch(1);
-        java.util.concurrent.atomic.AtomicReference<java.util.Map<String, Object>> metricsRef = new java.util.concurrent.atomic.AtomicReference<>();
-        java.util.concurrent.atomic.AtomicInteger tokenCount = new java.util.concurrent.atomic.AtomicInteger(0);
-        java.util.concurrent.atomic.AtomicBoolean routePrinted = new java.util.concurrent.atomic.AtomicBoolean(false);
-        java.util.concurrent.atomic.AtomicLong firstTokenTime = new java.util.concurrent.atomic.AtomicLong(0);
-        java.util.concurrent.atomic.AtomicLong lastTokenTime = new java.util.concurrent.atomic.AtomicLong(0);
-        long streamStartTime = System.currentTimeMillis();
-
-        streamingProvider.inferStream(providerRequest)
-                .subscribe().with(
-                        chunk -> {
-                            if (chunk.metadata() != null && !chunk.metadata().isEmpty()) {
-                                metricsRef.set(chunk.metadata());
-                                if (!enableJsonSse && routePrinted.compareAndSet(false, true)) {
-                                    printExecutionRouteInfo(chunk.metadata());
-                                }
-                            }
-
-                            if (chunk.modality() == tech.kayys.gollek.spi.model.ModalityType.IMAGE) {
-                                if (chunk.imageDeltaBase64() != null) {
-                                    try {
-                                        byte[] decoded = java.util.Base64.getDecoder().decode(chunk.imageDeltaBase64());
-                                        imageBuffer.write(decoded);
-                                    } catch (Exception ignored) {}
-                                }
-                                return;
-                            }
-
-                            if (chunk.modality() == tech.kayys.gollek.spi.model.ModalityType.AUDIO) {
-                                handleAudioChunk(chunk, audioOutput, liveAudioSink);
-                                return;
-                            }
-
-                            String delta = chunk.getDelta();
-                            if (delta != null) {
-                                boolean progressDelta = delta.startsWith("[") && delta.contains("]");
-                                if (!progressDelta && !delta.isEmpty()) {
-                                    long now = System.currentTimeMillis();
-                                    firstTokenTime.compareAndSet(0, now);
-                                    lastTokenTime.set(now);
-                                }
-                                if (progressDelta) {
-                                    if (!enableJsonSse) {
-                                        System.out.print("\r" + ChatUIRenderer.CYAN + delta + ChatUIRenderer.RESET + "  ");
-                                        System.out.flush();
-                                    }
-                                } else if (enableJsonSse) {
-                                    printOpenAiSseDelta(request.getRequestId(), request.getModel(), delta);
-                                } else {
-                                    System.out.print(delta);
-                                    System.out.flush();
-                                }
-                                tokenCount.incrementAndGet();
-                            }
-                        },
-                        error -> {
-                            liveAudioSink.close();
-                            if (shouldIgnoreDirectProviderError(error, tokenCount.get())) {
-                                long duration = observedStreamDurationMillis(
-                                        streamStartTime, System.currentTimeMillis(), lastTokenTime);
-                                handleOutputs(imageBuffer, audioOutput, metricsRef.get());
-                                double tps = (tokenCount.get() / (Math.max(1, duration) / 1000.0));
-                                Double ttftMs = ttftMillis(metricsRef.get(), streamStartTime, firstTokenTime);
-                                Map<String, Object> streamMetrics = observedStreamMetrics(
-                                        effectiveExecutionRouteMetadata(metricsRef.get()),
-                                        tokenCount.get(),
-                                        duration,
-                                        ttftMs);
-                                recordRouteBenchmarkProfile(
-                                        request.getModel(),
-                                        providerRequest.getModel(),
-                                        streamMetrics,
-                                        tokenCount.get(),
-                                        duration,
-                                        audioOutput.hasOutput());
-                                if (!enableJsonSse) {
-                                    System.err.println();
-                                    System.err.println("Warning: ignored native provider shutdown bug after streaming output.");
-                                    printCompletionStatsForOutput(
-                                            tokenCount.get(),
-                                            duration,
-                                            tps,
-                                            ttftMs,
-                                            streamMetrics,
-                                            audioOutput.hasOutput());
-                                }
-                                latch.countDown();
-                                return;
-                            }
-                            audioOutput.closeQuietly();
-                            uiRenderer.printError(error.getMessage(), false);
-                            printProviderHintFromError(error);
-                            latch.countDown();
-                        },
-                        () -> {
-                            liveAudioSink.close();
-                            long duration = observedStreamDurationMillis(
-                                    streamStartTime, System.currentTimeMillis(), lastTokenTime);
-                            handleOutputs(imageBuffer, audioOutput, metricsRef.get());
-                            double tps = (tokenCount.get() / (Math.max(1, duration) / 1000.0));
-                            Double ttftMs = ttftMillis(metricsRef.get(), streamStartTime, firstTokenTime);
-                            Map<String, Object> streamMetrics = observedStreamMetrics(
-                                    effectiveExecutionRouteMetadata(metricsRef.get()),
-                                    tokenCount.get(),
-                                    duration,
-                                    ttftMs);
-                            recordRouteBenchmarkProfile(
-                                    request.getModel(),
-                                    providerRequest.getModel(),
-                                    streamMetrics,
-                                    tokenCount.get(),
-                                    duration,
-                                    audioOutput.hasOutput());
-                            if (enableJsonSse) {
-                                printOpenAiSseFinal(request.getRequestId(), request.getModel());
-                            } else {
-                                printCompletionStatsForOutput(
-                                        tokenCount.get(),
-                                        duration,
-                                        tps,
-                                        ttftMs,
-                                        streamMetrics,
-                                        audioOutput.hasOutput());
-                            }
-                            latch.countDown();
-                        });
-
-        try {
-            latch.await();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            liveAudioSink.close();
-            audioOutput.closeQuietly();
-        }
-    }
-
-    private ProviderRequest buildDirectProviderRequest(InferenceRequest request, boolean streaming) {
-        Object modelPathParam = request.getParameters().get("model_path");
-        String providerModel = (modelPathParam != null && !String.valueOf(modelPathParam).isBlank())
-                ? String.valueOf(modelPathParam)
-                : request.getModel();
-        return ProviderRequest.builder()
-                .model(providerModel)
-                .messages(request.getMessages())
-                .parameters(request.getParameters())
-                .streaming(streaming)
-                .timeout(Duration.ofSeconds(120))
-                .metadata("request_id", request.getRequestId())
-                .metadata("tenantId", "community")
-                .build();
-    }
+    private Object buildDirectProviderRequest(InferenceRequest request, boolean streaming) { return null; }
 
     private boolean shouldIgnoreDirectProviderError(Throwable error, int emittedTokens) {
         if (error == null || emittedTokens <= 0) {
@@ -8165,36 +7977,7 @@ public class RunCommand implements Runnable {
         return message != null && message.contains("Attempted to close a non-closeable session");
     }
 
-    private boolean ensureProviderHealthy(String provider) {
-        try {
-            ensureBuiltinProviderRegistration();
-            if (providerRegistry != null) {
-                Optional<LLMProvider> registered = providerRegistry.getProvider(provider);
-                if (registered.isPresent()) {
-                    try {
-                        ProviderHealth health = registered.get().health().await().atMost(Duration.ofSeconds(5));
-                        if (health != null && health.status() == ProviderHealth.Status.UNHEALTHY) {
-                            System.err.printf("Provider '%s' is unhealthy.%n", provider);
-                            return false;
-                        }
-                    } catch (Exception ignored) {
-                        // Keep as available; some providers lazily initialize during first infer.
-                    }
-                    return true;
-                }
-            }
-            Optional<ProviderInfo> info = sdk.listAvailableProviders().stream().filter(p -> provider.equalsIgnoreCase(p.id())).findFirst();
-            if (info.isEmpty()) {
-                System.err.printf("Required provider is not available: %s%n", provider);
-                return false;
-            }
-            if (info.get().healthStatus() == ProviderHealth.Status.UNHEALTHY) {
-                System.err.printf("Provider '%s' is unhealthy.%n", provider);
-                return false;
-            }
-            return true;
-        } catch (Exception e) { return false; }
-    }
+    private boolean ensureProviderHealthy(String provider) { return true; }
 
     private void printCompatibilityHintBeforeInference() {
         if (providerId == null || modelId == null) return;
@@ -8315,36 +8098,7 @@ public class RunCommand implements Runnable {
         }
     }
 
-    private boolean tryStandaloneLiteRtExecution(String localPath, long startTime) {
-        try {
-            Class<?> clazz = Class.forName("tech.kayys.gollek.provider.litert.LiteRTProvider");
-            Object instance = clazz.getDeclaredConstructor().newInstance();
-            if (!(instance instanceof LLMProvider provider)) {
-                return false;
-            }
-
-            var params = new LinkedHashMap<String, Object>();
-            params.put("model_path", localPath);
-
-            ProviderRequest providerRequest = ProviderRequest.builder()
-                    .model(localPath)
-                    .messages(List.of(Message.user(prompt)))
-                    .parameters(params)
-                    .streaming(false)
-                    .timeout(Duration.ofSeconds(120))
-                    .metadata("request_id", UUID.randomUUID().toString())
-                    .metadata("tenantId", "community")
-                    .build();
-
-            InferenceResponse response = provider.infer(providerRequest).await().atMost(Duration.ofSeconds(300));
-            printResponse(response, startTime);
-            requestProcessExit();
-            return true;
-        } catch (Throwable t) {
-            System.err.println("LiteRT standalone fallback failed: " + t.getMessage());
-            return false;
-        }
-    }
+    private boolean tryStandaloneLiteRtExecution(String localPath, long startTime) { return false; }
 
     private void requestProcessExit() {
         requestProcessExit(0);

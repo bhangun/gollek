@@ -383,7 +383,7 @@ Update `SafetensorProvider` to use runner plugin:
 
 ```java
 @ApplicationScoped
-public class SafetensorProvider implements StreamingProvider {
+public class SafetensorProvider implements StreamingLLMProvider {
     
     @Inject
     RunnerPluginRegistry runnerRegistry;

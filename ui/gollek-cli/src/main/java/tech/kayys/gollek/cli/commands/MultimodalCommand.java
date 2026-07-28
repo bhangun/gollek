@@ -145,7 +145,7 @@ public class MultimodalCommand implements Runnable {
                 String mime = detectMimeType(imagePath);
 
                 if (providerId != null && !providerId.isBlank()) {
-                    sdk.setPreferredProvider(providerId);
+                    
                 }
 
                 MultimodalRequest request = MultimodalRequest.builder()
@@ -204,7 +204,7 @@ public class MultimodalCommand implements Runnable {
                 String mime = detectMimeType(imagePath);
 
                 if (providerId != null && !providerId.isBlank()) {
-                    sdk.setPreferredProvider(providerId);
+                    
                 }
 
                 MultimodalRequest request = MultimodalRequest.builder()
@@ -261,7 +261,7 @@ public class MultimodalCommand implements Runnable {
                 String mime = detectMimeType(imagePath);
 
                 if (providerId != null && !providerId.isBlank()) {
-                    sdk.setPreferredProvider(providerId);
+                    
                 }
 
                 MultimodalRequest request = MultimodalRequest.builder()
@@ -321,7 +321,7 @@ public class MultimodalCommand implements Runnable {
                 String mime = detectMimeType(imagePath);
 
                 if (providerId != null && !providerId.isBlank()) {
-                    sdk.setPreferredProvider(providerId);
+                    
                 }
 
                 MultimodalRequest request = MultimodalRequest.builder()

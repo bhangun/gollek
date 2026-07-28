@@ -1,9 +1,6 @@
 package tech.kayys.gollek.provider.litert;
 
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.provider.core.session.AdaptiveSessionEvictionPolicy;
-import tech.kayys.gollek.provider.core.session.AdaptiveSessionEvictionState;
-import tech.kayys.gollek.provider.core.session.EwmaAdaptiveSessionEvictionPolicy;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -23,36 +20,25 @@ public class LiteRTSessionManager {
     private static final Logger LOG = Logger.getLogger(LiteRTSessionManager.class);
 
     private final Map<String, SessionPool> pools = new ConcurrentHashMap<>();
-    private final AdaptiveSessionEvictionState adaptiveEvictionState = new AdaptiveSessionEvictionState();
-    private final AtomicLong adaptiveIdleTimeoutSeconds = new AtomicLong(300);
-    private final AtomicLong adaptivePressureScorePermille = new AtomicLong(0);
-
-    private volatile boolean adaptiveMetricsRegistered;
-    private ScheduledExecutorService evictor;
+        private final AtomicLong adaptiveIdleTimeoutSeconds = new AtomicLong(300);
+    
+        private ScheduledExecutorService evictor;
 
     @jakarta.inject.Inject
     LiteRTProviderConfig config;
     
-    private final AdaptiveSessionEvictionPolicy adaptiveEvictionPolicy;
-
+    
     /**
      * Default constructor for CDI.
      */
-    public LiteRTSessionManager() {
-        this.adaptiveEvictionPolicy = EwmaAdaptiveSessionEvictionPolicy.DEFAULT;
-    }
+    public LiteRTSessionManager() {}
 
     /**
      * Constructor for manual instantiation (Standalone/JBang).
      */
-    public LiteRTSessionManager(LiteRTProviderConfig config) {
-        this(config, EwmaAdaptiveSessionEvictionPolicy.DEFAULT);
-    }
+    public LiteRTSessionManager(LiteRTProviderConfig config) { this.config = config; }
 
-    public LiteRTSessionManager(LiteRTProviderConfig config, AdaptiveSessionEvictionPolicy policy) {
-        this.config = config;
-        this.adaptiveEvictionPolicy = policy;
-    }
+    
 
     public SessionContext getSession(String tenantId, String modelId, Path modelPath, LiteRTRunnerConfig runnerConfig) {
         return getSession(tenantId, modelId, modelPath, runnerConfig, this::createRunner);
@@ -103,13 +89,7 @@ public class LiteRTSessionManager {
         LOG.info("LiteRT session manager shutdown complete");
     }
 
-    int adaptiveIdleTimeoutSeconds() {
-        int base = Math.max(1, config.session().idleTimeoutSeconds());
-        double utilization = (double) totalSessionCount() / Math.max(1, config.session().maxTotal());
-        int resolved = policy().resolveIdleTimeoutSeconds(adaptiveEvictionState, base, utilization);
-        adaptiveIdleTimeoutSeconds.set(resolved);
-        return resolved;
-    }
+    int adaptiveIdleTimeoutSeconds() { return Math.max(1, config.session().idleTimeoutSeconds()); }
 
     private void evictIdleSessions() {
         long threshold = System.currentTimeMillis() - (adaptiveIdleTimeoutSeconds() * 1000L);
@@ -124,8 +104,7 @@ public class LiteRTSessionManager {
                 LOG.debugf("Removed drained LiteRT pool %s", entry.getKey());
             }
         }
-        recordAdaptiveTelemetry(utilization >= 0.75d, evictedTotal);
-    }
+            }
 
     private int evictIdleSessionsUnderPressure() {
         long threshold = System.currentTimeMillis() - (Math.max(5, config.session().idleTimeoutSeconds() / 4) * 1000L);
@@ -138,36 +117,22 @@ public class LiteRTSessionManager {
                 LOG.debugf("Removed drained LiteRT pool %s under pressure", entry.getKey());
             }
         }
-        recordAdaptiveTelemetry(true, evictedTotal);
-        return evictedTotal;
+                return evictedTotal;
     }
 
-    private void recordAdaptiveTelemetry(boolean underPressure, int reclaimedSessions) {
-        policy().recordTelemetry(adaptiveEvictionState, underPressure, reclaimedSessions);
-        double score = adaptivePressureScore();
-        adaptivePressureScorePermille.set(Math.round(score * 1000.0d));
-        // Note: Micrometer metrics removed for standalone stability
-    }
+    
 
-    private double adaptivePressureScore() {
-        return policy().pressureScore(adaptiveEvictionState);
-    }
+    
 
-    private AdaptiveSessionEvictionPolicy policy() {
-        return adaptiveEvictionPolicy != null ? adaptiveEvictionPolicy : EwmaAdaptiveSessionEvictionPolicy.DEFAULT;
-    }
+    
 
     // ====================================================================
     // TEST HELPERS (Package-Private)
     // ====================================================================
 
-    void recordAdaptiveTelemetryForTest(boolean underPressure, int reclaimedSessions) {
-        recordAdaptiveTelemetry(underPressure, reclaimedSessions);
-    }
+    
 
-    double adaptivePressureScoreForTest() {
-        return adaptivePressureScore();
-    }
+    
 
     private int totalSessionCount() {
         return pools.values().stream().mapToInt(SessionPool::totalCount).sum();

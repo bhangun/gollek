@@ -7,10 +7,9 @@ val quarkusVersion = rootProject.extra["quarkusVersion"] as String
 dependencies {
     implementation(project(":core:gollek-runtime-config"))
     implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
-    implementation(project(":core:gollek-provider-core"))
+    implementation(project(":spi:gollek-spi-inference"))
     implementation(project(":spi:gollek-spi-model"))
     implementation(project(":spi:gollek-spi"))
-    implementation(project(":spi:gollek-spi-inference"))
     implementation(project(":core:gollek-error-code"))
     implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.1")

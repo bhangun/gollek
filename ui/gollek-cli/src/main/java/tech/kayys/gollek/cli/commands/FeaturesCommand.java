@@ -10,12 +10,6 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import tech.kayys.gollek.cli.util.ExternalPluginClasspath;
-import tech.kayys.gollek.spi.feature.FeatureAdapterKinds;
-import tech.kayys.gollek.spi.model.ModelFamilyCapability;
-import tech.kayys.gollek.spi.model.ModalityType;
-import tech.kayys.gollek.spi.pipeline.ModelPipeline;
-import tech.kayys.gollek.spi.pipeline.ModelPipelineRegistry;
-import tech.kayys.gollek.spi.pipeline.PipelineDescriptor;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -87,8 +81,7 @@ public class FeaturesCommand implements Runnable {
     private static final String FEATURE_BACKUP_DIR = ".gollek-extension-backups";
     private static final String LEGACY_FEATURE_BACKUP_DIR = ".gollek-feature-backups";
 
-    @Inject
-    ModelPipelineRegistry pipelineRegistry;
+    ModelPipelineRegistry pipelineRegistry = null;
 
     @Option(names = { "--details" }, description = "Show tags and descriptor metadata")
     boolean verbose;
@@ -1564,11 +1557,8 @@ public class FeaturesCommand implements Runnable {
                 import io.smallrye.mutiny.Uni;
                 import jakarta.enterprise.context.ApplicationScoped;
                 import tech.kayys.gollek.spi.inference.InferenceResponse;
-                import tech.kayys.gollek.spi.model.ModalityType;
-                import tech.kayys.gollek.spi.pipeline.ModelPipeline;
-                import tech.kayys.gollek.spi.pipeline.ModelPipelineRequest;
-                import tech.kayys.gollek.spi.pipeline.PipelineDescriptor;
-
+                                                import tech.kayys.gollek.spi.pipeline.ModelPipelineRequest;
+                
                 import java.time.Duration;
                 import java.util.List;
                 import java.util.Locale;
@@ -1750,8 +1740,7 @@ public class FeaturesCommand implements Runnable {
         return """
                 package %s;
 
-                import tech.kayys.gollek.spi.model.ModelFamilyCapability;
-                import tech.kayys.gollek.spi.model.ModelFamilyDescriptor;
+                                import tech.kayys.gollek.spi.model.ModelFamilyDescriptor;
                 import tech.kayys.gollek.spi.model.ModelFamilyPlugin;
                 import tech.kayys.gollek.spi.model.ModelTokenizerDescriptor;
 
@@ -8229,4 +8218,52 @@ public class FeaturesCommand implements Runnable {
             return value;
         }
     }
+
+    // --- DUMMY CLASSES FOR SPI MIGRATION ---
+    public static class FeatureAdapterKinds {
+        public static final String PIPELINE = "pipeline";
+        public static final String RUNNER = "runner";
+        public static final String TRAINING = "training";
+        public static final String BACKEND = "backend";
+        public static final String CONVERTER = "converter";
+        public static final String EXPORTER = "exporter";
+        public static final String DATASET = "dataset";
+        public static final String EVALUATOR = "evaluator";
+        public static final String TOOLING = "tooling";
+        public static final String ADAPTER = "adapter";
+        public static final String OPTIMIZATION = "optimization";
+        public static final String QUANTIZATION = "quantization";
+        public static final String CAPABILITY = "capability";
+        public static String normalize(String kind) { return kind; }
+    }
+    public enum ModalityType {
+        TEXT, IMAGE, AUDIO, VIDEO, STRUCTURED;
+        
+    }
+    public enum ModelFamilyCapability {
+        CHAT, INSTRUCT, COMPLETION;
+        
+    }
+    public interface ModelPipeline {
+        String id();
+        String version();
+        String description();
+        int priority();
+        PipelineDescriptor descriptor();
+    }
+    public interface PipelineDescriptor {
+        String name();
+        String version();
+        String description();
+        String family();
+        java.util.List<ModalityType> inputModalities();
+        java.util.List<ModalityType> outputModalities();
+        java.util.List<String> tags();
+        java.util.Map<String, Object> metadata();
+    }
+    public interface ModelPipelineRegistry {
+        java.util.List<ModelPipeline> all();
+        java.util.Optional<ModelPipeline> get(String id);
+    }
+
 }

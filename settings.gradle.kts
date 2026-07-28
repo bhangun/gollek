@@ -29,8 +29,6 @@ includeOptionalProject("core:gollek-model-repo-local", "core/gollek-model-repo-l
 includeOptionalProject("core:gollek-model-runner", "core/gollek-model-runner")
 includeOptionalProject("core:gollek-multitenancy", "core/gollek-multitenancy")
 includeOptionalProject("core:gollek-observability", "core/gollek-observability")
-includeOptionalProject("core:gollek-provider-core", "core/gollek-provider-core")
-includeOptionalProject("core:gollek-provider-routing", "core/gollek-provider-routing")
 includeOptionalProject("core:gollek-runtime-config", "core/gollek-runtime-config")
 includeOptionalProject("core:gollek-tensor", "core/gollek-tensor")
 includeOptionalProject("core:gollek-tokenizer-core", "core/gollek-tokenizer-core")
@@ -83,6 +81,11 @@ includeOptionalProject("optimization:gollek-plugin-qlora", "optimization/gollek-
 includeOptionalProject("plugins:gollek-plugin-content-safety", "plugins/gollek-plugin-content-safety")
 includeOptionalProject("plugins:gollek-plugin-mcp", "plugins/gollek-plugin-mcp")
 includeOptionalProject("plugins:gollek-plugin-model-router", "plugins/gollek-plugin-model-router")
+includeOptionalProject("plugins:wayang-plugin-openai", "../wayang/modules/provider/wayang-plugin-openai")
+includeOptionalProject("plugins:wayang-plugin-anthropic", "../wayang/modules/provider/wayang-plugin-anthropic")
+includeOptionalProject("plugins:wayang-plugin-gemini", "../wayang/modules/provider/wayang-plugin-gemini")
+includeOptionalProject("plugins:wayang-plugin-cerebras", "../wayang/modules/provider/wayang-plugin-cerebras")
+includeOptionalProject("plugins:wayang-plugin-mistral", "../wayang/modules/provider/wayang-plugin-mistral")
 // includeOptionalProject("plugins:gollek-plugin-observability", "plugins/gollek-plugin-observability")
 // includeOptionalProject("plugins:gollek-plugin-pii-redaction", "plugins/gollek-plugin-pii-redaction")
 // includeOptionalProject("plugins:gollek-plugin-prompt", "plugins/gollek-plugin-prompt")
@@ -96,12 +99,7 @@ includeOptionalProject("plugins:gollek-plugin-semantic-cache", "plugins/gollek-p
 includeOptionalProject("plugins:log-parser", "plugins/log-parser")
 includeOptionalProject("plugins:gamelan", "plugins/gamelan")
 
-// Optional provider plugins
-// includeOptionalProject("provider:gollek-plugin-anthropic", "provider/gollek-plugin-anthropic")
-includeOptionalProject("provider:gollek-plugin-cerebras", "provider/gollek-plugin-cerebras")
-// includeOptionalProject("provider:gollek-plugin-gemini", "provider/gollek-plugin-gemini")
-includeOptionalProject("provider:gollek-plugin-mistral", "provider/gollek-plugin-mistral")
-includeOptionalProject("provider:gollek-plugin-openai", "provider/gollek-plugin-openai")
+
 
 // Optional quantizers
 includeOptionalProject("quantizer:gollek-quantizer-autoround", "quantizer/gollek-quantizer-autoround")
@@ -132,7 +130,6 @@ includeOptionalProject("spi:gollek-spi-inference", "spi/gollek-spi-inference")
 includeOptionalProject("spi:gollek-spi-model", "spi/gollek-spi-model")
 includeOptionalProject("spi:gollek-spi-multimodal", "spi/gollek-spi-multimodal")
 includeOptionalProject("spi:gollek-spi-plugin", "spi/gollek-spi-plugin")
-includeOptionalProject("spi:gollek-spi-provider", "spi/gollek-spi-provider")
 includeOptionalProject("spi:gollek-spi-runtime", "spi/gollek-spi-runtime")
 
 // Optional UI

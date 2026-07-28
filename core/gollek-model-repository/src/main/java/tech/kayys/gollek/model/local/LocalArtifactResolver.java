@@ -1,7 +1,7 @@
 package tech.kayys.gollek.model.local;
 
 import io.smallrye.mutiny.Uni;
-import tech.kayys.gollek.provider.core.loader.ArtifactResolver;
+import tech.kayys.gollek.spi.model.ArtifactResolver;
 
 import org.jboss.logging.Logger;
 

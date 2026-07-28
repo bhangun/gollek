@@ -20,10 +20,8 @@ publishing {
 
 dependencies {
     implementation(project(":spi:gollek-spi-inference"))
-    implementation(project(":spi:gollek-spi-provider"))
     implementation(project(":core:plugin:gollek-plugin-runner-core"))
     implementation(project(":plugins:gollek-plugin-model-router"))
-    implementation(project(":core:gollek-provider-core"))
     implementation(project(":core:plugin:gollek-plugin-optimization-core"))
     implementation("io.smallrye.reactive:mutiny")
     

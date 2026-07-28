@@ -6,6 +6,7 @@ import org.eclipse.microprofile.health.HealthCheckResponseBuilder;
 import org.eclipse.microprofile.health.Liveness;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 import tech.kayys.gollek.spi.inference.InferenceEngine;
@@ -20,13 +21,21 @@ public class InferenceEngineHealthCheck implements HealthCheck {
     private static final Logger LOG = Logger.getLogger(InferenceEngineHealthCheck.class);
 
     @Inject
-    InferenceEngine engine;
+    Instance<InferenceEngine> engineInstance;
 
     @Override
     public HealthCheckResponse call() {
         HealthCheckResponseBuilder builder = HealthCheckResponse.named("inference-engine");
 
         try {
+            if (engineInstance.isUnsatisfied()) {
+                builder.up()
+                        .withData("status", "NO_ENGINE")
+                        .withData("reason", "No inference engine implementation available");
+                return builder.build();
+            }
+
+            InferenceEngine engine = engineInstance.get();
             if (engine.isHealthy()) {
                 var stats = engine.getStats();
 

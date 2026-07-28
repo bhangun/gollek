@@ -53,7 +53,7 @@ import tech.kayys.gollek.spi.model.ModelFamilyUnifiedRuntimeRequirement;
 import tech.kayys.gollek.spi.multimodal.UnifiedRuntimeManifest;
 import tech.kayys.gollek.spi.multimodal.UnifiedRuntimeManifestViolation;
 import tech.kayys.gollek.spi.multimodal.UnifiedRuntimeRegistry;
-import tech.kayys.gollek.spi.provider.ProviderInfo;
+
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -2852,18 +2852,7 @@ public class ExtensionsCommand implements Runnable {
     }
 
     private Set<String> getRuntimeProviderIds() {
-        Set<String> ids = new LinkedHashSet<>();
-        try {
-            List<ProviderInfo> providers = sdk.listAvailableProviders();
-            for (ProviderInfo provider : providers) {
-                if (provider.id() != null && !provider.id().isBlank()) {
-                    ids.add(provider.id());
-                }
-            }
-        } catch (Exception e) {
-            // Keep output useful even if provider registry is unavailable.
-        }
-        return ids;
+        return new LinkedHashSet<>();
     }
 
     private boolean isClassPresent(String className) {

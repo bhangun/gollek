@@ -25,8 +25,6 @@
 package tech.kayys.gollek.sdk.core;
 
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.spi.provider.ProviderInfo;
-import tech.kayys.gollek.spi.provider.ProviderRegistry;
 import tech.kayys.gollek.spi.plugin.GollekPlugin;
 import tech.kayys.gollek.sdk.exception.NoPluginsAvailableException;
 import tech.kayys.gollek.sdk.exception.PluginNotAvailableException;
@@ -77,8 +75,6 @@ public class PluginAvailabilityChecker {
     private static final String PLUGIN_DIRECTORY_PROPERTY = "gollek.plugin.directory";
     private static final String DEFAULT_PLUGIN_DIRECTORY = System.getProperty("user.home") + "/.gollek/plugins";
     private static final String DEPLOYMENT_MODE_PROPERTY = "gollek.deployment.mode";
-
-    private final ProviderRegistry providerRegistry;
     private final String pluginDirectory;
     private final DeploymentMode deploymentMode;
     private final Map<String, PluginDescriptor> discoveredPlugins = new ConcurrentHashMap<>();
@@ -90,8 +86,7 @@ public class PluginAvailabilityChecker {
      *
      * @param providerRegistry provider registry instance
      */
-    public PluginAvailabilityChecker(ProviderRegistry providerRegistry) {
-        this.providerRegistry = providerRegistry;
+    public PluginAvailabilityChecker() {
         this.pluginDirectory = System.getProperty(PLUGIN_DIRECTORY_PROPERTY, DEFAULT_PLUGIN_DIRECTORY);
         this.deploymentMode = detectDeploymentMode();
         
@@ -290,15 +285,6 @@ public class PluginAvailabilityChecker {
             return false;
         }
         
-        // Check if plugin is loaded
-        if (providerRegistry != null) {
-            try {
-                return providerRegistry.getProvider(plugin.getId()).isPresent();
-            } catch (Exception e) {
-                LOG.debugf("Error checking plugin %s: %s", plugin.getId(), e.getMessage());
-            }
-        }
-        
         // Check if plugin class is loadable
         try {
             if (plugin.getProviderClass() != null) {
@@ -419,38 +405,21 @@ public class PluginAvailabilityChecker {
     }
 
     // ───────────────────────────────────────────────────────────────────────
-    // Provider Checking (delegates to ProviderRegistry)
+    // Engine Checking
     // ───────────────────────────────────────────────────────────────────────
 
     /**
      * Check if any providers are available.
      */
     public boolean hasProviders() {
-        try {
-            if (providerRegistry == null) {
-                return false;
-            }
-            var providers = providerRegistry.getAllProviders();
-            return providers != null && !providers.isEmpty();
-        } catch (Exception e) {
-            LOG.debugf("Error checking providers: %s", e.getMessage());
-            return false;
-        }
+        return false;
     }
 
     /**
      * Check if a specific provider is available.
      */
     public boolean hasProvider(String providerId) {
-        try {
-            if (providerRegistry == null) {
-                return false;
-            }
-            return providerRegistry.getProvider(providerId).isPresent();
-        } catch (Exception e) {
-            LOG.debugf("Error checking provider %s: %s", providerId, e.getMessage());
-            return false;
-        }
+        return false;
     }
 
     // ───────────────────────────────────────────────────────────────────────
@@ -511,26 +480,8 @@ public class PluginAvailabilityChecker {
      */
     public String getProviderNotFoundError(String providerId) {
         StringBuilder message = new StringBuilder();
-        message.append("❌ Provider '").append(providerId).append("' is not available.\n\n");
-        message.append("📦 Plugin directory: ").append(pluginDirectory).append("\n\n");
-        
-        // List available providers
-        if (providerRegistry != null) {
-            try {
-                var providers = providerRegistry.getAllProviders();
-                if (providers != null && !providers.isEmpty()) {
-                    message.append("🔍 Available providers:\n");
-                    for (var provider : providers) {
-                        message.append("   - ").append(provider.id()).append("\n");
-                    }
-                } else {
-                    message.append("🔍 No providers currently installed\n");
-                }
-            } catch (Exception e) {
-                message.append("🔍 Unable to list providers\n");
-            }
-        }
-        
+        message.append("❌ Provider '").append(providerId).append("' is not available.\\n\\n");
+        message.append("📦 Plugin directory: ").append(pluginDirectory).append("\\n\\n");
         return message.toString();
     }
 

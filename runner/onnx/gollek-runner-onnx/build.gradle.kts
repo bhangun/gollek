@@ -25,7 +25,7 @@ dependencies {
     implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
     implementation(project(":spi:gollek-spi"))
     implementation(project(":spi:gollek-spi-model"))
-    implementation(project(":spi:gollek-spi-provider"))
+    
     implementation(project(":spi:gollek-spi-multimodal"))
     implementation(project(":core:gollek-model-runner"))
     implementation(project(":spi:gollek-spi-inference"))
