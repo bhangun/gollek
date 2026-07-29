@@ -1,194 +1,95 @@
-# Gollek Core — Module Guide
+<div align="center">
+  <img src="https://raw.githubusercontent.com/bhangun/repo-assets/master/gollek03%404x.png" alt="Gollek" width="300" />
+  
+  # Gollek Inference Engine
+  
+  [![Java 22](https://img.shields.io/badge/Java-22-blue.svg)](https://jdk.java.net/22/)
+  [![Gradle](https://img.shields.io/badge/Gradle-Build-brightgreen.svg)](https://gradle.org/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+</div>
 
-This directory contains the core building blocks for Gollek. Each module has a focused scope and clear dependency direction.
+This repository hosts the Wayang platform and its core sub-systems. Wayang is designed to be a high-performance orchestration and inference platform for AI agents and workflows.
 
-## Module Structure
-
-### **gollek-spi** (Interfaces & Contracts)
-**Purpose**: Public APIs, interfaces, and value objects that other modules depend on
-
-**Key Principle**: Only interfaces, DTOs, and exceptions. No implementations.
-
----
-
-### **gollek-core** (Core Domain Logic)
-**Purpose**: Core business logic, domain models, and base implementations
-
-**Key Principle**: Domain logic, no framework-specific code (Jakarta, Quarkus, etc.)
-
----
-
-### **gollek-model-repo-core** (Model Repository Layer)
-**Purpose**: Model discovery, loading, and repository management
+## Architecture & Sub-Systems
 
 
-**Key Principle**: Focus on model metadata, discovery, and artifact management. No inference execution logic.
+  [![Java 22](https://img.shields.io/badge/Java-22-blue.svg)](https://jdk.java.net/22/)
+  [![Gradle](https://img.shields.io/badge/Gradle-Build-brightgreen.svg)](https://gradle.org/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+</div>
 
----
+This repository hosts the Wayang platform and its core sub-systems. Wayang is designed to be a high-performance orchestration and inference platform for AI agents and workflows.
 
-### **gollek-provider-core** (Provider SPI)
-**Purpose**: Service Provider Interface for pluggable model runners
+## Installation
 
-**Key Principle**: Clean separation between model repository (metadata) and provider (execution)
+### Prerequisites
+- JDK 22 or higher
+- Gradle
+- macOS (Apple Silicon recommended for Metal acceleration) or Linux with CUDA
 
----
-
-### **gollek-engine** (Inference Engine Implementation)
-**Purpose**: Concrete implementations of inference pipeline and orchestration
-
-**Key Principle**: Framework-specific implementations (Jakarta CDI, Quarkus), orchestration logic
-
----
-
-### **gollek-infrastructure** (Infrastructure & Integration)
-**Purpose**: Framework integration, REST resources, persistence
-
-**Key Principle**: All infrastructure concerns - HTTP, persistence, monitoring, plugin loading
-
----
-
-## Capability Map (Quick)
-
-* **API Contracts**: `core/gollek-spi/`
-* **Domain + Policy**: `core/gollek-core/`
-* **Engine Orchestration**: `core/gollek-engine/`
-* **Model Registry & Artifacts**: `core/gollek-model-repo-core/`
-* **Provider SPI**: `core/gollek-provider-core/`
-* **Infrastructure**: `core/gollek-infrastructure/`
-* **Plugin API**: `core/gollek-spi/`
-
-## Error Codes
-
-Generate docs for the centralized error codes:
+### Build and Install
+Clone the repository and build the modules using Gradle:
 
 ```bash
-./scripts/generate-error-codes.sh
+git clone https://github.com/kayys/wayang-platform.git
+cd wayang-platform
+
+# Build all modules and publish to Maven Local
+cd Families/alkhawarizm
+./gradlew publishToMavenLocal
+
+cd ../gollek
+./gradlew publishToMavenLocal
 ```
 
-## Dependency Flow
+*Note: The `autograd` module in Alkhawarizm is currently disabled to prioritize build stability.*
 
-The modules should depend on each other in this order (no circular dependencies):
+## Usage
 
-```mermaid
-graph TD
-    A[gollek-spi] 
-    C[gollek-core]
-    D[gollek-model-repo-core]
-    E[gollek-provider-core]
-    F[gollek-engine]
-    G[gollek-infrastructure]
+You can run the Wayang development script to start a local model for inference. For example, to run the `gemma-4-12b-it-GGUF` model:
 
-    %% Tier 1: Base Contracts
-    C --> A
-    
-    %% Tier 2: Domain Logic & SPIs
-    D --> C
-    E --> C
-    E --> B
-
-    %% Tier 3: Core Implementation (Engine)
-    F --> D
-    F --> E
-    F --> C
-    F --> B
-
-    %% Tier 4: Infrastructure & Integration
-    G --> F
-    G --> A
-    
-    style A fill:#e1f5ff,stroke:#0077c8,stroke-width:2px
-    style B fill:#e1f5ff,stroke:#0077c8,stroke-width:2px
-    style C fill:#fff4e1,stroke:#d99e00,stroke-width:2px
-    style D fill:#fff4e1,stroke:#d99e00,stroke-width:2px
-    style E fill:#fff4e1,stroke:#d99e00,stroke-width:2px
-    style F fill:#ffe1e1,stroke:#c80000,stroke-width:2px
-    style G fill:#f0e1ff,stroke:#6f00c8,stroke-width:2px
+```bash
+./scripts/run-dev.sh run --model hf:unsloth/gemma-4-12b-it-GGUF --prompt "who are you"
 ```
 
-**Legend**:
-- **Blue** (gollek-spi): **Contracts & APIs** - Stable interfaces, minimal dependencies
-- **Yellow** (gollek-core, model-repo, provider-core): **Domain Layer** - Business logic & SPI definitions
-- **Red** (gollek-engine): **Application Layer** - Orchestration, reliability patterns, implementation
-- **Purple** (gollek-infrastructure): **Infrastructure Layer** - Framework integration (Quarkus/REST), adapters
+This will download the model (if not already cached) and execute the inference using the Gollek GGUF engine with the Alkhawarizm Metal backend on macOS.
 
----
+## Architecture & Sub-Systems
 
----
+The core logic is divided into distinct "Families", located in the `Families/` directory:
 
-## Best Practices
+- **Alkhawarizm** (`Families/alkhawarizm/`): The core tensor and compute engine. It provides high-performance backends for Safetensor operations, including CPU, CUDA, Metal (Apple Silicon), and HAT. It features optimized GPU kernels such as vectorized `float4` operations for maximum throughput.
+- **Gollek** (`Families/gollek/`): The high-performance inference engine. Supports execution of large language models via various runners, including `llama.cpp` for GGUF models. It is designed to safely handle multi-modal inference, large context windows, and advanced generation parameters.
+- **Tafkir** (`Families/tafkir/`): The orchestration and reasoning backend, routing operations to inference engines.
+- **Gamelan** (`Families/gamelan/`): The workflow engine for designing and executing multi-agent AI workflows and RAG pipelines.
+- **Wayang Core** (`Families/wayang/`): The foundational shared models, clients, and services that tie the sub-systems together.
 
-### 1. **Single Responsibility Principle**
-- Each module should have ONE clear purpose
-- If you can't describe a module's purpose in one sentence, it's doing too much
+## Quick Links
 
-### 2. **Acyclic Dependencies**
-- Never allow circular dependencies between modules
-- Use interfaces in lower-level modules to break cycles
+- UI & Frontend: `wayang-ui/`, `wayang-backoffice/`, `wayang-kulit/`
+- IDE Extensions: `wayang-vscode/`
+- Cepot / Extensions: `Cepot/`, `Extensions/`
 
-### 3. **Stable Dependencies Principle**
-- Depend on modules that change less frequently
-- `gollek-spi` should be the most stable (rarely changes)
-- `gollek-infrastructure` can change frequently
+## Features
 
-### 4. **Interface Segregation**
-- Put interfaces in the module that defines the abstraction
-- Put implementations in the module that provides the functionality
+### 🤖 Gollek Inference Engine
+- **Local Models**: Advanced GGUF support (via `llama.cpp` JNI bindings), ONNX, LibTorch, TFLite.
+- **GPU Acceleration**: Metal (Apple Silicon) with unified memory fallback, CUDA support.
+- **Optimization**: Implements KV Cache optimizations, FlashAttention, and handles context parameters efficiently to avoid memory fragmentation.
 
-### 5. **Naming Conventions**
-- **Interfaces**: Use descriptive nouns (`ModelRepository`, `InferenceEngine`)
-- **Implementations**: Prefix with implementation strategy (`Default`, `Cached`, `Enhanced`)
-- **Abstract Classes**: Prefix with `Abstract` (`AbstractPlugin`)
-- **DTOs**: Suffix based on purpose (`Request`, `Response`, `Metadata`)
+### 🧠 Alkhawarizm Compute (Tensor) Engine
+- **Multi-Backend**: Supports Metal, CUDA, CPU, and HAT.
+- **Custom Kernels**: Provides native hardware-optimized operations (e.g. `RMSNorm`, `LayerNorm`, Matrix Multiplications) to maximize LLM evaluation throughput.
 
----
+### 🎼 Gamelan Workflow Engine
+- Orchestrate AI agents and complex tool-use workflows.
+- Extensible logic and visual integration.
 
+## Documentation
 
+- Core API contracts are defined within the respective `spi` and `core` packages of each family.
+- Explore the sub-directories for specific READMEs and module-level JavaDocs.
 
-# Walkthrough: Multimodal/Omni Inference Support for Golek Core
-
-## Summary
-
-Added comprehensive multimodal and omni-model inference support to `pkg/core/` in the gollek Go workflow engine. This introduces first-class content types for text, image, audio, video, file, and embedding modalities, plus a provider SPI for inference engine integration.
-
-## Changes Made
-
-### New Files
-
-| File | Purpose |
-|------|---------|
-| [inference.go](gollek/pkg/core/inference.go) | Core inference types: `ContentPart`, `Message`, `InferenceRequest`, `InferenceResponse`, `InferenceChunk`, `InferenceEngine` interface |
-| [provider.go](gollek/pkg/core/provider.go) | Provider SPI: `InferenceProvider`, `ProviderCapabilities`, `ProviderHealth`, `InferenceProviderRegistry` |
-| [inference_test.go](gollek/pkg/core/inference_test.go) | 21 tests for inference domain types |
-| [provider_test.go](gollek/pkg/core/provider_test.go) | 12 tests for provider SPI types |
-
-### Modified Files
-
-| File | Change |
-|------|--------|
-| [domain.go](gollek/pkg/core/domain.go) | Added `NodeTypeInference` and `PluginTypeInference` constants |
-
-## Architecture
-
-## Changes Made
-
-### New Files
-
-| File | Purpose |
-|------|---------|
-| [inference.go](gollek/pkg/core/inference.go) | Core inference types: [ContentPart](gollek/pkg/core/inference.go#71-79), [Message](gollek/pkg/core/inference.go#192-198), [InferenceRequest](gollek/pkg/core/inference.go#269-282), [InferenceResponse](gollek/pkg/core/inference.go#383-394), [InferenceChunk](gollek/pkg/core/inference.go#430-437), [InferenceEngine](gollek/pkg/core/inference.go#449-465) interface |
-| [provider.go](gollek/pkg/core/provider.go) | Provider SPI: [InferenceProvider](gollek/pkg/core/provider.go#19-49), [ProviderCapabilities](gollek/pkg/core/provider.go#58-91), [ProviderHealth](gollek/pkg/core/provider.go#162-168), [InferenceProviderRegistry](gollek/pkg/core/provider.go#238-264) |
-| [inference_test.go](gollek/pkg/core/inference_test.go) | 21 tests for inference domain types |
-| [provider_test.go](gollek/pkg/core/provider_test.go) | 12 tests for provider SPI types |
-| [batching.go](gollek/pkg/core/batching.go) | Batching Domain: [BatchStrategy](gollek/pkg/core/batching.go#18-19), [InferenceStage](gollek/pkg/core/batching.go#43-44), [BatchConfig](gollek/pkg/core/batching.go#76-100), [BatchRequest](gollek/pkg/core/batching.go#149-156), [BatchScheduler](gollek/pkg/core/batching.go#246-273) |
-| [batching_test.go](gollek/pkg/core/batching_test.go) | 15 tests for batching configurations and stage routing |
-
-### Modified Files
-
-| File | Change |
-|------|--------|
-| [domain.go](gollek/pkg/core/domain.go) | Added `NodeTypeInference` and `PluginTypeInference` constants |
-| [inference.go](gollek/pkg/core/inference.go) | Added [Stage](gollek/pkg/core/batching.go#43-44)/`PromptTokenCount` to [InferenceRequest](gollek/pkg/core/inference.go#269-282), added [InferBatch()](gollek/pkg/core/inference.go#453-455) method |
-| [provider.go](gollek/pkg/core/provider.go) | Added [Batching](gollek/pkg/core/batching_test.go#264-276) flag and `MaxBatchSize` to [ProviderCapabilities](gollek/pkg/core/provider.go#58-91) |
 
 ## Architecture
 
