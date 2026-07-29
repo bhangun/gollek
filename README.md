@@ -35,7 +35,7 @@ git clone https://github.com/kayys/wayang-platform.git
 cd wayang-platform
 
 # Build all modules and publish to Maven Local
-cd Families/alkhawarizm
+cd alkhawarizm
 ./gradlew publishToMavenLocal
 
 cd ../gollek
@@ -56,19 +56,15 @@ This will download the model (if not already cached) and execute the inference u
 
 ## Architecture & Sub-Systems
 
-The core logic is divided into distinct "Families", located in the `Families/` directory:
+The core logic is divided into distinct "Families", located in the `` directory:
 
-- **Alkhawarizm** (`Families/alkhawarizm/`): The core tensor and compute engine. It provides high-performance backends for Safetensor operations, including CPU, CUDA, Metal (Apple Silicon), and HAT. It features optimized GPU kernels such as vectorized `float4` operations for maximum throughput.
-- **Gollek** (`Families/gollek/`): The high-performance inference engine. Supports execution of large language models via various runners, including `llama.cpp` for GGUF models. It is designed to safely handle multi-modal inference, large context windows, and advanced generation parameters.
-- **Tafkir** (`Families/tafkir/`): The orchestration and reasoning backend, routing operations to inference engines.
-- **Gamelan** (`Families/gamelan/`): The workflow engine for designing and executing multi-agent AI workflows and RAG pipelines.
-- **Wayang Core** (`Families/wayang/`): The foundational shared models, clients, and services that tie the sub-systems together.
+- **Alkhawarizm** (`alkhawarizm`): The core tensor and compute engine. It provides high-performance backends for Safetensor operations, including CPU, CUDA, Metal (Apple Silicon), and HAT. It features optimized GPU kernels such as vectorized `float4` operations for maximum throughput.
+- **Gollek** (`gollek`): The high-performance inference engine. Supports execution of large language models via various runners, including `llama.cpp` for GGUF models. It is designed to safely handle multi-modal inference, large context windows, and advanced generation parameters.
+- **Tafkir** (`tafkir`): The orchestration and reasoning backend, routing operations to inference engines.
+- **Gamelan** (`gamelan`): The workflow engine for designing and executing multi-agent AI workflows and RAG pipelines.
+- **Wayang Core** (`wayang`): The foundational shared models, clients, and services that tie the sub-systems together.
 
-## Quick Links
 
-- UI & Frontend: `wayang-ui/`, `wayang-backoffice/`, `wayang-kulit/`
-- IDE Extensions: `wayang-vscode/`
-- Cepot / Extensions: `Cepot/`, `Extensions/`
 
 ## Features
 
