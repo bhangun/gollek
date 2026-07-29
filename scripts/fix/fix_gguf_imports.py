@@ -3,13 +3,13 @@ import os
 dir_path = "/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/gollek/runner/gguf/gollek-gguf-core"
 
 replacements = {
-    "import tech.kayys.gollek.ml.autograd.GradTensor;": "import tech.kayys.aljabr.ml.autograd.GradTensor;",
-    "import tech.kayys.gollek.ml.nn.NNModule;": "import tech.kayys.aljabr.nn.NNModule;",
-    "import tech.kayys.gollek.tokenizer.impl.BpeTokenizer;": "import tech.kayys.aljabr.tokenizer.impl.BpeTokenizer;",
-    "import tech.kayys.gollek.tokenizer.impl.Gpt2PreTokenizer;": "import tech.kayys.aljabr.tokenizer.impl.Gpt2PreTokenizer;",
-    "import tech.kayys.gollek.tokenizer.spi.DecodeOptions;": "import tech.kayys.aljabr.tokenizer.spi.DecodeOptions;",
-    "import tech.kayys.gollek.tokenizer.spi.EncodeOptions;": "import tech.kayys.aljabr.tokenizer.spi.EncodeOptions;",
-    "import tech.kayys.gollek.tokenizer.spi.Tokenizer;": "import tech.kayys.aljabr.tokenizer.spi.Tokenizer;"
+    "import tech.kayys.gollek.ml.autograd.GradTensor;": "import tech.kayys.alkhawarizm.ml.autograd.GradTensor;",
+    "import tech.kayys.gollek.ml.nn.NNModule;": "import tech.kayys.alkhawarizm.nn.NNModule;",
+    "import tech.kayys.gollek.tokenizer.impl.BpeTokenizer;": "import tech.kayys.alkhawarizm.tokenizer.impl.BpeTokenizer;",
+    "import tech.kayys.gollek.tokenizer.impl.Gpt2PreTokenizer;": "import tech.kayys.alkhawarizm.tokenizer.impl.Gpt2PreTokenizer;",
+    "import tech.kayys.gollek.tokenizer.spi.DecodeOptions;": "import tech.kayys.alkhawarizm.tokenizer.spi.DecodeOptions;",
+    "import tech.kayys.gollek.tokenizer.spi.EncodeOptions;": "import tech.kayys.alkhawarizm.tokenizer.spi.EncodeOptions;",
+    "import tech.kayys.gollek.tokenizer.spi.Tokenizer;": "import tech.kayys.alkhawarizm.tokenizer.spi.Tokenizer;"
 }
 
 for root, dirs, files in os.walk(dir_path):

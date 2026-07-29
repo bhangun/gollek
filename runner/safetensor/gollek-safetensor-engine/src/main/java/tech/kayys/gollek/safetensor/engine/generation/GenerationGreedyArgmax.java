@@ -5,24 +5,23 @@
  */
 package tech.kayys.gollek.safetensor.engine.generation;
 
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.util.BitSet;
 
 final class GenerationGreedyArgmax {
-    private static final String DISABLE_NATIVE_GREEDY_ARGMAX_PROPERTY =
-            "gollek.safetensor.disable_native_greedy_argmax";
-    private static final boolean DISABLE_NATIVE_GREEDY_ARGMAX_ENABLED =
-            Boolean.getBoolean(DISABLE_NATIVE_GREEDY_ARGMAX_PROPERTY);
+    private static final String DISABLE_NATIVE_GREEDY_ARGMAX_PROPERTY = "gollek.safetensor.disable_native_greedy_argmax";
+    private static final boolean DISABLE_NATIVE_GREEDY_ARGMAX_ENABLED = Boolean
+            .getBoolean(DISABLE_NATIVE_GREEDY_ARGMAX_PROPERTY);
     private static final int MAX_NATIVE_REJECTED_CANDIDATES = 8;
     private static final int NATIVE_ARGMAX_UNAVAILABLE = Integer.MIN_VALUE;
     private static final String NATIVE_ARGMAX_PATH = "native_argmax_f32";
     private static final String JAVA_MEMORY_SEGMENT_PATH = "java_memory_segment";
     private static final String JAVA_MEMORY_SEGMENT_MASK_PATH = "java_memory_segment_mask";
-    private static final ThreadLocal<int[]> NATIVE_REJECTION_BUFFER =
-            ThreadLocal.withInitial(() -> new int[MAX_NATIVE_REJECTED_CANDIDATES]);
+    private static final ThreadLocal<int[]> NATIVE_REJECTION_BUFFER = ThreadLocal
+            .withInitial(() -> new int[MAX_NATIVE_REJECTED_CANDIDATES]);
     private static volatile Boolean nativeArgmaxDisabledForTest;
 
     private GenerationGreedyArgmax() {
@@ -242,8 +241,8 @@ final class GenerationGreedyArgmax {
             }
         }
         if (rejectedMask != null) {
-            for (int tokenId = rejectedMask.nextSetBit(0); tokenId >= 0 && tokenId < vocabLimit;
-                    tokenId = rejectedMask.nextSetBit(tokenId + 1)) {
+            for (int tokenId = rejectedMask.nextSetBit(0); tokenId >= 0
+                    && tokenId < vocabLimit; tokenId = rejectedMask.nextSetBit(tokenId + 1)) {
                 count = appendNativeRejection(compact, count, tokenId);
                 if (count < 0) {
                     return -1;

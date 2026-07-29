@@ -8,7 +8,7 @@ package tech.kayys.gollek.safetensor.engine.forward;
 import jakarta.annotation.PostConstruct;
 import jakarta.inject.Singleton;
 import org.jboss.logging.Logger;
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 
 /**
  * Owns platform runtime initialization and capability detection for direct

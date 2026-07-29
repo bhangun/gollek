@@ -3,7 +3,7 @@ package tech.kayys.gollek.runner;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import tech.kayys.aljabr.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;

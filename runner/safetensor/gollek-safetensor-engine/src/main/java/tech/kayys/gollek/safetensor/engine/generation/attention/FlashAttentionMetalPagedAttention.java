@@ -5,7 +5,7 @@
  */
 package tech.kayys.gollek.safetensor.engine.generation.attention;
 
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.engine.generation.kv.BlockManager;
 import tech.kayys.gollek.safetensor.engine.generation.kv.ForwardWorkspace;
@@ -55,8 +55,8 @@ final class FlashAttentionMetalPagedAttention {
             MemorySegment blockTableSegment = ws.getAttentionBlockTableSeg();
             MemorySegment contextLensSegment = ws.getAttentionContextLensSeg();
             if (kvSession.isQuantized()) {
-                PagedKvCacheMaterializer.MaterializedKvPools materialized =
-                        PagedKvCacheMaterializer.materializeBlocksForMetal(
+                PagedKvCacheMaterializer.MaterializedKvPools materialized = PagedKvCacheMaterializer
+                        .materializeBlocksForMetal(
                                 blockManager, kvSession, blocks, numKVHeads, headDim, arena);
                 kPool = materialized.kPool();
                 vPool = materialized.vPool();

@@ -2,7 +2,7 @@ package tech.kayys.gollek.diffusion;
 
 import tech.kayys.gollek.core.graph.Node;
 import tech.kayys.gollek.core.graph.node.ConstantNode;
-import tech.kayys.aljabr.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
 import tech.kayys.gollek.diffusion.graph.*;
 import tech.kayys.gollek.diffusion.model.UNetModel;
 import tech.kayys.gollek.diffusion.scheduler.Scheduler;

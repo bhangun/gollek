@@ -12,8 +12,8 @@ import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.exception.InferenceException;
-import tech.kayys.aljabr.core.tensor.DeviceType;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 import tech.kayys.gollek.spi.model.ModalityType;
 import tech.kayys.gollek.spi.observability.AdapterMetricsRecorder;
 import tech.kayys.gollek.spi.observability.AdapterMetricSchema;
@@ -177,7 +177,7 @@ public class LiteRTEngine implements LocalInferenceEngine {
     }
 
     public boolean supports(String modelId, InferenceRequest request) {
-        
+
         Path path = resolveModelPath(modelId, request);
         return path != null && Files.exists(path);
     }
@@ -186,16 +186,16 @@ public class LiteRTEngine implements LocalInferenceEngine {
     public Uni<InferenceResponse> infer(InferenceRequest request) {
         return Uni.createFrom().item(() -> {
             ensureInitialized();
-            
+
             String tenantId = resolveTenantId(request);
             String adapterId = PROVIDER_ID;
-            
+
             adapterMetricsRecorder.recordSuccess(
                     AdapterMetricSchema.builder()
                             .adapterId(adapterId)
                             .modelId(request.getModel())
                             .operation("request_receive")
-                            
+
                             .build(),
                     0);
 
@@ -223,7 +223,7 @@ public class LiteRTEngine implements LocalInferenceEngine {
                                 .adapterId(adapterId)
                                 .modelId(request.getModel())
                                 .operation("session_acquire")
-                                
+
                                 .build(),
                         Duration.between(sessionAcquireStart, Instant.now()).toMillis());
 
@@ -271,7 +271,9 @@ public class LiteRTEngine implements LocalInferenceEngine {
         if (request.getUserId().isPresent()) {
             return request.getUserId().get();
         }
-        if (request.getApiKey() != null && !request.getApiKey().isEmpty()) { return request.getApiKey(); }
+        if (request.getApiKey() != null && !request.getApiKey().isEmpty()) {
+            return request.getApiKey();
+        }
         return "community";
     }
 
@@ -399,7 +401,6 @@ public class LiteRTEngine implements LocalInferenceEngine {
     public io.smallrye.mutiny.Multi<StreamingInferenceChunk> stream(InferenceRequest request) {
         return Multi.createFrom().emitter(emitter -> {
             ensureInitialized();
-            
 
             String tenantId = resolveTenantId(request);
             Path modelPath = resolveModelPath(request.getModel(), request);
@@ -486,10 +487,6 @@ public class LiteRTEngine implements LocalInferenceEngine {
             }
         });
     }
-
-    
-
-    
 
     private static void put(Map<String, Object> target, String key, Object value) {
         if (value != null) {

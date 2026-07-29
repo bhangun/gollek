@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":sdk:gollek-sdk-api"))
     implementation(project(":core:gollek-model-repository"))
     implementation(project(":core:plugin:gollek-plugin-kernel-core"))

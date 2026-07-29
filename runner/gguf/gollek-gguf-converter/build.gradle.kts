@@ -5,7 +5,7 @@ plugins {
 dependencies {
     implementation(project(":runner:gguf:gollek-gguf-core"))
     implementation(project(":core:gollek-core"))
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":spi:gollek-spi"))
     implementation(project(":runner:safetensor:gollek-safetensor-loader"))
     implementation("io.smallrye.reactive:mutiny:2.5.5")

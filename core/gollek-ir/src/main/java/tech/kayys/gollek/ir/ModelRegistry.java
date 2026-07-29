@@ -1,7 +1,7 @@
 package tech.kayys.gollek.ir;
 
-import tech.kayys.aljabr.core.tensor.ModelWeightLoader;
-import tech.kayys.aljabr.core.tensor.WeightAdapter;
+import tech.kayys.alkhawarizm.core.tensor.ModelWeightLoader;
+import tech.kayys.alkhawarizm.core.tensor.WeightAdapter;
 import java.nio.file.Path;
 import java.util.*;
 

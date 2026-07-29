@@ -3,16 +3,16 @@ import os
 dir_path = "/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/gollek/runner/onnx/gollek-runner-onnx"
 
 replacements = {
-    "import tech.kayys.gollek.runner.RunnerConfiguration;": "import tech.kayys.aljabr.runner.RunnerConfiguration;",
-    "import tech.kayys.gollek.runner.RunnerCapabilities;": "import tech.kayys.aljabr.runner.RunnerCapabilities;",
-    "import tech.kayys.gollek.extension.AbstractGollekRunner;": "import tech.kayys.aljabr.extension.AbstractAljabrRunner;",
+    "import tech.kayys.gollek.runner.RunnerConfiguration;": "import tech.kayys.alkhawarizm.runner.RunnerConfiguration;",
+    "import tech.kayys.gollek.runner.RunnerCapabilities;": "import tech.kayys.alkhawarizm.runner.RunnerCapabilities;",
+    "import tech.kayys.gollek.extension.AbstractGollekRunner;": "import tech.kayys.alkhawarizm.extension.AbstractAljabrRunner;",
     "extends AbstractGollekRunner": "extends AbstractAljabrRunner",
-    "import tech.kayys.gollek.exception.RunnerInitializationException;": "import tech.kayys.aljabr.exception.RunnerInitializationException;",
-    "import tech.kayys.gollek.core.model.ModelFormat;": "import tech.kayys.aljabr.core.model.ModelFormat;",
-    "import tech.kayys.gollek.tokenizer.runtime.TokenizerFactory;": "import tech.kayys.aljabr.tokenizer.runtime.TokenizerFactory;",
-    "import tech.kayys.gollek.tokenizer.spi.DecodeOptions;": "import tech.kayys.aljabr.tokenizer.spi.DecodeOptions;",
-    "import tech.kayys.gollek.tokenizer.spi.EncodeOptions;": "import tech.kayys.aljabr.tokenizer.spi.EncodeOptions;",
-    "import tech.kayys.gollek.tokenizer.spi.Tokenizer;": "import tech.kayys.aljabr.tokenizer.spi.Tokenizer;"
+    "import tech.kayys.gollek.exception.RunnerInitializationException;": "import tech.kayys.alkhawarizm.exception.RunnerInitializationException;",
+    "import tech.kayys.gollek.core.model.ModelFormat;": "import tech.kayys.alkhawarizm.core.model.ModelFormat;",
+    "import tech.kayys.gollek.tokenizer.runtime.TokenizerFactory;": "import tech.kayys.alkhawarizm.tokenizer.runtime.TokenizerFactory;",
+    "import tech.kayys.gollek.tokenizer.spi.DecodeOptions;": "import tech.kayys.alkhawarizm.tokenizer.spi.DecodeOptions;",
+    "import tech.kayys.gollek.tokenizer.spi.EncodeOptions;": "import tech.kayys.alkhawarizm.tokenizer.spi.EncodeOptions;",
+    "import tech.kayys.gollek.tokenizer.spi.Tokenizer;": "import tech.kayys.alkhawarizm.tokenizer.spi.Tokenizer;"
 }
 
 for root, dirs, files in os.walk(dir_path):

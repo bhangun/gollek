@@ -1,6 +1,6 @@
 package tech.kayys.gollek.ir;
 
-import tech.kayys.aljabr.core.tensor.*;
+import tech.kayys.alkhawarizm.core.tensor.*;
 import tech.kayys.gollek.ir.schema.*;
 import tech.kayys.gollek.ir.validate.*;
 import java.util.*;
@@ -19,15 +19,15 @@ public final class GraphValidator {
             OpSchema schema = registry.get(op.opType());
             if (schema == null)
                 throw new RuntimeException("Unknown op: " + op.opType());
-            
+
             List<GValue> inputs = op.inputs().stream()
                     .map(ref -> ctx.get(ref.id()))
                     .collect(Collectors.toList());
-            
+
             schema.validator().validate(inputs, op.attrs());
             Shape[] shapes = schema.shapeInfer().infer(inputs, op.attrs());
             GType[] types = schema.typeInfer().infer(inputs, op.attrs());
-            
+
             for (int i = 0; i < op.outputs().size(); i++) {
                 GValueId outId = op.outputs().get(i);
                 GValue out = new GValue.Builder(outId)

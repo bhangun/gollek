@@ -32,7 +32,7 @@ import tech.kayys.gollek.inference.libtorch.util.SafetensorsLoader;
 import tech.kayys.gollek.spi.observability.AdapterSpec;
 import tech.kayys.gollek.spi.observability.AdapterSpecResolver;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 import tech.kayys.gollek.spi.provider.ProviderHealth;
 import tech.kayys.gollek.spi.provider.ProviderMetadata;
 import tech.kayys.gollek.spi.inference.LocalInferenceEngine;

@@ -5,7 +5,7 @@
  */
 package tech.kayys.gollek.safetensor.engine.generation.attention;
 
-import tech.kayys.aljabr.metal.binding.MetalFlashAttentionBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalFlashAttentionBinding;
 
 import java.util.Objects;
 

@@ -12,7 +12,7 @@ println("   - Backends: $backends")
 println("   - Inference Enabled: $enableInference")
 
 dependencies {
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     // Optional intra-build project dependencies — only add if those projects are present
     val gollekIr = findProject(":core:gollek-ir")
     if (gollekIr != null) {
@@ -32,8 +32,8 @@ dependencies {
     } else {
         println("   [Warning] spi:gollek-spi-model not present; skipping project dependency")
     }
-    // Depend on published aljabr core aggregator for shared math/tensor/tokenizer foundations
-    implementation("tech.kayys.aljabr:aljabr-core:0.1.0-SNAPSHOT")
+    // Depend on published alkhawarizm core aggregator for shared math/tensor/tokenizer foundations
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-core:0.1.0-SNAPSHOT")
     
     implementation("io.smallrye.reactive:mutiny:2.5.5")
     implementation("jakarta.enterprise:jakarta.enterprise.cdi-api:4.0.1")

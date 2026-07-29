@@ -1,7 +1,8 @@
 package tech.kayys.gollek.spi.model;
+
 import tech.kayys.gollek.spi.spec.*;
-import tech.kayys.aljabr.core.tensor.DeviceType;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 
 /**
  * GGUF quantization types with metadata.
@@ -90,23 +91,23 @@ public enum QuantizationType {
         }
 
         public String getNativeName() {
-            return nativeName;
+                return nativeName;
         }
 
         public String getDescription() {
-            return description;
+                return description;
         }
 
         public QualityLevel getQualityLevel() {
-            return qualityLevel;
+                return qualityLevel;
         }
 
         public double getCompressionRatio() {
-            return compressionRatio;
+                return compressionRatio;
         }
 
         public String getUseCase() {
-            return useCase;
+                return useCase;
         }
 
         /**
@@ -169,9 +170,9 @@ public enum QuantizationType {
                 QualityLevel(double score) {
                         this.score = score;
                 }
-                
+
                 public double getScore() {
-                    return score;
+                        return score;
                 }
         }
 }

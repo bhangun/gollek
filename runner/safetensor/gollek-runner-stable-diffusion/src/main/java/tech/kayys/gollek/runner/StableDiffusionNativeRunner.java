@@ -4,9 +4,9 @@ import io.smallrye.mutiny.Multi;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
-import tech.kayys.aljabr.core.model.ModelFormat;
-import tech.kayys.aljabr.core.random.GaussianNoise;
-import tech.kayys.aljabr.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.random.GaussianNoise;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
 import tech.kayys.gollek.extension.AbstractGollekRunner;
 import tech.kayys.gollek.runner.RunnerCapabilities;
 import tech.kayys.gollek.runner.RunnerConfiguration;
@@ -83,24 +83,23 @@ public class StableDiffusionNativeRunner extends AbstractGollekRunner {
     public RunnerCapabilities capabilities() {
         return RunnerCapabilities.builder()
                 .supportsStreaming(true)
-                .supportedDataTypes(new String[]{"float32", "float16"})
+                .supportedDataTypes(new String[] { "float32", "float16" })
                 .build();
     }
 
     @Override
     public RunnerMetadata metadata() {
         return new RunnerMetadata(
-            RUNNER_NAME, 
-            "1.0.0", 
-            List.of(ModelFormat.SAFETENSORS), 
-            List.of(DeviceType.CPU), 
-            Map.of(
-                    "native", true,
-                    "diffusionPipeline", "stable-diffusion",
-                    "schedulerFamily", PNDMScheduler.FAMILY,
-                    "trainingAlignedSchedulerSurface", true,
-                    "defaultLatentShape", "1x4x64x64")
-        );
+                RUNNER_NAME,
+                "1.0.0",
+                List.of(ModelFormat.SAFETENSORS),
+                List.of(DeviceType.CPU),
+                Map.of(
+                        "native", true,
+                        "diffusionPipeline", "stable-diffusion",
+                        "schedulerFamily", PNDMScheduler.FAMILY,
+                        "trainingAlignedSchedulerSurface", true,
+                        "defaultLatentShape", "1x4x64x64"));
     }
 
     @Override
@@ -148,15 +147,15 @@ public class StableDiffusionNativeRunner extends AbstractGollekRunner {
         return Multi.createFrom().emitter(emitter -> {
             try {
                 long[] tokens = tokenize(prompt);
-                long[] uncondTokens = tokenize(""); 
-                
+                long[] uncondTokens = tokenize("");
+
                 AccelTensor cond = clip.encode(tokens);
                 AccelTensor uncond = clip.encode(uncondTokens);
-                
+
                 float[] noise = new float[1 * 4 * 64 * 64];
                 GaussianNoise.fill(noise, new Random());
                 AccelTensor latents = AccelTensor.fromFloatArray(noise, 1, 4, 64, 64);
-                
+
                 PNDMScheduler scheduler = new PNDMScheduler(steps);
                 List<Long> timesteps = scheduler.getTimesteps();
                 LOG.debugf(
@@ -165,24 +164,25 @@ public class StableDiffusionNativeRunner extends AbstractGollekRunner {
                         guidance,
                         scheduler.family(),
                         Arrays.toString(scheduler.timestepsArray()));
-                
+
                 for (int i = 0; i < steps; i++) {
                     long t = timesteps.get(i);
                     AccelTensor noiseCond = unet.predict(latents, t, cond);
                     AccelTensor noiseUncond = unet.predict(latents, t, uncond);
-                    AccelTensor noisePred = AccelOps.add(noiseUncond, AccelOps.mulScalar(AccelOps.sub(noiseCond, noiseUncond), guidance));
-                    
+                    AccelTensor noisePred = AccelOps.add(noiseUncond,
+                            AccelOps.mulScalar(AccelOps.sub(noiseCond, noiseUncond), guidance));
+
                     AccelTensor nextLatents = scheduler.step(noisePred, t, latents);
                     latents.close();
                     latents = nextLatents;
-                    
-                    emitter.emit(StreamingInferenceChunk.textDelta("sd", i, "Step " + (i+1) + "..."));
+
+                    emitter.emit(StreamingInferenceChunk.textDelta("sd", i, "Step " + (i + 1) + "..."));
                 }
-                
+
                 AccelTensor image = vae.decode(latents);
                 emitter.emit(StreamingInferenceChunk.textDelta("sd", steps, "Decoding image complete."));
                 emitter.complete();
-                
+
                 latents.close();
                 cond.close();
                 uncond.close();
@@ -195,22 +195,27 @@ public class StableDiffusionNativeRunner extends AbstractGollekRunner {
 
     private long[] tokenize(String text) throws IOException {
         Path tokDir = baseDir.resolve("tokenizer");
-        if (!Files.exists(tokDir)) tokDir = baseDir;
-        
+        if (!Files.exists(tokDir))
+            tokDir = baseDir;
+
         var tokenizer = tokenizerService.load(tokDir);
         long[] ids = tokenizer.encode(text, EncodeOptions.defaultOptions());
-        
+
         long[] tokens = new long[77];
         Arrays.fill(tokens, 49407);
-        for (int i = 0; i < Math.min(ids.length, 77); i++) tokens[i] = ids[i];
+        for (int i = 0; i < Math.min(ids.length, 77); i++)
+            tokens[i] = ids[i];
         return tokens;
     }
 
     @Override
     public void close() {
-        if (textEncoderWeights != null) textEncoderWeights.values().forEach(AccelTensor::close);
-        if (unetWeights != null) unetWeights.values().forEach(AccelTensor::close);
-        if (vaeWeights != null) vaeWeights.values().forEach(AccelTensor::close);
+        if (textEncoderWeights != null)
+            textEncoderWeights.values().forEach(AccelTensor::close);
+        if (unetWeights != null)
+            unetWeights.values().forEach(AccelTensor::close);
+        if (vaeWeights != null)
+            vaeWeights.values().forEach(AccelTensor::close);
     }
 
     private static long paramLong(InferenceRequest req, String key, long defaultVal) {

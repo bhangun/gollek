@@ -18,10 +18,10 @@ repositories {
 }
 
 dependencies {
-    implementation("tech.kayys.aljabr:aljabr-ml-autograd:0.1.0-SNAPSHOT")
-    implementation("tech.kayys.aljabr:aljabr-ml-nn:0.1.0-SNAPSHOT")
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
-    implementation("tech.kayys.aljabr:aljabr-ml-core:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-ml-autograd:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-ml-nn:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-ml-core:0.1.0-SNAPSHOT")
     implementation(project(":ml:gollek-ml-estimator"))
     implementation(project(":ml:gollek-ml-preprocessing"))
     implementation(project(":ml:gollek-ml-persistence"))

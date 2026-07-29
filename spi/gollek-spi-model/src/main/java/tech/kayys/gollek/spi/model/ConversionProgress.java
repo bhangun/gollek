@@ -1,7 +1,8 @@
 package tech.kayys.gollek.spi.model;
+
 import tech.kayys.gollek.spi.spec.*;
-import tech.kayys.aljabr.core.tensor.DeviceType;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 
 /**
  * Progress update for model conversion.
@@ -71,7 +72,7 @@ public class ConversionProgress {
     public boolean isComplete() {
         return progress >= 1.0f;
     }
-    
+
     /**
      * Builder class for ConversionProgress.
      */

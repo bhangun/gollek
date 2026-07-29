@@ -9,7 +9,7 @@ import static tech.kayys.gollek.safetensor.engine.forward.DirectForwardTensorOps
 import static tech.kayys.gollek.safetensor.engine.forward.DirectForwardTensorOps.reusableOutputTensor;
 
 import org.jboss.logging.Logger;
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.engine.generation.DirectInferenceProfiler;
 import tech.kayys.gollek.spi.model.ModelConfig;
@@ -22,21 +22,21 @@ final class DirectForwardMetalHalfLinearPair {
     }
 
     static Result tryPair(Logger log,
-                          MetalBinding metalBinding,
-                          DirectForwardMetalCapabilities capabilities,
-                          ModelConfigTraits traits,
-                          ModelConfig config,
-                          boolean metalLinearEnabled,
-                          boolean decodeLogitsPhase,
-                          AccelTensor input,
-                          AccelTensor firstWeight,
-                          AccelTensor firstBias,
-                          AccelTensor secondWeight,
-                          AccelTensor secondBias,
-                          AccelTensor firstOutputBuffer,
-                          AccelTensor secondOutputBuffer) {
-        DirectForwardMetalHalfLinearPairAdmissionPlan admissionPlan =
-                DirectForwardMetalHalfLinearPairAdmissionPlan.from(
+            MetalBinding metalBinding,
+            DirectForwardMetalCapabilities capabilities,
+            ModelConfigTraits traits,
+            ModelConfig config,
+            boolean metalLinearEnabled,
+            boolean decodeLogitsPhase,
+            AccelTensor input,
+            AccelTensor firstWeight,
+            AccelTensor firstBias,
+            AccelTensor secondWeight,
+            AccelTensor secondBias,
+            AccelTensor firstOutputBuffer,
+            AccelTensor secondOutputBuffer) {
+        DirectForwardMetalHalfLinearPairAdmissionPlan admissionPlan = DirectForwardMetalHalfLinearPairAdmissionPlan
+                .from(
                         capabilities,
                         traits,
                         metalLinearEnabled,
@@ -47,8 +47,8 @@ final class DirectForwardMetalHalfLinearPair {
             trace(admissionPlan.rejectionDecision(), config, input, firstWeight, secondWeight);
             return null;
         }
-        DirectForwardMetalLinearShapePlan shapePlan =
-                DirectForwardMetalLinearShapePlan.pair(input, firstWeight, secondWeight);
+        DirectForwardMetalLinearShapePlan shapePlan = DirectForwardMetalLinearShapePlan.pair(input, firstWeight,
+                secondWeight);
         if (shapePlan == null) {
             trace("reject:shape_mismatch", config, input, firstWeight, secondWeight);
             return null;
@@ -77,8 +77,8 @@ final class DirectForwardMetalHalfLinearPair {
             int m = Math.toIntExact(shapePlan.rows());
             int kk = Math.toIntExact(shapePlan.inputDim());
             int n = Math.toIntExact(shapePlan.outputDim());
-            DirectForwardMetalHalfLinearPairExecutionPlan executionPlan =
-                    DirectForwardMetalHalfLinearPairExecutionPlan.from(
+            DirectForwardMetalHalfLinearPairExecutionPlan executionPlan = DirectForwardMetalHalfLinearPairExecutionPlan
+                    .from(
                             m,
                             kk,
                             n,
@@ -143,10 +143,10 @@ final class DirectForwardMetalHalfLinearPair {
     }
 
     private static void trace(String decision,
-                              ModelConfig config,
-                              AccelTensor input,
-                              AccelTensor firstWeight,
-                              AccelTensor secondWeight) {
+            ModelConfig config,
+            AccelTensor input,
+            AccelTensor firstWeight,
+            AccelTensor secondWeight) {
         DirectForwardFfnFastPathTrace.trace(PATH, decision, config, input, firstWeight, secondWeight, null);
     }
 

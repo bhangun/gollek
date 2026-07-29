@@ -1,6 +1,6 @@
 package tech.kayys.gollek.provider.litert;
 
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import java.io.IOException;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -16,18 +16,22 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Multiplatform Gemma-4 inference engine using Gollek's compute backend.
  *
- * <p>Uses {@link MetalBinding} for hardware-accelerated operations on Apple Silicon
- * and automatically falls back to the CPU implementation on all other platforms.
+ * <p>
+ * Uses {@link MetalBinding} for hardware-accelerated operations on Apple
+ * Silicon
+ * and automatically falls back to the CPU implementation on all other
+ * platforms.
  * Weights are loaded from the companion {@code .task} file (MediaPipe format)
  * since {@code .litertlm} files use opaque NPU-compiled blobs.
  *
- * <p>Architecture (Gemma-4 E2B):
+ * <p>
+ * Architecture (Gemma-4 E2B):
  * <ul>
- *   <li>35 transformer layers with GQA (8 Q heads : 1 KV head)</li>
- *   <li>hidden_dim=1536, head_dim=256, ffn_dim=6144</li>
- *   <li>INT4 quantized weights with per-channel float32 scales</li>
- *   <li>Pre/post attention + FFN RMSNorm with skip connections</li>
- *   <li>SwiGLU FFN: gate * silu(ff1) → down projection</li>
+ * <li>35 transformer layers with GQA (8 Q heads : 1 KV head)</li>
+ * <li>hidden_dim=1536, head_dim=256, ffn_dim=6144</li>
+ * <li>INT4 quantized weights with per-channel float32 scales</li>
+ * <li>Pre/post attention + FFN RMSNorm with skip connections</li>
+ * <li>SwiGLU FFN: gate * silu(ff1) → down projection</li>
  * </ul>
  */
 public class LiteRTGemmaMetalRunner implements AutoCloseable {
@@ -70,12 +74,11 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
     private static final float PER_LAYER_MODEL_SCALE = (float) (1.0 / Math.sqrt(HIDDEN_DIM));
     private static final float FINAL_LOGIT_SOFTCAP = 30.0f;
     private static final float RMS_EPS = 1.0e-6f;
-    private static final boolean DISABLE_GEMMA4_PLE =
-            Boolean.getBoolean("gollek.litert.disable_gemma4_ple");
-    private static final boolean DISABLE_GEMMA4_LAYER_SCALAR =
-            Boolean.getBoolean("gollek.litert.disable_gemma4_layer_scalar");
-    private static final boolean USE_LEGACY_SIGNED_ROW_MAJOR_INT4 =
-            Boolean.getBoolean("gollek.litert.legacy_signed_row_major_int4");
+    private static final boolean DISABLE_GEMMA4_PLE = Boolean.getBoolean("gollek.litert.disable_gemma4_ple");
+    private static final boolean DISABLE_GEMMA4_LAYER_SCALAR = Boolean
+            .getBoolean("gollek.litert.disable_gemma4_layer_scalar");
+    private static final boolean USE_LEGACY_SIGNED_ROW_MAJOR_INT4 = Boolean
+            .getBoolean("gollek.litert.legacy_signed_row_major_int4");
 
     // TFLite type constants
     private static final int TFLITE_INT8 = 9;
@@ -105,13 +108,15 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
 
     private Path resolveWeightSource() {
         String fileName = modelPath.getFileName().toString();
-        if (fileName.endsWith(".task")) return modelPath;
+        if (fileName.endsWith(".task"))
+            return modelPath;
 
         Path dir = modelPath.getParent();
-        if (dir == null) dir = Path.of(".");
+        if (dir == null)
+            dir = Path.of(".");
 
         String baseName = fileName.replaceAll("(_qualcomm_[^.]+)?\\.litertlm$", "");
-        for (String suffix : new String[]{"-web.task", ".task"}) {
+        for (String suffix : new String[] { "-web.task", ".task" }) {
             Path candidate = dir.resolve(baseName + suffix);
             if (Files.exists(candidate)) {
                 log.info("Found companion .task weight file: {}", candidate.getFileName());
@@ -139,8 +144,8 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
 
         // 2. Load weights from .task file
         Path weightSource = resolveWeightSource();
-        Map<String, LiteRTContainerParser.WeightEntry> weightEntries =
-                LiteRTContainerParser.extractWeightMap(weightSource);
+        Map<String, LiteRTContainerParser.WeightEntry> weightEntries = LiteRTContainerParser
+                .extractWeightMap(weightSource);
 
         log.info("Extracted {} weight tensors from {}", weightEntries.size(), weightSource.getFileName());
 
@@ -220,19 +225,21 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
     /**
      * Dequantize INT4 packed weight tensor to float32.
      *
-     * <p>The Gemma LiteRT companion `.task` weights are packed input-major and use
+     * <p>
+     * The Gemma LiteRT companion `.task` weights are packed input-major and use
      * centered unsigned nibbles (q - 8) with one scale per output channel. We
      * expand them here into a conventional row-major [outDim, inDim] matrix so
      * the rest of the runner can keep using standard GEMM.
      *
-     * <p>The legacy row-major signed-nibble path remains behind a property only
+     * <p>
+     * The legacy row-major signed-nibble path remains behind a property only
      * as a diagnostics escape hatch.
      */
     private MemorySegment dequantizeInt4(MemorySegment weight, MemorySegment scale,
-                                          int outDim, int inDim, Arena a) {
+            int outDim, int inDim, Arena a) {
         long floatSize = (long) outDim * inDim * 4;
         MemorySegment out = a.allocate(floatSize, 64);
-        
+
         byte[] wArr = weight.toArray(ValueLayout.JAVA_BYTE);
         float[] sArr = scale.toArray(ValueLayout.JAVA_FLOAT);
 
@@ -246,8 +253,10 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
                     byte packed = wArr[rowByteOffset + col / 2];
                     int lo = (packed & 0x0F);
                     int hi = (packed >> 4) & 0x0F;
-                    if (lo >= 8) lo -= 16;
-                    if (hi >= 8) hi -= 16;
+                    if (lo >= 8)
+                        lo -= 16;
+                    if (hi >= 8)
+                        hi -= 16;
 
                     out.setAtIndex(ValueLayout.JAVA_FLOAT, outRowOffset + col, lo * s);
                     if (col + 1 < inDim) {
@@ -277,7 +286,7 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
      * Dequantize INT8 weight tensor to float32.
      */
     private MemorySegment dequantizeInt8(MemorySegment weight, MemorySegment scale,
-                                          int outDim, int inDim, Arena a) {
+            int outDim, int inDim, Arena a) {
         long floatSize = (long) outDim * inDim * 4;
         MemorySegment out = a.allocate(floatSize, 64);
 
@@ -329,8 +338,10 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
                 int packed = packedWeight.get(ValueLayout.JAVA_BYTE, rowOffset + (i / 2)) & 0xFF;
                 int lo = packed & 0x0F;
                 int hi = (packed >>> 4) & 0x0F;
-                if (lo >= 8) lo -= 16;
-                if (hi >= 8) hi -= 16;
+                if (lo >= 8)
+                    lo -= 16;
+                if (hi >= 8)
+                    hi -= 16;
                 out.setAtIndex(ValueLayout.JAVA_FLOAT, i, lo * rowScale * embeddingScale);
                 if (i + 1 < dim) {
                     out.setAtIndex(ValueLayout.JAVA_FLOAT, i + 1, hi * rowScale * embeddingScale);
@@ -444,7 +455,8 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
             MemorySegment rowBuffer = arena.allocate((long) HIDDEN_DIM * Float.BYTES, 64);
             for (int row = 0; row < rowCount; row++) {
                 lookupScaledEmbeddingRow(rowBuffer, packedWeight, scale, startRow + row, HIDDEN_DIM, 1.0f);
-                MemorySegment.copy(rowBuffer, 0, chunk, (long) row * HIDDEN_DIM * Float.BYTES, (long) HIDDEN_DIM * Float.BYTES);
+                MemorySegment.copy(rowBuffer, 0, chunk, (long) row * HIDDEN_DIM * Float.BYTES,
+                        (long) HIDDEN_DIM * Float.BYTES);
             }
             dequantizeNanos += System.nanoTime() - startNanos;
             return chunk;
@@ -489,7 +501,7 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
 
     /** Matrix multiplication with auto-dequantization caching. */
     private void linearForward(MemorySegment out, MemorySegment input,
-                                String weightName, int outDim, int inDim, Arena stepArena) {
+            String weightName, int outDim, int inDim, Arena stepArena) {
         String cacheKey = weightName + ".w_float32";
         MemorySegment wFloat = dequantizedWeights.get(cacheKey);
 
@@ -511,7 +523,8 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
             dequantizedWeights.put(cacheKey, wFloat);
         }
 
-        // Cached weights are row-major [outDim, inDim], so the right-hand side is transposed.
+        // Cached weights are row-major [outDim, inDim], so the right-hand side is
+        // transposed.
         matmulTransposedRightChecked(out, input, wFloat, inDim, outDim, weightName);
     }
 
@@ -543,7 +556,8 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
         float max = Float.NEGATIVE_INFINITY;
         for (int i = 0; i < size; i++) {
             float v = logits.getAtIndex(ValueLayout.JAVA_FLOAT, i);
-            if (v > max) max = v;
+            if (v > max)
+                max = v;
         }
         float sum = 0;
         for (int i = 0; i < size; i++) {
@@ -722,9 +736,11 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
                             perLayerGate.getAtIndex(ValueLayout.JAVA_FLOAT, i)
                                     * perLayerInput.getAtIndex(ValueLayout.JAVA_FLOAT, i));
                 }
-                linearForward(perLayerProj, perLayerGate, prefix + "per_layer_embedding_projection", HIDDEN_DIM, PLE_DIM, a);
+                linearForward(perLayerProj, perLayerGate, prefix + "per_layer_embedding_projection", HIDDEN_DIM,
+                        PLE_DIM, a);
                 if (hasWeight(prefix + "post_per_layer_input_norm.scale")) {
-                    rmsNorm(perLayerProj, perLayerProj, getWeight(prefix + "post_per_layer_input_norm.scale"), HIDDEN_DIM);
+                    rmsNorm(perLayerProj, perLayerProj, getWeight(prefix + "post_per_layer_input_norm.scale"),
+                            HIDDEN_DIM);
                 }
                 addChecked(x, residual, perLayerProj, HIDDEN_DIM, prefix + "per_layer_residual");
             }
@@ -778,7 +794,8 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
             }
 
             for (int i = 0; i < maxNewTokens; i++) {
-                if (tokenizer.isTerminalToken(nextToken)) break;
+                if (tokenizer.isTerminalToken(nextToken))
+                    break;
 
                 String tokenStr = tokenizer.decodeToken(nextToken);
                 if (!tokenStr.isEmpty()) {
@@ -796,7 +813,8 @@ public class LiteRTGemmaMetalRunner implements AutoCloseable {
                     break;
                 }
             }
-            log.info("Gemma fallback runner stats: matmulCalls={}, rmsNormCalls={}, addCalls={}, lmHeadMs={}, dequantizeMs={}, lmHeadChunks={}",
+            log.info(
+                    "Gemma fallback runner stats: matmulCalls={}, rmsNormCalls={}, addCalls={}, lmHeadMs={}, dequantizeMs={}, lmHeadChunks={}",
                     matmulCalls,
                     rmsNormCalls,
                     addCalls,

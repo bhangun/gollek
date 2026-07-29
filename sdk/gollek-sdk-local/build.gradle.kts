@@ -26,7 +26,7 @@ dependencies {
     implementation(project(":core:gollek-core"))
     implementation(project(":core:gollek-model-repository"))
     implementation(project(":core:gollek-observability"))
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":plugins:gollek-plugin-mcp"))
     implementation(project(":plugins:gollek-plugin-model-router"))
     implementation(project(":runner:gguf:gollek-gguf-converter"))

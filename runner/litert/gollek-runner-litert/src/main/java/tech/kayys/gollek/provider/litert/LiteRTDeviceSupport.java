@@ -1,6 +1,6 @@
 package tech.kayys.gollek.provider.litert;
 
-import tech.kayys.aljabr.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
 
 import java.util.LinkedHashSet;
 import java.util.Locale;
@@ -22,7 +22,8 @@ final class LiteRTDeviceSupport {
 
     static boolean customMetalLibraryExists() {
         String home = System.getProperty("user.home");
-        if (home == null) return false;
+        if (home == null)
+            return false;
         return java.nio.file.Files.exists(java.nio.file.Paths.get(home, ".gollek", "libs", "libgollek_metal.dylib"));
     }
 

@@ -7,7 +7,8 @@ import tech.kayys.gollek.plugin.kernel.KernelPlatform;
 /**
  * Small CLI boundary for Metal runtime probing.
  *
- * <p>The CLI should not directly depend on the optional Metal module at
+ * <p>
+ * The CLI should not directly depend on the optional Metal module at
  * compile-time, because CPU-only and non-macOS builds still need to start.
  */
 public final class CliMetalRuntime {
@@ -30,7 +31,7 @@ public final class CliMetalRuntime {
 
     public static void initialize() {
         try {
-            Class<?> metalBindingClass = Class.forName("tech.kayys.aljabr.metal.binding.MetalBinding");
+            Class<?> metalBindingClass = Class.forName("tech.kayys.alkhawarizm.metal.binding.MetalBinding");
             Method initializeMethod = metalBindingClass.getMethod("initialize");
             initializeMethod.invoke(null);
             Method getInstanceMethod = metalBindingClass.getMethod("getInstance");
@@ -38,7 +39,8 @@ public final class CliMetalRuntime {
             Method initMethod = binding.getClass().getMethod("init");
             initMethod.invoke(binding);
         } catch (Throwable ignored) {
-            // Callers validate status separately and decide whether CPU fallback is acceptable.
+            // Callers validate status separately and decide whether CPU fallback is
+            // acceptable.
         }
     }
 
@@ -48,7 +50,7 @@ public final class CliMetalRuntime {
 
     public static NativeStatus status() {
         try {
-            Class<?> metalBindingClass = Class.forName("tech.kayys.aljabr.metal.binding.MetalBinding");
+            Class<?> metalBindingClass = Class.forName("tech.kayys.alkhawarizm.metal.binding.MetalBinding");
             Method getInstanceMethod = metalBindingClass.getMethod("getInstance");
             Object binding = getInstanceMethod.invoke(null);
 

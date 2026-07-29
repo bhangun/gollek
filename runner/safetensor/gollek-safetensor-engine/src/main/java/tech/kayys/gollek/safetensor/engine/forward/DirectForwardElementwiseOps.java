@@ -8,7 +8,7 @@ package tech.kayys.gollek.safetensor.engine.forward;
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorSpecies;
 import org.jboss.logging.Logger;
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 
 import java.lang.foreign.MemorySegment;

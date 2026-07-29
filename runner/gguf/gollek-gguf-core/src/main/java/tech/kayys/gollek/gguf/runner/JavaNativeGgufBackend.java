@@ -14,16 +14,17 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 
-import tech.kayys.aljabr.core.tensor.Tensor;
-import tech.kayys.aljabr.core.tensor.TensorFactory;
-import tech.kayys.gollek.gguf.model.aljabr.LlamaModel;
-import tech.kayys.gollek.gguf.model.aljabr.SigLIPVisionTransformer;
-import tech.kayys.gollek.gguf.model.aljabr.VisionProjector;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.TensorFactory;
+import tech.kayys.gollek.gguf.model.alkhawarizm.LlamaModel;
+import tech.kayys.gollek.gguf.model.alkhawarizm.SigLIPVisionTransformer;
+import tech.kayys.gollek.gguf.model.alkhawarizm.VisionProjector;
 import tech.kayys.gollek.gguf.runner.AljabrWeightAdapter;
 import tech.kayys.gollek.gguf.loader.model.ModelConfig;
 
 /**
- * Java-native GGUF backend scaffold backed by the active GGUF tensor primitives.
+ * Java-native GGUF backend scaffold backed by the active GGUF tensor
+ * primitives.
  */
 public class JavaNativeGgufBackend implements GgufBackend {
     private final GGUFModel model;
@@ -50,19 +51,19 @@ public class JavaNativeGgufBackend implements GgufBackend {
             // 1. Load weights into Aljabr Tensors
             AljabrWeightAdapter weights = new AljabrWeightAdapter(model.file());
             ModelConfig config = new ModelConfig(model.file());
-            
+
             // 2. Initialize Aljabr-NN Modules
             LlamaModel textModel = new LlamaModel(config, weights);
-            
+
             boolean isMultimodal = config.contains("vision_config");
             SigLIPVisionTransformer visionModel = null;
             VisionProjector projector = null;
-            
+
             if (isMultimodal) {
                 visionModel = new SigLIPVisionTransformer(config, weights);
                 projector = new VisionProjector(weights);
             }
-            
+
             // 3. Process inputs (Scaffold for generation loop)
             List<String> imagePaths = (List<String>) request.getParameter("vision_input_paths").orElse(null);
             Tensor visionEmbeds = null;
@@ -74,13 +75,14 @@ public class JavaNativeGgufBackend implements GgufBackend {
                     int targetWidth = 384; // config.getInt("vision_config.image_size", 384)
                     int targetHeight = targetWidth; // usually square
                     java.awt.Image tmp = img.getScaledInstance(targetWidth, targetHeight, java.awt.Image.SCALE_SMOOTH);
-                    java.awt.image.BufferedImage resized = new java.awt.image.BufferedImage(targetWidth, targetHeight, java.awt.image.BufferedImage.TYPE_INT_RGB);
+                    java.awt.image.BufferedImage resized = new java.awt.image.BufferedImage(targetWidth, targetHeight,
+                            java.awt.image.BufferedImage.TYPE_INT_RGB);
                     java.awt.Graphics2D g2d = resized.createGraphics();
                     g2d.drawImage(tmp, 0, 0, null);
                     g2d.dispose();
-                    
-                    float[] mean = {0.5f, 0.5f, 0.5f};
-                    float[] std = {0.5f, 0.5f, 0.5f};
+
+                    float[] mean = { 0.5f, 0.5f, 0.5f };
+                    float[] std = { 0.5f, 0.5f, 0.5f };
                     float[] tensorData = new float[3 * targetHeight * targetWidth];
                     for (int y = 0; y < targetHeight; y++) {
                         for (int x = 0; x < targetWidth; x++) {
@@ -98,27 +100,28 @@ public class JavaNativeGgufBackend implements GgufBackend {
                     visionEmbeds = projector.forward(visionOut);
                 }
             }
-            
+
             // Tokenize prompt and run prefill/decode loop using textModel.forward()
             System.out.println("Starting Java-native generation loop...");
-            
+
             // Dummy prompt (since tokenizer is pending)
-            Tensor promptIds = TensorFactory.of(new float[]{1, 2, 3}, 1, 3);
-            
+            Tensor promptIds = TensorFactory.of(new float[] { 1, 2, 3 }, 1, 3);
+
             for (int i = 0; i < 5; i++) {
                 long startMs = System.currentTimeMillis();
-                
+
                 // Pass visionEmbeds on the first step (prefill), then null for decode steps
                 Tensor logits = textModel.forward(promptIds, i == 0 ? visionEmbeds : null);
-                
+
                 long elapsed = System.currentTimeMillis() - startMs;
-                System.out.println("Step " + (i+1) + ": textModel.forward() took " + elapsed + "ms. Logits shape: " + logits.shape());
-                
+                System.out.println("Step " + (i + 1) + ": textModel.forward() took " + elapsed + "ms. Logits shape: "
+                        + logits.shape());
+
                 // Dummy decode (just appending a token)
-                promptIds = TensorFactory.of(new float[]{4}, 1, 1);
+                promptIds = TensorFactory.of(new float[] { 4 }, 1, 1);
             }
-            
-            return (RunnerResult<T>) RunnerResult.success("Aljabr native engine successfully initialized graph with " 
+
+            return (RunnerResult<T>) RunnerResult.success("Aljabr native engine successfully initialized graph with "
                     + textModel.parameterCount() + " parameters and executed generation loop.");
         } catch (Exception e) {
             return RunnerResult.failed("Aljabr native engine failed: " + e.getMessage());

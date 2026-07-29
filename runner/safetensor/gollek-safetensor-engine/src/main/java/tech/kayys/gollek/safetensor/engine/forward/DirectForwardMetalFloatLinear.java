@@ -6,7 +6,7 @@
 package tech.kayys.gollek.safetensor.engine.forward;
 
 import org.jboss.logging.Logger;
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelOps;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 
@@ -15,16 +15,15 @@ final class DirectForwardMetalFloatLinear {
     }
 
     static AccelTensor tryLinear(Logger log,
-                                 MetalBinding metalBinding,
-                                 boolean metalLinearEnabled,
-                                 AccelTensor input,
-                                 AccelTensor weight,
-                                 AccelTensor bias) {
+            MetalBinding metalBinding,
+            boolean metalLinearEnabled,
+            AccelTensor input,
+            AccelTensor weight,
+            AccelTensor bias) {
         if (!canUseCandidate(metalLinearEnabled, metalBinding, input, weight)) {
             return null;
         }
-        DirectForwardMetalLinearShapePlan shapePlan =
-                DirectForwardMetalLinearShapePlan.single(input, weight);
+        DirectForwardMetalLinearShapePlan shapePlan = DirectForwardMetalLinearShapePlan.single(input, weight);
         if (shapePlan == null) {
             return null;
         }
@@ -56,14 +55,15 @@ final class DirectForwardMetalFloatLinear {
         }
     }
 
-    // MPS hangs indefinitely on very large F32 matrices (e.g. lm_head for 152k-vocab models).
+    // MPS hangs indefinitely on very large F32 matrices (e.g. lm_head for
+    // 152k-vocab models).
     // Cap at 256M weight elements (~1 GB in F32) to prevent a hard hang.
     private static final long MAX_METAL_FLOAT_WEIGHT_ELEMENTS = 256L * 1024L * 1024L;
 
     private static boolean canUseCandidate(boolean metalLinearEnabled,
-                                           MetalBinding metalBinding,
-                                           AccelTensor input,
-                                           AccelTensor weight) {
+            MetalBinding metalBinding,
+            AccelTensor input,
+            AccelTensor weight) {
         if (!metalLinearEnabled || metalBinding == null) {
             return false;
         }

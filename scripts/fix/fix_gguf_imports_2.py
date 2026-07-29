@@ -3,7 +3,7 @@ import os
 dir_path = "/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/gollek/runner/gguf/gollek-gguf-core"
 
 replacements = {
-    "import tech.kayys.aljabr.nn.NNModule;": "import tech.kayys.aljabr.ml.nn.NNModule;"
+    "import tech.kayys.alkhawarizm.nn.NNModule;": "import tech.kayys.alkhawarizm.ml.nn.NNModule;"
 }
 
 for root, dirs, files in os.walk(dir_path):

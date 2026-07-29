@@ -1,6 +1,6 @@
 package tech.kayys.gollek.ir;
 
-import tech.kayys.aljabr.core.tensor.*;
+import tech.kayys.alkhawarizm.core.tensor.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,14 +28,14 @@ public final class GGraphBuilder {
         }
         GValueId out = new GValueId(outputName);
         OpDescriptor desc = new OpDescriptor(new OpId(opType));
-        
+
         ops.add(new GOp(
                 desc,
                 outputName,
                 inputs.stream().map(GValueRef::new).collect(Collectors.toList()),
-                List.of(out), 
+                List.of(out),
                 attrs));
-        
+
         defined.add(out);
         return out;
     }

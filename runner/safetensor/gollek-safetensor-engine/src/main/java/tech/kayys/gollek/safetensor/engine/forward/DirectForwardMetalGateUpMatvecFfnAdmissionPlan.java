@@ -5,7 +5,7 @@
  */
 package tech.kayys.gollek.safetensor.engine.forward;
 
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.spi.model.FFNActivationType;
 
@@ -36,8 +36,7 @@ record DirectForwardMetalGateUpMatvecFfnAdmissionPlan(
             AccelTensor gateB,
             AccelTensor upB,
             AccelTensor combinedBuffer) {
-        DirectForwardMetalFfnActivationPlan activation =
-                DirectForwardMetalFfnActivationPlan.from(activationType);
+        DirectForwardMetalFfnActivationPlan activation = DirectForwardMetalFfnActivationPlan.from(activationType);
         if (!DirectForwardFfnFastPathPolicy.shouldUseMetalGateUpMatvecFfn()) {
             return reject(activation, "flag_disabled");
         }

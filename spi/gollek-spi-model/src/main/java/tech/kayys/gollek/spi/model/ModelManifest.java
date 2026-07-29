@@ -1,7 +1,8 @@
 package tech.kayys.gollek.spi.model;
+
 import tech.kayys.gollek.spi.spec.*;
-import tech.kayys.aljabr.core.tensor.DeviceType;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 
 import java.time.Instant;
 import java.util.List;
@@ -161,7 +162,8 @@ public record ModelManifest(
         }
 
         public ModelManifest build() {
-            return new ModelManifest(modelId, name, version, path, apiKey, requestId, architecture, artifacts, supportedDevices,
+            return new ModelManifest(modelId, name, version, path, apiKey, requestId, architecture, artifacts,
+                    supportedDevices,
                     resourceRequirements,
                     metadata, createdAt, updatedAt);
         }

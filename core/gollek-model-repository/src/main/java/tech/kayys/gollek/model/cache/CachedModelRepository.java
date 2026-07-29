@@ -4,7 +4,7 @@ import io.quarkus.cache.CacheResult;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 import tech.kayys.gollek.spi.model.ModelManifest;
 import tech.kayys.gollek.spi.model.Pageable;
 import tech.kayys.gollek.spi.model.ModelArtifact;

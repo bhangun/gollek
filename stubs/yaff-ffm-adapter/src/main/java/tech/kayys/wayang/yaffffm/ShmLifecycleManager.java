@@ -28,8 +28,10 @@ import java.lang.foreign.MemorySegment;
  *
  * - Allocates temp files in /dev/shm (or java.io.tmpdir) and memory-maps them
  * - Writes provided bytes into the mapped buffer
- * - Stores a durable reference (metadata) in UnifiedMemoryStore (RocksDB) under key "yaff:frame:{id}"
- * - Exposes HTTP endpoints: /allocate (POST with raw bytes) and /release (POST with JSON {id})
+ * - Stores a durable reference (metadata) in UnifiedMemoryStore (RocksDB) under
+ * key "yaff:frame:{id}"
+ * - Exposes HTTP endpoints: /allocate (POST with raw bytes) and /release (POST
+ * with JSON {id})
  *
  * This is intentionally small and self-contained for prototype verification.
  */
@@ -47,14 +49,15 @@ public class ShmLifecycleManager {
 
     public ShmLifecycleManager(int port) throws IOException {
         this.transport = new WayangYaffShmTransport(WayangYaffShmTransport.defaultShmDir());
-        // Try to open UnifiedMemoryStore via reflection; if not available, fallback to local file metadata
+        // Try to open UnifiedMemoryStore via reflection; if not available, fallback to
+        // local file metadata
         Object tmpStore = null;
         Method putM = null;
         Method delM = null;
         Method flushM = null;
         try {
-            String dbPath = System.getProperty("wayang.aljabr.dbpath", "./data/aljabr");
-            Class<?> factoryCls = Class.forName("tech.kayys.aljabr.core.memory.MemoryStoreFactory");
+            String dbPath = System.getProperty("wayang.alkhawarizm.dbpath", "./data/alkhawarizm");
+            Class<?> factoryCls = Class.forName("tech.kayys.alkhawarizm.core.memory.MemoryStoreFactory");
             Method open = factoryCls.getMethod("openRocksDb", String.class);
             tmpStore = open.invoke(null, dbPath);
             Class<?> storeCls = tmpStore.getClass();
@@ -85,11 +88,13 @@ public class ShmLifecycleManager {
         if (store != null && storeFlushMethod != null) {
             try {
                 storeFlushMethod.invoke(store);
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+            }
         }
     }
 
-    public record FrameMeta(String id, String path, long offset, long length) {}
+    public record FrameMeta(String id, String path, long offset, long length) {
+    }
 
     private class AllocateHandler implements HttpHandler {
         @Override
@@ -103,8 +108,10 @@ public class ShmLifecycleManager {
             MappedByteBuffer mb = null;
             Path backing = null;
             try {
-                backing = WayangYaffShmTransport.defaultShmDir().resolve("yaff-" + UUID.randomUUID().toString() + ".dat");
-                FileChannel fc = FileChannel.open(backing, StandardOpenOption.CREATE_NEW, StandardOpenOption.READ, StandardOpenOption.WRITE);
+                backing = WayangYaffShmTransport.defaultShmDir()
+                        .resolve("yaff-" + UUID.randomUUID().toString() + ".dat");
+                FileChannel fc = FileChannel.open(backing, StandardOpenOption.CREATE_NEW, StandardOpenOption.READ,
+                        StandardOpenOption.WRITE);
                 fc.truncate(body.length);
                 mb = fc.map(FileChannel.MapMode.READ_WRITE, 0, body.length);
                 mb.put(body);
@@ -114,23 +121,24 @@ public class ShmLifecycleManager {
                 FrameMeta meta = new FrameMeta(id, backing.toString(), 0L, body.length);
                 // persist metadata as JSON in store if available, otherwise write to local file
                 byte[] metaBytes = mapper.writeValueAsBytes(Map.of(
-                    "id", id,
-                    "path", meta.path,
-                    "offset", meta.offset,
-                    "length", meta.length
-                ));
+                        "id", id,
+                        "path", meta.path,
+                        "offset", meta.offset,
+                        "length", meta.length));
                 if (store != null && storePutMethod != null) {
                     try {
                         MemorySegment seg = MemorySegment.ofArray(metaBytes);
                         storePutMethod.invoke(store, ("yaff:frame:" + id).getBytes(), seg);
                     } catch (Throwable t) {
-                        Files.write(WayangYaffShmTransport.defaultShmDir().resolve("yaff-meta-" + id + ".json"), metaBytes);
+                        Files.write(WayangYaffShmTransport.defaultShmDir().resolve("yaff-meta-" + id + ".json"),
+                                metaBytes);
                     }
                 } else {
                     Files.write(WayangYaffShmTransport.defaultShmDir().resolve("yaff-meta-" + id + ".json"), metaBytes);
                 }
 
-                byte[] resp = mapper.writeValueAsBytes(Map.of("id", id, "path", meta.path, "offset", meta.offset, "length", meta.length));
+                byte[] resp = mapper.writeValueAsBytes(
+                        Map.of("id", id, "path", meta.path, "offset", meta.offset, "length", meta.length));
                 exchange.getResponseHeaders().set("Content-Type", "application/json");
                 exchange.sendResponseHeaders(200, resp.length);
                 try (OutputStream os = exchange.getResponseBody()) {
@@ -157,7 +165,9 @@ public class ShmLifecycleManager {
             String id = (String) m.get("id");
             if (id == null) {
                 exchange.sendResponseHeaders(400, 0);
-                try (OutputStream os = exchange.getResponseBody()) { os.write("missing id".getBytes()); }
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write("missing id".getBytes());
+                }
                 return;
             }
             try {
@@ -173,7 +183,13 @@ public class ShmLifecycleManager {
                 }
                 // remove local metadata file if present
                 Path metaFile = WayangYaffShmTransport.defaultShmDir().resolve("yaff-meta-" + id + ".json");
-                try { Files.deleteIfExists(metaFile); exchange.sendResponseHeaders(200, 0); exchange.getResponseBody().close(); return; } catch (Throwable t) {}
+                try {
+                    Files.deleteIfExists(metaFile);
+                    exchange.sendResponseHeaders(200, 0);
+                    exchange.getResponseBody().close();
+                    return;
+                } catch (Throwable t) {
+                }
                 exchange.sendResponseHeaders(500, 0);
                 exchange.sendResponseHeaders(200, 0);
                 exchange.getResponseBody().close();

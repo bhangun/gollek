@@ -12,7 +12,7 @@ import tech.kayys.gollek.converter.model.ConversionResult;
 import tech.kayys.gollek.converter.model.GGUFConversionParams;
 import tech.kayys.gollek.converter.model.ModelMetadata;
 import tech.kayys.gollek.converter.model.QuantizationType;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.nio.file.Files;

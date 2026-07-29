@@ -1,7 +1,7 @@
 package tech.kayys.gollek.spi.registry;
 
 import org.junit.jupiter.api.Test;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 
 import java.nio.file.Path;
 import java.time.Instant;

@@ -15,12 +15,13 @@
  */
 
 package tech.kayys.gollek.spi.spec;
-import tech.kayys.aljabr.core.tensor.DeviceType;
+
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
 
 /**
  * Disk space requirements
  */
 public record DiskSpace(
-        long sizeBytes,
-        String path) {
+                long sizeBytes,
+                String path) {
 }

@@ -1,6 +1,6 @@
 package tech.kayys.gollek.core.weight;
 
-import tech.kayys.aljabr.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
 
 /**
  * 

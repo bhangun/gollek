@@ -1,6 +1,6 @@
 package tech.kayys.gollek.ml.gguf;
 
-import tech.kayys.aljabr.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -19,9 +19,10 @@ public final class GgufWriter {
 
     private static final int MAGIC = 0x46554747; // "GGUF" in LE
 
-    public static void save(Path path, Map<String, Tensor> tensors, Map<String, GgufMetaValue> metadata) throws IOException {
+    public static void save(Path path, Map<String, Tensor> tensors, Map<String, GgufMetaValue> metadata)
+            throws IOException {
         try (FileOutputStream fos = new FileOutputStream(path.toFile());
-             FileChannel channel = fos.getChannel()) {
+                FileChannel channel = fos.getChannel()) {
 
             // 1. Header
             ByteBuffer headerBuf = ByteBuffer.allocate(24).order(ByteOrder.LITTLE_ENDIAN);
@@ -43,17 +44,18 @@ public final class GgufWriter {
             for (Map.Entry<String, Tensor> entry : tensors.entrySet()) {
                 String name = entry.getKey();
                 Tensor tensor = entry.getValue();
-                
+
                 writeString(channel, name);
-                
+
                 long[] shape = tensor.shape().dims();
                 writeInt(channel, shape.length);
-                for (long d : shape) writeLong(channel, d);
-                
+                for (long d : shape)
+                    writeLong(channel, d);
+
                 GgmlType type = GgmlType.F32; // Default for SDK export
                 writeInt(channel, type.id);
                 writeLong(channel, currentOffset);
-                
+
                 currentOffset += type.bytesFor(tensor.numel());
                 // Align offset
                 currentOffset = (currentOffset + 31) & ~31;
@@ -71,10 +73,11 @@ public final class GgufWriter {
             for (Tensor tensor : tensors.values()) {
                 float[] data = tensor.toFloatArray();
                 ByteBuffer dataBuf = ByteBuffer.allocate(data.length * 4).order(ByteOrder.LITTLE_ENDIAN);
-                for (float f : data) dataBuf.putFloat(f);
+                for (float f : data)
+                    dataBuf.putFloat(f);
                 dataBuf.flip();
                 channel.write(dataBuf);
-                
+
                 // Align data segment
                 long endPos = channel.position();
                 long nextAligned = (endPos + alignment - 1) & ~(alignment - 1);

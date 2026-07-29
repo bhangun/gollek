@@ -20,8 +20,8 @@ repositories {
 dependencies {
     implementation(project(":core:plugin:gollek-plugin-runner-core"))
     implementation(project(":runner:gguf:gollek-gguf-core"))
-    implementation("tech.kayys.aljabr:aljabr-nn:0.1.0")
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-nn:0.1.0")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0")
     implementation(project(":spi:gollek-spi-inference"))
     implementation(project(":runner:safetensor:gollek-safetensor-engine"))
     testImplementation(group = "org.junit.jupiter", name = "junit-jupiter")

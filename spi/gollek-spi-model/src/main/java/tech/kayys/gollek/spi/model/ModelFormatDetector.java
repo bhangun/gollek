@@ -1,7 +1,8 @@
 package tech.kayys.gollek.spi.model;
+
 import tech.kayys.gollek.spi.spec.*;
-import tech.kayys.aljabr.core.tensor.DeviceType;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -77,11 +78,13 @@ public final class ModelFormatDetector {
      * Handles both ONNX variant (vae_decoder/) and safetensors variant (vae/).
      */
     public static boolean isStableDiffusion(Path modelPath) {
-        if (modelPath == null) return false;
+        if (modelPath == null)
+            return false;
         try {
             Path dir = Files.isDirectory(modelPath) ? modelPath : modelPath.getParent();
-            if (dir == null || !Files.exists(dir)) return false;
-            
+            if (dir == null || !Files.exists(dir))
+                return false;
+
             return Files.exists(dir.resolve("model_index.json"));
         } catch (Exception e) {
             return false;

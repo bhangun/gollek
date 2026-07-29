@@ -5,7 +5,7 @@
  */
 package tech.kayys.gollek.safetensor.engine.generation.attention;
 
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelOps;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.engine.generation.DirectInferenceProfiler;
@@ -128,8 +128,8 @@ final class FlashAttentionProjector {
         if (in == null || in.qW == null || layout == null || !layout.packedQkvProjection()) {
             return null;
         }
-        FlashAttentionShapeAdmissionPlan weightAdmission =
-                FlashAttentionShapeAdmissionPlan.packedQkvWeight(in.qW, layout);
+        FlashAttentionShapeAdmissionPlan weightAdmission = FlashAttentionShapeAdmissionPlan.packedQkvWeight(in.qW,
+                layout);
         if (!weightAdmission.admitted()) {
             throw weightAdmission.asException();
         }
@@ -138,8 +138,8 @@ final class FlashAttentionProjector {
         boolean packedOwnershipTransferred = false;
         try {
             packed = project(in.x, in.qW, in.qB, "attn_qkv_proj_packed", config, modelPolicy, outputBuffer);
-            FlashAttentionShapeAdmissionPlan outputAdmission =
-                    FlashAttentionShapeAdmissionPlan.packedQkvOutput(packed, layout);
+            FlashAttentionShapeAdmissionPlan outputAdmission = FlashAttentionShapeAdmissionPlan.packedQkvOutput(packed,
+                    layout);
             if (!outputAdmission.admitted()) {
                 throw outputAdmission.asException();
             }

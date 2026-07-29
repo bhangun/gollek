@@ -6,7 +6,7 @@ val quarkusVersion = rootProject.extra["quarkusVersion"] as String
 
 dependencies {
     implementation(project(":core:gollek-runtime-config"))
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":spi:gollek-spi-inference"))
     implementation(project(":spi:gollek-spi-model"))
     implementation(project(":spi:gollek-spi"))

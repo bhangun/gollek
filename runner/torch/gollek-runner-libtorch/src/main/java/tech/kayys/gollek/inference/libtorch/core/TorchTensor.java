@@ -2,10 +2,10 @@ package tech.kayys.gollek.inference.libtorch.core;
 
 import tech.kayys.gollek.inference.libtorch.binding.LibTorchBinding;
 import tech.kayys.gollek.core.backend.ComputeBackendType;
-import tech.kayys.aljabr.core.tensor.DType;
+import tech.kayys.alkhawarizm.core.tensor.DType;
 import tech.kayys.gollek.inference.libtorch.core.Device;
 import tech.kayys.gollek.core.graph.ExecutionContext;
-import tech.kayys.aljabr.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -65,39 +65,57 @@ import java.util.concurrent.atomic.AtomicLong;
 public class TorchTensor implements Tensor, AutoCloseable {
 
     @Override
-    public tech.kayys.aljabr.core.tensor.Tensor add(tech.kayys.aljabr.core.tensor.Tensor other) { return this; }
-    @Override
-    public tech.kayys.aljabr.core.tensor.Tensor sub(tech.kayys.aljabr.core.tensor.Tensor other) { return this; }
-    @Override
-    public tech.kayys.aljabr.core.tensor.Tensor mul(tech.kayys.aljabr.core.tensor.Tensor other) { return this; }
-    @Override
-    public tech.kayys.aljabr.core.tensor.Tensor mul(float scalar) { return this; }
-    @Override
-    public tech.kayys.aljabr.core.tensor.Tensor div(float scalar) { return this; }
-    @Override
-    public tech.kayys.aljabr.core.tensor.Tensor matmul(tech.kayys.aljabr.core.tensor.Tensor other) { return this; }
-
-    @Override
-    public tech.kayys.aljabr.core.tensor.Shape shape() {
-        return new tech.kayys.aljabr.core.tensor.Shape(shapeArray());
+    public tech.kayys.alkhawarizm.core.tensor.Tensor add(tech.kayys.alkhawarizm.core.tensor.Tensor other) {
+        return this;
     }
 
     @Override
-    
+    public tech.kayys.alkhawarizm.core.tensor.Tensor sub(tech.kayys.alkhawarizm.core.tensor.Tensor other) {
+        return this;
+    }
+
     @Override
-    public Tensor unsqueeze(int dim) { return this; }
-    
+    public tech.kayys.alkhawarizm.core.tensor.Tensor mul(tech.kayys.alkhawarizm.core.tensor.Tensor other) {
+        return this;
+    }
+
+    @Override
+    public tech.kayys.alkhawarizm.core.tensor.Tensor mul(float scalar) {
+        return this;
+    }
+
+    @Override
+    public tech.kayys.alkhawarizm.core.tensor.Tensor div(float scalar) {
+        return this;
+    }
+
+    @Override
+    public tech.kayys.alkhawarizm.core.tensor.Tensor matmul(tech.kayys.alkhawarizm.core.tensor.Tensor other) {
+        return this;
+    }
+
+    @Override
+    public tech.kayys.alkhawarizm.core.tensor.Shape shape() {
+        return new tech.kayys.alkhawarizm.core.tensor.Shape(shapeArray());
+    }
+
+    @Override
+
+    @Override
+    public Tensor unsqueeze(int dim) {
+        return this;
+    }
+
     @Override
     public Tensor transpose() {
         return transpose(0, 1);
     }
-    
+
     @Override
     public Tensor transpose(int dim0, int dim1) {
         // Simple stub for now
         return this;
     }
-
 
     private static final System.Logger LEAK_LOGGER = System.getLogger("tech.kayys.gollek.tensor.leak");
     private static final AtomicLong LIVE_COUNT = new AtomicLong(0);
@@ -254,7 +272,7 @@ public class TorchTensor implements Tensor, AutoCloseable {
             MemorySegment result = (MemorySegment) fn.invoke(dataSegment, shapeSegment, (long) shape.length,
                     ScalarType.FLOAT.code());
             TorchTensor tensor = new TorchTensor(result, arena);
-            
+
             if (device != null && device != Device.CPU) {
                 tensor = tensor.to(device);
             }
@@ -297,13 +315,14 @@ public class TorchTensor implements Tensor, AutoCloseable {
      * @return a new tensor containing the data
      */
     public static TorchTensor fromLongArray(long[] data, long[] shape) {
-        return fromLongArray(data, shape, null);  // Default to current device
+        return fromLongArray(data, shape, null); // Default to current device
     }
 
     /**
      * Create a long tensor with optional device placement.
-     * @param data the data array
-     * @param shape the tensor shape
+     * 
+     * @param data   the data array
+     * @param shape  the tensor shape
      * @param device the device to place tensor on (null = default)
      */
     public static TorchTensor fromLongArray(long[] data, long[] shape, Device device) {
@@ -317,7 +336,7 @@ public class TorchTensor implements Tensor, AutoCloseable {
             MemorySegment result = (MemorySegment) fn.invoke(dataSegment, shapeSegment, (long) shape.length,
                     ScalarType.LONG.code());
             TorchTensor tensor = new TorchTensor(result, arena);
-            
+
             // Move to specified device if not null
             if (device != null && device != Device.CPU) {
                 tensor = tensor.to(device);
@@ -563,14 +582,14 @@ public class TorchTensor implements Tensor, AutoCloseable {
     }
 
     @Override
-    public tech.kayys.aljabr.core.tensor.DeviceType device() {
+    public tech.kayys.alkhawarizm.core.tensor.DeviceType device() {
         return switch (deviceType()) {
-            case CPU -> tech.kayys.aljabr.core.tensor.DeviceType.CPU;
-            case CUDA -> tech.kayys.aljabr.core.tensor.DeviceType.CUDA;
-            case MPS -> tech.kayys.aljabr.core.tensor.DeviceType.METAL;
-            case HIP -> tech.kayys.aljabr.core.tensor.DeviceType.ROCM;
-            case XLA -> tech.kayys.aljabr.core.tensor.DeviceType.TPU;
-            default -> tech.kayys.aljabr.core.tensor.DeviceType.CPU;
+            case CPU -> tech.kayys.alkhawarizm.core.tensor.DeviceType.CPU;
+            case CUDA -> tech.kayys.alkhawarizm.core.tensor.DeviceType.CUDA;
+            case MPS -> tech.kayys.alkhawarizm.core.tensor.DeviceType.METAL;
+            case HIP -> tech.kayys.alkhawarizm.core.tensor.DeviceType.ROCM;
+            case XLA -> tech.kayys.alkhawarizm.core.tensor.DeviceType.TPU;
+            default -> tech.kayys.alkhawarizm.core.tensor.DeviceType.CPU;
         };
     }
 
@@ -609,7 +628,7 @@ public class TorchTensor implements Tensor, AutoCloseable {
     }
 
     @Override
-    public tech.kayys.aljabr.core.tensor.Tensor slice(int dim, long start, long end) {
+    public tech.kayys.alkhawarizm.core.tensor.Tensor slice(int dim, long start, long end) {
         checkClosed();
         Arena opArena = Arena.ofConfined();
         try {
@@ -1106,7 +1125,8 @@ public class TorchTensor implements Tensor, AutoCloseable {
 
     /**
      * Get the device this tensor is allocated on.
-     * Returns CPU by default since device detection from LibTorch may not be exposed.
+     * Returns CPU by default since device detection from LibTorch may not be
+     * exposed.
      * 
      * @return the Device this tensor is on
      */

@@ -1,7 +1,8 @@
 package tech.kayys.gollek.spi.model;
+
 import tech.kayys.gollek.spi.spec.*;
-import tech.kayys.aljabr.core.tensor.DeviceType;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 
 import io.smallrye.mutiny.Uni;
 

@@ -1,6 +1,6 @@
 package tech.kayys.gollek.core.graph;
 
-import tech.kayys.aljabr.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
 import java.util.UUID;
 
 public abstract class AbstractNode implements Node {

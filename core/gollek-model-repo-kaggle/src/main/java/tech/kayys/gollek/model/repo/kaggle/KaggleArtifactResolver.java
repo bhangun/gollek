@@ -1,6 +1,6 @@
 package tech.kayys.gollek.model.repo.kaggle;
 
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 import tech.kayys.gollek.spi.model.ModelRef;
 
 import java.net.URI;

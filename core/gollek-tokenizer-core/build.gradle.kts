@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":spi:gollek-spi"))
     implementation(project(":spi:gollek-spi-model"))
     implementation("jakarta.enterprise:jakarta.enterprise.cdi-api:4.0.1")

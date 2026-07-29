@@ -5,7 +5,7 @@
  */
 package tech.kayys.gollek.safetensor.engine.forward;
 
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.spi.model.FFNActivationType;
 
@@ -39,8 +39,7 @@ record DirectForwardMetalMatvecGatedFfnAdmissionPlan(
             AccelTensor gateB,
             AccelTensor upB,
             AccelTensor downB) {
-        DirectForwardMetalFfnActivationPlan activation =
-                DirectForwardMetalFfnActivationPlan.from(activationType);
+        DirectForwardMetalFfnActivationPlan activation = DirectForwardMetalFfnActivationPlan.from(activationType);
         String flagRejection = matvecFlagRejection(activation, traits);
         if (flagRejection != null) {
             return reject(activation, flagRejection);

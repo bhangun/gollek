@@ -6,7 +6,7 @@
 package tech.kayys.gollek.safetensor.engine.forward;
 
 import org.jboss.logging.Logger;
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.engine.generation.DirectInferenceProfiler;
 import tech.kayys.gollek.spi.model.FFNActivationType;
@@ -20,21 +20,21 @@ final class DirectForwardMetalGateUpMatvecFfn {
     }
 
     static AccelTensor tryFfn(Logger log,
-                              MetalBinding metalBinding,
-                              DirectForwardMetalCapabilities capabilities,
-                              ModelConfigTraits traits,
-                              ModelConfig config,
-                              boolean metalLinearEnabled,
-                              boolean decodeLogitsPhase,
-                              AccelTensor input,
-                              FFNActivationType activationType,
-                              AccelTensor gateW,
-                              AccelTensor gateB,
-                              AccelTensor upW,
-                              AccelTensor upB,
-                              AccelTensor combinedBuffer) {
-        DirectForwardMetalGateUpMatvecFfnAdmissionPlan admissionPlan =
-                DirectForwardMetalGateUpMatvecFfnAdmissionPlan.from(
+            MetalBinding metalBinding,
+            DirectForwardMetalCapabilities capabilities,
+            ModelConfigTraits traits,
+            ModelConfig config,
+            boolean metalLinearEnabled,
+            boolean decodeLogitsPhase,
+            AccelTensor input,
+            FFNActivationType activationType,
+            AccelTensor gateW,
+            AccelTensor gateB,
+            AccelTensor upW,
+            AccelTensor upB,
+            AccelTensor combinedBuffer) {
+        DirectForwardMetalGateUpMatvecFfnAdmissionPlan admissionPlan = DirectForwardMetalGateUpMatvecFfnAdmissionPlan
+                .from(
                         metalBinding,
                         metalLinearEnabled,
                         activationType,
@@ -52,8 +52,8 @@ final class DirectForwardMetalGateUpMatvecFfn {
             trace(candidatePlan.rejectionDecision(), config, input, gateW, upW);
             return null;
         }
-        DirectForwardMetalFfnShapeAdmissionPlan shapeAdmission =
-                DirectForwardMetalFfnShapeAdmissionPlan.singleTokenGateUp(input, gateW, upW, combinedBuffer);
+        DirectForwardMetalFfnShapeAdmissionPlan shapeAdmission = DirectForwardMetalFfnShapeAdmissionPlan
+                .singleTokenGateUp(input, gateW, upW, combinedBuffer);
         if (!shapeAdmission.admitted()) {
             trace(shapeAdmission.rejectionDecision(), config, input, gateW, upW);
             return null;
@@ -80,8 +80,8 @@ final class DirectForwardMetalGateUpMatvecFfn {
             return null;
         }
 
-        DirectForwardMetalGateUpMatvecKernelPlan kernelPlan =
-                DirectForwardMetalGateUpMatvecKernelPlan.from(activation, nativeBf16Weights);
+        DirectForwardMetalGateUpMatvecKernelPlan kernelPlan = DirectForwardMetalGateUpMatvecKernelPlan.from(activation,
+                nativeBf16Weights);
 
         long t0 = System.nanoTime();
         try (DirectForwardContiguousTensor contiguousInput = DirectForwardContiguousTensor.from(input)) {
@@ -101,10 +101,10 @@ final class DirectForwardMetalGateUpMatvecFfn {
     }
 
     private static void trace(String decision,
-                              ModelConfig config,
-                              AccelTensor input,
-                              AccelTensor gateW,
-                              AccelTensor upW) {
+            ModelConfig config,
+            AccelTensor input,
+            AccelTensor gateW,
+            AccelTensor upW) {
         DirectForwardFfnFastPathTrace.trace(PATH, decision, config, input, gateW, upW, null);
     }
 }

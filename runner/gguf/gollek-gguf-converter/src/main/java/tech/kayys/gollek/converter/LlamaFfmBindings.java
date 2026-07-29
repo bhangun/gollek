@@ -43,33 +43,31 @@ import java.util.Optional;
  * @author Bhangun
  * @version 1.0.0
  */
+@io.quarkus.runtime.annotations.RegisterForReflection
 public final class LlamaFfmBindings {
 
     private static final String LIB_BASE_NAME = "llama";
     private static final System.Logger LOG = System.getLogger(LlamaFfmBindings.class.getName());
 
     private static volatile boolean AVAILABLE = false;
+    private static volatile boolean INITIALIZED = false;
     private static volatile Throwable LOAD_ERROR = null;
-    private static SymbolLookup LOOKUP;
-    private static Linker LINKER;
+    private static volatile SymbolLookup LOOKUP;
+    // LINKER is lazily obtained at runtime — NOT in the static block.
+    // GraalVM Native Image runs static initializers at build time;
+    // Linker.nativeLinker() is a runtime-only operation and must be deferred.
+    private static volatile Linker LINKER;
 
-    // Method handles
+    // Method handles — all lazily populated by ensureInitialized()
     private static volatile MethodHandle llama_model_quantize_handle;
     private static volatile MethodHandle llama_get_last_error_handle;
     private static volatile MethodHandle llama_backend_init_handle;
     private static volatile MethodHandle llama_backend_free_handle;
 
     static {
-        AVAILABLE = false;
-        LOAD_ERROR = null;
-        LINKER = Linker.nativeLinker();
-
-        // Try to load llama.cpp library
-        loadLibrary();
-
-        if (AVAILABLE) {
-            initializeFunctionHandles();
-        }
+        // Intentionally empty — no Linker or SymbolLookup here.
+        // All initialization is deferred to first call via ensureInitialized().
+        // This makes the class safe for GraalVM Native Image build-time loading.
     }
 
     private LlamaFfmBindings() {
@@ -78,11 +76,32 @@ public final class LlamaFfmBindings {
 
     /**
      * Check if llama.cpp FFM bindings are available.
+     * Triggers lazy initialization on first call.
      *
      * @return true if native library is loaded and functions are linked
      */
     public static boolean isAvailable() {
+        ensureInitialized();
         return AVAILABLE;
+    }
+
+    /**
+     * Ensure the native linker and library are initialized.
+     * Thread-safe via double-checked locking on INITIALIZED.
+     */
+    private static void ensureInitialized() {
+        if (!INITIALIZED) {
+            synchronized (LlamaFfmBindings.class) {
+                if (!INITIALIZED) {
+                    LINKER = Linker.nativeLinker();
+                    loadLibrary();
+                    if (AVAILABLE) {
+                        initializeFunctionHandles();
+                    }
+                    INITIALIZED = true;
+                }
+            }
+        }
     }
 
     /**
@@ -91,6 +110,7 @@ public final class LlamaFfmBindings {
      * @return error message or empty string if available
      */
     public static String getUnavailableReason() {
+        ensureInitialized();
         if (AVAILABLE) {
             return "";
         }
@@ -106,6 +126,7 @@ public final class LlamaFfmBindings {
      * @return error message string
      */
     public static String getLastError() {
+        ensureInitialized();
         if (!AVAILABLE || llama_get_last_error_handle == null) {
             return "Native bindings not available";
         }
@@ -129,6 +150,7 @@ public final class LlamaFfmBindings {
      * Initialize llama.cpp backend (required before quantization).
      */
     public static void initBackend() {
+        ensureInitialized();
         if (!AVAILABLE || llama_backend_init_handle == null) {
             throw new IllegalStateException("llama.cpp bindings not available");
         }
@@ -145,6 +167,7 @@ public final class LlamaFfmBindings {
      * Free llama.cpp backend resources.
      */
     public static void freeBackend() {
+        ensureInitialized();
         if (!AVAILABLE || llama_backend_free_handle == null) {
             return;
         }
@@ -171,7 +194,7 @@ public final class LlamaFfmBindings {
             String inputPath,
             String outputPath,
             MemorySegment params) {
-
+        ensureInitialized();
         if (!AVAILABLE || llama_model_quantize_handle == null) {
             throw new IllegalStateException("llama.cpp quantization function not available");
         }

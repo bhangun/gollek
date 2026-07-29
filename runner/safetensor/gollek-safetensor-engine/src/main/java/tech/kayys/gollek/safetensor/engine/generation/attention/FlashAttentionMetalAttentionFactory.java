@@ -5,8 +5,8 @@
  */
 package tech.kayys.gollek.safetensor.engine.generation.attention;
 
-import tech.kayys.aljabr.metal.binding.MetalBinding;
-import tech.kayys.aljabr.metal.binding.MetalFlashAttentionBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalFlashAttentionBinding;
 
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
@@ -45,8 +45,8 @@ final class FlashAttentionMetalAttentionFactory {
         this.metalFa4 = Objects.requireNonNull(metalFa4, "metalFa4");
         this.routingPolicy = Objects.requireNonNull(routingPolicy, "routingPolicy");
         this.precisionOptions = precisionOptions == null ? FlashAttentionPrecisionOptions.defaults() : precisionOptions;
-        this.pagedAttentionOptions =
-                pagedAttentionOptions == null ? PagedAttentionVectorOptions.defaults() : pagedAttentionOptions;
+        this.pagedAttentionOptions = pagedAttentionOptions == null ? PagedAttentionVectorOptions.defaults()
+                : pagedAttentionOptions;
     }
 
     FlashAttentionMetalAttention create() {

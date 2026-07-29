@@ -39,7 +39,7 @@ dependencies {
 
     implementation(project(":core:gollek-runtime-config"))
     implementation(project(":core:gollek-model-repository"))
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":core:gollek-tokenizer-core"))
     implementation(project(":sdk:gollek-sdk-core"))
     implementation(project(":spi:gollek-spi"))
@@ -54,7 +54,7 @@ dependencies {
     implementation(project(":runner:safetensor:gollek-safetensor-loader"))
     implementation(project(":runner:safetensor:gollek-safetensor-quantization"))
 
-    implementation("tech.kayys.aljabr:aljabr-backend-metal:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-backend-metal:0.1.0-SNAPSHOT")
     implementation("tech.kayys.gollek:gollek-safetensor-audio:0.1.0-SNAPSHOT")
 
     implementation("com.fasterxml.jackson.core:jackson-annotations:2.16.1")

@@ -2,7 +2,7 @@ package tech.kayys.gollek.inference.libtorch.nn;
 
 import tech.kayys.gollek.inference.libtorch.binding.LibTorchBinding;
 import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
-import tech.kayys.aljabr.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;

@@ -3,8 +3,8 @@ import os
 dir_path = "/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/gollek/runner/onnx/gollek-runner-onnx"
 
 replacements = {
-    "import tech.kayys.gollek.spi.inference.": "import tech.kayys.aljabr.spi.inference.",
-    "import tech.kayys.gollek.spi.model.MultimodalProcessor;": "import tech.kayys.aljabr.spi.model.MultimodalProcessor;",
+    "import tech.kayys.gollek.spi.inference.": "import tech.kayys.alkhawarizm.spi.inference.",
+    "import tech.kayys.gollek.spi.model.MultimodalProcessor;": "import tech.kayys.alkhawarizm.spi.model.MultimodalProcessor;",
 }
 
 for root, dirs, files in os.walk(dir_path):

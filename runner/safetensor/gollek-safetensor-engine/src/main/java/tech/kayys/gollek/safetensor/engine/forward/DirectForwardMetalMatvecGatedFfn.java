@@ -10,7 +10,7 @@ import static tech.kayys.gollek.safetensor.engine.forward.DirectForwardTensorOps
 import static tech.kayys.gollek.safetensor.engine.forward.DirectForwardTensorOps.reusableOutputTensor;
 
 import org.jboss.logging.Logger;
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.engine.generation.DirectInferenceProfiler;
 import tech.kayys.gollek.spi.model.FFNActivationType;
@@ -38,23 +38,23 @@ final class DirectForwardMetalMatvecGatedFfn {
     }
 
     static AccelTensor tryFfn(Logger log,
-                              MetalBinding metalBinding,
-                              DirectForwardMetalCapabilities capabilities,
-                              ModelConfigTraits traits,
-                              ModelConfig config,
-                              boolean metalLinearEnabled,
-                              boolean decodeLogitsPhase,
-                              AccelTensor input,
-                              FFNActivationType activationType,
-                              AccelTensor gateW,
-                              AccelTensor gateB,
-                              AccelTensor upW,
-                              AccelTensor upB,
-                              AccelTensor downW,
-                              AccelTensor downB,
-                              AccelTensor outputBuffer) {
-        DirectForwardMetalMatvecGatedFfnAdmissionPlan admissionPlan =
-                DirectForwardMetalMatvecGatedFfnAdmissionPlan.from(
+            MetalBinding metalBinding,
+            DirectForwardMetalCapabilities capabilities,
+            ModelConfigTraits traits,
+            ModelConfig config,
+            boolean metalLinearEnabled,
+            boolean decodeLogitsPhase,
+            AccelTensor input,
+            FFNActivationType activationType,
+            AccelTensor gateW,
+            AccelTensor gateB,
+            AccelTensor upW,
+            AccelTensor upB,
+            AccelTensor downW,
+            AccelTensor downB,
+            AccelTensor outputBuffer) {
+        DirectForwardMetalMatvecGatedFfnAdmissionPlan admissionPlan = DirectForwardMetalMatvecGatedFfnAdmissionPlan
+                .from(
                         metalBinding,
                         traits,
                         metalLinearEnabled,
@@ -74,8 +74,8 @@ final class DirectForwardMetalMatvecGatedFfn {
             return null;
         }
 
-        DirectForwardMetalFfnShapeAdmissionPlan shapeAdmission =
-                DirectForwardMetalFfnShapeAdmissionPlan.singleTokenGated(input, gateW, upW, downW);
+        DirectForwardMetalFfnShapeAdmissionPlan shapeAdmission = DirectForwardMetalFfnShapeAdmissionPlan
+                .singleTokenGated(input, gateW, upW, downW);
         if (!shapeAdmission.admitted()) {
             trace(shapeAdmission.rejectionDecision(), config, input, gateW, upW, downW);
             return null;
@@ -107,8 +107,8 @@ final class DirectForwardMetalMatvecGatedFfn {
             trace("reject:" + typeRejection, config, input, gateW, upW, downW);
             return null;
         }
-        DirectForwardMetalMatvecGatedFfnKernelPlan kernelPlan =
-                DirectForwardMetalMatvecGatedFfnKernelPlan.from(activation, nativeBf16Weights);
+        DirectForwardMetalMatvecGatedFfnKernelPlan kernelPlan = DirectForwardMetalMatvecGatedFfnKernelPlan
+                .from(activation, nativeBf16Weights);
 
         long t0 = System.nanoTime();
         AccelTensor out = reusableOutputTensor(outputBuffer, shapePlan.outputShape());
@@ -135,11 +135,11 @@ final class DirectForwardMetalMatvecGatedFfn {
     }
 
     private static void trace(String decision,
-                              ModelConfig config,
-                              AccelTensor input,
-                              AccelTensor gateW,
-                              AccelTensor upW,
-                              AccelTensor downW) {
+            ModelConfig config,
+            AccelTensor input,
+            AccelTensor gateW,
+            AccelTensor upW,
+            AccelTensor downW) {
         DirectForwardFfnFastPathTrace.trace(PATH, decision, config, input, gateW, upW, downW);
     }
 }

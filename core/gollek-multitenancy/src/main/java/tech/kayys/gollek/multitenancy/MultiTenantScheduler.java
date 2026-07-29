@@ -4,7 +4,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import tech.kayys.aljabr.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
 import tech.kayys.gollek.runtime.execution.ExecutionRequest;
 import tech.kayys.gollek.runtime.orchestrator.ExecutionOrchestrator;
 

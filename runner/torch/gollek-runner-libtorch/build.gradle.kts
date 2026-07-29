@@ -50,7 +50,7 @@ dependencies {
     implementation(platform("io.quarkus.platform:quarkus-bom:$quarkusVersion"))
 
     implementation(project(":spi:gollek-spi"))
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":core:gollek-tokenizer-core"))
 
     implementation("io.quarkus:quarkus-arc")

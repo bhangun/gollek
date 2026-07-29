@@ -1,8 +1,8 @@
 package tech.kayys.gollek.ml.runner.onnx;
 
 import tech.kayys.gollek.ml.runner.*;
-import tech.kayys.aljabr.core.tensor.DeviceType;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 import org.jboss.logging.Logger;
 
 import java.lang.foreign.*;

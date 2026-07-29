@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     api("com.fasterxml.jackson.core:jackson-annotations:2.16.1")
     api("io.smallrye.reactive:mutiny:2.5.5")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")

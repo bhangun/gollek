@@ -15,16 +15,17 @@
  */
 
 package tech.kayys.gollek.spi.model;
+
 import tech.kayys.gollek.spi.spec.*;
-import tech.kayys.aljabr.core.tensor.DeviceType;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
 
 public record RepositoryContext(
-        Path cacheDir,
-        Duration timeout,
-        Map<String, Object> attributes) {
+                Path cacheDir,
+                Duration timeout,
+                Map<String, Object> attributes) {
 }

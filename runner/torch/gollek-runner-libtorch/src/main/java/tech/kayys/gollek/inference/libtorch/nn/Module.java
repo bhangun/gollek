@@ -9,7 +9,7 @@ import java.util.Objects;
 
 import tech.kayys.gollek.inference.libtorch.core.Device;
 import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
-import tech.kayys.aljabr.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
 
 /**
  * Abstract base class for all neural network modules.

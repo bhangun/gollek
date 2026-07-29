@@ -1,8 +1,9 @@
 package tech.kayys.gollek.diffusion.graph;
+
 import tech.kayys.gollek.core.graph.ExecutionContext;
 import tech.kayys.gollek.core.graph.Node;
 import tech.kayys.gollek.core.graph.AbstractNode;
-import tech.kayys.aljabr.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
 import tech.kayys.gollek.diffusion.model.UNetModel;
 
 public final class UNetNode extends AbstractNode {

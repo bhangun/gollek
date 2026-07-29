@@ -1,7 +1,7 @@
 package tech.kayys.gollek.inference.libtorch.core;
 
 import org.junit.jupiter.api.Test;
-import tech.kayys.aljabr.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -22,7 +22,7 @@ class LibTorchTensorOpsTest {
             try (Tensor unsqueezed = tensor.unsqueeze(0)) {
                 assertArrayEquals(new long[] { 1, 2, 3 }, unsqueezed.shape());
 
-                try (tech.kayys.aljabr.core.tensor.Tensor resqueezed = unsqueezed.squeeze()) {
+                try (tech.kayys.alkhawarizm.core.tensor.Tensor resqueezed = unsqueezed.squeeze()) {
                     assertArrayEquals(new long[] { 2, 3 }, resqueezed.shape());
                 }
             }
@@ -32,7 +32,7 @@ class LibTorchTensorOpsTest {
     @Test
     void testSplit() {
         try (Tensor tensor = TorchTensor.zeros(new long[] { 10, 5 }, ScalarType.FLOAT, Device.CPU)) {
-            List<tech.kayys.aljabr.core.tensor.Tensor> chunks = tensor.split(3, 0);
+            List<tech.kayys.alkhawarizm.core.tensor.Tensor> chunks = tensor.split(3, 0);
 
             assertEquals(4, chunks.size());
             assertArrayEquals(new long[] { 3, 5 }, chunks.get(0).shape());
@@ -48,7 +48,7 @@ class LibTorchTensorOpsTest {
                     }
                 });
             }));
-            for (tech.kayys.aljabr.core.tensor.Tensor t : chunks) {
+            for (tech.kayys.alkhawarizm.core.tensor.Tensor t : chunks) {
                 t.close();
             }
         }

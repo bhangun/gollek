@@ -5,7 +5,7 @@
  */
 package tech.kayys.gollek.safetensor.engine.generation.attention;
 
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.engine.generation.DirectInferenceProfiler;
 import tech.kayys.gollek.safetensor.engine.generation.kv.ForwardWorkspace;
@@ -33,8 +33,8 @@ final class FlashAttentionMetalSlidingDecodeAttention {
         this.metalBinding = metalBinding;
         this.routingPolicy = routingPolicy;
         this.pagedAttention = pagedAttention;
-        this.pagedAttentionOptions =
-                pagedAttentionOptions == null ? PagedAttentionVectorOptions.defaults() : pagedAttentionOptions;
+        this.pagedAttentionOptions = pagedAttentionOptions == null ? PagedAttentionVectorOptions.defaults()
+                : pagedAttentionOptions;
     }
 
     AccelTensor compute(AccelTensor q, KVCacheManager.KVCacheSession kvSession,
@@ -78,9 +78,9 @@ final class FlashAttentionMetalSlidingDecodeAttention {
             }
         }
 
-        FlashAttentionKvScratch.KvPools packedPools =
-                FlashAttentionKvScratch.projectionScratchPools(kvSession, poolElements,
-                        "Sliding decode packed KV scratch");
+        FlashAttentionKvScratch.KvPools packedPools = FlashAttentionKvScratch.projectionScratchPools(kvSession,
+                poolElements,
+                "Sliding decode packed KV scratch");
         MemorySegment packedK = packedPools.key();
         MemorySegment packedV = packedPools.value();
         PagedKvCacheMaterializer.packRangeIntoTemporaryPagedPool(kvSession.blockManager(), kvSession, kvLayerIdx,

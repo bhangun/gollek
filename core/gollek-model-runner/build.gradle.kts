@@ -22,7 +22,7 @@ dependencies {
     implementation(project(":spi:gollek-spi-inference"))
     implementation(project(":spi:gollek-spi"))
     implementation(project(":core:gollek-error-code"))
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":core:gollek-model-repository"))
     implementation(group = "org.slf4j", name = "slf4j-api")
     compileOnly(group = "org.jboss.logging", name = "jboss-logging")

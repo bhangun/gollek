@@ -10,7 +10,7 @@ import static tech.kayys.gollek.safetensor.engine.forward.DirectForwardTensorOps
 
 import java.lang.foreign.MemorySegment;
 import org.jboss.logging.Logger;
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.engine.generation.DirectInferenceProfiler;
 import tech.kayys.gollek.spi.model.ModelConfig;
@@ -20,29 +20,27 @@ final class DirectForwardMetalHalfLinear {
     }
 
     static AccelTensor tryLinear(Logger log,
-                                 MetalBinding metalBinding,
-                                 DirectForwardMetalCapabilities capabilities,
-                                 ModelConfigTraits traits,
-                                 ModelConfig config,
-                                 boolean metalLinearEnabled,
-                                 boolean decodeLogitsPhase,
-                                 AccelTensor input,
-                                 AccelTensor weight,
-                                 AccelTensor bias,
-                                 AccelTensor outputBuffer,
-                                 String profileKey) {
-        DirectForwardMetalHalfLinearAdmissionPlan admissionPlan =
-                DirectForwardMetalHalfLinearAdmissionPlan.from(
-                        traits,
-                        metalLinearEnabled,
-                        input,
-                        weight,
-                        profileKey);
+            MetalBinding metalBinding,
+            DirectForwardMetalCapabilities capabilities,
+            ModelConfigTraits traits,
+            ModelConfig config,
+            boolean metalLinearEnabled,
+            boolean decodeLogitsPhase,
+            AccelTensor input,
+            AccelTensor weight,
+            AccelTensor bias,
+            AccelTensor outputBuffer,
+            String profileKey) {
+        DirectForwardMetalHalfLinearAdmissionPlan admissionPlan = DirectForwardMetalHalfLinearAdmissionPlan.from(
+                traits,
+                metalLinearEnabled,
+                input,
+                weight,
+                profileKey);
         if (!admissionPlan.admitted()) {
             return null;
         }
-        DirectForwardMetalLinearShapePlan shapePlan =
-                DirectForwardMetalLinearShapePlan.single(input, weight);
+        DirectForwardMetalLinearShapePlan shapePlan = DirectForwardMetalLinearShapePlan.single(input, weight);
         if (shapePlan == null) {
             return null;
         }
@@ -60,21 +58,20 @@ final class DirectForwardMetalHalfLinear {
             int n = Math.toIntExact(shapePlan.outputDim());
             boolean nf4Weight = weightPlan.weight().quantType() == AccelTensor.QuantType.NF4;
             boolean int4Weight = weightPlan.weight().quantType() == AccelTensor.QuantType.INT4;
-            DirectForwardMetalHalfLinearExecutionPlan executionPlan =
-                    DirectForwardMetalHalfLinearExecutionPlan.from(
-                            m,
-                            kk,
-                            n,
-                            weightPlan.nativeBf16Weights(),
-                            nf4Weight,
-                            int4Weight,
-                            capabilities,
-                            DirectForwardMetalHalfMatvecPolicy.shouldUseMetalHalfMatvec(
-                                    traits, config, n, profileKey),
-                            DirectForwardMetalHalfMatvecPolicy.shouldUseMetalLogitsMpsMatvec(
-                                    traits, n, kk, profileKey),
-                            DirectForwardMetalHalfMatvecPolicy.shouldUseMetalTransposedHalfMatvec(
-                                    traits, n, profileKey));
+            DirectForwardMetalHalfLinearExecutionPlan executionPlan = DirectForwardMetalHalfLinearExecutionPlan.from(
+                    m,
+                    kk,
+                    n,
+                    weightPlan.nativeBf16Weights(),
+                    nf4Weight,
+                    int4Weight,
+                    capabilities,
+                    DirectForwardMetalHalfMatvecPolicy.shouldUseMetalHalfMatvec(
+                            traits, config, n, profileKey),
+                    DirectForwardMetalHalfMatvecPolicy.shouldUseMetalLogitsMpsMatvec(
+                            traits, n, kk, profileKey),
+                    DirectForwardMetalHalfMatvecPolicy.shouldUseMetalTransposedHalfMatvec(
+                            traits, n, profileKey));
             int rc = -2;
             String executionPath = executionPlan.matmulPath();
             AccelTensor metalWeight = null;
@@ -83,7 +80,8 @@ final class DirectForwardMetalHalfLinear {
                 MemorySegment absmax = weight.scales();
                 if (packed != null && absmax != null) {
                     if (m == 1) {
-                        try (DirectForwardContiguousTensor f32Input = DirectForwardContiguousTensor.from(input.dequantizeTransient())) {
+                        try (DirectForwardContiguousTensor f32Input = DirectForwardContiguousTensor
+                                .from(input.dequantizeTransient())) {
                             MemorySegment outPtr = out.dataPtr();
                             MemorySegment inPtr = f32Input.tensor().dataPtr();
                             long outStride = (long) n * Float.BYTES;
@@ -110,11 +108,12 @@ final class DirectForwardMetalHalfLinear {
                     }
                 }
             }
-                        if (rc != 0 && executionPlan.int4MatvecCandidate()) {
+            if (rc != 0 && executionPlan.int4MatvecCandidate()) {
                 metalWeight = weightPlan.weight();
                 if (metalWeight != null) {
                     if (m == 1) {
-                        try (DirectForwardContiguousTensor f32Input = DirectForwardContiguousTensor.from(input.dequantizeTransient())) {
+                        try (DirectForwardContiguousTensor f32Input = DirectForwardContiguousTensor
+                                .from(input.dequantizeTransient())) {
                             MemorySegment outPtr = out.dataPtr();
                             MemorySegment inPtr = f32Input.tensor().dataPtr();
                             MemorySegment wPtr = metalWeight.dataPtr();
@@ -127,7 +126,7 @@ final class DirectForwardMetalHalfLinear {
                                         inPtr.asSlice(i * inStride),
                                         wPtr,
                                         metalWeight.scales(),
-                                        kk, n, weight.groupSize()); 
+                                        kk, n, weight.groupSize());
                                 if (rowRc != 0) {
                                     rc = rowRc;
                                     break;
@@ -230,7 +229,8 @@ final class DirectForwardMetalHalfLinear {
                                     packed,
                                     absmax,
                                     kk, n, weight.groupSize());
-                            if (rc != 0) break;
+                            if (rc != 0)
+                                break;
                         }
                         if (rc == 0) {
                             executionPath = executionPlan.nf4MatvecPath(); // Or a new path for matmul
@@ -247,7 +247,8 @@ final class DirectForwardMetalHalfLinear {
                 }
             }
             if (rc != 0) {
-                log.infof("Metal linear failed with rc=%d, m=%d, halfMatvecCandidate=%b, nativeBf16Weight=%b", rc, m, executionPlan.halfMatvecCandidate(), executionPlan.nativeBf16Weight());
+                log.infof("Metal linear failed with rc=%d, m=%d, halfMatvecCandidate=%b, nativeBf16Weight=%b", rc, m,
+                        executionPlan.halfMatvecCandidate(), executionPlan.nativeBf16Weight());
                 throw new IllegalStateException("Metal matmulTransposedRightHalf failed with code " + rc);
             }
             DirectInferenceProfiler.recordLinearPath(profileKey, executionPath);

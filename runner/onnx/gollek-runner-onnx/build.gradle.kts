@@ -20,9 +20,9 @@ repositories {
 
 dependencies {
     implementation(project(":core:gollek-error-code"))
-    implementation("tech.kayys.aljabr:aljabr-error-code:0.1.0-SNAPSHOT")
-    implementation("tech.kayys.aljabr:aljabr-spi-model:0.1.0-SNAPSHOT")
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-error-code:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-spi-model:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":spi:gollek-spi"))
     implementation(project(":spi:gollek-spi-model"))
     
@@ -41,7 +41,7 @@ dependencies {
     compileOnly(group = "org.jboss.logging", name = "jboss-logging")
     testImplementation(group = "org.junit.jupiter", name = "junit-jupiter")
     testRuntimeOnly(group = "org.junit.platform", name = "junit-platform-launcher")
-    testImplementation("tech.kayys.aljabr:aljabr-model-repo-hf:0.1.0-SNAPSHOT")
+    testImplementation("tech.kayys.alkhawarizm:alkhawarizm-model-repo-hf:0.1.0-SNAPSHOT")
     testImplementation(project(":core:gollek-model-repository"))
     testImplementation(project(":core:gollek-runtime-config"))
 }

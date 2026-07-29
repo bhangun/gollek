@@ -7,7 +7,7 @@ package tech.kayys.gollek.safetensor.engine.generation.attention;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.spi.model.ModelAttentionTraitsPolicy;
 import tech.kayys.gollek.spi.model.ModelConfig;
 import tech.kayys.gollek.spi.model.ModelRuntimeTraits;
@@ -82,8 +82,8 @@ class FlashAttentionMetalRoutingPolicyTest {
     }
 
     private static FlashAttentionMetalRoutingPolicy policy(boolean canUseMetal, Supplier<MetalBinding> binding) {
-        FlashAttentionRestrictedMetalRoutingPolicy restrictedRouting =
-                new FlashAttentionRestrictedMetalRoutingPolicy(binding);
+        FlashAttentionRestrictedMetalRoutingPolicy restrictedRouting = new FlashAttentionRestrictedMetalRoutingPolicy(
+                binding);
         return new FlashAttentionMetalRoutingPolicy(() -> canUseMetal, binding, restrictedRouting);
     }
 

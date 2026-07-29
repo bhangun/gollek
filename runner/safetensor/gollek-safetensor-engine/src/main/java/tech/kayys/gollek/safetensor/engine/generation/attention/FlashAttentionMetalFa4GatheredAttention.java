@@ -5,7 +5,7 @@
  */
 package tech.kayys.gollek.safetensor.engine.generation.attention;
 
-import tech.kayys.aljabr.metal.binding.MetalFlashAttentionBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalFlashAttentionBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.engine.generation.DirectInferenceProfiler;
 import tech.kayys.gollek.safetensor.engine.generation.kv.BlockManager;

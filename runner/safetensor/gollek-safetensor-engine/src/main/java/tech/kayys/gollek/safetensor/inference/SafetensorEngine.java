@@ -14,7 +14,7 @@ import tech.kayys.gollek.spi.provider.ProviderHealth;
 import tech.kayys.gollek.spi.provider.ProviderMetadata;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 import tech.kayys.gollek.safetensor.engine.warmup.DirectSafetensorBackend;
 import tech.kayys.gollek.converter.GGUFConverter;
 import tech.kayys.gollek.converter.model.GGUFConversionParams;
@@ -124,7 +124,7 @@ public class SafetensorEngine implements LocalInferenceEngine {
         // SAFETENSORS format, trust it rather than repeating file-path heuristics.
         if (localModelRegistry != null) {
             boolean registryKnows = localModelRegistry.resolveAll(modelId).stream()
-                    .anyMatch(e -> e.format() == tech.kayys.aljabr.core.model.ModelFormat.SAFETENSORS);
+                    .anyMatch(e -> e.format() == tech.kayys.alkhawarizm.core.model.ModelFormat.SAFETENSORS);
             if (registryKnows) {
                 return true;
             }
@@ -364,8 +364,8 @@ public class SafetensorEngine implements LocalInferenceEngine {
         return exts.isEmpty() ? java.util.List.of(".safetensors", ".safetensor") : exts;
     }
 
-    private Set<tech.kayys.aljabr.core.tensor.DeviceType> mergedSupportedDevices() {
-        var devices = new LinkedHashSet<tech.kayys.aljabr.core.tensor.DeviceType>();
+    private Set<tech.kayys.alkhawarizm.core.tensor.DeviceType> mergedSupportedDevices() {
+        var devices = new LinkedHashSet<tech.kayys.alkhawarizm.core.tensor.DeviceType>();
         if (ggufBackend != null && ggufBackend.capabilities() != null) {
             devices.addAll(ggufBackend.capabilities().getSupportedDevices());
         }
@@ -373,7 +373,7 @@ public class SafetensorEngine implements LocalInferenceEngine {
             devices.addAll(libTorchProvider.capabilities().getSupportedDevices());
         }
         if (devices.isEmpty()) {
-            devices.add(tech.kayys.aljabr.core.tensor.DeviceType.CPU);
+            devices.add(tech.kayys.alkhawarizm.core.tensor.DeviceType.CPU);
         }
         return Set.copyOf(devices);
     }

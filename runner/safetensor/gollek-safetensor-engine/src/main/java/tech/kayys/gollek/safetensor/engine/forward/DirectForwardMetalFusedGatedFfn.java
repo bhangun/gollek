@@ -8,7 +8,7 @@ package tech.kayys.gollek.safetensor.engine.forward;
 import static tech.kayys.gollek.safetensor.engine.forward.DirectForwardTensorOps.reusableOutputTensor;
 
 import org.jboss.logging.Logger;
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.engine.generation.DirectInferenceProfiler;
 import tech.kayys.gollek.spi.model.FFNActivationType;
@@ -22,14 +22,14 @@ final class DirectForwardMetalFusedGatedFfn {
     }
 
     static String skipReason(MetalBinding metalBinding,
-                             DirectForwardMetalCapabilities capabilities,
-                             ModelConfigTraits traits,
-                             boolean metalLinearEnabled,
-                             AccelTensor input,
-                             FFNActivationType activationType,
-                             AccelTensor gateB,
-                             AccelTensor upB,
-                             AccelTensor downB) {
+            DirectForwardMetalCapabilities capabilities,
+            ModelConfigTraits traits,
+            boolean metalLinearEnabled,
+            AccelTensor input,
+            FFNActivationType activationType,
+            AccelTensor gateB,
+            AccelTensor upB,
+            AccelTensor downB) {
         return DirectForwardMetalFusedGatedFfnAdmissionPlan.from(
                 metalBinding,
                 capabilities,
@@ -43,32 +43,31 @@ final class DirectForwardMetalFusedGatedFfn {
     }
 
     static AccelTensor tryFfn(Logger log,
-                              MetalBinding metalBinding,
-                              DirectForwardMetalCapabilities capabilities,
-                              ModelConfigTraits traits,
-                              ModelConfig config,
-                              boolean metalLinearEnabled,
-                              boolean decodeLogitsPhase,
-                              AccelTensor input,
-                              FFNActivationType activationType,
-                              AccelTensor gateW,
-                              AccelTensor gateB,
-                              AccelTensor upW,
-                              AccelTensor upB,
-                              AccelTensor downW,
-                              AccelTensor downB,
-                              AccelTensor outputBuffer) {
-        DirectForwardMetalFusedGatedFfnAdmissionPlan admissionPlan =
-                DirectForwardMetalFusedGatedFfnAdmissionPlan.from(
-                        metalBinding,
-                        capabilities,
-                        traits,
-                        metalLinearEnabled,
-                        input,
-                        activationType,
-                        gateB,
-                        upB,
-                        downB);
+            MetalBinding metalBinding,
+            DirectForwardMetalCapabilities capabilities,
+            ModelConfigTraits traits,
+            ModelConfig config,
+            boolean metalLinearEnabled,
+            boolean decodeLogitsPhase,
+            AccelTensor input,
+            FFNActivationType activationType,
+            AccelTensor gateW,
+            AccelTensor gateB,
+            AccelTensor upW,
+            AccelTensor upB,
+            AccelTensor downW,
+            AccelTensor downB,
+            AccelTensor outputBuffer) {
+        DirectForwardMetalFusedGatedFfnAdmissionPlan admissionPlan = DirectForwardMetalFusedGatedFfnAdmissionPlan.from(
+                metalBinding,
+                capabilities,
+                traits,
+                metalLinearEnabled,
+                input,
+                activationType,
+                gateB,
+                upB,
+                downB);
         if (!admissionPlan.admitted()) {
             return reject(admissionPlan.rejectionReason(), config, input, gateW, upW, downW);
         }
@@ -80,8 +79,8 @@ final class DirectForwardMetalFusedGatedFfn {
             return reject(candidatePlan.rejectionReason(), config, input, gateW, upW, downW);
         }
 
-        DirectForwardMetalFfnShapeAdmissionPlan shapeAdmission =
-                DirectForwardMetalFfnShapeAdmissionPlan.gated(input, gateW, upW, downW);
+        DirectForwardMetalFfnShapeAdmissionPlan shapeAdmission = DirectForwardMetalFfnShapeAdmissionPlan.gated(input,
+                gateW, upW, downW);
         if (!shapeAdmission.admitted()) {
             return reject(shapeAdmission.rejectionReason(), config, input, gateW, upW, downW);
         }
@@ -100,8 +99,8 @@ final class DirectForwardMetalFusedGatedFfn {
             return reject(weightRejection, config, input, gateW, upW, downW);
         }
         boolean nativeBf16Weights = weightPlan.nativeBf16Weights();
-        DirectForwardMetalFusedGatedFfnKernelPlan kernelPlan =
-                DirectForwardMetalFusedGatedFfnKernelPlan.from(activation, nativeBf16Weights);
+        DirectForwardMetalFusedGatedFfnKernelPlan kernelPlan = DirectForwardMetalFusedGatedFfnKernelPlan
+                .from(activation, nativeBf16Weights);
 
         long t0 = System.nanoTime();
         AccelTensor out = reusableOutputTensor(outputBuffer, shapePlan.outputShape());
@@ -124,21 +123,21 @@ final class DirectForwardMetalFusedGatedFfn {
     }
 
     private static AccelTensor reject(String reason,
-                                      ModelConfig config,
-                                      AccelTensor input,
-                                      AccelTensor gateW,
-                                      AccelTensor upW,
-                                      AccelTensor downW) {
+            ModelConfig config,
+            AccelTensor input,
+            AccelTensor gateW,
+            AccelTensor upW,
+            AccelTensor downW) {
         trace("reject:" + reason, config, input, gateW, upW, downW);
         return null;
     }
 
     private static void trace(String decision,
-                              ModelConfig config,
-                              AccelTensor input,
-                              AccelTensor gateW,
-                              AccelTensor upW,
-                              AccelTensor downW) {
+            ModelConfig config,
+            AccelTensor input,
+            AccelTensor gateW,
+            AccelTensor upW,
+            AccelTensor downW) {
         DirectForwardFfnFastPathTrace.trace(PATH, decision, config, input, gateW, upW, downW);
     }
 }

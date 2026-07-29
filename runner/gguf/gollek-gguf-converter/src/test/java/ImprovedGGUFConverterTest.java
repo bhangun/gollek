@@ -9,7 +9,7 @@ import tech.kayys.gollek.converter.model.ConversionProgress;
 import tech.kayys.gollek.converter.model.GGUFConversionParams;
 import tech.kayys.gollek.converter.model.ModelMetadata;
 import tech.kayys.gollek.converter.model.QuantizationType;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

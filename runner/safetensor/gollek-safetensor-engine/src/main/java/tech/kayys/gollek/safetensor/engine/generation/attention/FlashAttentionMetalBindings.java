@@ -6,8 +6,8 @@
 package tech.kayys.gollek.safetensor.engine.generation.attention;
 
 import org.jboss.logging.Logger;
-import tech.kayys.aljabr.metal.binding.MetalBinding;
-import tech.kayys.aljabr.metal.binding.MetalFlashAttentionBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalFlashAttentionBinding;
 
 final class FlashAttentionMetalBindings {
     private final MetalBinding metalBinding;
@@ -51,7 +51,8 @@ final class FlashAttentionMetalBindings {
             MetalFlashAttentionBinding.initialize();
             metalFa4 = MetalFlashAttentionBinding.getInstance();
         } catch (Exception e) {
-            log.warnf("FlashAttentionKernel: failed to initialize MetalFlashAttentionBinding, forcing CPU fallback (%s)",
+            log.warnf(
+                    "FlashAttentionKernel: failed to initialize MetalFlashAttentionBinding, forcing CPU fallback (%s)",
                     e.getMessage());
             MetalFlashAttentionBinding.initializeFallback();
             metalFa4 = MetalFlashAttentionBinding.getInstance();

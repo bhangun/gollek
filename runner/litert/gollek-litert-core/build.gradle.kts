@@ -18,8 +18,8 @@ repositories {
 }
 
 dependencies {
-    implementation("tech.kayys.aljabr:aljabr-nn:0.1.0")
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-nn:0.1.0")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0")
     implementation(project(":sdk:gollek-sdk-api"))
     implementation(project(":runner:litert:gollek-runner-litert"))
     implementation(project(":spi:gollek-spi-inference"))

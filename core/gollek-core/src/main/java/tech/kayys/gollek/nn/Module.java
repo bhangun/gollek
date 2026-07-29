@@ -1,7 +1,7 @@
 package tech.kayys.gollek.nn;
 
-import tech.kayys.aljabr.core.tensor.Tensor;
-import tech.kayys.aljabr.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
 import java.util.List;
 
 public abstract class Module {

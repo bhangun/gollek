@@ -5,8 +5,8 @@
  */
 package tech.kayys.gollek.safetensor.engine.generation.attention;
 
-import tech.kayys.aljabr.metal.binding.MetalBinding;
-import tech.kayys.aljabr.metal.binding.MetalFlashAttentionBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalFlashAttentionBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.engine.generation.DirectInferenceProfiler;
 import tech.kayys.gollek.spi.model.ModelConfig;
@@ -73,10 +73,11 @@ final class FlashAttentionMetalDenseSharedAttention {
             if (!slidingLayer) {
                 useFa4 = true;
             } else {
-                useFa4 = routing.canUseRestrictedSlidingPrefillFa4Attention(config, layerIdx, Math.toIntExact(seqLenQ), startPos, softCap);
+                useFa4 = routing.canUseRestrictedSlidingPrefillFa4Attention(config, layerIdx, Math.toIntExact(seqLenQ),
+                        startPos, softCap);
             }
         }
-        
+
         if (!useFa4 && !usePackedSharedDecode && !routing.allowLegacyMetalAttentionBridge(modelPolicy)) {
             return null;
         }
@@ -140,13 +141,15 @@ final class FlashAttentionMetalDenseSharedAttention {
                                 ? binding.attentionWindowed(
                                         out.dataPtr(), qContiguous.dataPtr(), packedK, packedV,
                                         blockTable, contextLens,
-                                        Math.toIntExact(batch), Math.toIntExact(seqLenQ), numQHeads, numKVHeads, headDim,
+                                        Math.toIntExact(batch), Math.toIntExact(seqLenQ), numQHeads, numKVHeads,
+                                        headDim,
                                         blockSize, maxBlocks,
                                         scale, causal ? 1 : 0, startPos, config.getSlidingWindowSize(), softCap)
                                 : binding.attentionGqaWindowed(
                                         out.dataPtr(), qContiguous.dataPtr(), packedK, packedV,
                                         blockTable, contextLens,
-                                        Math.toIntExact(batch), Math.toIntExact(seqLenQ), numQHeads, numKVHeads, headDim,
+                                        Math.toIntExact(batch), Math.toIntExact(seqLenQ), numQHeads, numKVHeads,
+                                        headDim,
                                         blockSize, maxBlocks,
                                         scale, causal ? 1 : 0, startPos, config.getSlidingWindowSize(), softCap))
                         : (numKVHeads == numQHeads
@@ -159,7 +162,8 @@ final class FlashAttentionMetalDenseSharedAttention {
                                 : binding.attentionGqa(
                                         out.dataPtr(), qContiguous.dataPtr(), packedK, packedV,
                                         blockTable, contextLens,
-                                        Math.toIntExact(batch), Math.toIntExact(seqLenQ), numQHeads, numKVHeads, headDim,
+                                        Math.toIntExact(batch), Math.toIntExact(seqLenQ), numQHeads, numKVHeads,
+                                        headDim,
                                         blockSize, maxBlocks,
                                         scale, causal ? 1 : 0, softCap));
                 if (result == 0) {

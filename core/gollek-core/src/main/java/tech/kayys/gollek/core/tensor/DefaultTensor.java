@@ -1,7 +1,7 @@
-package tech.kayys.aljabr.core.tensor;
+package tech.kayys.alkhawarizm.core.tensor;
 
 import tech.kayys.gollek.core.memory.Buffer;
-import tech.kayys.aljabr.core.backend.ComputeBackend;
+import tech.kayys.alkhawarizm.core.backend.ComputeBackend;
 
 public final class DefaultTensor implements Tensor {
     private final Shape shape;
@@ -87,16 +87,24 @@ public final class DefaultTensor implements Tensor {
     private boolean requiresGrad;
 
     @Override
-    public Tensor grad() { return grad; }
+    public Tensor grad() {
+        return grad;
+    }
 
     @Override
-    public void setGrad(Tensor grad) { this.grad = grad; }
+    public void setGrad(Tensor grad) {
+        this.grad = grad;
+    }
 
     @Override
-    public boolean requiresGrad() { return requiresGrad; }
+    public boolean requiresGrad() {
+        return requiresGrad;
+    }
 
     @Override
-    public void setRequiresGrad(boolean requiresGrad) { this.requiresGrad = requiresGrad; }
+    public void setRequiresGrad(boolean requiresGrad) {
+        this.requiresGrad = requiresGrad;
+    }
 
     @Override
     public float item() {
@@ -123,18 +131,22 @@ public final class DefaultTensor implements Tensor {
     public Tensor pow(float exponent) {
         return backend.pow(this, exponent);
     }
+
     @Override
     public Tensor mean() {
         return backend.mean(this);
     }
+
     @Override
     public Tensor abs() {
         return backend.abs(this);
     }
+
     @Override
     public Tensor crossEntropy(Tensor target) {
         return backend.crossEntropy(this, target);
     }
+
     @Override
     public Tensor binaryCrossEntropy(Tensor target) {
         return backend.binaryCrossEntropy(this, target);
@@ -171,40 +183,64 @@ public final class DefaultTensor implements Tensor {
     }
 
     @Override
-    public Tensor relu() { return backend.relu(this); }
+    public Tensor relu() {
+        return backend.relu(this);
+    }
 
     @Override
-    public Tensor sigmoid() { return backend.sigmoid(this); }
+    public Tensor sigmoid() {
+        return backend.sigmoid(this);
+    }
 
     @Override
-    public Tensor tanh() { return backend.tanh(this); }
+    public Tensor tanh() {
+        return backend.tanh(this);
+    }
 
     @Override
-    public Tensor log() { return backend.log(this); }
+    public Tensor log() {
+        return backend.log(this);
+    }
 
     @Override
-    public Tensor exp() { return backend.exp(this); }
+    public Tensor exp() {
+        return backend.exp(this);
+    }
 
     @Override
-    public Tensor silu() { return backend.silu(this); }
+    public Tensor silu() {
+        return backend.silu(this);
+    }
 
     @Override
-    public Tensor flatten() { return backend.flatten(this); }
+    public Tensor flatten() {
+        return backend.flatten(this);
+    }
 
     @Override
-    public Tensor unsqueeze(int dim) { return backend.unsqueeze(this, dim); }
+    public Tensor unsqueeze(int dim) {
+        return backend.unsqueeze(this, dim);
+    }
 
     @Override
-    public Tensor squeeze() { return backend.squeeze(this); }
+    public Tensor squeeze() {
+        return backend.squeeze(this);
+    }
 
     @Override
-    public Tensor transpose() { return backend.transpose(this); }
+    public Tensor transpose() {
+        return backend.transpose(this);
+    }
 
     @Override
-    public Tensor transpose(int dim0, int dim1) { return backend.transpose(this, dim0, dim1); }
+    public Tensor transpose(int dim0, int dim1) {
+        return backend.transpose(this, dim0, dim1);
+    }
 
     @Override
-    public long numel() { return shape.numel(); }
+    public long numel() {
+        return shape.numel();
+    }
 
     @Override
     public float[] toFloatArray() {
@@ -218,23 +254,94 @@ public final class DefaultTensor implements Tensor {
         }
     }
 
-    @Override public Tensor eval() { return this; }
-    @Override public Tensor gelu() { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public Tensor softmax(int dim) { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public Tensor logSoftmax(int dim) { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public Tensor mean(int dim, boolean keepDim) { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public Tensor sum() { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public Tensor sum(int dim, boolean keepDim) { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public java.util.List<Tensor> split(int axis, int parts) { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public Tensor layerNorm(long[] normalizedShape, Tensor weight, Tensor bias, float eps) { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public Tensor rmsNorm(Tensor weight, float eps) { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public Tensor batchNorm(Tensor weight, Tensor bias, Tensor runningMean, Tensor runningVar, boolean training, float momentum, float eps) { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public Tensor conv2d(Tensor weight, Tensor bias, int stride, int padding, int dilation, int groups) { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public Tensor maxPool2d(int kernelSize, int stride, int padding) { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public Tensor adaptiveAvgPool2d(int outputH, int outputW) { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public Tensor dropout(float p, boolean training) { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public Tensor attention(Tensor K, Tensor V) { throw new UnsupportedOperationException("Not implemented yet"); }
-    @Override public Tensor embedding(Tensor weight, long paddingIdx) { throw new UnsupportedOperationException("Not implemented yet"); }
+    @Override
+    public Tensor eval() {
+        return this;
+    }
 
-    @Override public Tensor applyRoPE(int dim, float base, boolean useNeox) { throw new UnsupportedOperationException("Not implemented yet"); }
+    @Override
+    public Tensor gelu() {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor softmax(int dim) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor logSoftmax(int dim) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor mean(int dim, boolean keepDim) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor sum() {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor sum(int dim, boolean keepDim) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public java.util.List<Tensor> split(int axis, int parts) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor layerNorm(long[] normalizedShape, Tensor weight, Tensor bias, float eps) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor rmsNorm(Tensor weight, float eps) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor batchNorm(Tensor weight, Tensor bias, Tensor runningMean, Tensor runningVar, boolean training,
+            float momentum, float eps) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor conv2d(Tensor weight, Tensor bias, int stride, int padding, int dilation, int groups) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor maxPool2d(int kernelSize, int stride, int padding) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor adaptiveAvgPool2d(int outputH, int outputW) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor dropout(float p, boolean training) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor attention(Tensor K, Tensor V) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor embedding(Tensor weight, long paddingIdx) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Tensor applyRoPE(int dim, float base, boolean useNeox) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
 }

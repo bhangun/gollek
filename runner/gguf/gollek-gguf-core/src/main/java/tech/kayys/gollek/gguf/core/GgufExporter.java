@@ -1,7 +1,7 @@
 package tech.kayys.gollek.gguf.core;
 
-import tech.kayys.aljabr.core.tensor.Tensor;
-import tech.kayys.aljabr.core.nn.Module;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.nn.Module;
 import tech.kayys.gollek.gguf.writer.GGUFWriter;
 
 import java.io.IOException;

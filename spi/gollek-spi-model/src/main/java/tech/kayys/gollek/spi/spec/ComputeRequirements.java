@@ -1,5 +1,6 @@
 package tech.kayys.gollek.spi.spec;
-import tech.kayys.aljabr.core.tensor.DeviceType;
+
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
 
 /**
  * Represents compute requirements for a model.

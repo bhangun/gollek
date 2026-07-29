@@ -54,26 +54,26 @@ export JAVA_TOOL_OPTIONS
 
 # ── Metal dylib discovery ─────────────────────────────────────────────────────
 # Enable native Metal elementwise/FFN/attention kernels (opt-in gate).
-export ALJABR_METAL_ENABLE_ELEMENTWISE_KERNELS="${ALJABR_METAL_ENABLE_ELEMENTWISE_KERNELS:-1}"
+export ALKHAWARIZM_METAL_ENABLE_ELEMENTWISE_KERNELS="${ALKHAWARIZM_METAL_ENABLE_ELEMENTWISE_KERNELS:-1}"
 
 # If the metal dylib hasn't been pointed at explicitly, probe standard locations
 # relative to the repo root (which may differ from CWD when invoked from gollek/).
-if [[ -z "${ALJABR_METAL_DYLIB:-}" ]]; then
+if [[ -z "${ALKHAWARIZM_METAL_DYLIB:-}" ]]; then
   WAYANG_ROOT="$(cd "$ROOT_DIR/.." && pwd)"
   for DYLIB_CANDIDATE in \
-      "$WAYANG_ROOT/aljabr/backend/metal/aljabr-backend-metal/target/native/darwin-aarch64/libaljabr_metal.dylib" \
-      "$ROOT_DIR/aljabr/backend/metal/aljabr-backend-metal/target/native/darwin-aarch64/libaljabr_metal.dylib" \
-      "$HOME/.aljabr/libs/libaljabr_metal.dylib"; do
+      "$WAYANG_ROOT/alkhawarizm/backend/metal/alkhawarizm-backend-metal/target/native/darwin-aarch64/libalkhawarizm_metal.dylib" \
+      "$ROOT_DIR/alkhawarizm/backend/metal/alkhawarizm-backend-metal/target/native/darwin-aarch64/libalkhawarizm_metal.dylib" \
+      "$HOME/.alkhawarizm/libs/libalkhawarizm_metal.dylib"; do
     if [[ -f "$DYLIB_CANDIDATE" ]]; then
-      export ALJABR_METAL_DYLIB="$DYLIB_CANDIDATE"
+      export ALKHAWARIZM_METAL_DYLIB="$DYLIB_CANDIDATE"
       break
     fi
   done
 fi
 
-if [[ -n "${ALJABR_METAL_DYLIB:-}" ]]; then
-  append_java_tool_option "-Daljabr.metal.dylib=${ALJABR_METAL_DYLIB}"
-  echo "${BOLD}${CYAN}:) Metal dylib:${RESET} ${ALJABR_METAL_DYLIB}"
+if [[ -n "${ALKHAWARIZM_METAL_DYLIB:-}" ]]; then
+  append_java_tool_option "-Dalkhawarizm.metal.dylib=${ALKHAWARIZM_METAL_DYLIB}"
+  echo "${BOLD}${CYAN}:) Metal dylib:${RESET} ${ALKHAWARIZM_METAL_DYLIB}"
 else
   echo "${BOLD}${YELLOW}:) Metal dylib not found — Metal backend will fall back to CPU${RESET}"
 fi

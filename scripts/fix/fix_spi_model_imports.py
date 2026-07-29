@@ -9,7 +9,7 @@ for root, dirs, files in os.walk(dir_path):
                 content = f.read()
             
             old_import = "import tech.kayys.gollek.core.model.ModelFormat;"
-            new_import = "import tech.kayys.aljabr.core.model.ModelFormat;"
+            new_import = "import tech.kayys.alkhawarizm.core.model.ModelFormat;"
             
             if old_import in content:
                 print(f"Fixing imports in {file_path}")

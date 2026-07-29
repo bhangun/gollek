@@ -4,7 +4,7 @@ import tech.kayys.gollek.gguf.core.GgmlType;
 import tech.kayys.gollek.gguf.core.GgufMetaType;
 import tech.kayys.gollek.gguf.core.GgufMetaValue;
 import tech.kayys.gollek.gguf.core.GgufModel;
-import tech.kayys.aljabr.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -109,7 +109,7 @@ public final class GGUFWriter {
 
     private static long[] ggufShape(long[] shape) {
         if (shape.length == 0) {
-            return new long[] {1};
+            return new long[] { 1 };
         }
         if (shape.length > 4) {
             throw new IllegalArgumentException("GGUF supports tensors with at most 4 dimensions");
@@ -320,7 +320,7 @@ public final class GGUFWriter {
     }
 
     private static void writeByte(FileChannel channel, int value) throws IOException {
-        channel.write(ByteBuffer.wrap(new byte[] {(byte) value}));
+        channel.write(ByteBuffer.wrap(new byte[] { (byte) value }));
     }
 
     private static void writeShortLE(FileChannel channel, int value) throws IOException {

@@ -23,8 +23,8 @@ dependencies {
     implementation(project(":core:gollek-model-runner"))
     implementation(project(":core:gollek-error-code"))
     implementation(project(":core:gollek-core"))
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
-    implementation("tech.kayys.aljabr:aljabr-core:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-core:0.1.0-SNAPSHOT")
 
     implementation(project(":spi:gollek-spi-model"))
     implementation(project(":optimization:gollek-plugin-kv-cache"))

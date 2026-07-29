@@ -2,7 +2,7 @@ package tech.kayys.gollek.inference.libtorch;
 
 import tech.kayys.gollek.inference.libtorch.config.LibTorchProviderConfig;
 import tech.kayys.gollek.inference.libtorch.core.Device;
-import tech.kayys.aljabr.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
 
 import java.util.LinkedHashSet;
 import java.util.Locale;

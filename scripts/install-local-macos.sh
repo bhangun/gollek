@@ -130,15 +130,15 @@ if [[ ${#SKIPPED_MODULES[@]} -gt 0 ]]; then
   done
 fi
 
-echo "${BOLD}${GREEN}:) Checking for local aljabr project (publishing to mavenLocal)${RESET}"
-ALJABR_DIR="$(cd "$ROOT_DIR/.." && cd aljabr 2>/dev/null && pwd || true)"
-if [[ -n "${ALJABR_DIR}" && -d "${ALJABR_DIR}" ]]; then
-  echo "${BOLD}${CYAN}:) Found aljabr at ${ALJABR_DIR}${RESET}"
-  if [[ -f "${ALJABR_DIR}/gradlew" || -x "${ALJABR_DIR}/gradlew" ]]; then
-    echo "${BOLD}${GREEN}:) Publishing aljabr to mavenLocal for local development${RESET}"
-    (cd "${ALJABR_DIR}" && ./gradlew :core:aljabr-core:publishToMavenLocal --no-parallel -x test "${GRADLE_JAVA_HOME_ARG[@]}" "${GRADLE_MAX_WORKERS_ARG[@]}" ) || echo "${YELLOW}⚠ aljabr publish failed; continuing without it${RESET}"
+echo "${BOLD}${GREEN}:) Checking for local alkhawarizm project (publishing to mavenLocal)${RESET}"
+ALKHAWARIZM_DIR="$(cd "$ROOT_DIR/.." && cd alkhawarizm 2>/dev/null && pwd || true)"
+if [[ -n "${ALKHAWARIZM_DIR}" && -d "${ALKHAWARIZM_DIR}" ]]; then
+  echo "${BOLD}${CYAN}:) Found alkhawarizm at ${ALKHAWARIZM_DIR}${RESET}"
+  if [[ -f "${ALKHAWARIZM_DIR}/gradlew" || -x "${ALKHAWARIZM_DIR}/gradlew" ]]; then
+    echo "${BOLD}${GREEN}:) Publishing alkhawarizm to mavenLocal for local development${RESET}"
+    (cd "${ALKHAWARIZM_DIR}" && ./gradlew :core:alkhawarizm-core:publishToMavenLocal --no-parallel -x test "${GRADLE_JAVA_HOME_ARG[@]}" "${GRADLE_MAX_WORKERS_ARG[@]}" ) || echo "${YELLOW}⚠ alkhawarizm publish failed; continuing without it${RESET}"
   else
-    echo "${YELLOW}⚠ No gradle wrapper in aljabr; skipping publish.${RESET}"
+    echo "${YELLOW}⚠ No gradle wrapper in alkhawarizm; skipping publish.${RESET}"
   fi
 fi
 

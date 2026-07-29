@@ -194,7 +194,10 @@ public class SafetensorFFMLoader {
      * eventually page in all data, but the initial map call is O(1).
      */
     private SafetensorLoadResult loadMmap(Path resolved) {
-        Arena arena = Arena.ofAuto();
+        // Arena.ofShared() instead of ofAuto(): thread-safe and has explicit lifecycle.
+        // GraalVM Native Image cannot track GC-managed (ofAuto) arena finalization;
+        // ofShared is fully AOT-safe and is closed when SafetensorLoadResult.close() is called.
+        Arena arena = Arena.ofShared();
         try {
             FileChannel channel = FileChannel.open(resolved, StandardOpenOption.READ);
             long fileSize = channel.size();
@@ -247,7 +250,10 @@ public class SafetensorFFMLoader {
     private SafetensorLoadResult loadCopy(Path resolved) {
         // Use Arena.global() in native mode to ensure memory remains valid
         // until process exit, avoiding GC-related segfaults with VectorAPI.
-        Arena arena = Arena.global();
+        // Arena.ofShared() instead of Arena.global(): global() never frees memory within the
+        // process lifetime, causing leaks on model reload. ofShared() is AOT-safe and closed
+        // via SafetensorLoadResult.close(), giving deterministic off-heap reclamation.
+        Arena arena = Arena.ofShared();
         try (FileChannel channel = FileChannel.open(resolved, StandardOpenOption.READ)) {
             long fileSize = channel.size();
 

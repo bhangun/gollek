@@ -24,7 +24,7 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 import tech.kayys.gollek.spi.model.ModelManifest;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 import tech.kayys.gollek.spi.model.ModelRef;
 import tech.kayys.gollek.spi.model.ModelDescriptor;
 import tech.kayys.gollek.spi.model.ModelArtifact;

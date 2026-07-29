@@ -1,7 +1,8 @@
 package tech.kayys.gollek.spi.model;
+
 import tech.kayys.gollek.spi.spec.*;
-import tech.kayys.aljabr.core.tensor.DeviceType;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -11,7 +12,8 @@ import java.security.NoSuchAlgorithmException;
  */
 public final class ModelUtils {
 
-    private ModelUtils() {}
+    private ModelUtils() {
+    }
 
     /**
      * Generate a stable 6-character short ID from a full model ID.

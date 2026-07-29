@@ -6,7 +6,7 @@
 package tech.kayys.gollek.safetensor.engine.generation;
 
 import org.jboss.logging.Logger;
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 import tech.kayys.gollek.safetensor.engine.runtime.ModelRuntimeTraitsResolver;
 import tech.kayys.gollek.safetensor.loader.SafetensorLoaderFacade;
@@ -35,14 +35,10 @@ import java.util.Set;
 
 final class MetalF16WeightCache {
     private static final Logger LOG = Logger.getLogger(MetalF16WeightCache.class);
-    private static final String DISABLE_METAL_F16_DISK_CACHE_PROPERTY =
-            "gollek.safetensor.disable_metal_f16_disk_cache";
-    private static final String ENABLE_GEMMA4_METAL_F16_DISK_CACHE_PROPERTY =
-            "gollek.safetensor.enable_gemma4_metal_f16_disk_cache";
-    private static final String METAL_F16_DISK_CACHE_MAX_BYTES_PROPERTY =
-            "gollek.safetensor.metal_f16_disk_cache_max_bytes";
-    private static final String METAL_F16_DISK_CACHE_MIN_FREE_BYTES_PROPERTY =
-            "gollek.safetensor.metal_f16_disk_cache_min_free_bytes";
+    private static final String DISABLE_METAL_F16_DISK_CACHE_PROPERTY = "gollek.safetensor.disable_metal_f16_disk_cache";
+    private static final String ENABLE_GEMMA4_METAL_F16_DISK_CACHE_PROPERTY = "gollek.safetensor.enable_gemma4_metal_f16_disk_cache";
+    private static final String METAL_F16_DISK_CACHE_MAX_BYTES_PROPERTY = "gollek.safetensor.metal_f16_disk_cache_max_bytes";
+    private static final String METAL_F16_DISK_CACHE_MIN_FREE_BYTES_PROPERTY = "gollek.safetensor.metal_f16_disk_cache_min_free_bytes";
     private static final long GIB = 1024L * 1024L * 1024L;
     private static final long DEFAULT_METAL_F16_DISK_CACHE_MAX_BYTES = 12L * GIB;
     private static final long DEFAULT_METAL_F16_DISK_CACHE_MIN_FREE_BYTES = 2L * GIB;
@@ -119,7 +115,8 @@ final class MetalF16WeightCache {
                     return cached;
                 }
             } finally {
-                // Converted tensors are cached on the original BF16 tensors, so the normal model unload path owns them.
+                // Converted tensors are cached on the original BF16 tensors, so the normal
+                // model unload path owns them.
             }
         } catch (Exception e) {
             try {

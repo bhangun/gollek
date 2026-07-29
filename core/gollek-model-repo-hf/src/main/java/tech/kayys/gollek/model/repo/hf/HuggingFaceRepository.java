@@ -20,7 +20,7 @@ import tech.kayys.gollek.spi.model.ArtifactLocation;
 import tech.kayys.gollek.spi.model.ModelArtifact;
 import tech.kayys.gollek.spi.model.ModelDescriptor;
 import tech.kayys.gollek.spi.model.ModelRef;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 import tech.kayys.gollek.spi.model.ModelManifest;
 import tech.kayys.gollek.spi.model.Pageable;
 

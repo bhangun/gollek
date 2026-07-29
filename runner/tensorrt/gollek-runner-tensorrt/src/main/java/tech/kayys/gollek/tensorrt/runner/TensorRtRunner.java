@@ -18,8 +18,8 @@ import tech.kayys.gollek.exception.RunnerInitializationException;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
-import tech.kayys.aljabr.core.tensor.DeviceType;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 import tech.kayys.gollek.spi.model.ModelManifest;
 import tech.kayys.gollek.spi.model.RunnerMetadata;
 
@@ -455,7 +455,8 @@ public class TensorRtRunner extends AbstractGollekRunner {
      */
     private void enqueueStep(List<Integer> tokenIds) {
         if (tokenIds.size() > maxSeqLen) {
-            throw new IllegalArgumentException("Input sequence length " + tokenIds.size() + " exceeds maximum allowed " + maxSeqLen);
+            throw new IllegalArgumentException(
+                    "Input sequence length " + tokenIds.size() + " exceeds maximum allowed " + maxSeqLen);
         }
         int seqLen = tokenIds.size();
         for (int i = 0; i < seqLen; i++)
@@ -504,9 +505,21 @@ public class TensorRtRunner extends AbstractGollekRunner {
     public void close() {
         initialized = false;
         if (trt != null && trt.isNativeAvailable()) {
-            try { trt.destroyExecutionContext(trtCtx); } catch (Exception e) { log.warn("[TRT] Failed to destroy context", e); }
-            try { trt.destroyEngine(trtEngine); } catch (Exception e) { log.warn("[TRT] Failed to destroy engine", e); }
-            try { trt.destroyRuntime(trtRuntime); } catch (Exception e) { log.warn("[TRT] Failed to destroy runtime", e); }
+            try {
+                trt.destroyExecutionContext(trtCtx);
+            } catch (Exception e) {
+                log.warn("[TRT] Failed to destroy context", e);
+            }
+            try {
+                trt.destroyEngine(trtEngine);
+            } catch (Exception e) {
+                log.warn("[TRT] Failed to destroy engine", e);
+            }
+            try {
+                trt.destroyRuntime(trtRuntime);
+            } catch (Exception e) {
+                log.warn("[TRT] Failed to destroy runtime", e);
+            }
         }
         if (deviceArena != null)
             try {

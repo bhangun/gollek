@@ -19,8 +19,8 @@ import tech.kayys.gollek.exception.RunnerInitializationException;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
-import tech.kayys.aljabr.core.tensor.DeviceType;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 import tech.kayys.gollek.spi.model.ModelManifest;
 import tech.kayys.gollek.spi.model.RunnerMetadata;
 import tech.kayys.gollek.spi.model.ModalityType;
@@ -36,11 +36,13 @@ import java.util.ArrayList;
 /**
  * Stable Diffusion ONNX Runner for Gollek.
  *
- * <p>Orchestrates CLIP text encoder, UNet denoiser, and VAE decoder
+ * <p>
+ * Orchestrates CLIP text encoder, UNet denoiser, and VAE decoder
  * via individual ONNX Runtime sessions using the FFM-based
  * {@link OnnxRuntimeBinding}.
  *
  * <h2>Pipeline</h2>
+ * 
  * <pre>
  *   prompt → [CLIP text encoder] → text embeddings
  *   noise  → [UNet × N steps]    → denoised latents
@@ -48,7 +50,8 @@ import java.util.ArrayList;
  * </pre>
  *
  * <h2>Memory Model</h2>
- * <p>All intermediate data is kept as raw {@link MemorySegment} buffers
+ * <p>
+ * All intermediate data is kept as raw {@link MemorySegment} buffers
  * managed by a shared {@link Arena}. Buffers are wrapped into OrtValues
  * <em>only</em> at the point of each {@code ort.run()} call and released
  * immediately after, preventing use-after-free crashes in native code.
@@ -61,7 +64,7 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
 
     // ── Latent space constants ───────────────────────────────────────────────
     private static final int LATENT_CHANNELS = 4;
-    private static final int LATENT_SIZE = 64;   // 512 / 8
+    private static final int LATENT_SIZE = 64; // 512 / 8
     private static final int IMAGE_SIZE = 512;
     private static final int IMAGE_CHANNELS = 3;
     private static final long NUM_LATENT_FLOATS = 1L * LATENT_CHANNELS * LATENT_SIZE * LATENT_SIZE;
@@ -81,7 +84,7 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
     private static final int TOTAL_TRAIN_TIMESTEPS = 1000;
     private static final float BETA_START = 0.00085f;
     private static final float BETA_END = 0.012f;
-    private static final int STEPS_OFFSET = 1;  // from scheduler_config.json
+    private static final int STEPS_OFFSET = 1; // from scheduler_config.json
     /** Pre-computed alpha_bar table using scaled_linear schedule. */
     private final double[] alphaBarTable;
     /** PNDM noise prediction history (last 4 predictions). */
@@ -133,7 +136,8 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
         double cumProd = 1.0;
         alphaBarTable[0] = cumProd;
         for (int i = 1; i <= TOTAL_TRAIN_TIMESTEPS; i++) {
-            double sqrtBeta = sqrtBetaStart + (sqrtBetaEnd - sqrtBetaStart) * (double) (i - 1) / (TOTAL_TRAIN_TIMESTEPS - 1);
+            double sqrtBeta = sqrtBetaStart
+                    + (sqrtBetaEnd - sqrtBetaStart) * (double) (i - 1) / (TOTAL_TRAIN_TIMESTEPS - 1);
             double beta = sqrtBeta * sqrtBeta;
             cumProd *= (1.0 - beta);
             alphaBarTable[i] = cumProd;
@@ -155,7 +159,8 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
     @Override
     public DeviceType deviceType() {
         return executionProvider.toLowerCase().contains("coreml") || executionProvider.equals("auto")
-                ? DeviceType.METAL : DeviceType.CPU;
+                ? DeviceType.METAL
+                : DeviceType.CPU;
     }
 
     @Override
@@ -170,7 +175,7 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
     public RunnerCapabilities capabilities() {
         return RunnerCapabilities.builder()
                 .supportsStreaming(true)
-                .supportedDataTypes(new String[]{"fp32", "fp16"})
+                .supportedDataTypes(new String[] { "fp32", "fp16" })
                 .build();
     }
 
@@ -200,9 +205,9 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
 
         // 3. Use available CPU cores for thread pools
         int availCores = Math.max(2, Runtime.getRuntime().availableProcessors());
-        int encoderThreads = Math.min(availCores, 4);   // text encoder is small
-        int unetThreads = Math.max(2, availCores / 2);   // UNet is memory-bound
-        int vaeThreads = Math.min(availCores, 4);         // VAE is moderate
+        int encoderThreads = Math.min(availCores, 4); // text encoder is small
+        int unetThreads = Math.max(2, availCores / 2); // UNet is memory-bound
+        int vaeThreads = Math.min(availCores, 4); // VAE is moderate
 
         // 4. Configure session options with graph optimization
         MemorySegment encoderOpts = ort.createSessionOptions();
@@ -210,7 +215,8 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
         ort.setGraphOptimizationLevel(encoderOpts, OnnxRuntimeBinding.GRAPH_OPT_LEVEL_ENABLE_ALL);
         String ep = resolveAndAttachEp(encoderOpts);
 
-        // UNet session: strictly CPU-only options for the heavily-fragmented UNet to prevent system hangs
+        // UNet session: strictly CPU-only options for the heavily-fragmented UNet to
+        // prevent system hangs
         MemorySegment unetOpts = ort.createSessionOptions();
         ort.setIntraOpNumThreads(unetOpts, unetThreads); // Allow more threads but keep CPU
 
@@ -298,31 +304,33 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
 
                 // Validate dimensions
                 if (width % 64 != 0 || height % 64 != 0) {
-                    LOG.warnf("[SD-ONNX] Invalid dimensions %dx%d, must be multiples of 64. Using default 512x512.", 
+                    LOG.warnf("[SD-ONNX] Invalid dimensions %dx%d, must be multiples of 64. Using default 512x512.",
                             width, height);
                     width = IMAGE_SIZE;
                     height = IMAGE_SIZE;
                 }
-                
+
                 if (width != IMAGE_SIZE || height != IMAGE_SIZE) {
-                    LOG.warnf("[SD-ONNX] Non-default resolution %dx%d requested. This runner uses fixed-shape ONNX models optimized for 512x512. Results may be degraded.", 
+                    LOG.warnf(
+                            "[SD-ONNX] Non-default resolution %dx%d requested. This runner uses fixed-shape ONNX models optimized for 512x512. Results may be degraded.",
                             width, height);
                 }
 
-                LOG.infof("[SD-ONNX] Generating — prompt='%s', steps=%d, guidance=%.1f, seed=%d, size=%dx%d, scheduler=%s",
+                LOG.infof(
+                        "[SD-ONNX] Generating — prompt='%s', steps=%d, guidance=%.1f, seed=%d, size=%dx%d, scheduler=%s",
                         prompt, steps, guidance, seed, width, height, scheduler);
 
                 long pipelineStart = System.currentTimeMillis();
                 try (Arena arena = Arena.ofConfined()) {
 
                     // 1. Text Encoding — run CLIP on prompt and empty string
-                    emitter.emit(progressChunk(reqId, 0, 
+                    emitter.emit(progressChunk(reqId, 0,
                             String.format("[0/%d] Encoding prompt...", steps + 2)));
                     MemorySegment textEmbedData = encodePrompt(arena, prompt);
                     MemorySegment nullEmbedData = encodePrompt(arena, "");
 
                     // 2. Latent Initialization — Gaussian noise [1, 4, 64, 64]
-                    emitter.emit(progressChunk(reqId, 1, 
+                    emitter.emit(progressChunk(reqId, 1,
                             String.format("[1/%d] Initializing latents (seed=%d)...", steps + 2, seed)));
                     MemorySegment latentData = createNoiseLatents(arena, seed);
 
@@ -347,7 +355,7 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
                             diffMs, steps, diffMs / steps, scheduler);
 
                     // 5. VAE Decoding — latents → RGB pixels → PNG
-                    emitter.emit(progressChunk(reqId, steps + 2, 
+                    emitter.emit(progressChunk(reqId, steps + 2,
                             String.format("[%d/%d] Decoding image to PNG...", steps + 2, steps + 2)));
                     byte[] pngData = decodeToPng(arena, latentData);
 
@@ -396,13 +404,13 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
         }
 
         MemorySegment inputVal = ort.createTensorWithData(memInfo, inputData,
-                new long[]{1, CLIP_SEQ_LEN},
+                new long[] { 1, CLIP_SEQ_LEN },
                 OnnxRuntimeBinding.ONNX_TENSOR_INT32);
 
         try {
             // Text encoder session input order mapping
-            String[] names = {"input_ids"};
-            MemorySegment[] vals = {inputVal};
+            String[] names = { "input_ids" };
+            MemorySegment[] vals = { inputVal };
             MemorySegment[] orderedVals = new MemorySegment[textEncoderInputNames.length];
             for (int i = 0; i < textEncoderInputNames.length; i++) {
                 String actualName = textEncoderInputNames[i];
@@ -434,7 +442,8 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
                 outputData.copyFrom(srcData);
                 return outputData;
             } finally {
-                for (MemorySegment r : results) ort.releaseValue(r);
+                for (MemorySegment r : results)
+                    ort.releaseValue(r);
             }
         } finally {
             ort.releaseValue(inputVal);
@@ -446,7 +455,7 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
      * Returns a raw FP32 buffer.
      * 
      * @param arena the memory arena for allocation
-     * @param seed the random seed for reproducible generation
+     * @param seed  the random seed for reproducible generation
      * @return noise latent tensor
      */
     private MemorySegment createNoiseLatents(Arena arena, long seed) {
@@ -462,12 +471,13 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
      * One denoising step: runs UNet twice (cond + uncond) and applies
      * classifier-free guidance + DDIM scheduler.
      *
-     * <p>All data stays as raw MemorySegment buffers. OrtValues are created
+     * <p>
+     * All data stays as raw MemorySegment buffers. OrtValues are created
      * transiently for each {@code ort.run()} call and released immediately.
      *
-     * @param latentData  raw FP32 [1,4,64,64]
-     * @param textEmbeds  raw FP32 [1,77,768] for the prompt
-     * @param nullEmbeds  raw FP32 [1,77,768] for empty prompt
+     * @param latentData raw FP32 [1,4,64,64]
+     * @param textEmbeds raw FP32 [1,77,768] for the prompt
+     * @param nullEmbeds raw FP32 [1,77,768] for empty prompt
      * @return updated latentData (raw FP32 [1,4,64,64])
      */
     /**
@@ -476,8 +486,8 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
      * improving throughput on both CPU and GPU backends.
      */
     private MemorySegment denoiseStepBatched(Arena arena, MemorySegment latentData,
-                                              MemorySegment textEmbeds, MemorySegment nullEmbeds,
-                                              int step, int totalSteps, float guidance, String scheduler, int[] timesteps) {
+            MemorySegment textEmbeds, MemorySegment nullEmbeds,
+            int step, int totalSteps, float guidance, String scheduler, int[] timesteps) {
 
         long timestep = timesteps[step];
         MemorySegment timestepData = arena.allocate(8L, 8);
@@ -515,8 +525,8 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
      */
     @SuppressWarnings("unused")
     private MemorySegment denoiseStep(Arena arena, MemorySegment latentData,
-                                       MemorySegment textEmbeds, MemorySegment nullEmbeds,
-                                       int step, int totalSteps, float guidance, String scheduler, int[] timesteps) {
+            MemorySegment textEmbeds, MemorySegment nullEmbeds,
+            int step, int totalSteps, float guidance, String scheduler, int[] timesteps) {
 
         long timestep = timesteps[step];
         MemorySegment timestepData = arena.allocate(8L, 8);
@@ -535,33 +545,32 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
         return applySchedulerStep(arena, latentData, noisePred, step, totalSteps, scheduler, timesteps);
     }
 
-
     /**
      * Runs the UNet session with properly wrapped OrtValue inputs.
      * Returns raw FP32 buffer with the noise prediction [1,4,64,64].
      */
     private MemorySegment runUNet(Arena arena, MemorySegment latentData,
-                                   MemorySegment timestepData, MemorySegment embedData,
-                                   int batchSize) {
+            MemorySegment timestepData, MemorySegment embedData,
+            int batchSize) {
 
         // Wrap raw data as OrtValues
         MemorySegment latentVal = ort.createTensorWithData(memInfo, latentData,
-                new long[]{batchSize, LATENT_CHANNELS, LATENT_SIZE, LATENT_SIZE},
+                new long[] { batchSize, LATENT_CHANNELS, LATENT_SIZE, LATENT_SIZE },
                 OnnxRuntimeBinding.ONNX_TENSOR_FLOAT);
 
         MemorySegment timestepVal = ort.createTensorWithData(memInfo, timestepData,
-                new long[]{1},  // scalar as [1]
+                new long[] { 1 }, // scalar as [1]
                 OnnxRuntimeBinding.ONNX_TENSOR_INT64);
 
         MemorySegment embedVal = ort.createTensorWithData(memInfo, embedData,
-                new long[]{batchSize, CLIP_SEQ_LEN, CLIP_HIDDEN_DIM},
+                new long[] { batchSize, CLIP_SEQ_LEN, CLIP_HIDDEN_DIM },
                 OnnxRuntimeBinding.ONNX_TENSOR_FLOAT);
 
         try {
             // Robustly map inputs by name to ensure correct order
-            String[] names = {"sample", "timestep", "encoder_hidden_states"};
-            MemorySegment[] vals = {latentVal, timestepVal, embedVal};
-            
+            String[] names = { "sample", "timestep", "encoder_hidden_states" };
+            MemorySegment[] vals = { latentVal, timestepVal, embedVal };
+
             MemorySegment[] orderedVals = new MemorySegment[unetInputNames.length];
             for (int i = 0; i < unetInputNames.length; i++) {
                 String actualName = unetInputNames[i];
@@ -620,13 +629,13 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
 
             // Wrap as OrtValue
             MemorySegment latentVal = ort.createTensorWithData(memInfo, scaledLatents,
-                    new long[]{1, LATENT_CHANNELS, LATENT_SIZE, LATENT_SIZE},
+                    new long[] { 1, LATENT_CHANNELS, LATENT_SIZE, LATENT_SIZE },
                     OnnxRuntimeBinding.ONNX_TENSOR_FLOAT);
 
             try {
                 // Robustly map VAE inputs
-                String[] names = {"latent_sample", "latent"};
-                MemorySegment[] vals = {latentVal, latentVal}; // try both names
+                String[] names = { "latent_sample", "latent" };
+                MemorySegment[] vals = { latentVal, latentVal }; // try both names
                 MemorySegment[] orderedVals = new MemorySegment[vaeInputNames.length];
                 for (int i = 0; i < vaeInputNames.length; i++) {
                     String actualName = vaeInputNames[i];
@@ -638,7 +647,8 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
                             break;
                         }
                     }
-                    if (!found) orderedVals[i] = latentVal; // default
+                    if (!found)
+                        orderedVals[i] = latentVal; // default
                 }
 
                 MemorySegment[] results = ort.run(
@@ -683,8 +693,8 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
     }
 
     private MemorySegment applySchedulerStep(Arena arena, MemorySegment latentData,
-                                             MemorySegment noisePred, int step, int totalSteps,
-                                             String scheduler, int[] timesteps) {
+            MemorySegment noisePred, int step, int totalSteps,
+            String scheduler, int[] timesteps) {
         if ("pndm".equalsIgnoreCase(scheduler)) {
             return applyPNDMStep(arena, latentData, noisePred, step, totalSteps, timesteps);
         } else {
@@ -693,15 +703,17 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
     }
 
     private MemorySegment applyPNDMStep(Arena arena, MemorySegment latentData,
-                                        MemorySegment noisePred, int step, int totalSteps, int[] timesteps) {
+            MemorySegment noisePred, int step, int totalSteps, int[] timesteps) {
         // Basic PNDM using noise history
         pndmNoiseHistory.add(noisePred);
         if (pndmNoiseHistory.size() > 4) {
             pndmNoiseHistory.remove(0);
         }
 
-        // For simplicity, we just use the current noisePred (essentially falling back to DDIM)
-        // A full PNDM implementation would combine the past 4 noise predictions using Runge-Kutta.
+        // For simplicity, we just use the current noisePred (essentially falling back
+        // to DDIM)
+        // A full PNDM implementation would combine the past 4 noise predictions using
+        // Runge-Kutta.
         // We do a simplified version here.
         return applyDDIMStep(arena, latentData, noisePred, step, totalSteps, timesteps);
     }
@@ -710,7 +722,7 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
      * DDIM deterministic step (η=0).
      */
     private MemorySegment applyDDIMStep(Arena arena, MemorySegment latentData,
-                                         MemorySegment noisePred, int step, int totalSteps, int[] timesteps) {
+            MemorySegment noisePred, int step, int totalSteps, int[] timesteps) {
 
         int tCurrent = timesteps[step];
         int tPrev = (step + 1 < totalSteps) ? timesteps[step + 1] : 0;
@@ -749,10 +761,10 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
     private byte[] encodeNchwToPng(MemorySegment imageData, int width, int height, int channels) {
         try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
             // PNG signature
-            baos.write(new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A});
+            baos.write(new byte[] { (byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A });
 
             // IHDR
-            writePngChunk(baos, "IHDR", new byte[]{
+            writePngChunk(baos, "IHDR", new byte[] {
                     (byte) (width >> 24), (byte) (width >> 16), (byte) (width >> 8), (byte) width,
                     (byte) (height >> 24), (byte) (height >> 16), (byte) (height >> 8), (byte) height,
                     8, 2, 0, 0, 0 // 8-bit RGB, no compression/filter/interlace
@@ -832,9 +844,9 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
             for (int y = 0; y < h; y++) {
                 for (int x = 0; x < w; x++) {
                     long idx = (long) y * w + x;
-                    img.setAtIndex(ValueLayout.JAVA_FLOAT, idx, (float) x / w * 2 - 1);                   // R
-                    img.setAtIndex(ValueLayout.JAVA_FLOAT, stride + idx, (float) y / h * 2 - 1);           // G
-                    img.setAtIndex(ValueLayout.JAVA_FLOAT, 2 * stride + idx, 0.0f);                        // B
+                    img.setAtIndex(ValueLayout.JAVA_FLOAT, idx, (float) x / w * 2 - 1); // R
+                    img.setAtIndex(ValueLayout.JAVA_FLOAT, stride + idx, (float) y / h * 2 - 1); // G
+                    img.setAtIndex(ValueLayout.JAVA_FLOAT, 2 * stride + idx, 0.0f); // B
                 }
             }
             return encodeNchwToPng(img, w, h, IMAGE_CHANNELS);
@@ -850,14 +862,16 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
     private String[] discoverInputNames(MemorySegment session) {
         int count = (int) ort.getInputCount(session);
         String[] names = new String[count];
-        for (int i = 0; i < count; i++) names[i] = ort.getInputName(session, i);
+        for (int i = 0; i < count; i++)
+            names[i] = ort.getInputName(session, i);
         return names;
     }
 
     private String[] discoverOutputNames(MemorySegment session) {
         int count = (int) ort.getOutputCount(session);
         String[] names = new String[count];
-        for (int i = 0; i < count; i++) names[i] = ort.getOutputName(session, i);
+        for (int i = 0; i < count; i++)
+            names[i] = ort.getOutputName(session, i);
         return names;
     }
 
@@ -868,7 +882,8 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
                 .findFirst()
                 .map(loc -> {
                     String uri = loc.uri();
-                    if (uri.startsWith("file:")) return Path.of(java.net.URI.create(uri));
+                    if (uri.startsWith("file:"))
+                        return Path.of(java.net.URI.create(uri));
                     return Path.of(uri);
                 })
                 .map(p -> Files.isDirectory(p) ? p : p.getParent())
@@ -881,13 +896,15 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
      */
     private Path resolveSubmodel(Path baseDir, String subdir) {
         Path expected = baseDir.resolve(subdir).resolve("model.onnx");
-        if (Files.exists(expected)) return expected;
+        if (Files.exists(expected))
+            return expected;
 
         // Fallback: look one level up for the blob directory
         Path parent = baseDir.getParent();
         if (parent != null) {
             Path alt = parent.resolve(subdir).resolve("model.onnx");
-            if (Files.exists(alt)) return alt;
+            if (Files.exists(alt))
+                return alt;
         }
 
         throw new RuntimeException("Cannot find " + subdir + "/model.onnx under " + baseDir);
@@ -895,13 +912,15 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
 
     private String resolveAndAttachEp(MemorySegment opts) {
         if (executionProvider.equals("auto") || executionProvider.contains("coreml")) {
-            if (ort.appendCoreMlProvider(opts, 0)) return "CoreMLExecutionProvider";
+            if (ort.appendCoreMlProvider(opts, 0))
+                return "CoreMLExecutionProvider";
         }
         return "CPUExecutionProvider";
     }
 
     /**
-     * Try to attach a hardware EP (CoreML/CUDA) but return false silently on failure.
+     * Try to attach a hardware EP (CoreML/CUDA) but return false silently on
+     * failure.
      * Used for UNet where we want acceleration but can tolerate CPU fallback.
      */
     private boolean resolveAndAttachEpSafe(MemorySegment opts) {
@@ -920,16 +939,18 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
 
     private Path resolveLibraryPath(String configuredPath) {
         Path configured = Path.of(configuredPath);
-        if (Files.exists(configured)) return configured;
+        if (Files.exists(configured))
+            return configured;
         // Common fallback paths
         Path[] fallbacks = {
-            Path.of(System.getProperty("user.home"), ".gollek", "libs", "libonnxruntime.dylib"),
-            Path.of(System.getProperty("user.home"), ".gollek", "libs", "onnxruntime", "libonnxruntime.dylib"),
-            Path.of("/opt/homebrew/lib/libonnxruntime.dylib"),
-            Path.of("/usr/local/lib/libonnxruntime.dylib"),
+                Path.of(System.getProperty("user.home"), ".gollek", "libs", "libonnxruntime.dylib"),
+                Path.of(System.getProperty("user.home"), ".gollek", "libs", "onnxruntime", "libonnxruntime.dylib"),
+                Path.of("/opt/homebrew/lib/libonnxruntime.dylib"),
+                Path.of("/usr/local/lib/libonnxruntime.dylib"),
         };
         for (Path p : fallbacks) {
-            if (Files.exists(p)) return p;
+            if (Files.exists(p))
+                return p;
         }
         return fallbacks[0]; // Default fallback
     }
@@ -970,11 +991,16 @@ public class StableDiffusionOnnxRunner extends AbstractGollekRunner {
     @Override
     public void close() {
         if (ort != null) {
-            if (!textEncoderSession.equals(MemorySegment.NULL)) ort.releaseSession(textEncoderSession);
-            if (!unetSession.equals(MemorySegment.NULL)) ort.releaseSession(unetSession);
-            if (!vaeDecoderSession.equals(MemorySegment.NULL)) ort.releaseSession(vaeDecoderSession);
-            if (!ortEnv.equals(MemorySegment.NULL)) ort.releaseEnv(ortEnv);
-            if (!memInfo.equals(MemorySegment.NULL)) ort.releaseMemoryInfo(memInfo);
+            if (!textEncoderSession.equals(MemorySegment.NULL))
+                ort.releaseSession(textEncoderSession);
+            if (!unetSession.equals(MemorySegment.NULL))
+                ort.releaseSession(unetSession);
+            if (!vaeDecoderSession.equals(MemorySegment.NULL))
+                ort.releaseSession(vaeDecoderSession);
+            if (!ortEnv.equals(MemorySegment.NULL))
+                ort.releaseEnv(ortEnv);
+            if (!memInfo.equals(MemorySegment.NULL))
+                ort.releaseMemoryInfo(memInfo);
         }
         this.initialized = false;
     }

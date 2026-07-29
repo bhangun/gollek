@@ -8,7 +8,7 @@ package tech.kayys.gollek.safetensor.engine.generation.attention;
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
-import tech.kayys.aljabr.metal.binding.MetalBinding;
+import tech.kayys.alkhawarizm.metal.binding.MetalBinding;
 import tech.kayys.gollek.safetensor.core.tensor.AccelOps;
 import tech.kayys.gollek.safetensor.core.tensor.AccelTensor;
 
@@ -19,7 +19,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
- * Applies attention-local normalization, preferring Metal kernels when available
+ * Applies attention-local normalization, preferring Metal kernels when
+ * available
  * while still exposing in-place CPU fallbacks for reusable projection buffers.
  */
 final class FlashAttentionNormalizer {

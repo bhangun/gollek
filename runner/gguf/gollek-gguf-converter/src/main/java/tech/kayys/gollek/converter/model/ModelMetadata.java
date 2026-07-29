@@ -2,7 +2,7 @@ package tech.kayys.gollek.converter.model;
 
 import tech.kayys.gollek.gguf.core.*;
 
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 import java.util.Locale;
 
 /**

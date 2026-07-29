@@ -107,10 +107,10 @@ class OnnxRuntimeRunnerDeviceSelectionTest {
         Method method = OnnxRuntimeRunner.class.getDeclaredMethod("resolveSupportedDevices");
         method.setAccessible(true);
         @SuppressWarnings("unchecked")
-        List<tech.kayys.aljabr.core.tensor.DeviceType> devices =
-                (List<tech.kayys.aljabr.core.tensor.DeviceType>) method.invoke(runner);
+        List<tech.kayys.alkhawarizm.core.tensor.DeviceType> devices = (List<tech.kayys.alkhawarizm.core.tensor.DeviceType>) method
+                .invoke(runner);
 
-        assertTrue(devices.contains(tech.kayys.aljabr.core.tensor.DeviceType.METAL));
+        assertTrue(devices.contains(tech.kayys.alkhawarizm.core.tensor.DeviceType.METAL));
     }
 
     @Test
@@ -118,10 +118,10 @@ class OnnxRuntimeRunnerDeviceSelectionTest {
         OnnxRuntimeRunner runner = new OnnxRuntimeRunner();
         setField(runner, "executionProvider", "metal");
 
-        assertEquals(tech.kayys.aljabr.core.tensor.DeviceType.METAL, runner.deviceType());
+        assertEquals(tech.kayys.alkhawarizm.core.tensor.DeviceType.METAL, runner.deviceType());
 
         setField(runner, "executionProvider", "mps");
-        assertEquals(tech.kayys.aljabr.core.tensor.DeviceType.METAL, runner.deviceType());
+        assertEquals(tech.kayys.alkhawarizm.core.tensor.DeviceType.METAL, runner.deviceType());
     }
 
     @Test

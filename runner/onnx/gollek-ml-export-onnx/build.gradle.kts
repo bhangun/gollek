@@ -18,8 +18,8 @@ repositories {
 }
 
 dependencies {
-    implementation("tech.kayys.aljabr:aljabr-ml-autograd:0.1.0-SNAPSHOT")
-    implementation("tech.kayys.aljabr:aljabr-ml-nn:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-ml-autograd:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-ml-nn:0.1.0-SNAPSHOT")
     testImplementation(group = "org.junit.jupiter", name = "junit-jupiter")
 }
 

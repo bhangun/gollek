@@ -3,7 +3,7 @@ package tech.kayys.gollek.inference.libtorch.nn;
 import tech.kayys.gollek.inference.libtorch.core.Device;
 import tech.kayys.gollek.inference.libtorch.core.ScalarType;
 import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
-import tech.kayys.aljabr.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
 
 /**
  * Layer Normalization.

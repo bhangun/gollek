@@ -1,6 +1,6 @@
 package tech.kayys.gollek.ir;
 
-import tech.kayys.aljabr.core.tensor.*;
+import tech.kayys.alkhawarizm.core.tensor.*;
 import tech.kayys.gollek.ir.schema.*;
 import tech.kayys.gollek.ir.validate.*;
 import java.util.*;
@@ -31,11 +31,31 @@ public final class OpSchema {
         this.validator = validator;
     }
 
-    public String opType() { return opType; }
-    public int minInputs() { return minInputs; }
-    public int maxInputs() { return maxInputs; }
-    public int outputs() { return outputs; }
-    public ShapeInfer shapeInfer() { return shapeInfer; }
-    public TypeInfer typeInfer() { return typeInfer; }
-    public Validator validator() { return validator; }
+    public String opType() {
+        return opType;
+    }
+
+    public int minInputs() {
+        return minInputs;
+    }
+
+    public int maxInputs() {
+        return maxInputs;
+    }
+
+    public int outputs() {
+        return outputs;
+    }
+
+    public ShapeInfer shapeInfer() {
+        return shapeInfer;
+    }
+
+    public TypeInfer typeInfer() {
+        return typeInfer;
+    }
+
+    public Validator validator() {
+        return validator;
+    }
 }

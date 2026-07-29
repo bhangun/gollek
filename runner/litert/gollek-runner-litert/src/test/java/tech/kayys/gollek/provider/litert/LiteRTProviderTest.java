@@ -5,7 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import tech.kayys.aljabr.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
 import tech.kayys.gollek.spi.provider.ProviderRequest;
 import tech.kayys.gollek.spi.Message;
 import tech.kayys.gollek.spi.observability.NoopAdapterMetricsRecorder;

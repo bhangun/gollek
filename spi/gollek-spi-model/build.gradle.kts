@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
     api(project(":spi:gollek-spi"))
-    implementation("tech.kayys.aljabr:aljabr-tensor:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":core:gollek-ir"))
     implementation("io.smallrye.reactive:mutiny:2.5.5")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")

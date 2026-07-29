@@ -1,7 +1,7 @@
 package tech.kayys.gollek.core.graph.ops;
 
 import tech.kayys.gollek.core.graph.*;
-import tech.kayys.aljabr.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
 
 public final class MatMulOp implements OpBinary {
     @Override

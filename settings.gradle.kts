@@ -1,7 +1,7 @@
 rootProject.name = "gollek-engine"
 
-// Include aljabr as a composite build so gollek can depend on aljabr projects during development
-includeBuild("../aljabr")  // enabled: include local aljabr composite build as source-of-truth for model modules
+// Include alkhawarizm as a composite build so gollek can depend on alkhawarizm projects during development
+includeBuild("../alkhawarizm")  // enabled: include local alkhawarizm composite build as source-of-truth for model modules
 fun includeOptionalProject(projectPath: String, vararg candidatePaths: String) {
     val projectDir = candidatePaths
         .map { file(it) }
@@ -36,10 +36,10 @@ includeOptionalProject("core:gollek-tool-core", "core/gollek-tool-core")
 // Dynamically include model projects if they exist (avoid hard failure when some model dirs are missing)
 val staticallyIncludedModelProjects = setOf<String>()
 
-// Include statically listed ones only if their directories exist (also check aljabr/models)
+// Include statically listed ones only if their directories exist (also check alkhawarizm/models)
 staticallyIncludedModelProjects.forEach { name ->
-    val aljabrAlt = "../aljabr/models/aljabr-model-${name.removePrefix("gollek-model-")}"
-    includeOptionalProject("models:$name", "models/$name", "../aljabr/models/$name", aljabrAlt)
+    val alkhawarizmAlt = "../alkhawarizm/models/alkhawarizm-model-${name.removePrefix("gollek-model-")}"
+    includeOptionalProject("models:$name", "models/$name", "../alkhawarizm/models/$name", alkhawarizmAlt)
 }
 
 // Auto-include any additional model projects present under any 'models' directories in the repository

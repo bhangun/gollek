@@ -1,7 +1,7 @@
 package tech.kayys.gollek.inference.libtorch.nn;
 
 import tech.kayys.gollek.inference.libtorch.core.TorchTensor;
-import tech.kayys.aljabr.core.tensor.Tensor;
+import tech.kayys.alkhawarizm.core.tensor.Tensor;
 
 /**
  * Tanh activation module wrapper.

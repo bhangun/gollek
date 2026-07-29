@@ -17,8 +17,8 @@ import tech.kayys.gollek.spi.exception.ProviderException;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
-import tech.kayys.aljabr.core.tensor.DeviceType;
-import tech.kayys.aljabr.core.model.ModelFormat;
+import tech.kayys.alkhawarizm.core.tensor.DeviceType;
+import tech.kayys.alkhawarizm.core.model.ModelFormat;
 import tech.kayys.gollek.spi.model.ModalityType;
 import tech.kayys.gollek.spi.model.ModelManifest;
 import tech.kayys.gollek.spi.model.ArtifactLocation;
@@ -61,10 +61,6 @@ public class OnnxEngine implements tech.kayys.gollek.spi.inference.LocalInferenc
     @Inject
     MossTtsOnnxRunner mossTtsRunner;
 
-    
-
-    
-
     private volatile boolean initialized = false;
 
     public OnnxEngine() {
@@ -75,16 +71,6 @@ public class OnnxEngine implements tech.kayys.gollek.spi.inference.LocalInferenc
         this.runner = runner;
         this.sdRunner = sdRunner;
     }
-
-    
-
-    
-
-    
-
-    
-
-    
 
     public boolean supports(String modelId, tech.kayys.gollek.spi.inference.InferenceRequest request) {
         Path path = resolveModelPath(modelId, request);
@@ -195,7 +181,8 @@ public class OnnxEngine implements tech.kayys.gollek.spi.inference.LocalInferenc
         return null;
     }
 
-    private void ensureInitialized(tech.kayys.gollek.spi.inference.InferenceRequest request, Path modelPath) throws Exception {
+    private void ensureInitialized(tech.kayys.gollek.spi.inference.InferenceRequest request, Path modelPath)
+            throws Exception {
         ensureComponents();
         boolean isSd = isStableDiffusion(modelPath);
         var activeRunner = isSd ? sdRunner : runner;
@@ -226,7 +213,8 @@ public class OnnxEngine implements tech.kayys.gollek.spi.inference.LocalInferenc
         }
     }
 
-    private InferenceResponse inferMossTts(tech.kayys.gollek.spi.inference.InferenceRequest request, Path modelPath) throws Exception {
+    private InferenceResponse inferMossTts(tech.kayys.gollek.spi.inference.InferenceRequest request, Path modelPath)
+            throws Exception {
         Path codecDir = resolveMossCodecDir(request);
         if (codecDir == null) {
             throw missingMossCodecException(null);
@@ -342,9 +330,9 @@ public class OnnxEngine implements tech.kayys.gollek.spi.inference.LocalInferenc
                     null,
                     Instant.now(),
                     response.getMetadata(),
-                                    null,
-                                    null,
-                                    null));
+                    null,
+                    null,
+                    null));
             emitter.complete();
         } catch (Exception e) {
             emitter.fail(new RuntimeException(cleanErrorMessage(e), e));
@@ -414,9 +402,9 @@ public class OnnxEngine implements tech.kayys.gollek.spi.inference.LocalInferenc
                 null,
                 Instant.now(),
                 metadata,
-                                    null,
-                                    null,
-                                    null);
+                null,
+                null,
+                null);
     }
 
     private StreamingInferenceChunk mossTtsPcmChunk(
@@ -453,9 +441,9 @@ public class OnnxEngine implements tech.kayys.gollek.spi.inference.LocalInferenc
                 null,
                 Instant.now(),
                 metadata,
-                                    null,
-                                    null,
-                                    null);
+                null,
+                null,
+                null);
     }
 
     private void emitAudioChunks(
@@ -487,9 +475,9 @@ public class OnnxEngine implements tech.kayys.gollek.spi.inference.LocalInferenc
                     null,
                     Instant.now(),
                     chunkMetadata,
-                                    null,
-                                    null,
-                                    null));
+                    null,
+                    null,
+                    null));
         }
     }
 
@@ -683,7 +671,8 @@ public class OnnxEngine implements tech.kayys.gollek.spi.inference.LocalInferenc
         return item;
     }
 
-    private InferenceRequest toInferenceRequest(tech.kayys.gollek.spi.inference.InferenceRequest request, boolean streaming) {
+    private InferenceRequest toInferenceRequest(tech.kayys.gollek.spi.inference.InferenceRequest request,
+            boolean streaming) {
         return InferenceRequest.builder()
                 .requestId(request.getRequestId())
                 .model(request.getModel())
@@ -765,7 +754,8 @@ public class OnnxEngine implements tech.kayys.gollek.spi.inference.LocalInferenc
                         + "OpenMOSS-Team/MOSS-TTS-Nano-100M-ONNX --prompt \"hello\" --output output.wav");
     }
 
-    private void rejectUnsupportedCustomOnnxPipeline(OnnxModelDiagnostics.Report report, tech.kayys.gollek.spi.inference.InferenceRequest request) {
+    private void rejectUnsupportedCustomOnnxPipeline(OnnxModelDiagnostics.Report report,
+            tech.kayys.gollek.spi.inference.InferenceRequest request) {
         if (report == null || report.modelPath() == null || isStableDiffusion(report.modelPath())) {
             return;
         }
@@ -775,7 +765,8 @@ public class OnnxEngine implements tech.kayys.gollek.spi.inference.LocalInferenc
         throw new UnsupportedOperationException(unsupportedCustomPipelineMessage(report, request));
     }
 
-    private String unsupportedCustomPipelineMessage(OnnxModelDiagnostics.Report report, tech.kayys.gollek.spi.inference.InferenceRequest request) {
+    private String unsupportedCustomPipelineMessage(OnnxModelDiagnostics.Report report,
+            tech.kayys.gollek.spi.inference.InferenceRequest request) {
         StringBuilder message = new StringBuilder();
         message.append(report.pipelineType())
                 .append(" was detected at ")
@@ -1095,7 +1086,7 @@ public class OnnxEngine implements tech.kayys.gollek.spi.inference.LocalInferenc
             try {
                 var entries = java.util.List.of();
                 for (var entry : entries) {
-                    
+
                 }
             } catch (Exception ignored) {
             }
@@ -1210,8 +1201,6 @@ public class OnnxEngine implements tech.kayys.gollek.spi.inference.LocalInferenc
         return modelPath != null && Files.isRegularFile(modelPath.resolve("codec_browser_onnx_meta.json"));
     }
 
-    
-
     @Override
     public void shutdown() {
         if (runner != null) {
@@ -1275,13 +1264,14 @@ public class OnnxEngine implements tech.kayys.gollek.spi.inference.LocalInferenc
                 chunk.finished(),
                 chunk.finishReason(),
                 chunk.usage() != null
-                        ? new StreamingInferenceChunk.ChunkUsage(chunk.usage().inputTokens(), chunk.usage().outputTokens(), 0)
+                        ? new StreamingInferenceChunk.ChunkUsage(chunk.usage().inputTokens(),
+                                chunk.usage().outputTokens(), 0)
                         : null,
                 chunk.emittedAt(),
                 chunk.metadata(),
-                                    null,
-                                    null,
-                                    null);
+                null,
+                null,
+                null);
     }
 
     private ModalityType convertModality(tech.kayys.gollek.spi.model.ModalityType modality) {
