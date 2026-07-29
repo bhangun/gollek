@@ -5,7 +5,7 @@
   
   [![Java 22](https://img.shields.io/badge/Java-22-blue.svg)](https://jdk.java.net/22/)
   [![Gradle](https://img.shields.io/badge/Gradle-Build-brightgreen.svg)](https://gradle.org/)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![License: MIT](https://img.shields.io/badge/License-APACHE-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
 This repository hosts the Wayang platform and its core sub-systems. Wayang is designed to be a high-performance orchestration and inference platform for AI agents and workflows.
