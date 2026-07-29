@@ -40,8 +40,11 @@ final class LlamaStructLayouts {
             ValueLayout.JAVA_INT.withName("n_batch"),
             ValueLayout.JAVA_INT.withName("n_ubatch"),
             ValueLayout.JAVA_INT.withName("n_seq_max"),
+            ValueLayout.JAVA_INT.withName("n_rs_seq"),
+            ValueLayout.JAVA_INT.withName("n_outputs_max"),
             ValueLayout.JAVA_INT.withName("n_threads"),
             ValueLayout.JAVA_INT.withName("n_threads_batch"),
+            ValueLayout.JAVA_INT.withName("ctx_type"),
             ValueLayout.JAVA_INT.withName("rope_scaling_type"),
             ValueLayout.JAVA_INT.withName("pooling_type"),
             ValueLayout.JAVA_INT.withName("attention_type"),
@@ -68,7 +71,9 @@ final class LlamaStructLayouts {
             ValueLayout.JAVA_BYTE.withName("kv_unified"),
             MemoryLayout.paddingLayout(2),
             ValueLayout.ADDRESS.withName("samplers"),
-            ValueLayout.JAVA_LONG.withName("n_samplers")).withName("llama_context_params");
+            ValueLayout.JAVA_LONG.withName("n_samplers"),
+            ValueLayout.ADDRESS.withName("ctx_other")
+    ).withName("llama_context_params");
 
     /** {@code llama_batch} — token batch submitted to {@code llama_decode}. */
     static final MemoryLayout BATCH = MemoryLayout.structLayout(
