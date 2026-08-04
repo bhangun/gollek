@@ -1,10 +1,10 @@
 package tech.kayys.gollek.sdk.internal;
 
 import io.smallrye.mutiny.Multi;
-import tech.kayys.gollek.engine.inference.InferenceService;
+import tech.kayys.gollek.spi.inference.InferenceEngine;
 import tech.kayys.gollek.sdk.GollekClient;
 import tech.kayys.gollek.sdk.model.*;
-import tech.kayys.gollek.spi.model.ModelInfo;
+import tech.kayys.gollek.sdk.model.ModelInfo;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
@@ -24,7 +24,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public class LocalGollekClient implements GollekClient {
 
-    private final InferenceService inferenceService;
+    private final InferenceEngine inferenceService;
     /** Default model used when the request does not specify one. */
     private final String defaultModel;
 
@@ -34,7 +34,7 @@ public class LocalGollekClient implements GollekClient {
      * @param inferenceService the in-process inference engine
      * @param defaultModel     fallback model identifier when none is specified in a request
      */
-    public LocalGollekClient(InferenceService inferenceService, String defaultModel) {
+    public LocalGollekClient(InferenceEngine inferenceService, String defaultModel) {
         this.inferenceService = inferenceService;
         this.defaultModel = defaultModel;
     }
@@ -47,7 +47,7 @@ public class LocalGollekClient implements GollekClient {
     @Override
     public CompletableFuture<GenerationResponse> generateAsync(GenerationRequest request) {
         InferenceRequest spiRequest = mapToSpiRequest(request);
-        return inferenceService.inferAsync(spiRequest)
+        return inferenceService.infer(spiRequest)
                 .onItem().transform(this::mapToSdkResponse)
                 .subscribeAsCompletionStage();
     }
@@ -55,7 +55,7 @@ public class LocalGollekClient implements GollekClient {
     @Override
     public GenerationStream generateStream(GenerationRequest request) {
         InferenceRequest spiRequest = mapToSpiRequest(request);
-        Multi<StreamingInferenceChunk> multi = inferenceService.inferStream(spiRequest);
+        Multi<StreamingInferenceChunk> multi = inferenceService.stream(spiRequest);
 
         DefaultGenerationStream stream = new DefaultGenerationStream();
         multi.subscribe().with(
@@ -76,7 +76,7 @@ public class LocalGollekClient implements GollekClient {
                 .input(request.input())
                 .build();
 
-        var spiResponse = inferenceService.executeEmbedding(spiRequest).await().indefinitely();
+        var spiResponse = inferenceService.executeEmbedding(request.model() != null ? request.model() : defaultModel, spiRequest).await().indefinitely();
 
         float[] vector = (spiResponse.embeddings() != null && !spiResponse.embeddings().isEmpty())
                 ? spiResponse.embeddings().get(0)
@@ -95,7 +95,7 @@ public class LocalGollekClient implements GollekClient {
 
     @Override
     public ModelInfo getModelInfo(String modelId) {
-        return ModelInfo.builder().modelId(modelId).build();
+        return ModelInfo.builder().id(modelId).build();
     }
 
     /**

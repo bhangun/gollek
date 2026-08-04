@@ -127,6 +127,6 @@ class DirectForwardElementwiseRoutingPolicyTest {
             boolean gemma4Text,
             boolean gemma4StylePerLayerInputs) {
         return new ModelConfigTraits(
-                null, modelType, 0, 0, gemma4Text, false, false, gemma4StylePerLayerInputs);
+                null, modelType, 0, 0, gemma4Text, false, false, gemma4StylePerLayerInputs, false, false, false);
     }
 }

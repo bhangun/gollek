@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import picocli.CommandLine.Command;
 import tech.kayys.gollek.cli.commands.AgentCommand;
+import tech.kayys.gollek.cli.commands.BenchmarkCommand;
 import tech.kayys.gollek.cli.commands.ChatCommand;
 import tech.kayys.gollek.cli.commands.PrepareCommand;
 import tech.kayys.gollek.cli.commands.DeleteCommand;
@@ -44,6 +45,7 @@ import picocli.CommandLine.Option;
 @TopCommand
 @Command(name = "gollek", mixinStandardHelpOptions = true, versionProvider = GollekCommand.VersionProvider.class, description = "Gollek Inference CLI - Run local and cloud AI models", subcommands = {
         RunCommand.class,
+        BenchmarkCommand.class,
         ChatCommand.class,
         PullCommand.class,
         ModelCommand.class,

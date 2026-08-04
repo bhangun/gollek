@@ -6579,6 +6579,16 @@ public class RunCommand implements Runnable {
                 return;
             }
         }
+        if (jsonMode) {
+            Map<String, Object> jsonResult = new LinkedHashMap<>();
+            jsonResult.put("text", response.getContent());
+            jsonResult.put("tokenCount", response.getTokensUsed());
+            jsonResult.put("promptTokens", response.getInputTokens());
+            jsonResult.put("durationMs", response.getDurationMs());
+            printJsonPayload(jsonResult);
+            return;
+        }
+
         printExecutionRouteInfo(metadata);
         printQuantCacheInfo(metadata);
         printKvCacheQuantizationInfo(metadata);

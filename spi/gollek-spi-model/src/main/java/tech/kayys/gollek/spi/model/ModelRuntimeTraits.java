@@ -84,9 +84,7 @@ public record ModelRuntimeTraits(
         }
     }
 
-    public static final Set<String> GEMMA4_CONTROL_TOKEN_TEXTS = ModelPromptTraits.GEMMA4_CONTROL_TOKEN_TEXTS;
     public static final String DEFAULT_SYSTEM_PROMPT = ModelPromptTraits.DEFAULT_SYSTEM_PROMPT;
-    public static final String QWEN_DEFAULT_SYSTEM_PROMPT = ModelPromptTraits.QWEN_DEFAULT_SYSTEM_PROMPT;
 
     public static final ModelRuntimeTraits EMPTY = new ModelRuntimeTraits(false, false, false, false);
 
@@ -120,14 +118,13 @@ public record ModelRuntimeTraits(
     public ModelRuntimeTraits(boolean gemma4Text, boolean gemma3Text, boolean qwenText,
             boolean perLayerInputPath) {
         this(gemma4Text, gemma3Text, qwenText, perLayerInputPath,
-                // Capability flags derived from identity for compact constructor backward compat.
                 gemma4Text,
                 gemma3Text || gemma4Text,
                 perLayerInputPath && gemma4Text,
-                ModelPromptTraits.defaultPromptBosPolicy(gemma4Text, gemma3Text),
-                ModelPromptTraits.allowedControlTokenTexts(gemma4Text),
-                ModelPromptTraits.validatesContinuationTokensByDecode(gemma4Text),
-                ModelPromptTraits.rejectsEmptyDecodedTokens(gemma4Text),
+                gemma4Text ? PromptBosPolicy.NEVER : (gemma3Text ? PromptBosPolicy.GEMMA_TURN_AWARE : PromptBosPolicy.DEFAULT),
+                gemma4Text ? Set.of("<|channel>", "<channel|>", "<|think|>", "<|turn>", "<turn|>") : Set.of(),
+                gemma4Text,
+                gemma4Text,
                 null,
                 false,
                 false,
@@ -200,7 +197,14 @@ public record ModelRuntimeTraits(
         boolean gemma3Text = modelType.startsWith("gemma3");
         boolean gemmaFamily = modelType.startsWith("gemma");
         boolean qwenText = modelType.contains("qwen");
-        ModelPromptTraits prompt = ModelPromptTraits.fromFlags(gemma4Text, gemma3Text, gemmaFamily, qwenText);
+        PromptBosPolicy promptBosPolicy = gemma4Text ? PromptBosPolicy.NEVER : (gemma3Text || gemmaFamily ? PromptBosPolicy.GEMMA_TURN_AWARE : PromptBosPolicy.DEFAULT);
+        ModelPromptTraits prompt = new ModelPromptTraits(
+                promptBosPolicy,
+                gemma4Text ? Set.of("<|channel>", "<channel|>", "<|think|>", "<|turn>", "<turn|>") : Set.of(),
+                gemma4Text,
+                gemma4Text,
+                gemma4Text,
+                qwenText ? "You are Qwen, created by Alibaba Cloud. You are a helpful assistant." : ModelPromptTraits.DEFAULT_SYSTEM_PROMPT);
         ModelModalityTraits modality = ModelModalityTraits.fromConfig(config);
         boolean perLayerInputPath = config.getHiddenSizePerLayerInput() > 0 || config.getVocabSizePerLayerInput() > 0;
         // Derive capability flags from config metadata. Model-family modules that
@@ -252,11 +256,11 @@ public record ModelRuntimeTraits(
     }
 
     public boolean skipDefaultSystemPromptInjection() {
-        return ModelPromptTraits.skipsDefaultSystemPromptInjection(gemma4Text);
+        return gemma4Text;
     }
 
     public String defaultSystemPrompt() {
-        return ModelPromptTraits.defaultSystemPrompt(qwenText);
+        return qwenText ? "You are Qwen, created by Alibaba Cloud. You are a helpful assistant." : ModelPromptTraits.DEFAULT_SYSTEM_PROMPT;
     }
 
     private static String normalizedModelType(ModelConfig config) {
@@ -447,17 +451,17 @@ public record ModelRuntimeTraits(
                     geluGatedFfn,
                     perLayerInputEmbedding,
                     promptBosPolicy == null
-                            ? ModelPromptTraits.defaultPromptBosPolicy(gemma4Text, gemma3Text)
+                            ? (gemma4Text ? PromptBosPolicy.NEVER : (gemma3Text ? PromptBosPolicy.GEMMA_TURN_AWARE : PromptBosPolicy.DEFAULT))
                             : promptBosPolicy,
                     allowedControlTokenTextsSet
                             ? allowedControlTokenTexts
-                            : ModelPromptTraits.allowedControlTokenTexts(gemma4Text),
+                            : (gemma4Text ? Set.of("<|channel>", "<channel|>", "<|think|>", "<|turn>", "<turn|>") : Set.of()),
                     validateContinuationTokensByDecodeSet
                             ? validateContinuationTokensByDecode
-                            : ModelPromptTraits.validatesContinuationTokensByDecode(gemma4Text),
+                            : gemma4Text,
                     rejectEmptyDecodedTokensSet
                             ? rejectEmptyDecodedTokens
-                            : ModelPromptTraits.rejectsEmptyDecodedTokens(gemma4Text),
+                            : gemma4Text,
                     attention,
                     audioModel,
                     visionModel,

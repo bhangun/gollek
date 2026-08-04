@@ -108,6 +108,6 @@ class DirectForwardMetalLinearWeightPlanTest {
 
     private static ModelConfigTraits traits(boolean gemma4Text) {
         return new ModelConfigTraits(null, gemma4Text ? "gemma4_text" : "llama",
-                0, 0, gemma4Text, false, false, false);
+                0, 0, gemma4Text, false, false, false, false, false, false);
     }
 }

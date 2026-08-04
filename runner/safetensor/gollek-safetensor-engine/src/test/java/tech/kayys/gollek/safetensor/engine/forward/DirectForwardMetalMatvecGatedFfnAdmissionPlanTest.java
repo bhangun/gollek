@@ -141,6 +141,6 @@ class DirectForwardMetalMatvecGatedFfnAdmissionPlanTest {
             boolean qwenText,
             boolean gemma4StylePerLayerInputs) {
         return new ModelConfigTraits(
-                null, modelType, 0, 0, gemma4Text, gemma3Text, qwenText, gemma4StylePerLayerInputs);
+                null, modelType, 0, 0, gemma4Text, gemma3Text, qwenText, gemma4StylePerLayerInputs, false, false, false);
     }
 }

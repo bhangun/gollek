@@ -85,6 +85,6 @@ class DirectForwardMetalHalfMatvecLogitsPolicyTest {
             boolean gemma4Text,
             boolean gemma3Text,
             boolean qwenText) {
-        return new ModelConfigTraits(null, modelType, 0, 0, gemma4Text, gemma3Text, qwenText, false);
+        return new ModelConfigTraits(null, modelType, 0, 0, gemma4Text, gemma3Text, qwenText, false, false, false, false);
     }
 }

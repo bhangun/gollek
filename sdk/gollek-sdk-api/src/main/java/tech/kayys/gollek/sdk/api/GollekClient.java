@@ -263,6 +263,14 @@ public interface GollekClient extends AutoCloseable {
         Builder backend(String backend);
 
         /**
+         * Sets the deployment mode for the client (EMBEDDED, GRPC, REST, CLI).
+         * If not set, the client attempts to auto-detect based on endpoint and classpath.
+         *
+         * @param mode the deployment mode
+         */
+        Builder mode(DeploymentMode mode);
+
+        /**
          * Builds and initializes the {@link GollekClient}.
          *
          * @return ready-to-use client

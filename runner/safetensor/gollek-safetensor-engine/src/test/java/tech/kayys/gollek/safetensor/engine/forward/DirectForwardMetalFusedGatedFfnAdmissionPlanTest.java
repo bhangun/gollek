@@ -170,13 +170,13 @@ class DirectForwardMetalFusedGatedFfnAdmissionPlanTest {
     }
 
     private static ModelConfigTraits generic() {
-        return new ModelConfigTraits(null, "llama", 0, 0, false, false, false, false);
+        return new ModelConfigTraits(null, "llama", 0, 0, false, false, false, false, false, false, false);
     }
 
     private static DirectForwardMetalCapabilities allCapabilities() {
         return new DirectForwardMetalCapabilities(
                 true, true, true, true, true, true, true, true, true, true,
                 true, true, true, true, true, true, true, true, true, true,
-                true, true);
+                true, true, false, false);
     }
 }

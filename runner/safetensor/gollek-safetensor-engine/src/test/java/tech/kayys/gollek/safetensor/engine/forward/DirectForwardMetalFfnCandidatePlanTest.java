@@ -132,7 +132,7 @@ class DirectForwardMetalFfnCandidatePlanTest {
     }
 
     private static ModelConfigTraits generic() {
-        return new ModelConfigTraits(null, "llama", 0, 0, false, false, false, false);
+        return new ModelConfigTraits(null, "llama", 0, 0, false, false, false, false, false, false, false);
     }
 
     private static final class TestTensors implements AutoCloseable {

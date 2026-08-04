@@ -71,7 +71,7 @@ public class SafetensorEngine implements LocalInferenceEngine {
     @Inject
     AdapterMetricsRecorder adapterMetricsRecorder = new NoopAdapterMetricsRecorder();
 
-    public  {
+    public ProviderCapabilities capabilities() {
         var features = new LinkedHashSet<>(Set.of("safetensors", "libtorch-backend", "streaming-native"));
         if (modelConverterService != null && modelConverterService.isAvailable()) {
             features.add("gguf-conversion");

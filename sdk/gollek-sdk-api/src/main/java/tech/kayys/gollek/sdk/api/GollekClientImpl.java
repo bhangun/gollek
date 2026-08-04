@@ -165,6 +165,7 @@ final class GollekClientImpl implements GollekClient {
 
     static final class BuilderImpl implements GollekClient.Builder {
         String model, endpoint, backend;
+        DeploymentMode mode;
         int   maxTokens   = 512;
         float temperature = 0.7f;
 
@@ -173,6 +174,17 @@ final class GollekClientImpl implements GollekClient {
         @Override public Builder maxTokens(int n)      { this.maxTokens = n; return this; }
         @Override public Builder temperature(float t)  { this.temperature = t; return this; }
         @Override public Builder backend(String b)     { this.backend = b; return this; }
-        @Override public GollekClient build()          { return new GollekClientImpl(this); }
+        @Override public Builder mode(DeploymentMode m){ this.mode = m; return this; }
+        @Override public GollekClient build() {
+            try {
+                // Try to load the real implementation factory from gollek-sdk
+                Class<?> factoryClass = Class.forName("tech.kayys.gollek.sdk.internal.GollekClientFactory");
+                return (GollekClient) factoryClass.getMethod("build", DeploymentMode.class, String.class, String.class, String.class, int.class, float.class)
+                        .invoke(null, mode, endpoint, model, backend, maxTokens, temperature);
+            } catch (Exception e) {
+                // Fallback to the stub implementation if gollek-sdk is not on classpath
+                return new GollekClientImpl(this);
+            }
+        }
     }
 }

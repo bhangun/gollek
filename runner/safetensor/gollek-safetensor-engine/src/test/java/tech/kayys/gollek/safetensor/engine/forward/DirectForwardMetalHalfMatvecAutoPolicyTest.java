@@ -59,7 +59,7 @@ class DirectForwardMetalHalfMatvecAutoPolicyTest {
         DirectForwardMetalHalfMatvecAutoPolicy policy = policy(null, 4);
         Fixture blank = fixture("", false, false, false, false, 30, 4096, 4096);
         ModelConfigTraits traitsWithoutConfig =
-                new ModelConfigTraits(null, "llama", 0, 0, false, false, false, false);
+                new ModelConfigTraits(null, "llama", 0, 0, false, false, false, false, false, false, false);
 
         assertFalse(policy.shouldUseMetalHalfMatvec(blank.traits(), blank.config(), 4));
         assertFalse(policy.shouldUseMetalHalfMatvec(traitsWithoutConfig, null, 4));
@@ -94,7 +94,7 @@ class DirectForwardMetalHalfMatvecAutoPolicyTest {
                 gemma4Text,
                 gemma3Text,
                 qwenText,
-                gemma4StylePerLayerInputs);
+                gemma4StylePerLayerInputs, false, false, false);
         return new Fixture(config, traits);
     }
 

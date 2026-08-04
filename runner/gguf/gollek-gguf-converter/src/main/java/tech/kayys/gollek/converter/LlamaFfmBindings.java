@@ -43,7 +43,6 @@ import java.util.Optional;
  * @author Bhangun
  * @version 1.0.0
  */
-@io.quarkus.runtime.annotations.RegisterForReflection
 public final class LlamaFfmBindings {
 
     private static final String LIB_BASE_NAME = "llama";

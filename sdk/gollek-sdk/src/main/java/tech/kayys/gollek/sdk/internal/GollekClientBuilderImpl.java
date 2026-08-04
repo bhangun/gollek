@@ -1,7 +1,7 @@
 package tech.kayys.gollek.sdk.internal;
 
 import tech.kayys.gollek.sdk.GollekClient;
-import tech.kayys.gollek.engine.inference.InferenceService;
+import tech.kayys.gollek.spi.inference.InferenceEngine;
 
 import java.time.Duration;
 
@@ -108,9 +108,9 @@ public class GollekClientBuilderImpl implements GollekClient.Builder {
             Class<?> arcClass = Class.forName("io.quarkus.arc.Arc");
             Object container = arcClass.getMethod("container").invoke(null);
             Object instance = container.getClass().getMethod("instance", Class.class, java.lang.annotation.Annotation[].class)
-                    .invoke(container, InferenceService.class, new java.lang.annotation.Annotation[0]);
+                    .invoke(container, InferenceEngine.class, new java.lang.annotation.Annotation[0]);
             
-            InferenceService service = (InferenceService) instance.getClass().getMethod("get").invoke(instance);
+            InferenceEngine service = (InferenceEngine) instance.getClass().getMethod("get").invoke(instance);
             
             if (service == null) {
                 throw new IllegalStateException("InferenceService found on classpath but not initialized in CDI container. " +

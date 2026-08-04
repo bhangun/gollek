@@ -150,7 +150,7 @@ class DirectForwardMetalHalfMatvecRoutingPolicyTest {
                 }
                 """.formatted(modelType, layers, hiddenSize, intermediateSize), ModelConfig.class);
         ModelConfigTraits traits =
-                new ModelConfigTraits(config, modelType, 0, 0, gemma4Text, gemma3Text, qwenText, false);
+                new ModelConfigTraits(config, modelType, 0, 0, gemma4Text, gemma3Text, qwenText, false, false, false, false);
         return new Fixture(config, traits);
     }
 

@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package tech.kayys.gollek.grpc;
+
+option java_multiple_files = true;
+option java_package = "tech.kayys.gollek.grpc";
+option java_outer_classname = "GollekInferenceProto";
+
+service InferenceService {
+  // Synchronous generation
+  rpc Generate (GenerateRequest) returns (GenerateResponse);
+
+  // Streaming generation
+  rpc GenerateStream (GenerateRequest) returns (stream GenerateResponse);
+
+  // Embedding generation
+  rpc Embed (EmbedRequest) returns (EmbedResponse);
+}
+
+message GenerateRequest {
+  string prompt = 1;
+  string model = 2;
+  int32 max_tokens = 3;
+  float temperature = 4;
+  float top_p = 5;
+  repeated string stop_tokens = 6;
+}
+
+message GenerateResponse {
+  string text = 1;
+  int32 token_count = 2;
+  int32 prompt_tokens = 3;
+  int64 duration_ms = 4;
+}
+
+message EmbedRequest {
+  string text = 1;
+  string model = 2;
+}
+
+message EmbedResponse {
+  repeated float vector = 1;
+}

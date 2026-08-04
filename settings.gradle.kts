@@ -120,6 +120,7 @@ includeOptionalProject("sdk:gollek-sdk-api", "sdk/gollek-sdk-api")
 includeOptionalProject("sdk:gollek-sdk-core", "sdk/gollek-sdk-core")
 includeOptionalProject("sdk:gollek-sdk-local", "sdk/gollek-sdk-local")
 includeOptionalProject("sdk:gollek-sdk-remote", "sdk/gollek-sdk-remote")
+includeOptionalProject("sdk:gollek-sdk-protobuf", "sdk/gollek-sdk-protobuf")
 if (file("sdk/gollek-sdk-session").isDirectory) {
     include("sdk:gollek-sdk-session")
 }

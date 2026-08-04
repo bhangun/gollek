@@ -61,7 +61,7 @@ class DirectForwardMetalHalfMatvecTransposedPolicyTest {
     }
 
     private static ModelConfigTraits traits(String modelType, boolean gemma4Text) {
-        return new ModelConfigTraits(null, modelType, 0, 0, gemma4Text, false, false, false);
+        return new ModelConfigTraits(null, modelType, 0, 0, gemma4Text, false, false, false, false, false, false);
     }
 
     private static DirectForwardMetalHalfMatvecTransposedPolicy policy(
