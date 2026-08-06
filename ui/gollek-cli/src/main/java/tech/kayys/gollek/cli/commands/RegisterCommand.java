@@ -8,8 +8,8 @@ import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.spi.model.ModelManifest;
-import tech.kayys.gollek.spi.model.ModelRegistry.ModelUploadRequest;
+import tech.kayys.alkhawarizm.spi.model.ModelManifest;
+import tech.kayys.alkhawarizm.spi.model.ModelRegistry.ModelUploadRequest;
 
 @Dependent
 @Unremovable

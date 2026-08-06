@@ -13,8 +13,8 @@ import tech.kayys.gollek.plugin.core.ExtensionAvailability;
 import tech.kayys.gollek.plugin.core.ExtensionAvailabilityContractReport;
 import tech.kayys.gollek.plugin.core.ExtensionAvailabilityContractViolation;
 import tech.kayys.gollek.plugin.core.ExtensionAvailabilityRegistry;
-import tech.kayys.gollek.spi.model.ModelFamilyPlugin;
-import tech.kayys.gollek.spi.model.ModelFamilyPluginRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPluginRegistry;
 import tech.kayys.gollek.plugin.runner.RunnerPlugin;
 import tech.kayys.gollek.plugin.runner.RunnerPluginManager;
 

@@ -2,12 +2,12 @@ package tech.kayys.gollek.cli.util;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import tech.kayys.gollek.spi.model.ModelFamilyCapability;
-import tech.kayys.gollek.spi.model.ModelFamilyDescriptor;
-import tech.kayys.gollek.spi.model.ModelFamilyPlugin;
-import tech.kayys.gollek.spi.model.ModelFamilyPluginRegistry;
-import tech.kayys.gollek.spi.model.ModelFamilyResolution;
-import tech.kayys.gollek.spi.model.ModelTokenizerDescriptor;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyCapability;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyDescriptor;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPluginRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyResolution;
+import tech.kayys.alkhawarizm.spi.model.ModelTokenizerDescriptor;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;

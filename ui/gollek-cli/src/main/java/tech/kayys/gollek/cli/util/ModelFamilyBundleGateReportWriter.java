@@ -11,8 +11,8 @@ import tech.kayys.gollek.safetensor.engine.route.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import tech.kayys.gollek.cli.util.ModelFamilyBundleGateReportFields.Root;
-import tech.kayys.gollek.spi.model.ModelFamilyContractViolation;
-import tech.kayys.gollek.spi.model.ModelFamilyPluginRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyContractViolation;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPluginRegistry;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

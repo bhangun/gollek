@@ -6,7 +6,7 @@ import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
 import tech.kayys.gollek.cli.util.CLIUtils;
-import tech.kayys.gollek.spi.model.ModelInfo;
+import tech.kayys.alkhawarizm.spi.model.ModelInfo;
 import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.gollek.sdk.model.SystemInfo;
 import picocli.CommandLine.Parameters;

@@ -19,16 +19,16 @@ import tech.kayys.gollek.cli.util.ModelFamilyResolutionReportFields.DirectArchit
 import tech.kayys.gollek.cli.util.ModelFamilyResolutionReports;
 import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.gollek.sdk.model.ModelResolver;
-import tech.kayys.gollek.spi.model.ModelConfig;
-import tech.kayys.gollek.spi.model.loader.ModelConfigLoader;
-import tech.kayys.gollek.spi.model.ModelFamilyPlugin;
-import tech.kayys.gollek.spi.model.ModelFamilyPluginRegistry;
-import tech.kayys.gollek.spi.model.ModelFamilyResolution;
-import tech.kayys.gollek.spi.model.ModelFamilyRuntimeCompatibility;
-import tech.kayys.gollek.spi.model.ModelFamilyRuntimeManifest;
-import tech.kayys.gollek.spi.model.ModelFamilySupportReport;
-import tech.kayys.gollek.spi.model.ModelInfo;
-import tech.kayys.gollek.spi.model.ModelTokenizerDescriptor;
+import tech.kayys.alkhawarizm.spi.model.ModelConfig;
+import tech.kayys.alkhawarizm.spi.model.loader.ModelConfigLoader;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPluginRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyResolution;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyRuntimeCompatibility;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyRuntimeManifest;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilySupportReport;
+import tech.kayys.alkhawarizm.spi.model.ModelInfo;
+import tech.kayys.alkhawarizm.spi.model.ModelTokenizerDescriptor;
 import tech.kayys.gollek.spi.context.RequestContext;
 
 import java.nio.file.Files;

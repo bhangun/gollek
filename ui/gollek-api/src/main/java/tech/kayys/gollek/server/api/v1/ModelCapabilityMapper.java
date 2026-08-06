@@ -1,6 +1,6 @@
 package tech.kayys.gollek.server.api.v1;
 
-import tech.kayys.gollek.spi.model.ModelInfo;
+import tech.kayys.alkhawarizm.spi.model.ModelInfo;
 import java.util.List;
 import java.util.Optional;
 

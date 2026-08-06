@@ -6,9 +6,9 @@
 
 package tech.kayys.gollek.cli.util;
 
-import tech.kayys.gollek.spi.model.ModelFamilyCapability;
-import tech.kayys.gollek.spi.model.ModelFamilyDescriptor;
-import tech.kayys.gollek.spi.model.ModelFamilyPlugin;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyCapability;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyDescriptor;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
 
 import java.util.List;
 import java.util.Map;

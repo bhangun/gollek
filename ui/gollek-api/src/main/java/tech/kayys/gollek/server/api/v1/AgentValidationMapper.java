@@ -1,6 +1,8 @@
 package tech.kayys.gollek.server.api.v1;
 
-import com.fasterxml.jackson.databind.JsonNode;
+
+import tech.kayys.gollek.error.ErrorCode;
+import tech.kayys.gollek.spi.exception.InferenceException;import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.ws.rs.core.HttpHeaders;
 import tech.kayys.gollek.spi.Message;
 import tech.kayys.gollek.spi.embedding.EmbeddingRequest;
@@ -192,7 +194,7 @@ final class AgentValidationMapper {
         if (payload != null && payload.has("input")) {
             return "responses";
         }
-        throw new IllegalArgumentException("surface is required when it cannot be inferred");
+        throw new InferenceException(ErrorCode.VALIDATION_INVALID_FORMAT, "surface is required when it cannot be inferred");
     }
 
     private static String normalizeSurface(String surface) {

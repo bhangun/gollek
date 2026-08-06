@@ -15,7 +15,7 @@ import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.gollek.sdk.exception.SdkException;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.Message;
-import tech.kayys.gollek.spi.model.ModelInfo;
+import tech.kayys.alkhawarizm.spi.model.ModelInfo;
 import tech.kayys.gollek.sdk.model.ModelResolution;
 import tech.kayys.gollek.cli.util.CliInferenceFeatures;
 

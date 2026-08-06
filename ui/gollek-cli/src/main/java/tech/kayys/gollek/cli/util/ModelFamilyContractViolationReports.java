@@ -12,7 +12,7 @@ import tech.kayys.gollek.cli.util.ModelFamilyContractViolationReportFields.Repor
 import tech.kayys.gollek.cli.util.ModelFamilyContractViolationReportFields.Schema;
 import tech.kayys.gollek.cli.util.ModelFamilyContractViolationReportFields.Validation;
 import tech.kayys.gollek.cli.util.ModelFamilyContractViolationReportFields.Violation;
-import tech.kayys.gollek.spi.model.ModelFamilyContractViolation;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyContractViolation;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

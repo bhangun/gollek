@@ -2,8 +2,8 @@ package tech.kayys.gollek.cli.util;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import tech.kayys.gollek.spi.model.ModelFamilyPluginRegistry;
-import tech.kayys.gollek.spi.model.ModelFamilyResolution;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPluginRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyResolution;
 
 import javax.tools.JavaCompiler;
 import javax.tools.StandardJavaFileManager;
@@ -22,7 +22,7 @@ class ExternalModelFamilyPluginScopeTest {
     private static final String FAMILY_ID = "external_scope_family";
     private static final String MODEL_TYPE = "external_scope_model";
     private static final String SERVICE_DESCRIPTOR =
-            "META-INF/services/tech.kayys.gollek.spi.model.ModelFamilyPlugin";
+            "META-INF/services/tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin";
 
     @TempDir
     Path tempDir;
@@ -125,10 +125,10 @@ class ExternalModelFamilyPluginScopeTest {
 
                 import java.util.List;
                 import java.util.Map;
-                import tech.kayys.gollek.spi.model.ModelFamilyCapability;
-                import tech.kayys.gollek.spi.model.ModelFamilyDescriptor;
-                import tech.kayys.gollek.spi.model.ModelFamilyPlugin;
-                import tech.kayys.gollek.spi.model.ModelTokenizerDescriptor;
+                import tech.kayys.alkhawarizm.spi.model.ModelFamilyCapability;
+                import tech.kayys.alkhawarizm.spi.model.ModelFamilyDescriptor;
+                import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
+                import tech.kayys.alkhawarizm.spi.model.ModelTokenizerDescriptor;
 
                 public final class ExternalScopeModelFamilyPlugin implements ModelFamilyPlugin {
                     @Override

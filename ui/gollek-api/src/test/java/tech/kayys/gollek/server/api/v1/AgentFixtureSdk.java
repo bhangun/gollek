@@ -10,7 +10,7 @@ import tech.kayys.gollek.sdk.mcp.McpServerSummary;
 import tech.kayys.gollek.sdk.mcp.McpServerView;
 import tech.kayys.gollek.sdk.mcp.McpTestReport;
 import tech.kayys.gollek.sdk.mcp.McpToolModel;
-import tech.kayys.gollek.spi.model.ModelInfo;
+import tech.kayys.alkhawarizm.spi.model.ModelInfo;
 import tech.kayys.gollek.spi.provider.ProviderCapabilities;
 import tech.kayys.gollek.spi.provider.ProviderHealth;
 import tech.kayys.gollek.spi.provider.ProviderInfo;

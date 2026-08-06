@@ -42,8 +42,8 @@ import java.util.OptionalInt;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import tech.kayys.gollek.gguf.runtime.GgufRuntimeProfile;
-import tech.kayys.gollek.gguf.runtime.GgufRuntimeProbe;
+import tech.kayys.alkhawarizm.gguf.runtime.GgufRuntimeProfile;
+import tech.kayys.alkhawarizm.gguf.runtime.GgufRuntimeProbe;
 
 /**
  * Small GGUF/llama.cpp fast path used by the local macOS shim for simple
@@ -2578,7 +2578,7 @@ public final class GgufFastRun {
 
     private static String launchctlLabel() {
         return stringConfig("gollek.gguf.fast_run.daemon_launchctl_label",
-                "tech.kayys.gollek.gguf-fast-daemon");
+                "tech.kayys.alkhawarizm.gguf-fast-daemon");
     }
 
     private static void removeLaunchctlDaemon() {

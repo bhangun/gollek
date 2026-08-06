@@ -29,9 +29,9 @@ import tech.kayys.gollek.onnx.runner.PaddleOcrVlOnnxPlanner;
 import tech.kayys.gollek.onnx.runner.PaddleOcrVlOnnxProbe;
 import tech.kayys.gollek.sdk.model.ModelResolver;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.spi.model.ModelConfig;
-import tech.kayys.gollek.spi.model.loader.ModelConfigLoader;
-import tech.kayys.gollek.spi.model.ModelInfo;
+import tech.kayys.alkhawarizm.spi.model.ModelConfig;
+import tech.kayys.alkhawarizm.spi.model.loader.ModelConfigLoader;
+import tech.kayys.alkhawarizm.spi.model.ModelInfo;
 import tech.kayys.gollek.sdk.model.ModelResolution;
 import tech.kayys.gollek.sdk.model.PullProgress;
 import tech.kayys.gollek.sdk.exception.SdkException;
@@ -989,28 +989,28 @@ public class RunCommand implements Runnable {
                         gemma4MobileQatSelection.cacheHit(),
                         gemma4MobileQatSelection.cacheKind());
             }
-            DirectSafetensorRoutePolicy.AlternateRuntimeSelection gemma4TextSelection =
+            DirectSafetensorRoutePolicy.AlternateRuntimeSelection nativeBf16MatvecSelection =
                     DirectSafetensorRoutePolicy.selectGemma4TextAlternateRuntime(
                             providerId, modelId, finalLocalPath, providerExplicit,
                             preferAlternateRuntime, this::isRuntimeRouteActive);
-            if (!quietRouteResolutionOutput() && gemma4TextSelection.hasNotice()) {
-                System.out.println(gemma4TextSelection.notice());
+            if (!quietRouteResolutionOutput() && nativeBf16MatvecSelection.hasNotice()) {
+                System.out.println(nativeBf16MatvecSelection.notice());
             }
-            if (gemma4TextSelection.selected()) {
+            if (nativeBf16MatvecSelection.selected()) {
                 String previousProviderId = providerId;
                 String previousFormat = format;
-                providerId = gemma4TextSelection.provider();
-                finalLocalPath = gemma4TextSelection.localPath();
+                providerId = nativeBf16MatvecSelection.provider();
+                finalLocalPath = nativeBf16MatvecSelection.localPath();
                 modelId = finalLocalPath;
-                format = gemma4TextSelection.format();
+                format = nativeBf16MatvecSelection.format();
                 runnerRouteReport = runnerRouteReport.withRuntimeRedirect(
                         previousProviderId,
                         previousFormat,
                         providerId,
                         format,
-                        gemma4TextSelection.reason(),
-                        gemma4TextSelection.cacheHit(),
-                        gemma4TextSelection.cacheKind());
+                        nativeBf16MatvecSelection.reason(),
+                        nativeBf16MatvecSelection.cacheHit(),
+                        nativeBf16MatvecSelection.cacheKind());
             }
             DirectSafetensorRoutePolicy.AlternateRuntimeSelection communityTextGgufSelection =
                     DirectSafetensorRoutePolicy.selectCommunityTextGgufAlternateRuntime(
@@ -1503,7 +1503,7 @@ public class RunCommand implements Runnable {
                                     metricsRef.set(chunk.metadata());
                                 }
 
-                                if (chunk.modality() == tech.kayys.gollek.spi.model.ModalityType.IMAGE) {
+                                if (chunk.modality() == tech.kayys.alkhawarizm.spi.model.ModalityType.IMAGE) {
                                     if (chunk.imageDeltaBase64() != null) {
                                         try {
                                             byte[] decoded = java.util.Base64.getDecoder().decode(chunk.imageDeltaBase64());
@@ -1513,7 +1513,7 @@ public class RunCommand implements Runnable {
                                     return;
                                 }
 
-                                if (chunk.modality() == tech.kayys.gollek.spi.model.ModalityType.AUDIO) {
+                                if (chunk.modality() == tech.kayys.alkhawarizm.spi.model.ModalityType.AUDIO) {
                                     handleAudioChunk(chunk, audioOutput, liveAudioSink);
                                     return;
                                 }
@@ -1556,7 +1556,7 @@ public class RunCommand implements Runnable {
                                                         if (chunk.metadata() != null && !chunk.metadata().isEmpty()) {
                                                             metricsRef.set(chunk.metadata());
                                                         }
-                                                        if (chunk.modality() == tech.kayys.gollek.spi.model.ModalityType.IMAGE) {
+                                                        if (chunk.modality() == tech.kayys.alkhawarizm.spi.model.ModalityType.IMAGE) {
                                                             if (chunk.imageDeltaBase64() != null) {
                                                                 try {
                                                                     byte[] decoded = java.util.Base64.getDecoder().decode(chunk.imageDeltaBase64());
@@ -1565,7 +1565,7 @@ public class RunCommand implements Runnable {
                                                             }
                                                             return;
                                                         }
-                                                        if (chunk.modality() == tech.kayys.gollek.spi.model.ModalityType.AUDIO) {
+                                                        if (chunk.modality() == tech.kayys.alkhawarizm.spi.model.ModalityType.AUDIO) {
                                                             handleAudioChunk(chunk, audioOutput, liveAudioSink);
                                                             return;
                                                         }

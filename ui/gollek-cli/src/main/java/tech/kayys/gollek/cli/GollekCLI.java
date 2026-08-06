@@ -14,7 +14,7 @@ import tech.kayys.gollek.spi.Message;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
-import tech.kayys.gollek.spi.model.ModelInfo;
+import tech.kayys.alkhawarizm.spi.model.ModelInfo;
 
 import java.io.BufferedReader;
 import java.io.IOException;

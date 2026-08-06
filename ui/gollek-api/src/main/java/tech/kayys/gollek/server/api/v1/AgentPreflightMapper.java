@@ -14,7 +14,7 @@ import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.gollek.sdk.mcp.McpRegistryManager;
 import tech.kayys.gollek.sdk.mcp.McpServerSummary;
 import tech.kayys.gollek.sdk.mcp.McpToolModel;
-import tech.kayys.gollek.spi.model.ModelInfo;
+import tech.kayys.alkhawarizm.spi.model.ModelInfo;
 import java.util.HashMap;
 
 import java.util.ArrayList;

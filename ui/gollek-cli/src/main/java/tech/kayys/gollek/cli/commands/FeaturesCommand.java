@@ -64,7 +64,7 @@ public class FeaturesCommand implements Runnable {
     private static final String ADAPTER_SERVICE_ENTRY = "META-INF/services/tech.kayys.gollek.spi.feature.FeatureAdapter";
     private static final String MODEL_FAMILY_KIND = "model-family";
     private static final String MODEL_FAMILY_SERVICE_ENTRY =
-            "META-INF/services/tech.kayys.gollek.spi.model.ModelFamilyPlugin";
+            "META-INF/services/tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin";
     private static final String GOLLEK_PLUGIN_SERVICE_ENTRY =
             "META-INF/services/tech.kayys.gollek.spi.plugin.GollekPlugin";
     private static final String MANIFEST_ENTRY = "META-INF/gollek-extension.json";
@@ -1740,9 +1740,9 @@ public class FeaturesCommand implements Runnable {
         return """
                 package %s;
 
-                                import tech.kayys.gollek.spi.model.ModelFamilyDescriptor;
-                import tech.kayys.gollek.spi.model.ModelFamilyPlugin;
-                import tech.kayys.gollek.spi.model.ModelTokenizerDescriptor;
+                                import tech.kayys.alkhawarizm.spi.model.ModelFamilyDescriptor;
+                import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
+                import tech.kayys.alkhawarizm.spi.model.ModelTokenizerDescriptor;
 
                 import java.util.List;
                 import java.util.Map;
@@ -2246,7 +2246,7 @@ public class FeaturesCommand implements Runnable {
             case "wordpiece" -> "List.of(ModelTokenizerDescriptor.wordPiece(FAMILY_ID + \"-tokenizer\"))";
             case "custom" -> "List.of(new ModelTokenizerDescriptor("
                     + "FAMILY_ID + \"-tokenizer\", "
-                    + "tech.kayys.gollek.spi.model.ModelTokenizerKind.CUSTOM, "
+                    + "tech.kayys.alkhawarizm.spi.model.ModelTokenizerKind.CUSTOM, "
                     + "List.of(), "
                     + "Map.of()))";
             case "none" -> "List.of()";

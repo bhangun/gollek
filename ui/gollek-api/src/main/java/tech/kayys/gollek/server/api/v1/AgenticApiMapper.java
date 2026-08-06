@@ -1,6 +1,8 @@
 package tech.kayys.gollek.server.api.v1;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+
+import tech.kayys.gollek.error.ErrorCode;
+import tech.kayys.gollek.spi.exception.InferenceException;import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tech.kayys.gollek.spi.Message;
@@ -9,7 +11,7 @@ import tech.kayys.gollek.spi.embedding.EmbeddingResponse;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
-import tech.kayys.gollek.spi.model.ModelInfo;
+import tech.kayys.alkhawarizm.spi.model.ModelInfo;
 import tech.kayys.gollek.spi.tool.ToolCall;
 import tech.kayys.gollek.spi.tool.ToolDefinition;
 
@@ -729,7 +731,7 @@ final class AgenticApiMapper {
 
     private static List<String> embeddingInputs(JsonNode node) {
         if (node == null || node.isMissingNode() || node.isNull()) {
-            throw new IllegalArgumentException("input or inputs is required");
+            throw new InferenceException(ErrorCode.VALIDATION_INVALID_FORMAT, "input or inputs is required");
         }
         if (node.isArray()) {
             List<String> inputs = new ArrayList<>();
@@ -909,7 +911,7 @@ final class AgenticApiMapper {
     private static String requiredText(JsonNode node, String field) {
         String value = text(node, field, null);
         if (isBlank(value)) {
-            throw new IllegalArgumentException(field + " is required");
+            throw new InferenceException(ErrorCode.VALIDATION_INVALID_FORMAT, field + " is required");
         }
         return value;
     }

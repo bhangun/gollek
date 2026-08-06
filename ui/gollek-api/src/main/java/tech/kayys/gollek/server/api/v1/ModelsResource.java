@@ -16,7 +16,7 @@ import org.jboss.resteasy.reactive.RestSseElementType;
 
 import tech.kayys.gollek.server.SdkProvider;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.spi.model.ModelInfo;
+import tech.kayys.alkhawarizm.spi.model.ModelInfo;
 import tech.kayys.gollek.sdk.model.PullProgress;
 
 import java.util.List;

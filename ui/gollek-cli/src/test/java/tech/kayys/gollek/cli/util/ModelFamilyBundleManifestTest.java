@@ -1,14 +1,14 @@
 package tech.kayys.gollek.cli.util;
 
 import org.junit.jupiter.api.Test;
-import tech.kayys.gollek.spi.model.ModelFamilyContractValidator;
-import tech.kayys.gollek.spi.model.ModelFamilyContractViolation;
-import tech.kayys.gollek.spi.model.ModelFamilyCapability;
-import tech.kayys.gollek.spi.model.ModelFamilyDescriptor;
-import tech.kayys.gollek.spi.model.ModelFamilyPlugin;
-import tech.kayys.gollek.spi.model.ModelFamilyPluginRegistry;
-import tech.kayys.gollek.spi.model.ModelFamilyResolution;
-import tech.kayys.gollek.spi.model.ModelFamilyRuntimeCompatibility;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyContractValidator;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyContractViolation;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyCapability;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyDescriptor;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPluginRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyResolution;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyRuntimeCompatibility;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

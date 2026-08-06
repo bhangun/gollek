@@ -12,7 +12,7 @@ import org.mockito.Mockito;
 import jakarta.inject.Inject;
 import tech.kayys.gollek.cli.commands.ListCommand;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.spi.model.ModelInfo;
+import tech.kayys.alkhawarizm.spi.model.ModelInfo;
 import tech.kayys.gollek.spi.context.RequestContext;
 import tech.kayys.gollek.sdk.model.ModelListRequest;
 

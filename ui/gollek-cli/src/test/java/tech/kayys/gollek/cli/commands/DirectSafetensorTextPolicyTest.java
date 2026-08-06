@@ -13,8 +13,8 @@ import tech.kayys.gollek.safetensor.engine.route.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
-import tech.kayys.gollek.spi.model.ModelConfig;
-import tech.kayys.gollek.spi.model.ModelRuntimeTraits;
+import tech.kayys.alkhawarizm.spi.model.ModelConfig;
+import tech.kayys.alkhawarizm.spi.model.ModelRuntimeTraits;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -27,7 +27,7 @@ class DirectSafetensorTextPolicyTest {
     @Test
     void gemma4DefaultRepeatPenaltyFallsBackToNeutral() {
         DirectSafetensorRunProfile profile = profile("gemma4", ModelRuntimeTraits.builder()
-                .gemma4Text()
+                .nativeBf16Matvec()
                 .build());
 
         assertEquals(1.0f, DirectSafetensorTextPolicy.normalizeRepeatPenalty(profile, 1.1d));
@@ -60,7 +60,7 @@ class DirectSafetensorTextPolicyTest {
     @Test
     void unguardedGemma4TextProfileKeepsRawPrompt() {
         DirectSafetensorRunProfile profile = profile("gemma4_text", ModelRuntimeTraits.builder()
-                .gemma4Text()
+                .nativeBf16Matvec()
                 .build());
 
         String prompt = "where is jakarta";
@@ -81,7 +81,7 @@ class DirectSafetensorTextPolicyTest {
     @Test
     void gemma4ChannelMarkupIsSanitized() {
         DirectSafetensorRunProfile profile = profile("gemma4", ModelRuntimeTraits.builder()
-                .gemma4Text()
+                .nativeBf16Matvec()
                 .build());
         InferenceResponse response = InferenceResponse.builder()
                 .requestId("req-test")
@@ -108,7 +108,7 @@ class DirectSafetensorTextPolicyTest {
                 }
                 """, ModelConfig.class);
         return new DirectSafetensorRunProfile(config, "gemma4_unified", ModelRuntimeTraits.builder()
-                .gemma4Text()
+                .nativeBf16Matvec()
                 .build());
     }
 }

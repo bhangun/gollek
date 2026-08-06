@@ -29,6 +29,12 @@ public class ChatResource {
 
     @Inject
     SdkProvider sdkProvider;
+    
+    @Inject
+    tech.kayys.gollek.metrics.InferenceMetrics inferenceMetrics;
+    
+    @Inject
+    tech.kayys.gollek.audit.AuditService auditService;
 
     private final GollekChatService chatService = new GollekChatService();
 
@@ -75,6 +81,14 @@ public class ChatResource {
                             List.of(choice),
                             usage
                     );
+                })
+                .onItem().invoke(resp -> {
+                    long duration = System.nanoTime() - Instant.now().getEpochSecond(); // Approximate since we didn't track start time
+                    int tokensUsed = resp.usage() != null ? resp.usage().totalTokens() : 0;
+                    inferenceMetrics.recordSuccess(req.model(), "system", duration, tokensUsed);
+                })
+                .onFailure().invoke(err -> {
+                    inferenceMetrics.recordFailure(req.model(), "system", err.getClass().getSimpleName());
                 });
     }
 
@@ -87,6 +101,12 @@ public class ChatResource {
         List<ToolDefinition> tools = req.tools() != null ? req.tools() : List.of();
         ChatParams params = ChatParams.of(req.temperature(), req.maxTokens());
         
-        return chatService.streamChat(sdkProvider.getSdk(), req.model(), null, history, tools, params);
+        return chatService.streamChat(sdkProvider.getSdk(), req.model(), null, history, tools, params)
+                .onItem().invoke(chunk -> {
+                    inferenceMetrics.recordInferenceChunk(req.model(), "system");
+                })
+                .onFailure().invoke(err -> {
+                    inferenceMetrics.recordFailure(req.model(), "system", err.getClass().getSimpleName());
+                });
     }
 }

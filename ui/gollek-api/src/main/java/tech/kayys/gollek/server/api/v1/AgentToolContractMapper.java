@@ -1,6 +1,8 @@
 package tech.kayys.gollek.server.api.v1;
 
-import com.fasterxml.jackson.databind.JsonNode;
+
+import tech.kayys.gollek.error.ErrorCode;
+import tech.kayys.gollek.spi.exception.InferenceException;import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tech.kayys.gollek.spi.tool.ToolDefinition;
 
@@ -295,7 +297,7 @@ final class AgentToolContractMapper {
 
     private static JsonNode toolArray(JsonNode payload) {
         if (payload == null || payload.isMissingNode() || payload.isNull()) {
-            throw new IllegalArgumentException("tools array is required");
+            throw new InferenceException(ErrorCode.VALIDATION_INVALID_FORMAT, "tools array is required");
         }
         if (payload.isArray()) {
             return payload;
@@ -303,7 +305,7 @@ final class AgentToolContractMapper {
         if (payload.has("tools")) {
             return payload.path("tools");
         }
-        throw new IllegalArgumentException("tools array is required");
+        throw new InferenceException(ErrorCode.VALIDATION_INVALID_FORMAT, "tools array is required");
     }
 
     private static ToolDefinition.Type toolType(String raw) {
@@ -367,7 +369,7 @@ final class AgentToolContractMapper {
             List<String> errors) {
         void throwIfInvalid() {
             if (!errors.isEmpty()) {
-                throw new IllegalArgumentException(errors.get(0));
+                throw new InferenceException(ErrorCode.VALIDATION_INVALID_FORMAT, errors.get(0));
             }
         }
     }

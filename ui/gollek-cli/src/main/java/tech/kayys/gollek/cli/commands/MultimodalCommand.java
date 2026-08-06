@@ -8,9 +8,9 @@ import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.spi.model.MultimodalRequest;
-import tech.kayys.gollek.spi.model.MultimodalResponse;
-import tech.kayys.gollek.spi.model.MultimodalContent;
+import tech.kayys.alkhawarizm.spi.model.MultimodalRequest;
+import tech.kayys.alkhawarizm.spi.model.MultimodalResponse;
+import tech.kayys.alkhawarizm.spi.model.MultimodalContent;
 
 import java.io.IOException;
 import java.nio.file.Files;

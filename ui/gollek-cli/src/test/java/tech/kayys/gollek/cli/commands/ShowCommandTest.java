@@ -18,13 +18,13 @@ import jakarta.inject.Inject;
 import tech.kayys.gollek.cli.util.ModelFamilyResolutionReportContract;
 import tech.kayys.gollek.cli.util.ModelFamilyResolutionReportFields;
 import tech.kayys.gollek.sdk.core.GollekSdk;
-import tech.kayys.gollek.spi.model.ModelArchitecture;
-import tech.kayys.gollek.spi.model.ModelFamilyCapability;
-import tech.kayys.gollek.spi.model.ModelFamilyDescriptor;
-import tech.kayys.gollek.spi.model.ModelFamilyPlugin;
-import tech.kayys.gollek.spi.model.ModelFamilyPluginRegistry;
-import tech.kayys.gollek.spi.model.ModelInfo;
-import tech.kayys.gollek.spi.model.ModelTokenizerDescriptor;
+import tech.kayys.alkhawarizm.spi.model.ModelArchitecture;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyCapability;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyDescriptor;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPluginRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelInfo;
+import tech.kayys.alkhawarizm.spi.model.ModelTokenizerDescriptor;
 import tech.kayys.gollek.spi.context.RequestContext;
 
 import javax.tools.JavaCompiler;
@@ -498,7 +498,7 @@ public class ShowCommandTest {
         }
 
         Path serviceFile = classesDir.resolve(
-                "META-INF/services/tech.kayys.gollek.spi.model.ModelFamilyPlugin");
+                "META-INF/services/tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin");
         Files.createDirectories(serviceFile.getParent());
         Files.writeString(
                 serviceFile,
@@ -513,10 +513,10 @@ public class ShowCommandTest {
 
                 import java.util.List;
                 import java.util.Map;
-                import tech.kayys.gollek.spi.model.ModelFamilyCapability;
-                import tech.kayys.gollek.spi.model.ModelFamilyDescriptor;
-                import tech.kayys.gollek.spi.model.ModelFamilyPlugin;
-                import tech.kayys.gollek.spi.model.ModelTokenizerDescriptor;
+                import tech.kayys.alkhawarizm.spi.model.ModelFamilyCapability;
+                import tech.kayys.alkhawarizm.spi.model.ModelFamilyDescriptor;
+                import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
+                import tech.kayys.alkhawarizm.spi.model.ModelTokenizerDescriptor;
 
                 public final class ShowExternalModelFamilyPlugin implements ModelFamilyPlugin {
                     @Override

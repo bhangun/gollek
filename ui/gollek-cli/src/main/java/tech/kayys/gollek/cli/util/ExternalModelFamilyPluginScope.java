@@ -8,8 +8,8 @@ package tech.kayys.gollek.cli.util;
 import tech.kayys.gollek.sdk.route.*;
 import tech.kayys.gollek.safetensor.engine.route.*;
 
-import tech.kayys.gollek.spi.model.ModelFamilyPlugin;
-import tech.kayys.gollek.spi.model.ModelFamilyPluginRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPluginRegistry;
 
 import java.nio.file.Path;
 import java.util.ArrayList;

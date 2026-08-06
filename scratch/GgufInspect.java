@@ -1,5 +1,5 @@
-import tech.kayys.gollek.gguf.loader.GGUFLoader;
-import tech.kayys.gollek.gguf.loader.GGUFModel;
+import tech.kayys.alkhawarizm.gguf.loader.GGUFLoader;
+import tech.kayys.alkhawarizm.gguf.loader.GGUFModel;
 
 import java.nio.file.Path;
 import java.util.Arrays;

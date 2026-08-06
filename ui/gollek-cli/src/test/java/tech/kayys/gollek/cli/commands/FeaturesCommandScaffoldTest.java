@@ -56,7 +56,7 @@ class FeaturesCommandScaffoldTest {
         assertContains(javaFile, "\"tokenizer_metadata_status\", \"ready\"");
 
         Path serviceFile = root.resolve(
-                "lib/src/main/resources/META-INF/services/tech.kayys.gollek.spi.model.ModelFamilyPlugin");
+                "lib/src/main/resources/META-INF/services/tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin");
         assertEquals(
                 "tech.kayys.gollek.extensions.modelacme.AcmeModelFamily",
                 Files.readString(serviceFile).trim());
@@ -1027,7 +1027,7 @@ class FeaturesCommandScaffoldTest {
         }
 
         Path serviceFile = classesDir.resolve(
-                "META-INF/services/tech.kayys.gollek.spi.model.ModelFamilyPlugin");
+                "META-INF/services/tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin");
         Files.createDirectories(serviceFile.getParent());
         Files.writeString(
                 serviceFile,
@@ -1069,10 +1069,10 @@ class FeaturesCommandScaffoldTest {
 
                 import java.util.List;
                 import java.util.Map;
-                import tech.kayys.gollek.spi.model.ModelFamilyCapability;
-                import tech.kayys.gollek.spi.model.ModelFamilyDescriptor;
-                import tech.kayys.gollek.spi.model.ModelFamilyPlugin;
-                import tech.kayys.gollek.spi.model.ModelTokenizerDescriptor;
+                import tech.kayys.alkhawarizm.spi.model.ModelFamilyCapability;
+                import tech.kayys.alkhawarizm.spi.model.ModelFamilyDescriptor;
+                import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
+                import tech.kayys.alkhawarizm.spi.model.ModelTokenizerDescriptor;
 
                 public final class InspectModelFamilyPlugin implements ModelFamilyPlugin {
                     @Override

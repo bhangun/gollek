@@ -11,9 +11,9 @@ import tech.kayys.gollek.safetensor.engine.route.*;
 import tech.kayys.gollek.cli.util.ModelFamilyRuntimeCompatibilityReportFields.Compatibility;
 import tech.kayys.gollek.cli.util.ModelFamilyRuntimeCompatibilityReportFields.DirectSafetensorCompatibility;
 import tech.kayys.gollek.cli.util.ModelFamilyRuntimeCompatibilityReportFields.Summary;
-import tech.kayys.gollek.spi.model.ModelFamilyPluginRegistry;
-import tech.kayys.gollek.spi.model.ModelFamilyRuntimeCompatibility;
-import tech.kayys.gollek.spi.model.ModelFamilyRuntimeCompatibilitySummary;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPluginRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyRuntimeCompatibility;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyRuntimeCompatibilitySummary;
 
 import java.util.LinkedHashMap;
 import java.util.List;

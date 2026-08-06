@@ -1,6 +1,6 @@
-import tech.kayys.gollek.gguf.loader.GGUFLoader;
-import tech.kayys.gollek.gguf.loader.GGUFModel;
-import tech.kayys.gollek.gguf.tokenizer.GGUFTokenizer;
+import tech.kayys.alkhawarizm.gguf.loader.GGUFLoader;
+import tech.kayys.alkhawarizm.gguf.loader.GGUFModel;
+import tech.kayys.alkhawarizm.gguf.tokenizer.GGUFTokenizer;
 import tech.kayys.gollek.tokenizer.spi.DecodeOptions;
 import tech.kayys.gollek.tokenizer.spi.EncodeOptions;
 

@@ -5,20 +5,10 @@
   
   [![Java 22](https://img.shields.io/badge/Java-22-blue.svg)](https://jdk.java.net/22/)
   [![Gradle](https://img.shields.io/badge/Gradle-Build-brightgreen.svg)](https://gradle.org/)
-  [![License: MIT](https://img.shields.io/badge/License-APACHE-yellow.svg)](https://opensource.org/licenses/MIT)
-</div>
-
-This repository hosts the Wayang platform and its core sub-systems. Wayang is designed to be a high-performance orchestration and inference platform for AI agents and workflows.
-
-## Architecture & Sub-Systems
-
-
-  [![Java 22](https://img.shields.io/badge/Java-22-blue.svg)](https://jdk.java.net/22/)
-  [![Gradle](https://img.shields.io/badge/Gradle-Build-brightgreen.svg)](https://gradle.org/)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
-This repository hosts the Wayang platform and its core sub-systems. Wayang is designed to be a high-performance orchestration and inference platform for AI agents and workflows.
+This repository hosts the Gollek platform. Gollek is designed to be a high-performance inference engine for AI models, acting as the foundation for the larger Wayang ecosystem.
 
 ## Installation
 
@@ -56,13 +46,13 @@ This will download the model (if not already cached) and execute the inference u
 
 ## Architecture & Sub-Systems
 
-The core logic is divided into distinct "Families", located in the `` directory:
+The core logic revolves around the **Gollek Inference Engine**, which is supported by ecosystem projects that have now graduated into their own standalone repositories:
 
-- **Alkhawarizm** (`alkhawarizm`): The core tensor and compute engine. It provides high-performance backends for Safetensor operations, including CPU, CUDA, Metal (Apple Silicon), and HAT. It features optimized GPU kernels such as vectorized `float4` operations for maximum throughput.
-- **Gollek** (`gollek`): The high-performance inference engine. Supports execution of large language models via various runners, including `llama.cpp` for GGUF models. It is designed to safely handle multi-modal inference, large context windows, and advanced generation parameters.
-- **Tafkir** (`tafkir`): The orchestration and reasoning backend, routing operations to inference engines.
-- **Gamelan** (`gamelan`): The workflow engine for designing and executing multi-agent AI workflows and RAG pipelines.
-- **Wayang Core** (`wayang`): The foundational shared models, clients, and services that tie the sub-systems together.
+- **Gollek** (This Repository): The high-performance inference engine. Supports execution of large language models via various runners, including `llama.cpp` for GGUF models. It is designed to safely handle multi-modal inference, large context windows, and advanced generation parameters.
+- **Alkhawarizm** (Standalone Project): The core tensor and compute engine. It provides high-performance backends for Safetensor operations, including CPU, CUDA, Metal (Apple Silicon), and HAT. 
+- **Tafkir** (Standalone Project): The orchestration, reasoning, and training backend, routing operations to inference engines.
+- **Gamelan** (Standalone Project): The workflow engine for designing and executing multi-agent AI workflows and RAG pipelines.
+- **Wayang Core**: The foundational shared models, clients, and services that tie the sub-systems together.
 
 
 
@@ -85,44 +75,6 @@ The core logic is divided into distinct "Families", located in the `` directory:
 
 - Core API contracts are defined within the respective `spi` and `core` packages of each family.
 - Explore the sub-directories for specific READMEs and module-level JavaDocs.
-
-
-## Architecture
-
-### Multimodal Pipeline
-
-```mermaid
-graph TD
-    A["InferenceEngine"] --> B["InferenceProviderRegistry"]
-    B --> C["InferenceProvider (Cloud)"]
-    B --> D["InferenceProvider (Local)"]
-    
-    F["InferenceRequest"] --> A
-    F --> G["Message[]"]
-    G --> H["ContentPart[]"]
-    H --> H1["Text"]
-    H --> H2["Image/Audio/Video/File"]
-    
-    A --> I["InferenceResponse"]
-    I --> J["ContentPart[]"]
-    I --> K["ToolCall[]"]
-```
-
-### Batching & Disaggregation Scheduler
-
-```mermaid
-graph TD
-    R1["Request A (1600 tokens)"] --> S["BatchScheduler"]
-    R2["Request B (32 tokens)"] --> S
-    R3["Request C (1024 tokens)"] --> S
-
-    S -- "Stage: PREFILL (Compute-Bound)" --> B1["BatchRequest (A, C)"]
-    S -- "Stage: COMBINED (Fast Path)" --> B2["BatchRequest (B)"]
-
-    B1 --> E["InferenceEngine.InferBatch()"]
-    B2 --> E
-```
-
 
 
 ## Architecture

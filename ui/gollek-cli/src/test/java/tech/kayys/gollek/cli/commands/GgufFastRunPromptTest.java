@@ -7,8 +7,8 @@ import tech.kayys.gollek.safetensor.engine.route.*;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import tech.kayys.gollek.gguf.runtime.GgufRuntimeProfile;
-import tech.kayys.gollek.spi.model.ModelConfig;
+import tech.kayys.alkhawarizm.gguf.runtime.GgufRuntimeProfile;
+import tech.kayys.alkhawarizm.spi.model.ModelConfig;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;

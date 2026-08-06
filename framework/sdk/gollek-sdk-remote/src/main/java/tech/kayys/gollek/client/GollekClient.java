@@ -1,0 +1,729 @@
+package tech.kayys.gollek.client;
+
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.smallrye.mutiny.Multi;
+import tech.kayys.gollek.client.agent.AgentIntegrationClient;
+import tech.kayys.gollek.client.agent.AgentRequestOptions;
+import tech.kayys.gollek.client.agent.AgentStreamEvent;
+import tech.kayys.gollek.spi.inference.AsyncJobStatus;
+import tech.kayys.gollek.spi.inference.InferenceRequest;
+import tech.kayys.gollek.spi.inference.InferenceResponse;
+import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
+import tech.kayys.gollek.client.exception.*;
+import tech.kayys.gollek.sdk.core.GollekSdk;
+import tech.kayys.gollek.sdk.exception.SdkException;
+import tech.kayys.alkhawarizm.spi.model.ModelInfo;
+import tech.kayys.gollek.sdk.model.PullProgress;
+import tech.kayys.gollek.spi.auth.ApiKeyConstants;
+import tech.kayys.gollek.spi.batch.BatchInferenceRequest;
+
+import javax.net.ssl.SSLContext;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * HTTP-based remote client for the Gollek inference engine.
+ *
+ * <p>Implements {@link GollekSdk} by translating every SDK call into a REST
+ * request against the Gollek server API. Use {@link #builder()} to configure
+ * and create instances:
+ *
+ * <pre>{@code
+ * GollekClient client = GollekClient.builder()
+ *     .baseUrl("https://gollek.example.com")
+ *     .apiKey("my-api-key")
+ *     .connectTimeout(Duration.ofSeconds(10))
+ *     .build();
+ *
+ * InferenceResponse resp = client.createCompletion(
+ *     InferenceRequest.builder().model("llama3").prompt("Hello").build());
+ * }</pre>
+ *
+ * <p>HTTP error codes are mapped to typed exceptions:
+ * <ul>
+ *   <li>401/403 → {@link AuthenticationException}</li>
+ *   <li>429 → {@link RateLimitException} (with {@code Retry-After} seconds)</li>
+ *   <li>422 → {@link ModelException}</li>
+ *   <li>other 4xx/5xx → {@link GollekClientException}</li>
+ * </ul>
+ *
+ * @see RemoteGollekSdkProvider
+ */
+public class GollekClient implements GollekSdk {
+
+    private final HttpClient httpClient;
+    private final ObjectMapper objectMapper;
+    private final String baseUrl;
+    private final String apiKey;
+    private String preferredProvider;
+
+    private GollekClient(Builder builder) {
+        this.baseUrl = builder.baseUrl;
+        this.apiKey = normalizeApiKey(builder.apiKey);
+        this.preferredProvider = builder.preferredProvider;
+
+        HttpClient.Builder clientBuilder = HttpClient.newBuilder()
+                .connectTimeout(builder.connectTimeout)
+                .followRedirects(HttpClient.Redirect.NORMAL);
+
+        if (builder.sslContext != null) {
+            clientBuilder.sslContext(builder.sslContext);
+        }
+
+        this.httpClient = clientBuilder.build();
+        this.objectMapper = new ObjectMapper();
+    }
+
+    /**
+     * Creates a new inference request synchronously.
+     *
+     * @param request The inference request
+     * @return The inference response
+     * @throws SdkException if the request fails
+     */
+    @Override
+    public InferenceResponse createCompletion(InferenceRequest request) throws SdkException {
+        try {
+            String requestBody = objectMapper.writeValueAsString(request);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/inference/completions"))
+                    .header("Content-Type", "application/json")
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .timeout(Duration.ofSeconds(60)) // Add timeout for sync requests
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            return handleResponse(response, InferenceResponse.class);
+        } catch (GollekClientException e) {
+            // Convert GollekClientException to SdkException
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("Failed to create completion", e);
+        }
+    }
+
+    /**
+     * Creates a new inference request asynchronously.
+     *
+     * @param request The inference request
+     * @return A CompletableFuture that will complete with the inference response
+     */
+    @Override
+    public CompletableFuture<InferenceResponse> createCompletionAsync(InferenceRequest request) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return createCompletion(request);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    /**
+     * Submits an async inference job.
+     *
+     * @param request The inference request
+     * @return The job ID
+     * @throws SdkException if the request fails
+     */
+    @Override
+    public String submitAsyncJob(InferenceRequest request) throws SdkException {
+        try {
+            String requestBody = objectMapper.writeValueAsString(request);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/inference/jobs"))
+                    .header("Content-Type", "application/json")
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .timeout(Duration.ofSeconds(10)) // Short timeout for job submission
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            // For job submission, we expect a response with the job ID
+            java.util.Map<String, Object> jsonResponse = handleResponse(response, java.util.Map.class);
+
+            return (String) jsonResponse.get("jobId");
+        } catch (GollekClientException e) {
+            // Convert GollekClientException to SdkException
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("Failed to submit async job", e);
+        }
+    }
+
+    /**
+     * Gets the status of an async inference job.
+     *
+     * @param jobId The job ID
+     * @return The job status
+     * @throws SdkException if the request fails
+     */
+    @Override
+    public AsyncJobStatus getJobStatus(String jobId) throws SdkException {
+        try {
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/inference/jobs/" + URLEncoder.encode(jobId, StandardCharsets.UTF_8)))
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
+                    .timeout(Duration.ofSeconds(10)) // Short timeout for status check
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            return handleResponse(response, AsyncJobStatus.class);
+        } catch (GollekClientException e) {
+            // Convert GollekClientException to SdkException
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("Failed to get job status", e);
+        }
+    }
+
+    /**
+     * Waits for an async job to complete.
+     *
+     * @param jobId        The job ID
+     * @param maxWaitTime  Maximum time to wait
+     * @param pollInterval Interval between status checks
+     * @return The final job status
+     * @throws SdkException if the request fails or times out
+     */
+    @Override
+    public AsyncJobStatus waitForJob(String jobId, Duration maxWaitTime, Duration pollInterval) throws SdkException {
+        long startTime = System.currentTimeMillis();
+        long maxWaitMillis = maxWaitTime.toMillis();
+
+        while (System.currentTimeMillis() - startTime < maxWaitMillis) {
+            AsyncJobStatus status = getJobStatus(jobId);
+
+            if (status.isComplete()) {
+                return status;
+            }
+
+            try {
+                Thread.sleep(pollInterval.toMillis());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new SdkException("Job polling interrupted", e);
+            }
+        }
+
+        throw new SdkException("Job " + jobId + " did not complete within the specified time");
+    }
+
+    /**
+     * Performs batch inference.
+     *
+     * @param batchRequest The batch inference request
+     * @return List of inference responses
+     * @throws SdkException if the request fails
+     */
+    @Override
+    public List<InferenceResponse> batchInference(BatchInferenceRequest batchRequest) throws SdkException {
+        try {
+            String requestBody = objectMapper.writeValueAsString(batchRequest);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/inference/batch"))
+                    .header("Content-Type", "application/json")
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .timeout(Duration.ofMinutes(5)) // Longer timeout for batch processing
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            return handleResponse(response,
+                    objectMapper.getTypeFactory().constructCollectionType(java.util.List.class,
+                            InferenceResponse.class));
+        } catch (GollekClientException e) {
+            // Convert GollekClientException to SdkException
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("Failed to perform batch inference", e);
+        }
+    }
+
+    /**
+     * Creates a streaming inference request.
+     *
+     * @param request The inference request
+     * @return A Multi that emits StreamingInferenceChunk objects
+     */
+    @Override
+    public tech.kayys.gollek.spi.embedding.EmbeddingResponse createEmbedding(
+            tech.kayys.gollek.spi.embedding.EmbeddingRequest request) throws SdkException {
+        try {
+            String requestBody = objectMapper.writeValueAsString(request);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/inference/embeddings"))
+                    .header("Content-Type", "application/json")
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .timeout(Duration.ofSeconds(60))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            return handleResponse(response, tech.kayys.gollek.spi.embedding.EmbeddingResponse.class);
+        } catch (Exception e) {
+            throw new SdkException("Failed to create embedding", e);
+        }
+    }
+
+    /**
+     * Creates a streaming inference request.
+     *
+     * @param request The inference request
+     * @return A Multi that emits StreamingInferenceChunk objects
+     */
+    @Override
+    public Multi<StreamingInferenceChunk> streamCompletion(InferenceRequest request) {
+        try {
+            String requestBody = objectMapper.writeValueAsString(request);
+
+            StreamingHelper helper = new StreamingHelper(httpClient, objectMapper, baseUrl, apiKey);
+
+            // Return the Multi directly from helper
+            return helper.createStreamPublisher(requestBody);
+        } catch (Exception e) {
+            return Multi.createFrom().failure(new SdkException("Failed to initiate streaming completion", e));
+        }
+    }
+
+    /**
+     * Streams OpenAI-compatible chat completion events from {@code /v1/chat/completions}.
+     *
+     * <p>The request map is copied and {@code stream=true} is applied automatically.
+     * Add {@code stream_options.include_usage=true} when the caller needs final
+     * token usage.
+     */
+    public Multi<AgentStreamEvent> streamOpenAiChat(Map<String, Object> request) {
+        return streamOpenAiChat(request, AgentRequestOptions.empty());
+    }
+
+    /**
+     * Streams OpenAI-compatible chat completion events from {@code /v1/chat/completions}.
+     *
+     * <p>The request map is copied and {@code stream=true} is applied automatically.
+     * Trace/session headers from {@code options} are propagated to the server.
+     */
+    public Multi<AgentStreamEvent> streamOpenAiChat(Map<String, Object> request, AgentRequestOptions options) {
+        try {
+            String requestBody = objectMapper.writeValueAsString(streamingRequest(request));
+            StreamingHelper helper = new StreamingHelper(httpClient, objectMapper, baseUrl, apiKey);
+            return helper.createOpenAiChatStreamPublisher(requestBody, options);
+        } catch (Exception e) {
+            return Multi.createFrom().failure(new SdkException("Failed to initiate OpenAI chat stream", e));
+        }
+    }
+
+    /**
+     * Streams OpenAI-compatible Responses events from {@code /v1/responses}.
+     *
+     * <p>The request map is copied and {@code stream=true} is applied automatically.
+     * Gollek remains the serving boundary; agent planning and tool execution stay
+     * with the caller.
+     */
+    public Multi<AgentStreamEvent> streamOpenAiResponses(Map<String, Object> request) {
+        return streamOpenAiResponses(request, AgentRequestOptions.empty());
+    }
+
+    /**
+     * Streams OpenAI-compatible Responses events from {@code /v1/responses}.
+     *
+     * <p>The request map is copied and {@code stream=true} is applied automatically.
+     * Gollek remains the serving boundary; agent planning and tool execution stay
+     * with the caller.
+     */
+    public Multi<AgentStreamEvent> streamOpenAiResponses(Map<String, Object> request, AgentRequestOptions options) {
+        try {
+            String requestBody = objectMapper.writeValueAsString(streamingRequest(request));
+            StreamingHelper helper = new StreamingHelper(httpClient, objectMapper, baseUrl, apiKey);
+            return helper.createOpenAiResponsesStreamPublisher(requestBody, options);
+        } catch (Exception e) {
+            return Multi.createFrom().failure(new SdkException("Failed to initiate OpenAI Responses stream", e));
+        }
+    }
+
+    /**
+     * Returns agent-facing discovery and validation operations for this server.
+     *
+     * <p>The returned client exposes contracts, MCP tool schemas, and validation
+     * endpoints only. Agent planning and tool execution remain caller-owned.
+     */
+    public AgentIntegrationClient agent() {
+        return new AgentIntegrationClient(httpClient, objectMapper, baseUrl, apiKey);
+    }
+
+    private <T> T handleResponse(HttpResponse<String> response, Class<T> responseType) throws GollekClientException {
+        return handleResponseUsingJavaType(response, objectMapper.getTypeFactory().constructType(responseType));
+    }
+
+    private <T> T handleResponse(HttpResponse<String> response, JavaType responseType) throws GollekClientException {
+        return handleResponseUsingJavaType(response, responseType);
+    }
+
+    private <T> T handleResponseUsingJavaType(HttpResponse<String> response, JavaType responseType)
+            throws GollekClientException {
+        int statusCode = response.statusCode();
+        String responseBody = response.body();
+
+        if (statusCode >= 200 && statusCode < 300) {
+            try {
+                return objectMapper.readValue(responseBody, responseType);
+            } catch (Exception e) {
+                throw new GollekClientException("Failed to parse response: " + e.getMessage(), e);
+            }
+        }
+
+        // Handle specific error codes
+        switch (statusCode) {
+            case 400:
+                throw new GollekClientException("Bad request: " + responseBody);
+            case 401:
+            case 403:
+                throw new AuthenticationException("Authentication failed: " + responseBody);
+            case 429:
+                // Extract retry-after header if present
+                int retryAfter = response.headers().firstValue("Retry-After")
+                        .map(Integer::parseInt)
+                        .orElse(60);
+                throw new RateLimitException("Rate limit exceeded: " + responseBody, retryAfter);
+            case 404:
+                throw new GollekClientException("Resource not found: " + responseBody);
+            case 422:
+                throw new ModelException(null, "Unprocessable entity: " + responseBody);
+            case 500:
+                throw new GollekClientException("Internal server error: " + responseBody);
+            case 503:
+                throw new GollekClientException("Service unavailable: " + responseBody);
+            default:
+                throw new GollekClientException(
+                        "Request failed with status: " + statusCode + ", body: " + responseBody);
+        }
+    }
+
+    private Map<String, Object> streamingRequest(Map<String, Object> request) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (request != null) {
+            out.putAll(request);
+        }
+        out.put("stream", true);
+        return out;
+    }
+
+    /**
+    /**
+     * Creates a new builder for {@link GollekClient}.
+     *
+     * @return a new {@link Builder}
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Builder for creating {@link GollekClient} instances.
+     */
+    public static class Builder {
+        private String baseUrl = "http://localhost:8080";
+        private String apiKey;
+        private String preferredProvider;
+        private Duration connectTimeout = Duration.ofSeconds(30);
+        private SSLContext sslContext;
+
+        /**
+         * Sets the base URL of the Gollek server.
+         *
+         * @param baseUrl server base URL (default: {@code "http://localhost:8080"})
+         * @return {@code this} for chaining
+         */
+        public Builder baseUrl(String baseUrl) { this.baseUrl = baseUrl; return this; }
+
+        /**
+         * Sets the API key used for bearer-token authentication.
+         *
+         * @param apiKey API key; {@code null} or blank uses the community key
+         * @return {@code this} for chaining
+         */
+        public Builder apiKey(String apiKey) { this.apiKey = apiKey; return this; }
+
+        /**
+         * Sets the preferred inference provider for all requests.
+         *
+         * @param preferredProvider provider identifier (e.g. {@code "gguf"}, {@code "openai"})
+         * @return {@code this} for chaining
+         */
+        public Builder preferredProvider(String preferredProvider) { this.preferredProvider = preferredProvider; return this; }
+
+        /**
+         * Sets the TCP connection timeout.
+         *
+         * @param timeout connection timeout (default: 30 seconds)
+         * @return {@code this} for chaining
+         */
+        public Builder connectTimeout(Duration timeout) { this.connectTimeout = timeout; return this; }
+
+        /**
+         * Sets a custom {@link SSLContext} for TLS configuration.
+         *
+         * @param sslContext custom SSL context; {@code null} uses the JVM default
+         * @return {@code this} for chaining
+         */
+        public Builder sslContext(SSLContext sslContext) { this.sslContext = sslContext; return this; }
+
+        /**
+         * Builds the {@link GollekClient}.
+         *
+         * @return a configured {@link GollekClient}
+         */
+        public GollekClient build() { return new GollekClient(this); }
+    }
+
+    // ==================== Model Operations ====================
+
+    @Override
+    public List<ModelInfo> listModels() throws SdkException {
+        try {
+            String url = String.format("%s/v1/models", baseUrl);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
+                    .header("Content-Type", "application/json")
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            return handleResponse(response,
+                    objectMapper.getTypeFactory().constructCollectionType(java.util.List.class,
+                            ModelInfo.class));
+        } catch (GollekClientException e) {
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_MODEL_LIST", "Failed to list models", e);
+        }
+    }
+
+    @Override
+    public List<ModelInfo> listModels(int offset, int limit) throws SdkException {
+        try {
+            String url = String.format("%s/v1/models?offset=%d&limit=%d", baseUrl, offset, limit);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
+                    .header("Content-Type", "application/json")
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            return handleResponse(response,
+                    objectMapper.getTypeFactory().constructCollectionType(java.util.List.class,
+                            ModelInfo.class));
+        } catch (GollekClientException e) {
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_MODEL_LIST", "Failed to list models", e);
+        }
+    }
+
+    @Override
+    public java.util.Optional<ModelInfo> getModelInfo(String modelId)
+            throws SdkException {
+        try {
+            String encodedModelId = URLEncoder.encode(modelId, StandardCharsets.UTF_8);
+            String url = String.format("%s/v1/models/%s", baseUrl, encodedModelId);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
+                    .header("Content-Type", "application/json")
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 404) {
+                return java.util.Optional.empty(); // Model not found
+            }
+
+            ModelInfo modelInfo = handleResponse(response,
+                    ModelInfo.class);
+            return java.util.Optional.of(modelInfo);
+        } catch (GollekClientException e) {
+            if (e.getErrorCode().equals("CLIENT_ERROR") && e.getMessage().contains("404")) {
+                return java.util.Optional.empty(); // Model not found
+            }
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_MODEL_INFO", "Failed to get model info", e);
+        }
+    }
+
+    @Override
+    public void pullModel(String modelSpec,
+            java.util.function.Consumer<PullProgress> progressCallback)
+            throws SdkException {
+        pullModel(modelSpec, null, false, progressCallback);
+    }
+
+    @Override
+    public void pullModel(String modelSpec, String revision, boolean force,
+            java.util.function.Consumer<PullProgress> progressCallback)
+            throws SdkException {
+        try {
+            // First, try to initiate the model pull
+            java.util.Map<String, Object> requestBodyMap = new java.util.HashMap<>();
+            requestBodyMap.put("model", modelSpec);
+            if (revision != null) {
+                requestBodyMap.put("revision", revision);
+            }
+            if (force) {
+                requestBodyMap.put("force", true);
+            }
+
+            String requestBody = objectMapper.writeValueAsString(requestBodyMap);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/models/pull"))
+                    .header("Content-Type", "application/json")
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .timeout(Duration.ofMinutes(5)) // Shorter timeout for initial request
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            // If the server immediately returns success, call the callback
+            if (response.statusCode() == 200) {
+                if (progressCallback != null) {
+                    PullProgress progress = new PullProgress(
+                            "Model pulled successfully", null, 100L, 100L);
+                    progressCallback.accept(progress);
+                }
+                return;
+            } else if (response.statusCode() == 202) {
+                // Server accepted the request, now we need to stream progress updates
+                StreamingHelper helper = new StreamingHelper(httpClient, objectMapper, baseUrl, apiKey);
+
+                // Create a Multi for the streaming progress
+                Multi<PullProgress> progressMulti = helper
+                        .createModelPullStreamPublisher(modelSpec, revision, force, progressCallback);
+
+                // Use blocking subscribe for model pull
+                try {
+                    progressMulti.subscribe().asStream().forEach(p -> {
+                    });
+                } catch (Exception e) {
+                    throw new SdkException("SDK_ERR_MODEL_PULL", "Error during model pull streaming: " + e.getMessage(),
+                            e);
+                }
+            } else {
+                // Parse error response
+                java.util.Map<String, Object> errorResponse = handleResponse(response, java.util.Map.class);
+                String errorMessage = (String) errorResponse.getOrDefault("error", "Unknown error during model pull");
+                throw new SdkException("SDK_ERR_MODEL_PULL", "Failed to pull model: " + errorMessage);
+            }
+        } catch (GollekClientException e) {
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_MODEL_PULL", "Failed to pull model", e);
+        }
+    }
+
+    @Override
+    public void deleteModel(String modelId) throws SdkException {
+        try {
+            String encodedModelId = URLEncoder.encode(modelId, StandardCharsets.UTF_8);
+            String url = String.format("%s/v1/models/%s", baseUrl, encodedModelId);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
+                    .header("Content-Type", "application/json")
+                    .timeout(Duration.ofSeconds(30))
+                    .DELETE()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200 || response.statusCode() == 204) {
+                // Success - model deleted
+                return;
+            } else {
+                // Parse error response
+                java.util.Map<String, Object> errorResponse = handleResponse(response, java.util.Map.class);
+                String errorMessage = (String) errorResponse.getOrDefault("error",
+                        "Unknown error during model deletion");
+                throw new SdkException("SDK_ERR_MODEL_DELETE", "Failed to delete model: " + errorMessage);
+            }
+        } catch (GollekClientException e) {
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_MODEL_DELETE", "Failed to delete model", e);
+        }
+    }
+
+    // ==================== System Operations ====================
+
+    @Override
+    public tech.kayys.gollek.sdk.model.SystemInfo getSystemInfo() throws SdkException {
+        try {
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/system/info"))
+                    .header(ApiKeyConstants.HEADER_API_KEY, apiKey)
+                    .header(ApiKeyConstants.HEADER_AUTHORIZATION, ApiKeyConstants.authorizationValue(apiKey))
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            return handleResponse(response, tech.kayys.gollek.sdk.model.SystemInfo.class);
+        } catch (GollekClientException e) {
+            throw new SdkException(e.getErrorCode(), e.getMessage(), e);
+        } catch (Exception e) {
+            throw new SdkException("SDK_ERR_SYSTEM_INFO", "Failed to get system info", e);
+        }
+    }
+
+    private static String normalizeApiKey(String apiKey) {
+        if (apiKey == null || apiKey.isBlank()) {
+            return ApiKeyConstants.COMMUNITY_API_KEY;
+        }
+        return apiKey;
+    }
+}

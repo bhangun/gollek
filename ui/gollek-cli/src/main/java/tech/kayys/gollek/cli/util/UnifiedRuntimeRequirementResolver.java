@@ -8,9 +8,9 @@ package tech.kayys.gollek.cli.util;
 import tech.kayys.gollek.sdk.route.*;
 import tech.kayys.gollek.safetensor.engine.route.*;
 
-import tech.kayys.gollek.spi.model.ModelFamilyPluginRegistry;
-import tech.kayys.gollek.spi.model.ModelFamilyRuntimeManifest;
-import tech.kayys.gollek.spi.model.ModelFamilyUnifiedRuntimeRequirement;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPluginRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyRuntimeManifest;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyUnifiedRuntimeRequirement;
 import tech.kayys.gollek.spi.multimodal.UnifiedRuntimeManifest;
 import tech.kayys.gollek.spi.multimodal.UnifiedRuntimeRegistry;
 

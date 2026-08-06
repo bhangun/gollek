@@ -373,7 +373,7 @@ gollek chat --model <tool-model> --session
 
 ## Technical Details
 
-The CLI leverages a centralized `tech.kayys.gollek.spi.model.LocalModelRegistry` to scan and index models across multiple root directories:
+The CLI leverages a centralized `tech.kayys.alkhawarizm.spi.model.LocalModelRegistry` to scan and index models across multiple root directories:
 - `~/.gollek/models/gguf`
 - `~/.gollek/models/safetensors`
 - `~/.gollek/models/libtorchscript`

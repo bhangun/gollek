@@ -1,6 +1,6 @@
-import tech.kayys.gollek.gguf.loader.GGUFModel;
-import tech.kayys.gollek.gguf.loader.GGUFLoader;
-import tech.kayys.gollek.gguf.loader.GGUFTensorInfo;
+import tech.kayys.alkhawarizm.gguf.loader.GGUFModel;
+import tech.kayys.alkhawarizm.gguf.loader.GGUFLoader;
+import tech.kayys.alkhawarizm.gguf.loader.GGUFTensorInfo;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;

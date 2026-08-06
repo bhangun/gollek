@@ -11,9 +11,9 @@ import tech.kayys.gollek.safetensor.engine.route.*;
 import tech.kayys.gollek.cli.util.ModelFamilyBundleInventoryReportFields.Family;
 import tech.kayys.gollek.cli.util.ModelFamilyBundleInventoryReportFields.RuntimeManifest;
 import tech.kayys.gollek.cli.util.ModelFamilyBundleInventoryReportFields.RuntimeRequirement;
-import tech.kayys.gollek.spi.model.ModelFamilyRuntimeManifest;
-import tech.kayys.gollek.spi.model.ModelFamilySupportReport;
-import tech.kayys.gollek.spi.model.ModelFamilyUnifiedRuntimeRequirement;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyRuntimeManifest;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilySupportReport;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyUnifiedRuntimeRequirement;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

@@ -54,29 +54,7 @@ else
     echo "✓ Gollek CLI is already available: $(gollek --version 2>/dev/null || echo 'installed')"
 fi
 
-# 3. JBang Installation
-echo ""
-echo "📦 Checking jbang..."
-if ! command -v jbang &> /dev/null; then
-    if prompt_install "jbang not found. Install it now?"; then
-        curl -sSL https://sh.jbang.dev | bash -s - app setup
-        export PATH="$PATH:$HOME/.jbang/bin"
-    else
-        echo "⏭️ Skipping jbang installation."
-    fi
-else
-    echo "✓ jbang $(jbang --version 2>/dev/null | head -n 1) is already available."
-fi
 
-# 4. Jupyter Notebook Support
-echo ""
-echo "📓 Checking Jupyter kernel integration..."
-if prompt_install "Do you want to setup Jupyter integration for Gollek?"; then
-    echo "Setting up Jupyter integration..."
-    curl -sSL https://raw.githubusercontent.com/bhangun/gollek/main/sdk/integration/install-jupyter-jbang.sh | bash
-else
-    echo "⏭️ Skipping Jupyter integration."
-fi
 
 # 5. Summary & Usage
 echo ""
@@ -84,13 +62,10 @@ echo "✅ Gollek environment setup complete!"
 echo ""
 echo "🚀 Next Steps (Run any of these to start):"
 echo ""
-echo "1. Run the Hello Gollek example via jbang:"
-echo "   jbang https://raw.githubusercontent.com/bhangun/gollek/main/sdk/integration/jbang-templates/examples/hello_gollek.java"
+echo "1. Start the Gollek API Server:"
+echo "   gollek start"
 echo ""
-echo "2. Run the Batch Processing example:"
-echo "   jbang https://raw.githubusercontent.com/bhangun/gollek/main/sdk/integration/jbang-templates/examples/batch_process.java"
-echo ""
-echo "3. Use the newly installed Gollek CLI:"
+echo "2. Use the newly installed Gollek CLI:"
 echo "   gollek chat"
 echo ""
 echo "📖 View full documentation at: https://github.com/bhangun/gollek/tree/main/website/gollek-ai.github.io/docs"
