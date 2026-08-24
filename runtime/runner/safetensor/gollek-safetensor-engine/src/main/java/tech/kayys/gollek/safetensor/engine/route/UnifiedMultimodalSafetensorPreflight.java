@@ -167,10 +167,10 @@ final class Gemma4UnifiedSafetensorPreflight {
             ModelConfig config,
             Map<String, TensorMeta> tensors,
             List<String> problems) {
-        int hiddenSize = config.getHiddenSize();
-        int intermediateSize = config.getIntermediateSize();
-        int vocabSize = config.getVocabSize();
-        int layers = config.getNumHiddenLayers();
+        int hiddenSize = config.hiddenSize();
+        int intermediateSize = config.intermediateSize();
+        int vocabSize = config.vocabSize();
+        int layers = config.numHiddenLayers();
         if (hiddenSize <= 0 || intermediateSize <= 0 || vocabSize <= 0 || layers <= 0) {
             addProblem(problems, "invalid Gemma 4 text config dimensions: hidden=%d, intermediate=%d, vocab=%d, layers=%d"
                     .formatted(hiddenSize, intermediateSize, vocabSize, layers));
@@ -196,7 +196,7 @@ final class Gemma4UnifiedSafetensorPreflight {
         TensorMeta lmHead = findTensor(
                 tensors,
                 List.of("lm_head.weight", "model.lm_head.weight", "model.language_model.lm_head.weight"));
-        if (lmHead == null && !config.isTieWordEmbeddings()) {
+        if (lmHead == null && !config.tieWordEmbeddings()) {
             addProblem(problems, "missing tensor: lm_head.weight for untied output embeddings");
         } else if (lmHead != null) {
             requireShape(problems, lmHead, vocabSize, hiddenSize);
@@ -218,12 +218,12 @@ final class Gemma4UnifiedSafetensorPreflight {
             int hiddenSize,
             int intermediateSize) {
         String prefix = "layers.%d.".formatted(layer);
-        int headDim = config.getResolvedHeadDimForLayer(layer);
-        int queryRows = config.getNumAttentionHeads() > 0 && headDim > 0
-                ? config.getNumAttentionHeads() * headDim
+        int headDim = config.resolvedHeadDimForLayer(layer);
+        int queryRows = config.numAttentionHeads() > 0 && headDim > 0
+                ? config.numAttentionHeads() * headDim
                 : 0;
-        int kvRows = config.getResolvedNumKvHeadsForLayer(layer) > 0 && headDim > 0
-                ? config.getResolvedNumKvHeadsForLayer(layer) * headDim
+        int kvRows = config.resolvedNumKvHeadsForLayer(layer) > 0 && headDim > 0
+                ? config.resolvedNumKvHeadsForLayer(layer) * headDim
                 : 0;
         requireVector(tensors, problems, prefix + "layer_scalar", 1);
         requireVector(tensors, problems, prefix + "input_layernorm.weight", hiddenSize);
@@ -842,9 +842,9 @@ final class Gemma4UnifiedSafetensorPreflight {
             if (tensors == null || tensors.isEmpty()) {
                 return empty();
             }
-            int hiddenSize = config == null ? 0 : config.getHiddenSize();
-            int numExperts = config == null ? 0 : config.getNumLocalExperts();
-            int moeIntermediateSize = config == null ? 0 : config.getMoeIntermediateSize();
+            int hiddenSize = config == null ? 0 : config.hiddenSize();
+            int numExperts = config == null ? 0 : config.numLocalExperts();
+            int moeIntermediateSize = config == null ? 0 : config.moeIntermediateSize();
             TensorMeta vision = findAny(tensors, "model.embed_vision.embedding_projection.weight",
                     "embed_vision.embedding_projection.weight",
                     "model.vision_projection.weight",

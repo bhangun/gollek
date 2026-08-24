@@ -103,7 +103,7 @@ class OnnxHuggingFaceIntegrationTest {
         if (Files.exists(target) && Files.size(target) > 0) {
             return target;
         }
-        tech.kayys.alkhawarizm.model.repo.hf.HuggingFaceClient client = createHfClient();
+        tech.kayys.gollek.model.repo.hf.HuggingFaceClient client = createHfClient();
         boolean required = isRequired();
         try {
             client.downloadFile(repoId, fileName, target, null);
@@ -127,7 +127,7 @@ class OnnxHuggingFaceIntegrationTest {
         if (configured != null && !configured.isBlank()) {
             return configured.trim();
         }
-        tech.kayys.alkhawarizm.model.repo.hf.HuggingFaceClient client = createHfClient();
+        tech.kayys.gollek.model.repo.hf.HuggingFaceClient client = createHfClient();
         boolean required = isRequired();
         java.util.List<String> files;
         try {
@@ -177,8 +177,8 @@ class OnnxHuggingFaceIntegrationTest {
         return configured;
     }
 
-    private static tech.kayys.alkhawarizm.model.repo.hf.HuggingFaceClient createHfClient() throws Exception {
-        tech.kayys.alkhawarizm.model.repo.hf.HuggingFaceClient client = new tech.kayys.alkhawarizm.model.repo.hf.HuggingFaceClient();
+    private static tech.kayys.gollek.model.repo.hf.HuggingFaceClient createHfClient() throws Exception {
+        tech.kayys.gollek.model.repo.hf.HuggingFaceClient client = new tech.kayys.gollek.model.repo.hf.HuggingFaceClient();
         setField(client, "config", new EnvHfConfig());
         setField(client, "objectMapper", new com.fasterxml.jackson.databind.ObjectMapper());
         return client;
@@ -259,7 +259,7 @@ class OnnxHuggingFaceIntegrationTest {
         return fallback;
     }
 
-    private static final class EnvHfConfig implements tech.kayys.alkhawarizm.model.repo.hf.HuggingFaceConfig {
+    private static final class EnvHfConfig implements tech.kayys.gollek.model.repo.hf.HuggingFaceConfig {
         @Override
         public String baseUrl() {
             return "https://huggingface.co";

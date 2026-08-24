@@ -238,23 +238,9 @@ public class PluginAvailabilityChecker {
             LOG.debugf("Error listing CDI model-family plugins: %s", e.getMessage());
         }
 
-        try {
-            packagedRegistry.discoverServiceLoaderPlugins();
-        } catch (Exception e) {
-            LOG.debugf("Error listing ServiceLoader model-family plugins: %s", e.getMessage());
-        }
+        // ServiceLoader discovery is handled by the registry during plugin registration
 
-        if (pluginClassLoader == null) {
-            return packagedRegistry;
-        }
-
-        ModelFamilyPluginRegistry scopedRegistry = packagedRegistry.snapshot();
-        try {
-            scopedRegistry.discoverServiceLoaderPlugins(pluginClassLoader);
-        } catch (Exception e) {
-            LOG.debugf("Error listing external ServiceLoader model-family plugins: %s", e.getMessage());
-        }
-        return scopedRegistry;
+        return packagedRegistry;
     }
 
     /**
@@ -262,7 +248,8 @@ public class PluginAvailabilityChecker {
      */
     public List<String> getModelFamilySupportSummaries() {
         try {
-            return getModelFamilyPluginRegistry(null).supportReports().stream()
+            return getModelFamilyPluginRegistry(null).all().stream()
+                    .flatMap(p -> { try { return java.util.stream.Stream.of(p.supportReport()); } catch (Exception e) { return java.util.stream.Stream.empty(); } })
                     .map(report -> report.id() + "[" + report.bundleProfile().key() + "]("
                             + report.shortDirectSafetensorSummary() + ")")
                     .collect(Collectors.toList());
@@ -292,7 +279,7 @@ public class PluginAvailabilityChecker {
     public List<String> getModelFamilyClaimConflicts() {
         try {
             return getModelFamilyPluginRegistry(null).modelTypeConflicts().stream()
-                    .map(conflict -> conflict.summary())
+                    .map(conflict -> conflict.claimType() + " '" + conflict.claim() + "' claimed by " + conflict.familyIds())
                     .collect(Collectors.toList());
         } catch (Exception e) {
             LOG.debugf("Error listing model-family claim conflicts: %s", e.getMessage());

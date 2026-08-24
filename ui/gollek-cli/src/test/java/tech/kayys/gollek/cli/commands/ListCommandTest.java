@@ -50,7 +50,6 @@ public class ListCommandTest {
                                 .modelId("test-model")
                                 .name("Test Model")
                                 .version("1.0")
-                                .requestContext(RequestContext.of("community", "community"))
                                 .build();
 
                 Mockito.when(sdk.listModels(any(ModelListRequest.class)))
@@ -70,7 +69,6 @@ public class ListCommandTest {
                                 .modelId("test-model")
                                 .name("Test Model")
                                 .version("1.0")
-                                .requestContext(RequestContext.of("community", "community"))
                                 .build();
 
                 Mockito.when(sdk.listModels(any(ModelListRequest.class)))

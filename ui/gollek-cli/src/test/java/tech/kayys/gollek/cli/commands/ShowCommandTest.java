@@ -71,7 +71,6 @@ public class ShowCommandTest {
                 .modelId("test-model")
                 .name("Test Model")
                 .version("1.0")
-                .requestContext(RequestContext.of("community", "community"))
                 .format("GGUF")
                 .metadata(Collections.emptyMap())
                 .createdAt(Instant.now())
@@ -131,7 +130,6 @@ public class ShowCommandTest {
         ModelInfo model = ModelInfo.builder()
                 .modelId("show-model")
                 .name("Show Model")
-                .requestContext(RequestContext.of("community", "community"))
                 .format("SAFETENSORS")
                 .metadata(Map.of("path", tempDir.toString()))
                 .build();
@@ -194,7 +192,6 @@ public class ShowCommandTest {
         ModelInfo model = ModelInfo.builder()
                 .modelId("show-external-model")
                 .name("Show External Model")
-                .requestContext(RequestContext.of("community", "community"))
                 .format("SAFETENSORS")
                 .metadata(Map.of("path", modelDir.toString()))
                 .build();
@@ -248,7 +245,6 @@ public class ShowCommandTest {
         ModelInfo model = ModelInfo.builder()
                 .modelId("show-missing-model")
                 .name("Show Missing Model")
-                .requestContext(RequestContext.of("community", "community"))
                 .format("SAFETENSORS")
                 .metadata(Map.of("path", tempDir.toString()))
                 .build();
@@ -305,7 +301,6 @@ public class ShowCommandTest {
         ModelInfo model = ModelInfo.builder()
                 .modelId("show-tokenizer-missing-model")
                 .name("Show Tokenizer Missing Model")
-                .requestContext(RequestContext.of("community", "community"))
                 .format("SAFETENSORS")
                 .metadata(Map.of("path", tempDir.toString()))
                 .build();
@@ -379,7 +374,6 @@ public class ShowCommandTest {
         ModelInfo model = ModelInfo.builder()
                 .modelId("show-direct-model")
                 .name("Show Direct Model")
-                .requestContext(RequestContext.of("community", "community"))
                 .format("SAFETENSORS")
                 .metadata(Map.of("path", tempDir.toString()))
                 .build();
@@ -441,7 +435,6 @@ public class ShowCommandTest {
         ModelInfo model = ModelInfo.builder()
                 .modelId("show-direct-missing-adapter-model")
                 .name("Show Direct Missing Adapter Model")
-                .requestContext(RequestContext.of("community", "community"))
                 .format("SAFETENSORS")
                 .metadata(Map.of("path", tempDir.toString()))
                 .build();

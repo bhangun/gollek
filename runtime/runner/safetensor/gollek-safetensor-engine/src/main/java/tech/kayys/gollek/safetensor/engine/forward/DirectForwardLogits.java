@@ -49,7 +49,7 @@ final class DirectForwardLogits {
     }
 
     static void logPrefillDiagnostics(float[] result, ModelConfig config, boolean verboseTokensEnabled) {
-        if (!verboseTokensEnabled || config.getNumAttentionHeads() <= 0) {
+        if (!verboseTokensEnabled || config.numAttentionHeads() <= 0) {
             return;
         }
 

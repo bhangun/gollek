@@ -74,7 +74,7 @@ final class DirectModelLifecycle<T extends SafetensorEngine.LoadedModel> {
             modelWarmup.accept(model);
 
             log.infof("DirectInferenceEngine: loaded [%s] — %d weights, arch=%s",
-                    model.key(), model.weights().size(), model.config().getModelType());
+                    model.key(), model.weights().size(), model.config().modelType());
             return model.key();
         }
     }

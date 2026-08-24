@@ -11,7 +11,7 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.Optional;
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.model.download.DownloadProgressListener;
+import tech.kayys.alkhawarizm.spi.download.DownloadProgressListener;
 
 import tech.kayys.gollek.model.repo.local.ManifestStore;
 import tech.kayys.gollek.model.repo.local.GollekManifest;

@@ -25,10 +25,10 @@ dependencies {
 
     implementation(project(":spi:gollek-spi"))
     implementation(project(":spi:gollek-spi-plugin"))
-    implementation(project(":core:plugin:gollek-plugin-optimization-core"))
+    implementation(project(":plugin:gollek-plugin-optimization-core"))
 
-    implementation(project(":core:gollek-model-runner"))
-    implementation(project(":core:gollek-error-code"))
+    implementation(project(":core:gollek-core"))
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-error-code:0.1.0-SNAPSHOT")
     implementation(project(":core:gollek-core"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation("tech.kayys.alkhawarizm:alkhawarizm-core:0.1.0-SNAPSHOT")

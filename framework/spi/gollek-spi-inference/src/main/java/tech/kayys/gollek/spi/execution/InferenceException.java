@@ -1,6 +1,6 @@
 package tech.kayys.gollek.spi.execution;
 
-import tech.kayys.gollek.error.ErrorCode;
+import tech.kayys.alkhawarizm.error.ErrorCode;
 
 /**
  * Compatibility wrapper for InferenceException in execution package.

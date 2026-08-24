@@ -1,4 +1,5 @@
 package tech.kayys.gollek.cli.commands;
+
 import tech.kayys.gollek.sdk.route.*;
 import tech.kayys.gollek.safetensor.engine.route.*;
 
@@ -43,6 +44,10 @@ public class ListCommand implements Runnable {
             "--runnable-only" }, description = "Show only models runnable in local Java runtime", defaultValue = "false")
     boolean runnableOnly;
 
+    @Option(names = { "-t", "--task-type",
+            "--category" }, description = "Filter by task category: text, vision, tts, stt, ocr, multimodal, embedding, timeseries")
+    String filterTaskType;
+
     @Override
     public void run() {
         try {
@@ -84,7 +89,8 @@ public class ListCommand implements Runnable {
         }
 
         List<ModelInfo> models = new ArrayList<>(merged.values());
-        models.sort(Comparator.comparing((ModelInfo m) -> m.getUpdatedAt() != null ? m.getUpdatedAt() : Instant.EPOCH).reversed());
+        models.sort(Comparator.comparing((ModelInfo m) -> m.getUpdatedAt() != null ? m.getUpdatedAt() : Instant.EPOCH)
+                .reversed());
         if (models.size() > limit) {
             return new ArrayList<>(models.subList(0, limit));
         }
@@ -139,11 +145,16 @@ public class ListCommand implements Runnable {
 
     private int richnessScore(ModelInfo model) {
         int score = 0;
-        if (model.getFormat() != null && !model.getFormat().isBlank()) score++;
-        if (model.getArchitecture() != null && !model.getArchitecture().isBlank()) score++;
-        if (model.getSizeBytes() != null && model.getSizeBytes() > 0) score++;
-        if (model.getUpdatedAt() != null) score++;
-        if (model.getShortId() != null && !model.getShortId().isBlank()) score++;
+        if (model.getFormat() != null && !model.getFormat().isBlank())
+            score++;
+        if (model.getArchitecture() != null && !model.getArchitecture().isBlank())
+            score++;
+        if (model.getSizeBytes() != null && model.getSizeBytes() > 0)
+            score++;
+        if (model.getUpdatedAt() != null)
+            score++;
+        if (model.getShortId() != null && !model.getShortId().isBlank())
+            score++;
         return score;
     }
 
@@ -156,6 +167,13 @@ public class ListCommand implements Runnable {
             }
             if (runnableOnly && !e.runnable) {
                 continue;
+            }
+            if (filterTaskType != null && !filterTaskType.isBlank()) {
+                String wanted = filterTaskType.trim().toLowerCase(Locale.ROOT);
+                String actual = e.taskType != null ? e.taskType.trim().toLowerCase(Locale.ROOT) : "";
+                if (!actual.equals(wanted)) {
+                    continue;
+                }
             }
             String modelId = (e.id != null && !e.id.isBlank()) ? e.id : e.path;
             if (modelId == null || modelId.isBlank()) {
@@ -170,9 +188,13 @@ public class ListCommand implements Runnable {
                     .format(e.format)
                     .sizeBytes(e.sizeBytes)
                     .updatedAt(parseInstant(e.updatedAt))
+                    .metadata(e.taskType != null
+                            ? Map.of("taskType", e.taskType)
+                            : Map.of())
                     .build());
         }
-        models.sort(Comparator.comparing((ModelInfo m) -> m.getUpdatedAt() != null ? m.getUpdatedAt() : Instant.EPOCH).reversed());
+        models.sort(Comparator.comparing((ModelInfo m) -> m.getUpdatedAt() != null ? m.getUpdatedAt() : Instant.EPOCH)
+                .reversed());
         if (models.size() > limit) {
             return new ArrayList<>(models.subList(0, limit));
         }
@@ -191,18 +213,19 @@ public class ListCommand implements Runnable {
     }
 
     private void printTable(List<ModelInfo> models) {
-        final String ANSI_RESET   = "\u001B[0m";
-        final String ANSI_CYAN    = "\u001B[36m";
-        final String ANSI_YELLOW  = "\u001B[33m";
-        final String ANSI_GREEN   = "\u001B[32m";
+        final String ANSI_RESET = "\u001B[0m";
+        final String ANSI_CYAN = "\u001B[36m";
+        final String ANSI_YELLOW = "\u001B[33m";
+        final String ANSI_GREEN = "\u001B[32m";
         final String ANSI_MAGENTA = "\u001B[35m";
-        final String ANSI_BOLD    = "\u001B[1;37m";
-        final String ANSI_GRAY    = "\u001B[90m";
+        final String ANSI_BOLD = "\u001B[1;37m";
+        final String ANSI_GRAY = "\u001B[90m";
+        final String ANSI_BLUE = "\u001B[34m";
 
         // Header
-        System.out.printf(ANSI_BOLD + "%-7s %-14s %-26s %-12s %-10s %-12s %-10s" + ANSI_RESET + "%n",
-                "ID", "GROUP", "NAME", "ARCH", "FORMAT", "SIZE", "MODIFIED");
-        System.out.println(ANSI_GRAY + "─".repeat(97) + ANSI_RESET);
+        System.out.printf(ANSI_BOLD + "%-7s %-14s %-26s %-12s %-10s %-10s %-12s %-10s" + ANSI_RESET + "%n",
+                "ID", "GROUP", "NAME", "ARCH", "FORMAT", "TASK", "SIZE", "MODIFIED");
+        System.out.println(ANSI_GRAY + "─".repeat(107) + ANSI_RESET);
 
         for (ModelInfo model : models) {
             // Short ID
@@ -228,26 +251,42 @@ public class ListCommand implements Runnable {
                 }
             }
 
-            String arch     = model.getArchitecture() != null ? model.getArchitecture() : "unknown";
+            String arch = model.getArchitecture() != null ? model.getArchitecture() : "unknown";
             String modified = model.getUpdatedAt() != null
-                    ? model.getUpdatedAt().toString().substring(0, 10) : "N/A";
+                    ? model.getUpdatedAt().toString().substring(0, 10)
+                    : "N/A";
 
-            String fmtStr  = model.getFormat() != null ? model.getFormat() : "N/A";
+            String fmtStr = model.getFormat() != null ? model.getFormat() : "N/A";
             String fmtColor = switch (fmtStr.toUpperCase()) {
-                case "GGUF"        -> ANSI_CYAN;
+                case "GGUF" -> ANSI_CYAN;
                 case "SAFETENSORS" -> ANSI_YELLOW;
-                case "LITERT"      -> ANSI_GREEN;
-                case "ONNX"        -> ANSI_MAGENTA;
-                default            -> "";
+                case "LITERT" -> ANSI_GREEN;
+                case "ONNX" -> ANSI_MAGENTA;
+                default -> "";
             };
 
-            System.out.printf("%-7s %-14s %-26s %-12s %s%-10s%s %-12s %-10s%n",
+            // Task-type column with colour coding
+            String taskStr = taskTypeOf(model);
+            String taskColor = switch (taskStr.toLowerCase(Locale.ROOT)) {
+                case "vision", "ocr" -> ANSI_MAGENTA;
+                case "tts" -> ANSI_GREEN;
+                case "stt" -> ANSI_BLUE;
+                case "multimodal" -> ANSI_CYAN;
+                case "embedding" -> ANSI_GRAY;
+                case "timeseries" -> ANSI_YELLOW;
+                default -> ""; // text → no colour
+            };
+
+            System.out.printf("%-7s %-14s %-26s %-12s %s%-10s%s %s%-10s%s %-12s %-10s%n",
                     ANSI_YELLOW + id + ANSI_RESET,
                     truncate(group, 14),
                     truncate(displayName, 26),
                     truncate(arch, 12),
                     fmtColor,
                     truncate(fmtStr, 10),
+                    ANSI_RESET,
+                    taskColor,
+                    truncate(taskStr, 10),
                     ANSI_RESET,
                     CLIUtils.formatSize(model.getSizeBytes() != null ? model.getSizeBytes() : 0),
                     modified);
@@ -261,7 +300,7 @@ public class ListCommand implements Runnable {
             ModelInfo model = models.get(i);
             String modelId = model.getModelId() != null ? model.getModelId() : "";
             String group = "";
-            String name  = model.getName() != null ? model.getName() : modelId;
+            String name = model.getName() != null ? model.getName() : modelId;
             if (modelId.contains("/")) {
                 group = modelId.substring(0, modelId.indexOf('/'));
             }
@@ -269,21 +308,39 @@ public class ListCommand implements Runnable {
             if (shortId == null || shortId.isBlank()) {
                 shortId = tech.kayys.alkhawarizm.spi.model.ModelUtils.generateShortId(modelId);
             }
+            String task = taskTypeOf(model);
             System.out.printf(
-                "  {\"id\": \"%s\", \"shortId\": \"%s\", \"group\": \"%s\", \"name\": \"%s\", " +
-                "\"modelId\": \"%s\", \"format\": \"%s\", \"size\": %d}%s%n",
-                model.getModelId(),
-                shortId,
-                group,
-                name,
-                modelId,
-                model.getFormat() != null ? model.getFormat() : "",
-                model.getSizeBytes() != null ? model.getSizeBytes() : 0,
-                i < models.size() - 1 ? "," : "");
+                    "  {\"id\": \"%s\", \"shortId\": \"%s\", \"group\": \"%s\", \"name\": \"%s\", " +
+                            "\"modelId\": \"%s\", \"format\": \"%s\", \"taskType\": \"%s\", \"size\": %d}%s%n",
+                    model.getModelId(),
+                    shortId,
+                    group,
+                    name,
+                    modelId,
+                    model.getFormat() != null ? model.getFormat() : "",
+                    task,
+                    model.getSizeBytes() != null ? model.getSizeBytes() : 0,
+                    i < models.size() - 1 ? "," : "");
         }
         System.out.println("]");
     }
 
+    /**
+     * Extracts task type from the model's metadata map. Defaults to "text" if
+     * absent.
+     */
+    private static String taskTypeOf(ModelInfo model) {
+        if (model == null)
+            return "text";
+        Map<String, Object> meta = model.getMetadata();
+        if (meta != null) {
+            Object v = meta.get("taskType");
+            if (v instanceof String s && !s.isBlank()) {
+                return s;
+            }
+        }
+        return "text";
+    }
 
     private String truncate(String str, int maxLen) {
         if (str == null)

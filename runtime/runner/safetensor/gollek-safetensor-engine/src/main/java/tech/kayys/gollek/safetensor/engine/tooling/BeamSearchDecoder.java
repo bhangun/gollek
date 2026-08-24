@@ -177,7 +177,7 @@ public class BeamSearchDecoder {
             return forwardPass.decode(tokenId, pos, weights, config, arch, kv);
         } catch (Exception e) {
             log.warnf(e, "BeamSearch: decode step failed at pos=%d", pos);
-            return new float[config.getVocabSize()];
+            return new float[config.vocabSize()];
         }
     }
 

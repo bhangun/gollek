@@ -1,5 +1,7 @@
 package tech.kayys.gollek.server.api.v1;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
@@ -9,6 +11,8 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import org.jboss.resteasy.reactive.RestSseElementType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tech.kayys.gollek.server.SdkProvider;
 import tech.kayys.gollek.sdk.core.ChatParams;
 import tech.kayys.gollek.sdk.core.GollekChatService;
@@ -27,14 +31,13 @@ import java.util.UUID;
 @Path("/v1/gollek/chat")
 public class ChatResource {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ChatResource.class);
+
     @Inject
     SdkProvider sdkProvider;
     
     @Inject
-    tech.kayys.gollek.metrics.InferenceMetrics inferenceMetrics;
-    
-    @Inject
-    tech.kayys.gollek.audit.AuditService auditService;
+    MeterRegistry meterRegistry;
 
     private final GollekChatService chatService = new GollekChatService();
 
@@ -45,6 +48,9 @@ public class ChatResource {
         if (req.stream()) {
             throw new IllegalArgumentException("For streaming, use Accept: text/event-stream");
         }
+        
+        Timer.Sample sample = Timer.start(meterRegistry);
+        LOG.info("Received REST chat request for model: {}", req.model());
         
         List<Message> history = ChatCompletionMapper.toMessages(req.messages());
         List<ToolDefinition> tools = req.tools() != null ? req.tools() : List.of();
@@ -73,6 +79,13 @@ public class ChatResource {
                         );
                     }
 
+                    sample.stop(meterRegistry.timer("gollek.rest.chat.duration"));
+                    meterRegistry.counter("gollek.rest.chat.count").increment();
+                    if (usage != null) {
+                        meterRegistry.counter("gollek.rest.chat.tokens").increment(usage.totalTokens());
+                    }
+                    LOG.info("REST Chat response completed for model: {}, finish reason: {}", req.model(), finishReasonStr);
+
                     return new ChatCompletionResponse(
                             UUID.randomUUID().toString(),
                             "chat.completion",
@@ -82,13 +95,9 @@ public class ChatResource {
                             usage
                     );
                 })
-                .onItem().invoke(resp -> {
-                    long duration = System.nanoTime() - Instant.now().getEpochSecond(); // Approximate since we didn't track start time
-                    int tokensUsed = resp.usage() != null ? resp.usage().totalTokens() : 0;
-                    inferenceMetrics.recordSuccess(req.model(), "system", duration, tokensUsed);
-                })
                 .onFailure().invoke(err -> {
-                    inferenceMetrics.recordFailure(req.model(), "system", err.getClass().getSimpleName());
+                    LOG.error("Failed REST chat request for model: {}", req.model(), err);
+                    meterRegistry.counter("gollek.rest.chat.error").increment();
                 });
     }
 
@@ -97,16 +106,19 @@ public class ChatResource {
     @Produces(MediaType.SERVER_SENT_EVENTS)
     @RestSseElementType(MediaType.APPLICATION_JSON)
     public Multi<StreamingInferenceChunk> chatStream(ChatCompletionRequest req) {
+        LOG.info("Received REST chat stream request for model: {}", req.model());
+        
         List<Message> history = ChatCompletionMapper.toMessages(req.messages());
         List<ToolDefinition> tools = req.tools() != null ? req.tools() : List.of();
         ChatParams params = ChatParams.of(req.temperature(), req.maxTokens());
         
         return chatService.streamChat(sdkProvider.getSdk(), req.model(), null, history, tools, params)
                 .onItem().invoke(chunk -> {
-                    inferenceMetrics.recordInferenceChunk(req.model(), "system");
+                    meterRegistry.counter("gollek.rest.chat.stream.chunks").increment();
                 })
                 .onFailure().invoke(err -> {
-                    inferenceMetrics.recordFailure(req.model(), "system", err.getClass().getSimpleName());
+                    LOG.error("Failed REST chat stream request for model: {}", req.model(), err);
+                    meterRegistry.counter("gollek.rest.chat.stream.error").increment();
                 });
     }
 }

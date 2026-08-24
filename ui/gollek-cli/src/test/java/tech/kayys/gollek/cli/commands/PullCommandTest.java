@@ -38,8 +38,8 @@ public class PullCommandTest {
     }
 
     @Test
-    public void testPullCommandHuggingFace() throws Exception {
-        pullCommand.modelSpec = "hf:TheBloke/Llama-2";
+    public void testPullCommandCustomRegistry() throws Exception {
+        pullCommand.modelSpec = "registry:llama3.2";
         pullCommand.insecure = false;
 
         pullCommand.run();

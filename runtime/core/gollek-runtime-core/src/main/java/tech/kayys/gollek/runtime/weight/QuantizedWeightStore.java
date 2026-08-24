@@ -1,8 +1,9 @@
 package tech.kayys.gollek.runtime.weight;
 
 
-import tech.kayys.gollek.error.ErrorCode;
-import tech.kayys.gollek.spi.exception.InferenceException;import tech.kayys.gollek.core.weight.WeightStore;
+import tech.kayys.alkhawarizm.error.ErrorCode;
+import tech.kayys.gollek.spi.exception.InferenceException;
+import tech.kayys.gollek.core.weight.WeightStore;
 import tech.kayys.alkhawarizm.core.tensor.Tensor;
 import tech.kayys.alkhawarizm.core.tensor.DType;
 

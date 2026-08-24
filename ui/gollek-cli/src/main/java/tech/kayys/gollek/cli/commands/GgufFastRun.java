@@ -778,8 +778,10 @@ public final class GgufFastRun {
             NativeGgufSession session = lease.session();
             String sessionLabel = sessionReuseLabel(sessionCache != null, lease.reused(), lease.reuseKind());
             String warmSuffix = ", session=" + sessionLabel;
-            printExecutionRoute(out, session.backendName(), runnerName);
-            if (!fastRunQuiet()) {
+            if (!args.noInfo) {
+                printExecutionRoute(out, session.backendName(), runnerName);
+            }
+            if (!fastRunQuiet() && !args.noInfo) {
                 out.printf("Using llama.cpp GGUF %s for %s "
                                 + "(backend=%s, nGpuLayers=%d, threads=%d, context=%d, batch=%d, ubatch=%d, "
                                 + "swaFull=%s, cpuFallback=%s%s).%n",
@@ -799,13 +801,13 @@ public final class GgufFastRun {
             String output = session.generate(prompt, args.maxTokens, args.temperature, args.topK, args.topP);
             long afterGenerateNanos = System.nanoTime();
             long generateNanos = afterGenerateNanos - generateStartNanos;
-            out.print(output);
+            out.print(args.raw ? output : stripThinkingChannels(output));
             String label = benchmarkMode ? "llama.cpp fallback" : "Fast GGUF";
             Optional<String> nativeMetrics = safeMetrics(
                     session,
                     sessionCache != null && lease.reused(),
                     lease.reuseKind());
-            if (!fastRunQuiet()) {
+            if (!fastRunQuiet() && !args.noInfo) {
                 printFastRunStats(out, label, session.lastGeneratedTokens(), startNanos, openNanos, generateNanos,
                         afterGenerateNanos, nativeMetrics);
             }
@@ -821,6 +823,25 @@ public final class GgufFastRun {
 
     private static Optional<String> safeMetrics(NativeGgufSession session) {
         return safeMetrics(session, false, "cold");
+    }
+
+    /**
+     * Strips model thinking-channel blocks from the raw output string.
+     *
+     * <p>Gemma 4 (and similar models with chain-of-thought) emit thinking tokens in the
+     * form {@code <|channel>thought\n...<channel|>} before the visible response. In normal
+     * (non-raw) mode we discard those blocks so the caller only sees the final answer text.
+     *
+     * <p>With {@code --raw} this method is bypassed and the literal byte stream is printed.
+     */
+    static String stripThinkingChannels(String output) {
+        if (output == null || output.isEmpty()) {
+            return output;
+        }
+        // Remove every <|channel>NAME ... <channel|> block including the trailing newline.
+        String stripped = output.replaceAll("(?s)<\\|channel>[^<|]*?(?:<\\|[^|>]*\\|>|<channel\\|>)\\n?", "");
+        // Trim any leading blank lines that were left after removal.
+        return stripped.stripLeading();
     }
 
     private static Optional<String> safeMetrics(NativeGgufSession session, boolean warmSession, String reuseKind) {
@@ -1080,11 +1101,13 @@ public final class GgufFastRun {
         if (args == null || args.banner) {
             printBanner(out);
         }
-        if (shouldPrintResolvedModelPath(modelPath, args)) {
-            out.printf("Resolved local model index entry: %s%n", modelPath);
+        if (args == null || !args.noInfo) {
+            if (shouldPrintResolvedModelPath(modelPath, args)) {
+                out.printf("Resolved local model index entry: %s%n", modelPath);
+            }
+            out.printf("Model: %s%n", modelPath);
+            out.printf("Provider: gguf, format=%s%n", ggufModelFormat(modelPath));
         }
-        out.printf("Model: %s%n", modelPath);
-        out.printf("Provider: gguf, format=%s%n", ggufModelFormat(modelPath));
     }
 
     static void printExecutionRoute(PrintStream out, String backendName, String runnerName) {
@@ -1212,14 +1235,14 @@ public final class GgufFastRun {
             System.out.printf(
                     "%s config: type=%s, layers=%d, hidden=%d, heads=%d/%d, headDim=%d, context=%d, vocab=%d.%n",
                     label,
-                    profile.modelConfig().getModelType(),
-                    profile.modelConfig().getNumHiddenLayers(),
-                    profile.modelConfig().getHiddenSize(),
-                    profile.modelConfig().getNumAttentionHeads(),
-                    profile.modelConfig().getResolvedNumKvHeads(),
-                    profile.modelConfig().getResolvedHeadDim(),
-                    profile.modelConfig().getMaxPositionEmbeddings(),
-                    profile.modelConfig().getVocabSize());
+                    profile.modelConfig().modelType(),
+                    profile.modelConfig().numHiddenLayers(),
+                    profile.modelConfig().hiddenSize(),
+                    profile.modelConfig().numAttentionHeads(),
+                    profile.modelConfig().resolvedNumKvHeads(),
+                    profile.modelConfig().resolvedHeadDim(),
+                    profile.modelConfig().maxPositionEmbeddings(),
+                    profile.modelConfig().vocabSize());
         }
     }
 
@@ -1363,7 +1386,7 @@ public final class GgufFastRun {
     }
 
     private static int fastRunMaxAutoContext() {
-        return positiveIntConfig("gollek.gguf.fast_run.max_auto_context", 2048);
+        return positiveIntConfig("gollek.gguf.fast_run.max_auto_context", 4096);
     }
 
     private static String configValue(String property) {
@@ -2227,6 +2250,9 @@ public final class GgufFastRun {
         shellCommand.append("export DYLD_FALLBACK_LIBRARY_PATH=")
                 .append(shellQuote(nativePaths))
                 .append("${DYLD_FALLBACK_LIBRARY_PATH:+:$DYLD_FALLBACK_LIBRARY_PATH}; ");
+        if (System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("mac")) {
+            shellCommand.append("export GOLLEK_GGUF_FAST_PROMPT_CACHE=\"${GOLLEK_GGUF_FAST_PROMPT_CACHE:-false}\"; ");
+        }
         if (useNohup) {
             shellCommand.append("nohup ");
         } else {
@@ -2713,7 +2739,7 @@ public final class GgufFastRun {
         private String model;
         private String modelFile;
         private String prompt;
-        private int maxTokens = 256;
+        private int maxTokens = 2048;
         private double temperature = 0.2d;
         private double topP = 0.9d;
         private int topK = 40;
@@ -2724,6 +2750,8 @@ public final class GgufFastRun {
                 System.getenv("GOLLEK_GGUF_ENGINE"),
                 "auto");
         private boolean banner = true;
+        private boolean noInfo = false;
+        private boolean raw = false;
         private boolean supported = true;
 
         private boolean supported() {
@@ -2807,6 +2835,9 @@ public final class GgufFastRun {
                     case "--llamacpp", "--llama-cpp" -> parsed.engine = "llamacpp";
                     case "--benchmark", "--bench" -> parsed.engine = "benchmark";
                     case "--no-banner", "--suppress-banner" -> parsed.banner = false;
+                    case "--no-info" -> parsed.noInfo = true;
+                    case "--raw" -> parsed.raw = true;
+                    case "--only-text" -> { parsed.banner = false; parsed.noInfo = true; }
                     case "--use-cpu" -> parsed.backend = "cpu";
                     case "--max-tokens" -> {
                         Value next = valueOrNext(value, args, i);

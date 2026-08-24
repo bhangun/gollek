@@ -1,7 +1,7 @@
 package tech.kayys.gollek.server.api.v1;
 
 
-import tech.kayys.gollek.error.ErrorCode;
+import tech.kayys.alkhawarizm.error.ErrorCode;
 import tech.kayys.gollek.spi.exception.InferenceException;import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tech.kayys.gollek.spi.tool.ToolDefinition;

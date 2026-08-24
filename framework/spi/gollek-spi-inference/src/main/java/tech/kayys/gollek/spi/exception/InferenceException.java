@@ -14,7 +14,7 @@
 
 package tech.kayys.gollek.spi.exception;
 
-import tech.kayys.gollek.error.ErrorCode;
+import tech.kayys.alkhawarizm.error.ErrorCode;
 import java.util.HashMap;
 import java.util.Map;
 

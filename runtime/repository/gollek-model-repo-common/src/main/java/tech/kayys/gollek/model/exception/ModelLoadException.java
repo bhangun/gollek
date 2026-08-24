@@ -1,6 +1,6 @@
 package tech.kayys.gollek.model.exception;
 
-import tech.kayys.gollek.error.ErrorCode;
+import tech.kayys.alkhawarizm.error.ErrorCode;
 import tech.kayys.gollek.spi.exception.ModelException;
 
 public class ModelLoadException extends ModelException {

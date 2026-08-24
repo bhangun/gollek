@@ -4,7 +4,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.model.download.DownloadProgressListener;
+import tech.kayys.alkhawarizm.spi.download.DownloadProgressListener;
 import tech.kayys.alkhawarizm.spi.model.ModelRepository;
 import tech.kayys.alkhawarizm.spi.model.ArtifactLocation;
 import tech.kayys.alkhawarizm.spi.model.ModelArtifact;

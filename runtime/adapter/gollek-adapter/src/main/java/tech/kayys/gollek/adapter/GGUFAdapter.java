@@ -1,7 +1,5 @@
 package tech.kayys.gollek.adapter;
 
-import tech.kayys.gollek.core.graph.*;
-import tech.kayys.gollek.core.graph.node.*;
 
 import tech.kayys.alkhawarizm.core.tensor.*;
 

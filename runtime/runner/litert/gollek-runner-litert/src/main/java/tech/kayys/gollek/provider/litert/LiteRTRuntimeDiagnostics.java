@@ -19,7 +19,7 @@ public final class LiteRTRuntimeDiagnostics {
     }
 
     public static Snapshot snapshot() {
-        boolean nativeProviderAvailable = classAvailable("tech.kayys.gollek.provider.litert.LiteRTProvider");
+        boolean nativeProviderAvailable = classAvailable("tech.kayys.gollek.provider.litert.LiteRTEngine");
         boolean legacyInterpreterAvailable = classAvailable("org.tensorflow.lite.Interpreter");
         boolean gpuDelegateAvailable = classAvailable("org.tensorflow.lite.gpu.GpuDelegate");
         boolean nnapiAvailable = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("android");

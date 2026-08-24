@@ -158,14 +158,14 @@ public final class DirectSafetensorRoutePolicy {
         if (Boolean.getBoolean(DISABLE_DEFAULT_RUN_SYSTEM_PROPERTY)) {
             return null;
         }
-        if (profile.qwenText()) {
+        if (profile != null && profile.config() != null && profile.config().modelType() != null && profile.config().modelType().contains("qwen")) {
             return QWEN_SAFETENSOR_RUN_SYSTEM_PROMPT;
         }
         return DEFAULT_RUN_SYSTEM_PROMPT;
     }
 
     public static boolean shouldForwardSystemPromptToDirectPath(String explicitSystemPrompt, DirectSafetensorRunProfile profile) {
-        return hasText(explicitSystemPrompt) || profile.qwenText();
+        return hasText(explicitSystemPrompt) || (profile != null && profile.config() != null && profile.config().modelType() != null && profile.config().modelType().contains("qwen"));
     }
 
     public static boolean shouldUseDirectLiteRtStreamPath(String currentProvider, String localPath) {
@@ -810,8 +810,8 @@ public final class DirectSafetensorRoutePolicy {
         if (profile == null || profile.config() == null) {
             return Optional.empty();
         }
-        String modelType = communityClassifierToken(profile.config().getModelType());
-        String architecture = communityClassifierToken(profile.config().getPrimaryArchitecture());
+        String modelType = communityClassifierToken(profile.config().modelType());
+        String architecture = communityClassifierToken(profile.config().primaryArchitecture());
         if (isExcludedCommunityTextGgufFamily(modelType, architecture)) {
             return Optional.empty();
         }
@@ -1427,7 +1427,7 @@ public final class DirectSafetensorRoutePolicy {
 
     private static boolean isGemma4MobileQat(Path modelDir) {
         ModelFamilyQuantizedLoaderProfile profile = ModelFamilyQuantizedLoaderProfile.fromModelDir(modelDir);
-        return profile != null && profile.gemma4MobileQat();
+        return profile != null && profile.mobileQatSupported();
     }
 
     private static boolean looksLikeLiteRtArtifactOrDirectory(String localPath) {

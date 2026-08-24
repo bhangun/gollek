@@ -8,7 +8,7 @@ public class InspectLitertlm {
         System.out.println("isLlm: " + info.isLlmModel());
         System.out.println("SubModels: " + info.subModels().size());
         for (var sub : info.subModels()) {
-            System.out.println(" - " + sub.getModelType() + " at " + sub.offset() + " size " + sub.size());
+            System.out.println(" - " + sub.modelType() + " at " + sub.offset() + " size " + sub.size());
         }
     }
 }

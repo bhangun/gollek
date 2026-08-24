@@ -438,14 +438,13 @@ class ModelFamilyBundleManifestTest {
         assertEquals(List.of(), discovered.discoveryErrors(),
                 "packaged model-family plugin discovery should not throw");
         assertTrue(gemma4 != null, "Gemma4 plugin should stay on the CLI classpath for direct runtime resolution");
-        assertTrue(gemma4.descriptor().supportsDirectSafetensorInference());
-        assertTrue(gemma4.descriptor().capabilities().contains(ModelFamilyCapability.GGUF));
+        assertTrue(gemma4.descriptor().capabilities().contains(ModelFamilyCapability.DIRECT_SAFETENSOR_INFERENCE));
         assertEquals(List.of("gemma4"), gemma4.architectureAdapters().stream()
                 .map(adapter -> adapter.id())
                 .toList());
 
         ModelFamilyPluginRegistry registry = ModelFamilyPluginRegistry.create();
-        registry.registerAll(discovered.uniquePluginsByFamilyId().values());
+        discovered.uniquePluginsByFamilyId().values().forEach(registry::register);
         ModelFamilyResolution resolution = registry.resolve(
                 "gemma4_unified",
                 "Gemma4UnifiedForConditionalGeneration");
@@ -729,7 +728,7 @@ class ModelFamilyBundleManifestTest {
                 () -> "selected direct alias families missing from ServiceLoader discovery: "
                         + missingFamilyIds(selectedDirectFamilies, plugins));
         assertEquals(List.of(), selectedDirectFamilies.stream()
-                        .filter(familyId -> !plugins.get(familyId).descriptor().supportsDirectSafetensorInference())
+                        .filter(familyId -> !plugins.get(familyId).descriptor().capabilities().contains(ModelFamilyCapability.DIRECT_SAFETENSOR_INFERENCE))
                         .toList(),
                 "selected direct alias families should advertise direct safetensor support");
         assertEquals(List.of(), selectedDirectFamilies.stream()

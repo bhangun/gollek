@@ -48,13 +48,16 @@ class ModelFamilyResolutionReportsTest {
         ModelFamilyPluginRegistry registry = ModelFamilyPluginRegistry.create();
         registry.register(plugin);
         ModelFamilyResolution resolution = new ModelFamilyResolution(
+                ModelFamilyResolution.Status.RESOLVED,
                 "report_direct",
                 "ReportDirectForCausalLM",
-                ModelFamilyResolution.Status.RESOLVED,
                 List.of("report-direct-family"),
                 List.of(plugin.supportReport()),
                 List.of(plugin.runtimeManifest()),
-                plugin.tokenizerDescriptors());
+                plugin.tokenizerDescriptors(),
+                List.of(),
+                List.of(),
+                "");
 
         Map<String, Object> report = ModelFamilyResolutionReports.report(
                 resolution,

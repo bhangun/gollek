@@ -92,7 +92,7 @@ public class RunnerStats {
             return true;
         if (o == null || getClass() != o.getClass())
             return false;
-        RunnerStats that = (RunnerMetrics) o;
+        RunnerStats that = (RunnerStats) o;
         return totalRequests == that.totalRequests &&
                 failedRequests == that.failedRequests &&
                 averageLatencyMs == that.averageLatencyMs &&

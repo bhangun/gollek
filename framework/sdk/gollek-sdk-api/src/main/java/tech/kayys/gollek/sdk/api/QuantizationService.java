@@ -68,7 +68,20 @@ public class QuantizationService {
     private static final Logger log = Logger.getLogger(QuantizationService.class);
 
     @Inject
-    QuantizationEngine engine;
+    @jakarta.enterprise.inject.Any
+    jakarta.enterprise.inject.Instance<QuantizationEngine> engineInstance;
+
+    private QuantizationEngine engine;
+
+    private QuantizationEngine getEngine() {
+        if (engine != null) {
+            return engine;
+        }
+        if (engineInstance != null && engineInstance.isResolvable()) {
+            return engineInstance.get();
+        }
+        throw new IllegalStateException("QuantizationEngine is not available in current runtime classpath");
+    }
 
     /**
      * Get the singleton instance (for non-CDI usage).
@@ -140,7 +153,7 @@ public class QuantizationService {
      */
     public QuantResult quantizeGptq(Path modelPath, Path outputPath, QuantConfig config) {
         log.infof("GPTQ quantization: %s -> %s", modelPath, outputPath);
-        return engine.quantize(modelPath, outputPath, QuantizationEngine.QuantStrategy.INT4, config);
+        return getEngine().quantize(modelPath, outputPath, QuantizationEngine.QuantStrategy.INT4, config);
     }
 
     /**
@@ -151,7 +164,7 @@ public class QuantizationService {
      * @return quantization result
      */
     public QuantResult quantizeInt8(Path modelPath, Path outputPath) {
-        return engine.quantize(modelPath, outputPath, QuantizationEngine.QuantStrategy.INT8);
+        return getEngine().quantize(modelPath, outputPath, QuantizationEngine.QuantStrategy.INT8);
     }
 
     /**
@@ -162,7 +175,7 @@ public class QuantizationService {
      * @return quantization result
      */
     public QuantResult quantizeFp8(Path modelPath, Path outputPath) {
-        return engine.quantize(modelPath, outputPath, QuantizationEngine.QuantStrategy.FP8);
+        return getEngine().quantize(modelPath, outputPath, QuantizationEngine.QuantStrategy.FP8);
     }
 
     /**
@@ -179,7 +192,7 @@ public class QuantizationService {
             throw new IllegalStateException("No suitable quantizer found for config: " + config);
         }
         log.infof("Selected quantizer: %s", quantizer.getName());
-        return engine.quantize(modelPath, outputPath, config.getStrategy(), config);
+        return getEngine().quantize(modelPath, outputPath, config.getStrategy(), config);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -195,7 +208,7 @@ public class QuantizationService {
      * @return Uni emitting quantization result
      */
     public Uni<QuantResult> quantizeAsync(Path modelPath, Path outputPath, QuantConfig config) {
-        return engine.quantizeAsync(modelPath, outputPath, QuantizationEngine.QuantStrategy.INT4, config);
+        return getEngine().quantizeAsync(modelPath, outputPath, QuantizationEngine.QuantStrategy.INT4, config);
     }
 
     /**
@@ -207,7 +220,7 @@ public class QuantizationService {
      * @return Multi emitting progress updates and final result
      */
     public Multi<Object> quantizeWithProgress(Path modelPath, Path outputPath, QuantConfig config) {
-        return engine.quantizeWithProgress(modelPath, outputPath, QuantizationEngine.QuantStrategy.INT4, config);
+        return getEngine().quantizeWithProgress(modelPath, outputPath, QuantizationEngine.QuantStrategy.INT4, config);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -223,7 +236,7 @@ public class QuantizationService {
      */
     public java.util.Map<String, AccelTensor> loadQuantizedModel(
             Path quantizedModelPath, QuantizationEngine.QuantStrategy strategy) {
-        return engine.loadQuantizedModel(quantizedModelPath, strategy);
+        return getEngine().loadQuantizedModel(quantizedModelPath, strategy);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -237,14 +250,14 @@ public class QuantizationService {
      * @return cached result or null
      */
     public QuantResult getCachedResult(Path modelPath) {
-        return engine.getCachedResult(modelPath);
+        return getEngine().getCachedResult(modelPath);
     }
 
     /**
      * Clear the quantization results cache.
      */
     public void clearCache() {
-        engine.clearCache();
+        getEngine().clearCache();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -255,6 +268,6 @@ public class QuantizationService {
      * Shutdown the quantization service.
      */
     public void shutdown() {
-        engine.shutdown();
+        getEngine().shutdown();
     }
 }

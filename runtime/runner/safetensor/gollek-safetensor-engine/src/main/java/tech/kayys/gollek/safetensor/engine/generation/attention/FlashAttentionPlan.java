@@ -38,7 +38,7 @@ record FlashAttentionPlan(ModelConfig config,
         FlashAttentionHeadLayout headLayout = FlashAttentionHeadLayout.resolve(in, config, layerIdx, modelPolicy);
         FlashAttentionNormalizationPolicy normalizationPolicy =
                 FlashAttentionNormalizationPolicy.resolve(in.arch, config, modelPolicy, normalizationOptions);
-        int kvLayerIdx = config.getSharedKvSourceLayer(layerIdx);
+        int kvLayerIdx = config.sharedKvSourceLayer(layerIdx);
         return new FlashAttentionPlan(
                 config,
                 modelPolicy,

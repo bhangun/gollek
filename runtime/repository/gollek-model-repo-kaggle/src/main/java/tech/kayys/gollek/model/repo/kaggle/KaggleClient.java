@@ -5,7 +5,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.model.download.DownloadProgressListener;
+import tech.kayys.alkhawarizm.spi.download.DownloadProgressListener;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,18 +49,35 @@ public class KaggleClient {
     }
 
     /**
-     * List files in a model repository.
+     * List files with metadata in a model repository.
      *
-     * @param modelSlug e.g. "google/gemma/2b"
-     * @return list of filenames
+     * @param modelSlug e.g. "google/gemma/2b" or "google/gemma-2/pyTorch/gemma-2-2b-it"
+     * @return list of KaggleFileEntry
      */
-    public List<String> listFiles(String modelSlug) throws IOException, InterruptedException {
-        String url = String.format("%s/v1/models/%s/list", config.apiBaseUrl(), modelSlug);
-        LOG.infof("Listing files from Kaggle model: %s", modelSlug);
+    public List<KaggleFileEntry> listModelFiles(String modelSlug) throws IOException, InterruptedException {
+        String cleanSlug = cleanSlug(modelSlug);
+        String url = String.format("%s/v1/models/%s/list", config.apiBaseUrl(), cleanSlug);
+        LOG.infof("Listing files from Kaggle model: %s", cleanSlug);
 
         HttpResponse<String> response = httpClient.send(
                 buildGetRequest(url),
                 HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() == 401 || response.statusCode() == 403) {
+            throw new IOException(String.format(
+                    "Kaggle authentication failed (HTTP %d). "
+                            + "Please configure your Kaggle credentials via ~/.kaggle/kaggle.json "
+                            + "or KAGGLE_USERNAME and KAGGLE_KEY environment variables.",
+                    response.statusCode()));
+        }
+
+        if (response.statusCode() == 404) {
+            throw new IOException(String.format(
+                    "Kaggle model not found: '%s' (HTTP 404). "
+                            + "Please check the slug format (e.g., owner/model/framework/variation) "
+                            + "and ensure it is a published Model on kaggle.com/models.",
+                    cleanSlug));
+        }
 
         if (response.statusCode() != 200) {
             throw new IOException(String.format(
@@ -68,10 +85,19 @@ public class KaggleClient {
                     response.statusCode(), response.body()));
         }
 
-        // Parse response — Kaggle returns {"files": [{"path": "...", "size": ...}]}
         KaggleFileList fileList = objectMapper.readValue(response.body(), KaggleFileList.class);
-        return fileList.files().stream()
-                .map(f -> f.path())
+        return fileList.files() != null ? fileList.files() : List.of();
+    }
+
+    /**
+     * List file names in a model repository.
+     *
+     * @param modelSlug e.g. "google/gemma/2b"
+     * @return list of filenames
+     */
+    public List<String> listFiles(String modelSlug) throws IOException, InterruptedException {
+        return listModelFiles(modelSlug).stream()
+                .map(KaggleFileEntry::path)
                 .toList();
     }
 
@@ -84,19 +110,26 @@ public class KaggleClient {
             Path targetPath,
             DownloadProgressListener progressListener) throws IOException, InterruptedException {
 
+        String cleanSlug = cleanSlug(modelSlug);
         String url = String.format(
                 "%s/v1/models/%s/download/%s",
-                config.apiBaseUrl(), modelSlug, filename);
+                config.apiBaseUrl(), cleanSlug, filename);
 
-        LOG.infof("Downloading: %s from Kaggle model %s", filename, modelSlug);
+        LOG.infof("Downloading: %s from Kaggle model %s", filename, cleanSlug);
 
         HttpResponse<InputStream> response = httpClient.send(
                 buildGetRequest(url),
                 HttpResponse.BodyHandlers.ofInputStream());
 
+        if (response.statusCode() == 401 || response.statusCode() == 403) {
+            throw new IOException(String.format(
+                    "Kaggle authentication failed downloading %s (HTTP %d). Check Kaggle credentials.",
+                    filename, response.statusCode()));
+        }
+
         if (response.statusCode() != 200) {
             throw new IOException(String.format(
-                    "Failed to download file: %d", response.statusCode()));
+                    "Failed to download file '%s' from Kaggle: HTTP %d", filename, response.statusCode()));
         }
 
         long contentLength = response.headers()
@@ -166,18 +199,67 @@ public class KaggleClient {
                 .header("User-Agent", config.userAgent())
                 .GET();
 
-        configuredKey().ifPresent(key -> builder.header("Authorization", "Bearer " + key));
+        resolveCredentials().ifPresent(creds -> {
+            if (!creds.username().isBlank()) {
+                String auth = creds.username() + ":" + creds.key();
+                String encoded = java.util.Base64.getEncoder().encodeToString(
+                        auth.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                builder.header("Authorization", "Basic " + encoded);
+            } else {
+                builder.header("Authorization", "Bearer " + creds.key());
+            }
+        });
         return builder.build();
     }
 
-    private Optional<String> configuredKey() {
-        return config.token()
-                .map(String::trim)
-                .filter(k -> !k.isBlank() && !k.contains("${"));
+    public record KaggleCredentials(String username, String key) {}
+
+    public Optional<KaggleCredentials> resolveCredentials() {
+        if (config != null && config.username().isPresent() && config.token().isPresent()) {
+            String u = config.username().get().trim();
+            String k = config.token().get().trim();
+            if (!u.isBlank() && !k.isBlank() && !u.contains("${") && !k.contains("${")) {
+                return Optional.of(new KaggleCredentials(u, k));
+            }
+        }
+
+        String envUser = System.getenv("KAGGLE_USERNAME");
+        String envKey = System.getenv("KAGGLE_KEY");
+        if (envUser != null && !envUser.isBlank() && envKey != null && !envKey.isBlank()) {
+            return Optional.of(new KaggleCredentials(envUser.trim(), envKey.trim()));
+        }
+
+        String envToken = System.getenv("KAGGLE_API_TOKEN");
+        if (envToken == null || envToken.isBlank()) envToken = System.getenv("KAGGLE_TOKEN");
+        if (envToken != null && !envToken.isBlank()) {
+            return Optional.of(new KaggleCredentials("", envToken.trim()));
+        }
+
+        try {
+            Path kaggleJson = Path.of(System.getProperty("user.home"), ".kaggle", "kaggle.json");
+            if (Files.exists(kaggleJson)) {
+                String content = Files.readString(kaggleJson);
+                var node = objectMapper.readTree(content);
+                if (node.has("username") && node.has("key")) {
+                    return Optional.of(new KaggleCredentials(node.get("username").asText(), node.get("key").asText()));
+                }
+            }
+        } catch (Exception ignored) {}
+
+        return Optional.empty();
+    }
+
+    private String cleanSlug(String raw) {
+        if (raw == null) return "";
+        String s = raw.trim();
+        if (s.startsWith("kg:")) s = s.substring(3).trim();
+        if (s.startsWith("kaggle:")) s = s.substring(7).trim();
+        if (s.startsWith("kaggle://")) s = s.substring(9).trim();
+        return s;
     }
 
     // ── Inner records for JSON parsing ──────────────────────────────────
 
-    record KaggleFileList(List<KaggleFileEntry> files) {}
-    record KaggleFileEntry(String path, long size) {}
+    public record KaggleFileList(List<KaggleFileEntry> files) {}
+    public record KaggleFileEntry(String path, long size) {}
 }

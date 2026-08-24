@@ -18,7 +18,7 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":core:plugin:gollek-plugin-runner-core"))
+    implementation(project(":plugin:gollek-plugin-runner-core"))
     implementation(project(":runner:tensorrt:gollek-runner-tensorrt"))
     compileOnly(group = "org.jboss.logging", name = "jboss-logging")
     testImplementation(group = "org.junit.jupiter", name = "junit-jupiter")

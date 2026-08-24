@@ -25,7 +25,7 @@ public class SlidingWindowAttention {
      * Get the window size from model config.
      */
     public static int windowSize(ModelConfig config) {
-        return config.getSlidingWindowSize();
+        return config.slidingWindowSize();
     }
 
     /**

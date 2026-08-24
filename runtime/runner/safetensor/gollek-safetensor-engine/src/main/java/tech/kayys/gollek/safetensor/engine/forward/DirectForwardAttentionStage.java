@@ -44,7 +44,7 @@ final class DirectForwardAttentionStage {
         // Qwen3.6 attn_output_gate hack: slice q_proj weight in half
         // so standard FlashAttention gets the correct head dimension.
         if (attnIn.qW != null) {
-            long expectedQRows = (long) ctx.config().getNumAttentionHeads() * ctx.config().getResolvedHeadDim();
+            long expectedQRows = (long) ctx.config().numAttentionHeads() * ctx.config().resolvedHeadDim();
             if (expectedQRows > 0 && attnIn.qW.size(0) == expectedQRows * 2) {
                 if (ctx.verboseLayers()) {
                     System.err.printf("[DEBUG] Layer %d slicing qW from %d to %d for attn_output_gate%n",
@@ -88,7 +88,7 @@ final class DirectForwardAttentionStage {
 
         DirectForwardElementwiseOps.residualAdd(ctx.runtime().log(), ctx.runtime().metalBinding(),
                 ctx.hiddenIn(), attnOut, ctx.hiddenOut(),
-                ctx.seqLen(), ctx.config().getHiddenSize(), ctx.useNativeElementwiseAdd());
+                ctx.seqLen(), ctx.config().hiddenSize(), ctx.useNativeElementwiseAdd());
         attnOut.close();
         if (ctx.verboseLayers()) {
             logSegmentStats(ctx.hiddenOut(), ctx.hiddenShape(), "layer " + ctx.layerIdx() + " postAttnResidual");

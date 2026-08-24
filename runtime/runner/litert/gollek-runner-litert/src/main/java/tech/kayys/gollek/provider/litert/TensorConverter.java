@@ -3,7 +3,7 @@ package tech.kayys.gollek.provider.litert;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import tech.kayys.gollek.error.ErrorCode;
+import tech.kayys.alkhawarizm.error.ErrorCode;
 
 /**
  * Utility for converting between platform tensors and native tensor formats.

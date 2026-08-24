@@ -110,7 +110,7 @@ public final class SlidingWindowAttention {
      */
     public static int windowSize(ModelConfig config) {
         return config.hasSlidingWindow()
-                ? config.getSlidingWindowSize()
+                ? config.slidingWindowSize()
                 : Integer.MAX_VALUE;
     }
 
@@ -119,7 +119,7 @@ public final class SlidingWindowAttention {
      */
     public static int windowSize(ModelConfig config, int layerIdx) {
         return config.isSlidingAttentionLayer(layerIdx)
-                ? config.getSlidingWindowSize()
+                ? config.slidingWindowSize()
                 : Integer.MAX_VALUE;
     }
 

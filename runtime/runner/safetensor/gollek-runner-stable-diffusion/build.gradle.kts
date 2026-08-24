@@ -20,7 +20,7 @@ repositories {
 dependencies {
     implementation("tech.kayys.alkhawarizm:alkhawarizm-spi-model:0.1.0-SNAPSHOT")
     implementation(project(":spi:gollek-spi-inference"))
-    implementation(project(":core:gollek-model-runner"))
+    implementation(project(":core:gollek-core"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":core:gollek-tokenizer-core"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-safetensor-spi:0.1.0-SNAPSHOT")

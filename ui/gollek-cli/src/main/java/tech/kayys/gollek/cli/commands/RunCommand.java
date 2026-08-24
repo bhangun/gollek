@@ -19,7 +19,7 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Parameters;
 import tech.kayys.gollek.cli.GollekCommand;
-import tech.kayys.gollek.model.download.DownloadProgressListener;
+import tech.kayys.alkhawarizm.spi.download.DownloadProgressListener;
 import tech.kayys.gollek.model.repo.hf.HuggingFaceClient;
 import tech.kayys.gollek.model.repo.local.GollekManifest;
 import tech.kayys.gollek.model.repo.local.ManifestStore;
@@ -30,7 +30,7 @@ import tech.kayys.gollek.onnx.runner.PaddleOcrVlOnnxProbe;
 import tech.kayys.gollek.sdk.model.ModelResolver;
 import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.alkhawarizm.spi.model.ModelConfig;
-import tech.kayys.alkhawarizm.spi.model.loader.ModelConfigLoader;
+import tech.kayys.alkhawarizm.spi.model.ModelLoader;
 import tech.kayys.alkhawarizm.spi.model.ModelInfo;
 import tech.kayys.gollek.sdk.model.ModelResolution;
 import tech.kayys.gollek.sdk.model.PullProgress;
@@ -139,6 +139,15 @@ public class RunCommand implements Runnable {
     @Option(names = { "--no-banner" }, description = "Suppress header and footer output")
     public boolean noBanner;
 
+    @Option(names = { "--no-info" }, description = "Suppress performance statistic output")
+    public boolean noInfo;
+
+    @Option(names = { "--only-text" }, description = "Only print generated text, equivalent to --no-banner --no-info")
+    public boolean onlyText;
+
+    @Option(names = { "--raw" }, description = "Raw response from inference calculation before json mapping")
+    public boolean raw;
+
     @Option(names = { "--modelFile" }, description = "Path to a local model file (.gguf, .tflite, .task, .litertlm)")
     public String modelFile;
 
@@ -188,7 +197,7 @@ public class RunCommand implements Runnable {
             "--enable-json" }, description = "Emit OpenAI-compatible SSE JSON for streamed chunks", defaultValue = "false")
     boolean enableJsonSse;
 
-    @Option(names = { "--max-tokens" }, description = "Maximum tokens to generate", defaultValue = "256")
+    @Option(names = { "--max-tokens" }, description = "Maximum tokens to generate", defaultValue = "2048")
     int maxTokens;
 
     @Option(names = { "--mirostat" }, description = "Mirostat mode (0, 1, 2)", defaultValue = "0")
@@ -529,6 +538,11 @@ public class RunCommand implements Runnable {
 
     @Override
     public void run() {
+        if (onlyText) {
+            noBanner = true;
+            noInfo = true;
+        }
+        
         try (ExternalModelFamilyPluginScope ignored =
                 ExternalModelFamilyPluginScope.attach(
                         externalPluginClasspath,
@@ -1326,6 +1340,7 @@ public class RunCommand implements Runnable {
             if (outputPath != null) requestBuilder.parameter("output_path", outputPath);
             if (width != null) requestBuilder.parameter("width", width);
             if (height != null) requestBuilder.parameter("height", height);
+            requestBuilder.parameter("raw", raw);
             if (!normalizedInputImages.isEmpty()) {
                 requestBuilder.parameter("image_path", normalizedInputImages.get(0));
                 requestBuilder.parameter("input_image", normalizedInputImages.get(0));
@@ -5768,16 +5783,16 @@ public class RunCommand implements Runnable {
 
         try {
             Path configPath = Path.of(localPath).resolve("config.json");
-            ModelConfig parsed = new ModelConfigLoader(new ObjectMapper()).load(configPath);
-            String modelType = parsed.getModelType() == null ? "" : parsed.getModelType().toLowerCase(Locale.ROOT);
-            String architecture = parsed.getPrimaryArchitecture() == null
+            ModelConfig parsed = ModelConfig.load(configPath, new ObjectMapper());
+            String modelType = parsed.modelType() == null ? "" : parsed.modelType().toLowerCase(Locale.ROOT);
+            String architecture = parsed.primaryArchitecture() == null
                     ? ""
-                    : parsed.getPrimaryArchitecture().toLowerCase(Locale.ROOT);
+                    : parsed.primaryArchitecture().toLowerCase(Locale.ROOT);
             boolean gemma4UnifiedWrapper = isGemma4UnifiedWrapper(modelType, architecture);
             boolean resolvedGemma4Text = modelType.startsWith("gemma4")
-                    && parsed.getHiddenSize() > 0
-                    && parsed.getNumHiddenLayers() > 0
-                    && parsed.getNumAttentionHeads() > 0;
+                    && parsed.hiddenSize() > 0
+                    && parsed.numHiddenLayers() > 0
+                    && parsed.numAttentionHeads() > 0;
             if (resolvedGemma4Text) {
                 return null;
             }
@@ -6061,8 +6076,14 @@ public class RunCommand implements Runnable {
     String[] buildStandaloneGgufFastRunArgs(boolean suppressBanner) {
         List<String> args = new java.util.ArrayList<>();
         args.add("run");
-        if (suppressBanner) {
+        if (suppressBanner || noBanner) {
             args.add("--no-banner");
+        }
+        if (noInfo) {
+            args.add("--no-info");
+        }
+        if (raw) {
+            args.add("--raw");
         }
         if (modelFile != null && !modelFile.isBlank()) {
             args.add("--modelFile");
@@ -6593,7 +6614,7 @@ public class RunCommand implements Runnable {
         printQuantCacheInfo(metadata);
         printKvCacheQuantizationInfo(metadata);
         System.out.println();
-        System.out.println(ChatUIRenderer.GREEN + response.getContent() + ChatUIRenderer.RESET);
+        System.out.println(ChatUIRenderer.GREEN + (raw ? response.getContent() : GgufFastRun.stripThinkingChannels(response.getContent())) + ChatUIRenderer.RESET);
         if (response.getSessionId() != null && !response.getSessionId().isBlank()) {
             System.out.println(ChatUIRenderer.DIM + "Session: " + response.getSessionId() + ChatUIRenderer.RESET);
         }
@@ -6928,8 +6949,9 @@ public class RunCommand implements Runnable {
             printAudioRunStats(metadata, durationMs);
             return;
         }
-        uiRenderer.printStats(tokenCount, durationMs / 1000.0, tps, ttftMs, noBanner);
-        uiRenderer.printBenchmarks(metadata, noBanner);
+        uiRenderer.printStats(tokenCount, durationMs / 1000.0, tps, ttftMs, noBanner || noInfo);
+        uiRenderer.printBenchmarks(metadata, noBanner || noInfo);
+
     }
 
     private void printAudioRunStats(Map<String, Object> metadata, long fallbackDurationMs) {

@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import tech.kayys.gollek.registry.repository.ModelRepositoryRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelRepository;
 
 /**
  * Cached wrapper around model repositories.
@@ -27,19 +27,16 @@ import io.quarkus.cache.CacheInvalidateAll;
 public class CachedModelRepository {
 
     @Inject
-    jakarta.enterprise.inject.Instance<tech.kayys.gollek.model.core.ModelRepository> repositories;
-
-    @Inject
-    ModelRepositoryRegistry registry;
+    jakarta.enterprise.inject.Instance<tech.kayys.alkhawarizm.spi.model.ModelRepository> repositories;
 
     /**
      * Get repositories in prioritized order: Local > HuggingFace > Others (Kaggle,
      * etc.)
      */
-    private List<tech.kayys.gollek.model.core.ModelRepository> getPrioritizedRepositories() {
-        List<tech.kayys.gollek.model.core.ModelRepository> local = new ArrayList<>();
-        List<tech.kayys.gollek.model.core.ModelRepository> hf = new ArrayList<>();
-        List<tech.kayys.gollek.model.core.ModelRepository> others = new ArrayList<>();
+    private List<tech.kayys.alkhawarizm.spi.model.ModelRepository> getPrioritizedRepositories() {
+        List<tech.kayys.alkhawarizm.spi.model.ModelRepository> local = new ArrayList<>();
+        List<tech.kayys.alkhawarizm.spi.model.ModelRepository> hf = new ArrayList<>();
+        List<tech.kayys.alkhawarizm.spi.model.ModelRepository> others = new ArrayList<>();
 
         for (var repo : repositories) {
             String className = repo.getClass().getSimpleName();
@@ -52,7 +49,7 @@ public class CachedModelRepository {
             }
         }
 
-        List<tech.kayys.gollek.model.core.ModelRepository> prioritized = new ArrayList<>();
+        List<tech.kayys.alkhawarizm.spi.model.ModelRepository> prioritized = new ArrayList<>();
         prioritized.addAll(local);
         prioritized.addAll(hf);
         prioritized.addAll(others);

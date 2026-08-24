@@ -46,7 +46,7 @@ public final class GollekChatService {
                 .onItem().invoke(chunk -> {
                     obs.getMetricsCollector().recordClientChunk(modelId);
                     // Approximation of TTFT for stream
-                    if (chunk.getText() != null && !chunk.getText().isEmpty()) {
+                    if (chunk.delta() != null && !chunk.delta().isEmpty()) {
                         obs.getMetricsCollector().recordClientTtft(modelId, System.currentTimeMillis() - startMs);
                     }
                 })

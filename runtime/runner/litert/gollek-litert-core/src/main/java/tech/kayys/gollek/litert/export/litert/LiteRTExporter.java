@@ -1,7 +1,7 @@
 package tech.kayys.gollek.ml.export.litert;
 
 import tech.kayys.alkhawarizm.core.tensor.Tensor;
-import tech.kayys.alkhawarizm.core.nn.Module;
+import tech.kayys.alkhawarizm.core.nn.NNModule;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -52,15 +52,15 @@ public final class LiteRTExporter {
     private static final int OP_CUSTOM = 32;
     private static final int TENSOR_FLOAT32 = 0;
 
-    private final Module model;
+    private final NNModule model;
     private final long[] inputShape;
 
-    private LiteRTExporter(Module model, long[] inputShape) {
+    private LiteRTExporter(NNModule model, long[] inputShape) {
         this.model = model;
         this.inputShape = inputShape;
     }
 
-    public static LiteRTExporter fromModel(Module model, long[] inputShape) {
+    public static LiteRTExporter fromModel(NNModule model, long[] inputShape) {
         return new LiteRTExporter(model, inputShape);
     }
 

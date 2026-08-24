@@ -8,7 +8,9 @@ package tech.kayys.gollek.safetensor.engine.generation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.inject.Instance;
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.model.registry.ModelArchitectureRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPluginRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelArchitecture;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
 import tech.kayys.gollek.safetensor.engine.forward.DirectForwardPass;
 import tech.kayys.gollek.safetensor.engine.generation.kv.KVCacheManager;
 import tech.kayys.gollek.safetensor.engine.warmup.ModelWarmupService;
@@ -29,7 +31,7 @@ final class DirectInferenceComponentGraph {
     private final Supplier<AccelWeightBridge> weightBridge;
     private final Supplier<ObjectMapper> objectMapper;
     private final Supplier<QuantizationEngine> quantizationEngine;
-    private final Supplier<ModelArchitectureRegistry> architectureRegistry;
+    private final Supplier<ModelFamilyPluginRegistry> architectureRegistry;
     private final Supplier<DirectForwardPass> forwardPass;
     private final Supplier<TokenSampler> tokenSampler;
     private final Supplier<KVCacheManager> kvCacheManager;
@@ -47,7 +49,7 @@ final class DirectInferenceComponentGraph {
             Supplier<AccelWeightBridge> weightBridge,
             Supplier<ObjectMapper> objectMapper,
             Supplier<QuantizationEngine> quantizationEngine,
-            Supplier<ModelArchitectureRegistry> architectureRegistry,
+            Supplier<ModelFamilyPluginRegistry> architectureRegistry,
             Supplier<DirectForwardPass> forwardPass,
             Supplier<TokenSampler> tokenSampler,
             Supplier<KVCacheManager> kvCacheManager,

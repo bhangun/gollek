@@ -2,7 +2,7 @@ package tech.kayys.gollek.extension;
 
 import org.jboss.logging.Logger;
 import tech.kayys.gollek.runner.ModelRunner;
-import tech.kayys.gollek.runner.RunnerMetrics;
+import tech.kayys.gollek.runner.RunnerStats;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.alkhawarizm.spi.model.ResourceMetrics;
 
@@ -26,10 +26,10 @@ public abstract class AbstractGollekRunner implements ModelRunner {
     protected volatile boolean initialized = false;
 
     @Override
-    public RunnerMetrics metrics() {
+    public RunnerStats metrics() {
         long reqs = totalRequests.get();
         long avg = reqs > 0 ? totalLatencyMs.get() / reqs : 0L;
-        return RunnerMetrics.builder()
+        return RunnerStats.builder()
                 .totalRequests(reqs)
                 .failedRequests(totalFailures.get())
                 .averageLatencyMs(avg)

@@ -29,7 +29,9 @@ on:
       - "core/**"
       - "backend/**"
       - "buildSrc/**"
+      - "framework/**"
       - "gradle/**"
+      - "observability/**"
       - "plugins/**"
       - "provider/**"
       - "repository/**"
@@ -158,3 +160,45 @@ jobs:
           export GOLLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch"
           export GOLLEK_LIBTORCH_LIB_PATH="$HOME/.gollek/source/vendor/libtorch/lib"
           ./gradlew --no-daemon --stacktrace :ui:gollek-cli:buildNative -x test
+
+  publish-snapshot:
+    name: Publish Snapshot to Maven Local
+    runs-on: ubuntu-latest
+    needs: [build-jvm]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Prepare llama.cpp source
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOLLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp" \
+          ./scripts/prepare-llama-source.sh
+
+      - name: Prepare libtorch source
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOLLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch" \
+          ./scripts/prepare-libtorch-source.sh
+
+      - name: Publish snapshot
+        shell: bash
+        env:
+          GRADLE_OPTS: -Xmx3G
+        run: |
+          set -euo pipefail
+          export GOLLEK_LLAMA_SOURCE_DIR="$HOME/.gollek/source/vendor/llama.cpp"
+          export GOLLEK_LIBTORCH_SOURCE_DIR="$HOME/.gollek/source/vendor/libtorch"
+          export GOLLEK_LIBTORCH_LIB_PATH="$HOME/.gollek/source/vendor/libtorch/lib"
+          ./gradlew --no-daemon publishToMavenLocal -x test

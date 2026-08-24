@@ -22,7 +22,7 @@ dependencies {
     implementation("tech.kayys.alkhawarizm:alkhawarizm-spi-model:0.1.0-SNAPSHOT")
     implementation(project(":spi:gollek-spi"))
     implementation(project(":spi:gollek-spi-inference"))
-    implementation(project(":core:gollek-model-repository"))
+    implementation(project(":core:gollek-core"))
     implementation("jakarta.validation:jakarta.validation-api:3.0.2")
     implementation(group = "io.quarkus", name = "quarkus-micrometer")
     implementation(group = "io.quarkus", name = "quarkus-micrometer-registry-prometheus")
@@ -32,6 +32,8 @@ dependencies {
     implementation(group = "io.quarkus", name = "quarkus-smallrye-fault-tolerance")
     implementation(group = "io.quarkus", name = "quarkus-cache")
     implementation(group = "io.quarkus", name = "quarkus-config-yaml")
+    implementation("io.quarkus:quarkus-rest")
+    implementation("io.quarkus:quarkus-rest-jackson")
 }
 
 publishing {

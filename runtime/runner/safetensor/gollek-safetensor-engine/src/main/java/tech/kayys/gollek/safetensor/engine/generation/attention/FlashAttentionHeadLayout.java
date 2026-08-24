@@ -18,8 +18,8 @@ record FlashAttentionHeadLayout(int numQueryHeads, int numKeyValueHeads, int hea
 
     static FlashAttentionHeadLayout resolve(AttentionInput in, ModelConfig config, int layerIdx,
             FlashAttentionModelPolicy modelPolicy) {
-        int numQueryHeads = config.getNumAttentionHeads();
-        int numKeyValueHeads = config.getResolvedNumKvHeadsForLayer(layerIdx);
+        int numQueryHeads = config.numAttentionHeads();
+        int numKeyValueHeads = config.resolvedNumKvHeadsForLayer(layerIdx);
         boolean packedQkv = FlashAttentionPackedQkvPolicy.shouldUse(
                 in, config, numQueryHeads, numKeyValueHeads, modelPolicy);
         AccelTensor queryWeight = in == null ? null : in.qW;

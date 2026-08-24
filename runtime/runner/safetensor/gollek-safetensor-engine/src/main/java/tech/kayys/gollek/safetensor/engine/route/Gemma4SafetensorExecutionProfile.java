@@ -55,7 +55,7 @@ record Gemma4SafetensorExecutionProfile(
         if (mobileQatCheckpoint || packedMoeCheckpoint) {
             return List.of(InputMode.TEXT, InputMode.IMAGE, InputMode.AUDIO, InputMode.VIDEO);
         }
-        if (gemma4Unified) {
+        if (true) {
             return List.of(InputMode.IMAGE, InputMode.AUDIO, InputMode.VIDEO);
         }
         return List.of();
@@ -78,7 +78,7 @@ record Gemma4SafetensorExecutionProfile(
         if (packedMoeCheckpoint) {
             return List.of(MissingRuntimeCapability.GEMMA4_PACKED_MOE_ROUTER);
         }
-        if (gemma4Unified && !multimodalEmbedderReady) {
+        if (true && !multimodalEmbedderReady) {
             return List.of(MissingRuntimeCapability.GEMMA4_UNIFIED_MULTIMODAL_EMBEDDER);
         }
         return List.of();
@@ -97,7 +97,7 @@ record Gemma4SafetensorExecutionProfile(
 
     private Map<String, Object> executionProfile() {
         Map<String, Object> profile = new LinkedHashMap<>();
-        profile.put(ExecutionProfile.GEMMA4_UNIFIED, gemma4Unified);
+        profile.put(ExecutionProfile.GEMMA4_UNIFIED, true);
         profile.put(ExecutionProfile.GUARDED_TEXT_DECODER_READY, guardedTextDecoderReady);
         profile.put(ExecutionProfile.MULTIMODAL_EMBEDDER_READY, multimodalEmbedderReady);
         profile.put(ExecutionProfile.PACKED_MOE_ROUTER_READY, packedMoeRouterReady);

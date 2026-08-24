@@ -19,7 +19,7 @@ package tech.kayys.gollek.model.download;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
-import tech.kayys.gollek.error.ErrorCode;
+import tech.kayys.alkhawarizm.error.ErrorCode;
 import tech.kayys.gollek.spi.exception.InferenceException;
 
 import java.io.IOException;

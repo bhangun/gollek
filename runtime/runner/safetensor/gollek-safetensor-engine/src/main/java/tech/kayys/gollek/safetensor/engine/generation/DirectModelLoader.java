@@ -7,16 +7,18 @@ package tech.kayys.gollek.safetensor.engine.generation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.model.registry.ModelArchitectureRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPluginRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelArchitecture;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
 import tech.kayys.alkhawarizm.safetensor.core.tensor.AccelTensor;
-import tech.kayys.gollek.safetensor.engine.runtime.ModelRuntimeTraitsResolver;
+
 import tech.kayys.alkhawarizm.safetensor.loader.SafetensorLoaderFacade;
 import tech.kayys.alkhawarizm.safetensor.loader.SafetensorShardLoader.SafetensorShardSession;
 import tech.kayys.alkhawarizm.safetensor.quantization.QuantizationEngine;
 import tech.kayys.alkhawarizm.safetensor.quantization.bridge.AccelWeightBridge;
 import tech.kayys.alkhawarizm.spi.model.ModelArchitecture;
 import tech.kayys.alkhawarizm.spi.model.ModelConfig;
-import tech.kayys.alkhawarizm.spi.model.loader.ModelConfigLoader;
+import tech.kayys.alkhawarizm.spi.model.ModelConfig;
 import tech.kayys.alkhawarizm.spi.model.ModelRuntimeTraits;
 import tech.kayys.gollek.tokenizer.runtime.TokenizerFactory;
 import tech.kayys.gollek.tokenizer.spi.Tokenizer;
@@ -39,13 +41,13 @@ final class DirectModelLoader {
     private final Supplier<AccelWeightBridge> weightBridge;
     private final Supplier<ObjectMapper> objectMapper;
     private final Supplier<QuantizationEngine> quantizationEngine;
-    private final Supplier<ModelArchitectureRegistry> architectureRegistry;
+    private final Supplier<ModelFamilyPluginRegistry> architectureRegistry;
 
     DirectModelLoader(Supplier<SafetensorLoaderFacade> safetensorLoader,
             Supplier<AccelWeightBridge> weightBridge,
             Supplier<ObjectMapper> objectMapper,
             Supplier<QuantizationEngine> quantizationEngine,
-            Supplier<ModelArchitectureRegistry> architectureRegistry) {
+            Supplier<ModelFamilyPluginRegistry> architectureRegistry) {
         this.safetensorLoader = Objects.requireNonNull(safetensorLoader, "safetensorLoader");
         this.weightBridge = Objects.requireNonNull(weightBridge, "weightBridge");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
@@ -58,8 +60,12 @@ final class DirectModelLoader {
 
         Arena weightArena = Arena.ofAuto();
         ModelConfig config = loadConfig(modelPath);
-        ModelArchitecture architecture = architectureRegistry.get().resolve(config);
-        ModelRuntimeTraits runtimeTraits = ModelRuntimeTraitsResolver.resolve(architecture, config);
+        ModelArchitecture architecture = null;
+        ModelFamilyPlugin plugin = architectureRegistry.get().all().stream().filter(p -> p.architectureAdapters().stream().anyMatch(a -> a.supportedArchClassNames().contains(config.primaryArchitecture()))).findFirst().orElse(null);
+        if (plugin != null) {
+            architecture = plugin.architectureAdapters().stream().filter(a -> a.supportedArchClassNames().contains(config.primaryArchitecture())).findFirst().orElse(null);
+        }
+        ModelRuntimeTraits runtimeTraits = plugin != null ? plugin.runtimeTraits(config) : ModelRuntimeTraits.fallbackFromConfig(config);
         WeightLoadResult weightLoadResult = loadWeights(modelPath, effectiveQuantStrategy, config, runtimeTraits);
         Map<String, AccelTensor> weights = weightLoadResult.weights();
         Tokenizer tokenizer = loadTokenizerWithContext(modelPath);
@@ -145,7 +151,7 @@ final class DirectModelLoader {
         try {
             Path configDir = Files.isRegularFile(modelPath) ? modelPath.getParent() : modelPath;
             if (configDir != null) {
-                return new ModelConfigLoader(objectMapper.get()).loadFromDirectory(configDir);
+                return ModelConfig.fromDirectory(configDir, objectMapper.get());
             }
             return new ModelConfig();
         } catch (IOException e) {

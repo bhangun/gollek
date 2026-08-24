@@ -97,7 +97,7 @@ public interface ModelRunner extends AutoCloseable {
      * 
      * @return Runtime metrics
      */
-    RunnerMetrics metrics();
+    RunnerStats metrics();
 
     /**
      * Initialize the runner with model artifacts and configuration.

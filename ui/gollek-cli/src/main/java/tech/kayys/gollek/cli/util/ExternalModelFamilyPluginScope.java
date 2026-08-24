@@ -79,10 +79,10 @@ public final class ExternalModelFamilyPluginScope implements AutoCloseable {
             if (pluginChecker != null) {
                 pluginChecker.getModelFamilyPluginRegistry(null);
             } else {
-                registry.discoverServiceLoaderPlugins();
+                java.util.ServiceLoader.load(ModelFamilyPlugin.class).forEach(registry::register);
             }
             before = modelFamilyPluginSnapshot(registry);
-            registry.discoverServiceLoaderPlugins(classpathScope.discoveryClassLoader());
+            java.util.ServiceLoader.load(ModelFamilyPlugin.class, classpathScope.discoveryClassLoader()).forEach(registry::register);
             Map<String, ModelFamilyPlugin> after = modelFamilyPluginSnapshot(registry);
 
             List<String> detachablePluginIds = new ArrayList<>();

@@ -2,6 +2,7 @@ package tech.kayys.gollek.sdk.core;
 
 import io.smallrye.mutiny.Multi;
 
+import tech.kayys.gollek.sdk.core.observability.SdkMetricsCollector;
 import tech.kayys.gollek.sdk.exception.SdkException;
 import tech.kayys.gollek.sdk.feature.GollekFeatureKit;
 import tech.kayys.gollek.sdk.mcp.McpRegistryManager;
@@ -234,6 +235,14 @@ public interface GollekSdk {
     List<ModelInfo> listModels(int offset, int limit) throws SdkException;
 
     /**
+     * Legacy method required by old agent-core.
+     */
+    default List<String> listAvailableProviders() {
+        return List.of();
+    }
+
+
+    /**
      * List models filtered by format — NEW in v0.1.4.
      *
      * @param format GGUF, SAFETENSORS, etc. {@code null} = all formats.
@@ -343,11 +352,30 @@ public interface GollekSdk {
 
     /**
      * Get real-time performance metrics for a provider/model pair.
-     * 
-     * @return Map containing latency, error rate, etc.
+     *
+     * <p>The returned map includes latency/error-rate data merged with current
+     * resource utilization ({@code cpu_load}, {@code heap_used_mb}, etc.).
+     *
+     * @return Map containing latency, error rate, and resource metrics.
      */
     default Map<String, Object> getMetrics(String providerId, String modelId) throws SdkException {
         return Map.of();
+    }
+
+    /**
+     * Returns a point-in-time snapshot of CPU and memory utilization.
+     * Useful for capacity planning, auto-scaling decisions, and dashboards.
+     *
+     * <p>CPU values are in the range [0.0, 1.0].
+     * Memory values are in bytes.
+     *
+     * <p>NEW in v1.4.0.
+     *
+     * @return resource snapshot, or {@link SdkMetricsCollector.ResourceSnapshot#unavailable()}
+     *         if not supported by the SDK implementation.
+     */
+    default SdkMetricsCollector.ResourceSnapshot getResourceSnapshot() throws SdkException {
+        return SdkMetricsCollector.ResourceSnapshot.unavailable();
     }
 
     /**

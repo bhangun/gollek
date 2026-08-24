@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+package tech.kayys.gollek.protobuf;
+
+option java_multiple_files = true;
+option java_package = "tech.kayys.gollek.protobuf";
+
+// ----------------------------------------
+// Gollek Inference Services
+// ----------------------------------------
+service GollekService {
+  rpc Chat (ChatRequest) returns (ChatResponse);
+  rpc StreamChat (ChatRequest) returns (stream ChatResponse);
+  rpc Complete (CompletionRequest) returns (CompletionResponse);
+  rpc StreamComplete (CompletionRequest) returns (stream CompletionResponse);
+}
+
+message Message {
+  string role = 1;
+  string content = 2;
+}
+
+message ChatRequest {
+  string model_id = 1;
+  repeated Message messages = 2;
+  float temperature = 3;
+  int32 max_tokens = 4;
+}
+
+message ChatResponse {
+  string id = 1;
+  Message message = 2;
+  string finish_reason = 3;
+  int32 prompt_tokens = 4;
+  int32 completion_tokens = 5;
+}
+
+message CompletionRequest {
+  string model_id = 1;
+  string prompt = 2;
+  float temperature = 3;
+  int32 max_tokens = 4;
+}
+
+message CompletionResponse {
+  string id = 1;
+  string text = 2;
+  string finish_reason = 3;
+  int32 prompt_tokens = 4;
+  int32 completion_tokens = 5;
+}
+
+// ----------------------------------------
+// Model Registry Services
+// ----------------------------------------
+service ModelService {
+  rpc ListModels (ListModelsRequest) returns (ListModelsResponse);
+  rpc GetModelManifest (GetModelManifestRequest) returns (GetModelManifestResponse);
+}
+
+message ListModelsRequest {
+  string query = 1;
+}
+
+message ModelMetadata {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string format = 4;
+}
+
+message ListModelsResponse {
+  repeated ModelMetadata models = 1;
+}
+
+message GetModelManifestRequest {
+  string model_id = 1;
+}
+
+message GetModelManifestResponse {
+  string manifest_json = 1;
+}
+
+// ----------------------------------------
+// Download Management Services
+// ----------------------------------------
+service DownloadService {
+  rpc StartDownload (StartDownloadRequest) returns (DownloadState);
+  rpc PauseDownload (PauseDownloadRequest) returns (DownloadState);
+  rpc ResumeDownload (ResumeDownloadRequest) returns (DownloadState);
+  rpc GetDownloadStatus (GetDownloadStatusRequest) returns (DownloadState);
+}
+
+message StartDownloadRequest {
+  string model_id = 1;
+}
+
+message PauseDownloadRequest {
+  string model_id = 1;
+}
+
+message ResumeDownloadRequest {
+  string model_id = 1;
+}
+
+message GetDownloadStatusRequest {
+  string model_id = 1;
+}
+
+message DownloadState {
+  string model_id = 1;
+  int64 total_bytes = 2;
+  int64 bytes_downloaded = 3;
+  double percentage = 4;
+  string status = 5;
+  string error_message = 6;
+}

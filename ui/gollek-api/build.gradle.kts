@@ -7,12 +7,15 @@ val quarkusVersion = rootProject.extra["quarkusVersion"] as String
 
 configurations.configureEach {
     exclude(group = "tech.kayys.gollek", module = "gollek-safetensor-api")
+    exclude(group = "tech.kayys.alkhawarizm", module = "alkhawarizm-safetensor-api")
+    exclude(group = "tech.kayys.aljabr")
+    exclude(group = "tech.kayys.tafkir")
 }
 
 dependencies {
     implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
-    implementation(project(":core:gollek-ir"))
     implementation(project(":core:gollek-core"))
+    implementation(project(":core:gollek-tokenizer-core"))
     implementation(platform("io.quarkus.platform:quarkus-bom:$quarkusVersion"))
     implementation("io.quarkus:quarkus-arc")
     implementation("io.quarkus:quarkus-rest")

@@ -8,7 +8,7 @@ package tech.kayys.gollek.safetensor.engine.route;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import tech.kayys.alkhawarizm.spi.model.ModelConfig;
-import tech.kayys.alkhawarizm.spi.model.loader.ModelConfigLoader;
+import tech.kayys.alkhawarizm.spi.model.ModelConfig;
 import tech.kayys.alkhawarizm.spi.model.ModelRuntimeTraits;
 
 import java.nio.file.Files;
@@ -43,10 +43,10 @@ public record DirectSafetensorRunProfile(
             if (configDir == null) {
                 return unresolved();
             }
-            ModelConfig config = new ModelConfigLoader(OBJECT_MAPPER).loadFromDirectory(configDir);
+            ModelConfig config = ModelConfig.fromDirectory(configDir, OBJECT_MAPPER);
             return new DirectSafetensorRunProfile(
                     config,
-                    config.getModelType(),
+                    config.modelType(),
                     runtimeTraits(config));
         } catch (Exception ignored) {
             return unresolved();
@@ -65,8 +65,8 @@ public record DirectSafetensorRunProfile(
         if (config == null) {
             return false;
         }
-        String normalizedModelType = normalize(config.getModelType());
-        String normalizedArchitecture = normalize(config.getPrimaryArchitecture());
+        String normalizedModelType = normalize(config.modelType());
+        String normalizedArchitecture = normalize(config.primaryArchitecture());
         return normalizedModelType.equals("gemma4_unified")
                 || normalizedArchitecture.equals("gemma4unifiedforconditionalgeneration")
                 || normalizedArchitecture.equals("gemma4formultimodallm")
@@ -82,8 +82,7 @@ public record DirectSafetensorRunProfile(
     }
 
     public boolean requiresChatTemplateFormatting() {
-        return runtimeTraits.prompt().requiresChatTemplateFormatting();
-    }
+        return config != null && config.modelType() != null && config.modelType().contains("qwen");
     }
 
     private static String normalize(String value) {

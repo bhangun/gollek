@@ -5,8 +5,8 @@ plugins {
 dependencies {
     implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":sdk:gollek-sdk-api"))
-    implementation(project(":core:gollek-model-repository"))
-    implementation(project(":core:plugin:gollek-plugin-kernel-core"))
+    implementation(project(":core:gollek-core"))
+    implementation(project(":plugin:gollek-plugin-kernel-core"))
     implementation(project(":spi:gollek-spi"))
     implementation(project(":spi:gollek-spi-inference"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-spi-model:0.1.0-SNAPSHOT")

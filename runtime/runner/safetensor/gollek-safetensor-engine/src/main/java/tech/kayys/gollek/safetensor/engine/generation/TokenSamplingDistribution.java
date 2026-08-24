@@ -41,7 +41,7 @@ final class TokenSamplingDistribution {
     }
 
     private static float finalLogitSoftCap(ModelConfig modelConfig) {
-        Double cap = modelConfig == null ? null : modelConfig.getFinalLogitSoftcapping();
+        Double cap = modelConfig == null ? null : modelConfig.finalLogitSoftcapping();
         return cap != null && cap > 0 ? cap.floatValue() : 0.0f;
     }
 

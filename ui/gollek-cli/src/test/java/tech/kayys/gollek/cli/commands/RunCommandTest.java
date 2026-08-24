@@ -70,7 +70,7 @@ public class RunCommandTest {
                 Mockito.when(sdk.getModelInfo(eq("test-model")))
                                 .thenReturn(Optional.of(modelInfo));
 
-                Mockito.when(sdk.ensureModelAvailable(
+                Mockito.when(sdk.prepareModel(
                                 eq("test-model"),
                                 Mockito.<String>isNull(),
                                 Mockito.<String>isNull(),
@@ -123,7 +123,7 @@ public class RunCommandTest {
                                 });
                 Mockito.when(sdk.getModelInfo(eq("profile-model")))
                                 .thenReturn(Optional.of(modelInfo));
-                Mockito.when(sdk.ensureModelAvailable(
+                Mockito.when(sdk.prepareModel(
                                 eq("profile-model"),
                                 Mockito.<String>isNull(),
                                 Mockito.<String>isNull(),
@@ -181,7 +181,7 @@ public class RunCommandTest {
                 Mockito.when(sdk.getModelInfo(eq("external-run-model")))
                                 .thenReturn(Optional.of(modelInfo));
 
-                Mockito.when(sdk.ensureModelAvailable(
+                Mockito.when(sdk.prepareModel(
                                 eq("external-run-model"),
                                 Mockito.<String>isNull(),
                                 Mockito.<String>isNull(),

@@ -3,16 +3,17 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":core:gollek-runtime-config"))
+    implementation(project(":core:gollek-core"))
     implementation(project(":spi:gollek-spi"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-spi-model:0.1.0-SNAPSHOT")
     implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
-    implementation(project(":core:gollek-model-repository"))
+    implementation(project(":core:gollek-core"))
     implementation(project(":core:gollek-model-repo-local"))
     implementation("io.quarkus:quarkus-arc")
     implementation("io.quarkus:quarkus-rest-client")
     implementation("io.quarkus:quarkus-rest-client-jackson")
     implementation("io.smallrye.reactive:mutiny")
+    implementation("io.smallrye.config:smallrye-config:3.10.1")
     implementation("io.vertx:vertx-web-client:4.5.10")
     implementation("software.amazon.awssdk:s3:2.25.53")
     implementation("software.amazon.awssdk:s3-transfer-manager:2.25.53")
@@ -27,7 +28,6 @@ dependencies {
 sourceSets {
     main {
         java {
-            exclude("tech/kayys/gollek/model/repo/hf/HuggingFaceConfig.java")
         }
     }
 }

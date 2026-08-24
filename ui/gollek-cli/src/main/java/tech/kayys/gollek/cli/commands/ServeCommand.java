@@ -20,12 +20,20 @@ public class ServeCommand implements Runnable {
     @Option(names = {"--port"}, description = "Port to run the server on (default: 9131)")
     int port = 9131;
 
+    @Option(names = {"--grpc"}, description = "Only serve gRPC")
+    boolean grpcOnly = false;
+
+    @Option(names = {"--rest"}, description = "Only serve REST")
+    boolean restOnly = false;
+
     @Override
     public void run() {
         try {
             ServerCommand.ServeSubcommand subcommand = new ServerCommand.ServeSubcommand();
             subcommand.debug = this.debug;
             subcommand.port = this.port;
+            subcommand.grpcOnly = this.grpcOnly;
+            subcommand.restOnly = this.restOnly;
             subcommand.run();
         } catch (Exception e) {
             System.err.println("Error starting server: " + e.getMessage());

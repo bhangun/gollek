@@ -180,7 +180,6 @@ public final class ModelFamilyContractViolationReports {
         report.put(Violation.CODE, normalized.code());
         report.put(Violation.CATEGORY, category);
         report.put(Violation.REMEDIATION_HINT, remediationHint(category));
-        report.put(Violation.MESSAGE, normalized.message());
         report.put(Violation.SUMMARY, normalized.summary());
         return report;
     }

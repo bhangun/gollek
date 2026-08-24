@@ -116,14 +116,14 @@ public class MoeForwardPass {
             if (explicit > 0) {
                 maxExpertCacheBytes = explicit;
             } else {
-                long hiddenSize = config.getHiddenSize();
-                long intermSize = config.getMoeIntermediateSize() != null && config.getMoeIntermediateSize() > 0 
-                        ? config.getMoeIntermediateSize() 
-                        : (config.getIntermediateSize() > 0 ? config.getIntermediateSize() : hiddenSize * 4L);
-                long numExpertsPerTok = config.getNumExpertsPerTok() != null && config.getNumExpertsPerTok() > 0
-                        ? config.getNumExpertsPerTok()
+                long hiddenSize = config.hiddenSize();
+                long intermSize = config.moeIntermediateSize() > 0 
+                        ? config.moeIntermediateSize() 
+                        : (config.intermediateSize() > 0 ? config.intermediateSize() : hiddenSize * 4L);
+                long numExpertsPerTok = config.numExpertsPerTok() > 0
+                        ? config.numExpertsPerTok()
                         : 1;
-                long numHiddenLayers = config.getNumHiddenLayers() > 0 ? config.getNumHiddenLayers() : 32;
+                long numHiddenLayers = config.numHiddenLayers() > 0 ? config.numHiddenLayers() : 32;
                 
                 // Size of 1 active expert across all layers: 3 matrices (Gate, Up, Down) * 2 bytes (F16) = 6
                 long totalActiveBytes = 6L * hiddenSize * intermSize * numExpertsPerTok * numHiddenLayers;
@@ -137,8 +137,8 @@ public class MoeForwardPass {
 
     public AccelTensor computeAccel(AccelTensor hidden, Map<String, AccelTensor> weights, ModelConfig config, ModelArchitecture arch, int layerIdx) {
         initMaxExpertCacheBytes(config);
-        int numExperts = config.getNumLocalExperts();
-        int topK = config.getNumExpertsPerTok();
+        int numExperts = config.numLocalExperts();
+        int topK = config.numExpertsPerTok();
         log.tracef("MoE layer %d: %d experts, top-%d routing", layerIdx, numExperts, topK);
 
         AccelTensor hiddenFlat = flattenBatch(hidden);
@@ -170,7 +170,7 @@ public class MoeForwardPass {
             routerWeight = gateWeight.toQuantizedF16CachedUpTo(1024 * 1024 * 1024);
         }
         AccelTensor routerLogits = AccelOps.linear(hiddenFlat, routerWeight);
-        String modelType = config.getModelType() != null ? config.getModelType() : "";
+        String modelType = config.modelType() != null ? config.modelType() : "";
         boolean useSigmoid = modelType.contains("qwen") || modelType.contains("moe");
         float[] probData = routerLogits.toFloatArray();
         routerLogits.close();

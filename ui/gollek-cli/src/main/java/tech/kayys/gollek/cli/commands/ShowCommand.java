@@ -20,7 +20,7 @@ import tech.kayys.gollek.cli.util.ModelFamilyResolutionReports;
 import tech.kayys.gollek.sdk.core.GollekSdk;
 import tech.kayys.gollek.sdk.model.ModelResolver;
 import tech.kayys.alkhawarizm.spi.model.ModelConfig;
-import tech.kayys.alkhawarizm.spi.model.loader.ModelConfigLoader;
+import tech.kayys.alkhawarizm.spi.model.ModelLoader;
 import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
 import tech.kayys.alkhawarizm.spi.model.ModelFamilyPluginRegistry;
 import tech.kayys.alkhawarizm.spi.model.ModelFamilyResolution;
@@ -99,17 +99,16 @@ public class ShowCommand implements Runnable {
                     return;
                 }
                 LocalModelIndex.Entry entry = idx.get();
-                ModelInfo model = ModelInfo.builder()
-                        .modelId(entry.id != null ? entry.id : modelId)
-                        .name(entry.name)
-                        .format(entry.format)
-                        .sizeBytes(entry.sizeBytes)
-                        .updatedAt(LocalModelIndex.parseInstant(entry.updatedAt))
-                        .requestContext(RequestContext.of("community", "community"))
-                        .metadata(java.util.Map.of(
-                                "path", entry.path != null ? entry.path : "",
-                                "source", entry.source != null ? entry.source : "local"))
-                        .build();
+                 ModelInfo model = ModelInfo.builder()
+                         .modelId(entry.id != null ? entry.id : modelId)
+                         .name(entry.name)
+                         .format(entry.format)
+                         .sizeBytes(entry.sizeBytes)
+                         .updatedAt(LocalModelIndex.parseInstant(entry.updatedAt))
+                         .metadata(java.util.Map.of(
+                                 "path", entry.path != null ? entry.path : "",
+                                 "source", entry.source != null ? entry.source : "local"))
+                         .build();
                 resolvedOpt = Optional.of(new ModelResolver.ResolvedModel(
                         model.getModelId(), model, entry.path != null ? Path.of(entry.path) : null, false));
             }
@@ -220,15 +219,12 @@ public class ShowCommand implements Runnable {
         ModelFamilyRuntimeCompatibility directCompatibility =
                 ModelFamilyResolutionReports.directSafetensorCompatibility(resolution, modelDir, registry);
         if (ModelFamilyResolutionReports.directAdapterExpected(resolution)
-                || !directCompatibility.architectureAdapterIds().isEmpty()) {
-            System.out.printf("  Direct SafeTensor Runtime: %s selected=%s tokenizers=%s%n",
+                || !directCompatibility.selectedArchitectureAdapterId().isBlank()) {
+            System.out.printf("  Direct SafeTensor Runtime: %s selected=%s%n",
                     directCompatibility.compatible() ? "compatible" : "blocked",
                     directCompatibility.selectedArchitectureAdapterId().isBlank()
                             ? "none"
-                            : directCompatibility.selectedArchitectureAdapterId(),
-                    directCompatibility.usableTokenizerIds().isEmpty()
-                            ? "not inspected"
-                            : String.join(", ", directCompatibility.usableTokenizerIds()));
+                            : directCompatibility.selectedArchitectureAdapterId());
         }
         if (!resolution.tokenizerDescriptors().isEmpty()) {
             System.out.println("  Tokenizers:");
@@ -248,8 +244,8 @@ public class ShowCommand implements Runnable {
                         manifest.chatTemplateReady()
                                 ? String.join(", ", manifest.chatTemplateIds())
                                 : "none",
-                        manifest.directSafetensorStatus().label(),
-                        manifest.architectureAdapterIds().isEmpty()
+                         manifest.directSafetensorStatus().name().toLowerCase(Locale.ROOT),
+                         manifest.architectureAdapterIds().isEmpty()
                                 ? "none"
                                 : String.join(", ", manifest.architectureAdapterIds()));
             }
@@ -294,7 +290,7 @@ public class ShowCommand implements Runnable {
             if (modelDir.isEmpty() || !Files.isRegularFile(modelDir.get().resolve("config.json"))) {
                 return Optional.empty();
             }
-            ModelConfig config = new ModelConfigLoader(JSON).load(modelDir.get().resolve("config.json"));
+            ModelConfig config = ModelConfig.load(modelDir.get().resolve("config.json"), JSON);
             return Optional.of(registry.resolve(config));
         } catch (Exception ignored) {
             return Optional.empty();
@@ -322,13 +318,7 @@ public class ShowCommand implements Runnable {
                 packagedRegistry.register(plugin);
             }
         }
-        packagedRegistry.discoverServiceLoaderPlugins();
-        if (pluginClassLoader == null) {
-            return packagedRegistry;
-        }
-        ModelFamilyPluginRegistry scopedRegistry = packagedRegistry.snapshot();
-        scopedRegistry.discoverServiceLoaderPlugins(pluginClassLoader);
-        return scopedRegistry;
+        return packagedRegistry;
     }
 
     private boolean isRunnableLocally(ModelResolver.ResolvedModel resolved) {

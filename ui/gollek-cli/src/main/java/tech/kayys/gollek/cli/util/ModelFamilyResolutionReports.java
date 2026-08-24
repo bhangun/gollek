@@ -96,22 +96,15 @@ public final class ModelFamilyResolutionReports {
     public static Map<String, Object> runtimeManifestReport(ModelFamilyRuntimeManifest manifest) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put(RuntimeManifest.FAMILY_ID, manifest.familyId());
-        out.put(RuntimeManifest.DISPLAY_NAME, manifest.displayName());
         out.put(RuntimeManifest.MODEL_TYPES, manifest.modelTypes());
-        out.put(RuntimeManifest.ARCHITECTURE_CLASS_NAMES, manifest.architectureClassNames());
         out.put(RuntimeManifest.ARCHITECTURE_ADAPTER_IDS, manifest.architectureAdapterIds());
         out.put(RuntimeManifest.TOKENIZER_PROFILE_IDS, manifest.tokenizerProfileIds());
-        out.put(RuntimeManifest.TOKENIZER_KINDS, manifest.tokenizerKinds().stream().map(Enum::name).toList());
         out.put(RuntimeManifest.TOKENIZER_READY, manifest.tokenizerReady());
         out.put(RuntimeManifest.CHAT_TEMPLATE_IDS, manifest.chatTemplateIds());
         out.put(RuntimeManifest.CHAT_TEMPLATE_READY, manifest.chatTemplateReady());
         out.put(RuntimeManifest.BUNDLE_PROFILE, manifest.bundleProfile().name());
-        out.put(RuntimeManifest.CAPABILITIES, manifest.capabilities().stream().map(Enum::name).toList());
         out.put(RuntimeManifest.DIRECT_SAFETENSOR_STATUS, manifest.directSafetensorStatus().name());
         out.put(RuntimeManifest.DIRECT_SAFETENSOR_READY, manifest.directSafetensorReady());
-        out.put(RuntimeManifest.DIRECT_SAFETENSOR_REASON, manifest.directSafetensorReason());
-        out.put(RuntimeManifest.DIRECT_SAFETENSOR_CAVEATS, manifest.directSafetensorCaveats());
-        out.put(RuntimeManifest.METADATA, manifest.metadata());
         return out;
     }
 
@@ -128,21 +121,11 @@ public final class ModelFamilyResolutionReports {
     public static Map<String, Object> runtimeCompatibilityReport(
             ModelFamilyRuntimeCompatibility compatibility) {
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put(DirectSafetensorCompatibility.RUNTIME_ID, compatibility.runtimeId());
         out.put(DirectSafetensorCompatibility.COMPATIBLE, compatibility.compatible());
-        out.put(DirectSafetensorCompatibility.REQUIRES_ATTENTION, compatibility.requiresAttention());
-        out.put(DirectSafetensorCompatibility.SUMMARY, compatibility.summary());
-        out.put(DirectSafetensorCompatibility.ARCHITECTURE_ADAPTER_READY,
-                compatibility.architectureAdapterReady());
         out.put(DirectSafetensorCompatibility.SELECTED_ARCHITECTURE_ADAPTER_ID,
                 compatibility.selectedArchitectureAdapterId());
         out.put(DirectSafetensorCompatibility.SELECTED_ARCHITECTURE_ADAPTER_BY,
                 compatibility.selectedArchitectureAdapterBy());
-        out.put(DirectSafetensorCompatibility.ARCHITECTURE_ADAPTER_IDS, compatibility.architectureAdapterIds());
-        out.put(DirectSafetensorCompatibility.TOKENIZER_READY, compatibility.tokenizerReady());
-        out.put(DirectSafetensorCompatibility.TOKENIZER_FILE_INSPECTION_AVAILABLE,
-                compatibility.tokenizerFileInspectionAvailable());
-        out.put(DirectSafetensorCompatibility.USABLE_TOKENIZER_IDS, compatibility.usableTokenizerIds());
         out.put(DirectSafetensorCompatibility.PROBLEM_CODES, compatibility.problemCodes());
         out.put(DirectSafetensorCompatibility.REMEDIATION_HINTS, compatibility.remediationHints());
         return out;

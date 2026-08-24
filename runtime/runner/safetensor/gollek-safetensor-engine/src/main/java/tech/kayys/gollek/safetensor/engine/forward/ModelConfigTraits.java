@@ -33,7 +33,7 @@ record ModelConfigTraits(
      * Metal SwiGLU matvec FFN fast path dynamically, without needing hardcoded model checks.
      */
     boolean siluGated() {
-        return source != null && "silu".equalsIgnoreCase(source.getHiddenAct());
+        return source != null && "silu".equalsIgnoreCase(source.hiddenAct());
     }
 
     static ModelConfigTraits create(ModelConfig config) {
@@ -41,9 +41,9 @@ record ModelConfigTraits(
     }
 
     static ModelConfigTraits create(ModelConfig config, ModelArchitecture arch) {
-        String modelType = config.getModelType() == null ? "" : config.getModelType();
-        int hiddenSizePerLayerInput = config.getHiddenSizePerLayerInput();
-        int vocabSizePerLayerInput = config.getVocabSizePerLayerInput();
+        String modelType = config.modelType() == null ? "" : config.modelType();
+        int hiddenSizePerLayerInput = config.hiddenSizePerLayerInput();
+        int vocabSizePerLayerInput = config.vocabSizePerLayerInput();
         ModelRuntimeTraits runtimeTraits = ModelRuntimeTraitsResolver.resolve(arch, config);
         boolean perLayerInputPath = runtimeTraits.perLayerInputPath() || hiddenSizePerLayerInput > 0;
         return new ModelConfigTraits(
@@ -61,8 +61,8 @@ record ModelConfigTraits(
 
     boolean matches(ModelConfig config) {
         return source == config
-                && modelType.equals(config.getModelType() == null ? "" : config.getModelType())
-                && hiddenSizePerLayerInput == config.getHiddenSizePerLayerInput()
-                && vocabSizePerLayerInput == config.getVocabSizePerLayerInput();
+                && modelType.equals(config.modelType() == null ? "" : config.modelType())
+                && hiddenSizePerLayerInput == config.hiddenSizePerLayerInput()
+                && vocabSizePerLayerInput == config.vocabSizePerLayerInput();
     }
 }

@@ -18,7 +18,7 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":core:plugin:gollek-plugin-runner-core"))
+    implementation(project(":plugin:gollek-plugin-runner-core"))
     implementation(project(":spi:gollek-spi-inference"))
     implementation(group = "net.java.dev.jna", name = "jna", version = "5.14.0")
     implementation(group = "org.jboss.logging", name = "jboss-logging", version = "3.6.0.Final")

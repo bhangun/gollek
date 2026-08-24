@@ -19,12 +19,12 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":core:gollek-runtime-config"))
+    implementation(project(":core:gollek-core"))
     implementation(project(":spi:gollek-spi"))
     implementation(project(":spi:gollek-spi-inference"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-spi-model:0.1.0-SNAPSHOT")
     implementation(project(":spi:gollek-spi-multimodal"))
-    implementation(project(":core:gollek-error-code"))
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-error-code:0.1.0-SNAPSHOT")
     implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":core:gollek-tokenizer-core"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-backend-metal:0.1.0-SNAPSHOT")
@@ -44,13 +44,7 @@ dependencies {
     testImplementation("tech.kayys.alkhawarizm:alkhawarizm-safetensor-loader:0.1.0-SNAPSHOT")
 }
 
-sourceSets {
-    main {
-        java {
-            exclude("tech/kayys/gollek/provider/litert/LiteRTProviderConfig.java")
-        }
-    }
-}
+
 
 publishing {
     publications {

@@ -26,7 +26,7 @@ final class DirectForwardLayerTailStage {
                     ctx.runtime().metalBinding(),
                     ctx.hiddenOut(),
                     ctx.seqLen(),
-                    ctx.config().getHiddenSize(),
+                    ctx.config().hiddenSize(),
                     ctx.layerWeights().layerScalarValue(),
                     ctx.runtime().canUseMetalLayerScalarScale(ctx.useMetalElementwise(), ctx.seqLen()));
         }

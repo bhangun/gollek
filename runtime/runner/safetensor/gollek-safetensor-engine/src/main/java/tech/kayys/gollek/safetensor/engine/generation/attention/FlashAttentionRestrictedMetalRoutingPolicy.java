@@ -38,7 +38,7 @@ final class FlashAttentionRestrictedMetalRoutingPolicy {
             return false;
         }
         int totalTokens = startPos + seqLen;
-        return totalTokens <= config.getSlidingWindowSize() && fa4Available;
+        return totalTokens <= config.slidingWindowSize() && fa4Available;
     }
 
     boolean canUseDenseAttention(ModelConfig config, FlashAttentionModelPolicy modelPolicy, int layerIdx) {
@@ -72,7 +72,7 @@ final class FlashAttentionRestrictedMetalRoutingPolicy {
     }
 
     boolean slidingWindowFitsPackedMetal(ModelConfig config) {
-        return config != null && config.getSlidingWindowSize() <= MAX_PACKED_METAL_SLIDING_WINDOW;
+        return config != null && config.slidingWindowSize() <= MAX_PACKED_METAL_SLIDING_WINDOW;
     }
 
     private boolean slidingPrefillFa4AttentionEnabled() {

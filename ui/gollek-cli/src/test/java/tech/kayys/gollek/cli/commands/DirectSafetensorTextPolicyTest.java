@@ -36,8 +36,7 @@ class DirectSafetensorTextPolicyTest {
 
     @Test
     void qwenProfileUsesChatTemplateFormatterWithRuntimeTraits() {
-        DirectSafetensorRunProfile profile = profile("unknown-wrapper", ModelRuntimeTraits.builder()
-                .qwenText()
+        DirectSafetensorRunProfile profile = profile("qwen", ModelRuntimeTraits.builder()
                 .build());
 
         String prepared = DirectSafetensorTextPolicy.preparePrompt(profile, "You are concise.", "where is jakarta");
@@ -71,7 +70,6 @@ class DirectSafetensorTextPolicyTest {
     @Test
     void preformattedPromptsStayUntouched() {
         DirectSafetensorRunProfile profile = profile("qwen2", ModelRuntimeTraits.builder()
-                .qwenText()
                 .build());
         String prompt = "<|im_start|>user\nwhere is jakarta<|im_end|>";
 

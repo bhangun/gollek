@@ -53,7 +53,7 @@ public class DirectLoadedModel implements SafetensorEngine.LoadedModel {
         this.runtimeTraits = ModelRuntimeTraitsResolver.resolve(this.architecture, this.config, runtimeTraits);
         this.baseStopTokenIds = buildBaseStopTokenIds(tokenizer, this.config);
         this.baseTokenSamplingMasks = buildTokenSamplingMasks(tokenizer, this.baseStopTokenIds,
-                this.config.getVocabSize(), this.runtimeTraits);
+                this.config.vocabSize(), this.runtimeTraits);
         this.weightArena = weightArena;
     }
 
@@ -88,7 +88,7 @@ public class DirectLoadedModel implements SafetensorEngine.LoadedModel {
     }
 
     public String arch() {
-        return config.getPrimaryArchitecture();
+        return config.primaryArchitecture();
     }
 
     public ModelArchitecture architecture() {

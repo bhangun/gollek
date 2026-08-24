@@ -39,9 +39,9 @@ final class FlashAttentionNormalizationPolicy {
             FlashAttentionModelPolicy modelPolicy, FlashAttentionNormalizationOptions options) {
         boolean nativeBf16Matvec = modelPolicy != null && modelPolicy.nativeBf16Matvec();
         boolean addOne = architecture != null && architecture.addOneToRmsNormWeight();
-        Double qPas = config == null ? null : config.getQueryPreAttnScalar();
+        Double qPas = config == null ? null : config.queryPreAttnScalar();
         double scalar = qPas == null ? 0.0 : qPas;
-        int headDim = config == null ? 1 : config.getResolvedHeadDim();
+        int headDim = config == null ? 1 : config.resolvedHeadDim();
         if (options == null) {
             options = FlashAttentionNormalizationOptions.defaults();
         }

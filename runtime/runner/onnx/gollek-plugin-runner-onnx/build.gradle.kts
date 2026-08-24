@@ -18,7 +18,7 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":core:plugin:gollek-plugin-runner-core"))
+    implementation(project(":plugin:gollek-plugin-runner-core"))
     implementation(project(":runner:onnx:gollek-runner-onnx"))
     implementation(project(":core:gollek-tokenizer-core"))
     implementation(project(":spi:gollek-spi-inference"))

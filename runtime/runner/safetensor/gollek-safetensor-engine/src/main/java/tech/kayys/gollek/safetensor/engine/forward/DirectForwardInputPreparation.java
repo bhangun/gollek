@@ -74,8 +74,8 @@ final class DirectForwardInputPreparation {
 
         ModelConfig config = request.config();
         ForwardWorkspace ws = request.kvCache().getWorkspace();
-        ws.ensureCapacity((long) seqLen * config.getHiddenSize(), config.getHiddenSize(), config.getIntermediateSize());
-        long[] hiddenShape = new long[] { 1L, seqLen, config.getHiddenSize() };
+        ws.ensureCapacity((long) seqLen * config.hiddenSize(), config.hiddenSize(), config.intermediateSize());
+        long[] hiddenShape = new long[] { 1L, seqLen, config.hiddenSize() };
         float scale = request.arch().embeddingScaleFactor((int) embedTable.size(-1));
         embedTable.copyRowsToFloatSegment(request.inputIds(), ws.getHiddenASeg(), scale);
 
@@ -103,8 +103,8 @@ final class DirectForwardInputPreparation {
 
         ModelConfig config = request.config();
         ForwardWorkspace ws = request.kvCache().getWorkspace();
-        ws.ensureCapacity(config.getHiddenSize(), config.getHiddenSize(), config.getIntermediateSize());
-        long[] tokenHiddenShape = new long[] { 1L, 1L, config.getHiddenSize() };
+        ws.ensureCapacity(config.hiddenSize(), config.hiddenSize(), config.intermediateSize());
+        long[] tokenHiddenShape = new long[] { 1L, 1L, config.hiddenSize() };
         float scale = request.arch().embeddingScaleFactor((int) embedTable.size(-1));
         embedTable.copyRowToFloatSegment(request.tokenId(), ws.getHiddenASeg(), scale);
 

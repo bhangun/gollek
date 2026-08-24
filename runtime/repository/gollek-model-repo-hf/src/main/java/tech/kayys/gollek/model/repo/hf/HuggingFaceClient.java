@@ -4,7 +4,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import tech.kayys.gollek.model.download.DownloadProgressListener;
+import tech.kayys.alkhawarizm.spi.download.DownloadProgressListener;
 
 import java.io.IOException;
 import java.io.InputStream;

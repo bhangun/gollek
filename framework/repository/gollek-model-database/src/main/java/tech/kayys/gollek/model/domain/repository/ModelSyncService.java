@@ -22,10 +22,10 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 import tech.kayys.alkhawarizm.spi.model.ModelManifest;
-import tech.kayys.gollek.error.ErrorCode;
-import tech.kayys.gollek.model.download.DownloadProgressListener;
+import tech.kayys.alkhawarizm.error.ErrorCode;
+import tech.kayys.alkhawarizm.spi.download.DownloadProgressListener;
 import tech.kayys.gollek.spi.exception.InferenceException;
-import tech.kayys.gollek.model.local.LocalModelRepository;
+import tech.kayys.gollek.model.repo.local.LocalModelRepository;
 import tech.kayys.gollek.model.remote.RemoteModelRepository;
 
 import java.util.Optional;
@@ -75,7 +75,7 @@ public class ModelSyncService {
         // Advanced: parallel downloads
         Uni<Void> chain = Uni.createFrom().nullItem();
 
-        for (String artifactId : manifest.artifacts().keySet().stream().map(Enum::name).toList()) {
+        for (String artifactId : manifest.artifacts().keySet().stream().map(tech.kayys.alkhawarizm.core.model.ModelFormat::name).toList()) {
             chain = chain
                     .flatMap(v -> remoteRepo.downloadArtifact(manifest, artifactId, null, listener).replaceWithVoid());
         }

@@ -41,13 +41,13 @@ final class DirectForwardSequenceRunner {
                     "Invalid sequence length: " + seqLen + ". Prompt must result in at least one token.");
         }
         int seqLenInt = Math.toIntExact(seqLen);
-        long[] hiddenShape = new long[] { 1L, seqLen, config.getHiddenSize() };
+        long[] hiddenShape = new long[] { 1L, seqLen, config.hiddenSize() };
         ForwardWorkspace ws = kvCache.getWorkspace();
-        ws.ensureCapacity((long) seqLen * config.getHiddenSize(), config.getHiddenSize(), config.getIntermediateSize());
+        ws.ensureCapacity((long) seqLen * config.hiddenSize(), config.hiddenSize(), config.intermediateSize());
 
         if (!request.embeddingsAlreadyInWorkspace()) {
             MemorySegment.copy(embeddings.dataPtr(), 0, ws.getHiddenASeg(), 0,
-                    (long) seqLen * config.getHiddenSize() * Float.BYTES);
+                    (long) seqLen * config.hiddenSize() * Float.BYTES);
         }
 
         boolean verboseTokens = DirectForwardExecutionOptions.verboseTokensEnabled();

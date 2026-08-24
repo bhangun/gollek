@@ -533,15 +533,7 @@ class PluginAvailabilityCheckerTest {
         PluginAvailabilityChecker.ModelFamilyBundleAvailability availability =
                 PluginAvailabilityChecker.modelFamilyBundleAvailability(manifest, Set.of("phi"));
         ModelFamilyRuntimeCompatibilitySummary runtimeSummary = new ModelFamilyRuntimeCompatibilitySummary(
-                "direct_safetensor",
                 1,
-                0,
-                1,
-                1,
-                0,
-                0,
-                0,
-                List.of(),
                 List.of("phi"),
                 Map.of("model_family_direct_safetensor_not_ready", 1));
 
@@ -2389,8 +2381,7 @@ class PluginAvailabilityCheckerTest {
                         List.of("gemma4", "gemma4_text", "gemma4_vision", "gemma4_audio", "gemma4_unified"),
                         List.of("Gemma4ForMultimodalLM", "Gemma4Processor"),
                         List.of(ModelFamilyCapability.MULTIMODAL,
-                                ModelFamilyCapability.VISION,
-                                ModelFamilyCapability.AUDIO),
+                                ModelFamilyCapability.VISION),
                         Map.of(
                                 "bundle_profile", "optional",
                                 "origin", "3rdparty/transformers/src/transformers/models/gemma4",
@@ -2423,8 +2414,7 @@ class PluginAvailabilityCheckerTest {
                         List.of("gemma4", "gemma4_text", "gemma4_vision", "gemma4_audio", "gemma4_unified"),
                         List.of("Gemma4ForMultimodalLM", "Gemma4Processor"),
                         List.of(ModelFamilyCapability.MULTIMODAL,
-                                ModelFamilyCapability.VISION,
-                                ModelFamilyCapability.AUDIO),
+                                ModelFamilyCapability.VISION),
                         Map.of(
                                 "bundle_profile", "optional",
                                 "origin", "3rdparty/transformers/src/transformers/models/gemma4",

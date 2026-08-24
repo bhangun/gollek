@@ -24,7 +24,7 @@ final class FlashAttentionPackedQkvPolicy {
     }
 
     static int resolveHeadDim(AccelTensor packedWeight, ModelConfig config, int numQueryHeads, int numKeyValueHeads) {
-        int configured = config.getResolvedHeadDim();
+        int configured = config.resolvedHeadDim();
         int denominator = projectionDenominator(numQueryHeads, numKeyValueHeads);
         long expectedRows = (long) denominator * configured;
         if (configured > 0 && packedWeight != null && packedWeight.size(0) == expectedRows) {
@@ -46,7 +46,7 @@ final class FlashAttentionPackedQkvPolicy {
         if (denominator <= 0) {
             return false;
         }
-        int configured = config.getResolvedHeadDim();
+        int configured = config.resolvedHeadDim();
         long rows = in.qW.size(0);
         return (configured > 0 && rows == (long) denominator * configured)
                 || rows % denominator == 0;

@@ -1,8 +1,9 @@
 package tech.kayys.gollek.runtime.weight;
 
 
-import tech.kayys.gollek.error.ErrorCode;
-import tech.kayys.gollek.spi.exception.InferenceException;import tech.kayys.alkhawarizm.core.backend.ComputeBackend;
+import tech.kayys.alkhawarizm.error.ErrorCode;
+import tech.kayys.gollek.spi.exception.InferenceException;
+import tech.kayys.alkhawarizm.core.backend.ComputeBackend;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

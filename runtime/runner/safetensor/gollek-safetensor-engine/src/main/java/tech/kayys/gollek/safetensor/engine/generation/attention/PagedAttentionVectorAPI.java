@@ -82,7 +82,7 @@ public class PagedAttentionVectorAPI {
         PagedKvCacheLayout layout = PagedKvCacheLayout.source(blockManager, numKVHeads, headDim, tokensPerBlock);
         BlockManager.KvStorageType storageType = blockManager.getStorageType();
         boolean slidingLayer = config != null && config.isSlidingAttentionLayer(layerIdx) && config.hasSlidingWindow();
-        int slidingWindow = slidingLayer ? config.getSlidingWindowSize() : Integer.MAX_VALUE;
+        int slidingWindow = slidingLayer ? config.slidingWindowSize() : Integer.MAX_VALUE;
         boolean debugProbe = options != null && options.debugAttentionProbe();
 
         AccelTensor out = FlashAttentionContextOutputBuffer.viewOrAllocate(attentionContextBuffer, q);

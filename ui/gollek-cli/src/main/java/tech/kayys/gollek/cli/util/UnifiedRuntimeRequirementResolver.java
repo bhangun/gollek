@@ -44,7 +44,8 @@ public final class UnifiedRuntimeRequirementResolver {
                 ? UnifiedRuntimeRegistry.of(List.of())
                 : unifiedRuntimes;
         Set<String> selected = normalizedSet(selectedFamilyIds);
-        return modelFamilies.runtimeManifests().stream()
+        return modelFamilies.all().stream()
+                .flatMap(p -> { try { return java.util.stream.Stream.of(p.runtimeManifest()); } catch (Exception e) { return java.util.stream.Stream.empty(); } })
                 .filter(manifest -> selected.isEmpty() || selected.contains(normalize(manifest.familyId())))
                 .flatMap(manifest -> manifest.unifiedRuntimeRequirements().stream()
                         .map(requirement -> evaluateRequirement(manifest, requirement, runtimeRegistry)))

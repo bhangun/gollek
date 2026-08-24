@@ -85,15 +85,15 @@ public record ModelFamilyBundleGate(
         if (requireDirectSafetensorRuntime) {
             runtimePassed = runtimeCompatibility != null
                     && !runtimeCompatibility.empty()
-                    && runtimeCompatibility.blockedFamilyCount() == 0;
+                    && runtimeCompatibility.problemCounts().isEmpty();
             if (runtimeCompatibility == null || runtimeCompatibility.empty()) {
                 violations.add("runtime: direct SafeTensor runtime is required but no model-family "
                         + "compatibility summary was available");
-            } else if (runtimeCompatibility.blockedFamilyCount() > 0) {
+            } else if (!runtimeCompatibility.problemCounts().isEmpty()) {
                 violations.add("runtime: direct SafeTensor runtime has "
-                        + runtimeCompatibility.blockedFamilyCount()
-                        + " blocked model-family plugin(s): "
-                        + String.join(", ", runtimeCompatibility.blockedFamilyIds()));
+                        + runtimeCompatibility.problemCounts().size()
+                        + " problem categories preventing compatibility: "
+                        + String.join(", ", runtimeCompatibility.problemCounts().keySet()));
             }
         }
 

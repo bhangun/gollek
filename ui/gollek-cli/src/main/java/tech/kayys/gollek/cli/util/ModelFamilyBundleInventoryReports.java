@@ -41,7 +41,7 @@ final class ModelFamilyBundleInventoryReports {
         report.put(Family.CAPABILITIES, family.capabilities().stream()
                 .map(capability -> capability.name().toLowerCase())
                 .toList());
-        report.put(Family.DIRECT_SAFETENSOR_STATUS, family.directSafetensorStatus().label());
+        report.put(Family.DIRECT_SAFETENSOR_STATUS, family.directSafetensorStatus().name().toLowerCase());
         report.put(Family.DIRECT_SAFETENSOR_READY, family.directSafetensorReady());
         report.put(Family.DIRECT_SAFETENSOR_REASON, family.directSafetensorReason());
         report.put(Family.DIRECT_SAFETENSOR_CAVEATS, family.directSafetensorCaveats());
@@ -52,29 +52,18 @@ final class ModelFamilyBundleInventoryReports {
     static Map<String, Object> runtimeManifest(ModelFamilyRuntimeManifest manifest) {
         Map<String, Object> report = new LinkedHashMap<>();
         report.put(RuntimeManifest.FAMILY_ID, manifest.familyId());
-        report.put(RuntimeManifest.DISPLAY_NAME, manifest.displayName());
         report.put(RuntimeManifest.MODEL_TYPES, manifest.modelTypes());
-        report.put(RuntimeManifest.ARCHITECTURE_CLASS_NAMES, manifest.architectureClassNames());
         report.put(RuntimeManifest.ARCHITECTURE_ADAPTER_IDS, manifest.architectureAdapterIds());
         report.put(RuntimeManifest.TOKENIZER_PROFILE_IDS, manifest.tokenizerProfileIds());
-        report.put(RuntimeManifest.TOKENIZER_KINDS, manifest.tokenizerKinds().stream()
-                .map(kind -> kind.name().toLowerCase())
-                .toList());
         report.put(RuntimeManifest.TOKENIZER_READY, manifest.tokenizerReady());
         report.put(RuntimeManifest.CHAT_TEMPLATE_IDS, manifest.chatTemplateIds());
         report.put(RuntimeManifest.CHAT_TEMPLATE_READY, manifest.chatTemplateReady());
         report.put(RuntimeManifest.BUNDLE_PROFILE, manifest.bundleProfile().key());
-        report.put(RuntimeManifest.CAPABILITIES, manifest.capabilities().stream()
-                .map(capability -> capability.name().toLowerCase())
-                .toList());
-        report.put(RuntimeManifest.DIRECT_SAFETENSOR_STATUS, manifest.directSafetensorStatus().label());
+        report.put(RuntimeManifest.DIRECT_SAFETENSOR_STATUS, manifest.directSafetensorStatus().name().toLowerCase());
         report.put(RuntimeManifest.DIRECT_SAFETENSOR_READY, manifest.directSafetensorReady());
-        report.put(RuntimeManifest.DIRECT_SAFETENSOR_REASON, manifest.directSafetensorReason());
-        report.put(RuntimeManifest.DIRECT_SAFETENSOR_CAVEATS, manifest.directSafetensorCaveats());
         report.put(RuntimeManifest.UNIFIED_RUNTIME_REQUIREMENTS, manifest.unifiedRuntimeRequirements().stream()
                 .map(ModelFamilyBundleInventoryReports::runtimeRequirement)
                 .toList());
-        report.put(RuntimeManifest.METADATA, manifest.metadata());
         return report;
     }
 

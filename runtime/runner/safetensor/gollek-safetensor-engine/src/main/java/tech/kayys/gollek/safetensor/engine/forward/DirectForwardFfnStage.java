@@ -48,11 +48,11 @@ final class DirectForwardFfnStage {
         if (postFfnNormW != null) {
             if (ctx.useMetalElementwise() && DirectForwardElementwisePolicy.shouldUseMetalPostFfnNorm(ctx.traits())) {
                 DirectForwardElementwiseOps.rmsNormRowsMetal(ctx.runtime().metalBinding(), normedFfnSeg,
-                        mlpOut.dataPtr(), postFfnNormW.dataPtr(), ctx.seqLen(), ctx.config().getHiddenSize(),
-                        (float) ctx.config().getRmsNormEps(), ctx.addOneRmsNorm());
+                        mlpOut.dataPtr(), postFfnNormW.dataPtr(), ctx.seqLen(), ctx.config().hiddenSize(),
+                        (float) ctx.config().rmsNormEps(), ctx.addOneRmsNorm());
                 mlpNormed = AccelTensor.view(normedFfnSeg, ctx.hiddenShape());
             } else {
-                mlpNormed = AccelOps.rmsNorm(mlpOut, postFfnNormW, ctx.config().getRmsNormEps(),
+                mlpNormed = AccelOps.rmsNorm(mlpOut, postFfnNormW, ctx.config().rmsNormEps(),
                         ctx.addOneRmsNorm());
             }
             mlpOut.close();
@@ -63,7 +63,7 @@ final class DirectForwardFfnStage {
 
         DirectForwardElementwiseOps.residualAdd(ctx.runtime().log(), ctx.runtime().metalBinding(),
                 ctx.hiddenOut(), mlpNormed, ctx.hiddenOut(),
-                ctx.seqLen(), ctx.config().getHiddenSize(), ctx.useNativeElementwiseAdd());
+                ctx.seqLen(), ctx.config().hiddenSize(), ctx.useNativeElementwiseAdd());
         mlpNormed.close();
         if (ctx.verboseLayers()) {
             logSegmentStats(ctx.hiddenOut(), ctx.hiddenShape(), "layer " + ctx.layerIdx() + " postFfnResidual");

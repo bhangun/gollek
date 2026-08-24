@@ -12,7 +12,7 @@ import picocli.CommandLine.Parameters;
 import tech.kayys.gollek.sdk.util.GollekHome;
 import tech.kayys.gollek.model.repo.kaggle.KaggleClient;
 import tech.kayys.gollek.model.repo.hf.HuggingFaceClient;
-import tech.kayys.gollek.model.download.DownloadProgressListener;
+import tech.kayys.alkhawarizm.spi.download.DownloadProgressListener;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

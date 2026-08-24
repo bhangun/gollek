@@ -27,7 +27,7 @@ import tech.kayys.gollek.spi.provider.AdapterCapabilityProfile;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
 import tech.kayys.gollek.safetensor.engine.runtime.ModelRuntimeTraitsResolver;
 import tech.kayys.alkhawarizm.spi.model.ModelConfig;
-import tech.kayys.alkhawarizm.spi.model.loader.ModelConfigLoader;
+import tech.kayys.alkhawarizm.spi.model.ModelConfig;
 import tech.kayys.gollek.spi.registry.LocalModelRegistry;
 import tech.kayys.gollek.spi.registry.ModelEntry;
 import org.jboss.logging.Logger;

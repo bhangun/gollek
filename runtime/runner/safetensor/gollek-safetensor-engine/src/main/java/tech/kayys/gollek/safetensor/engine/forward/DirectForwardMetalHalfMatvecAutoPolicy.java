@@ -43,12 +43,12 @@ record DirectForwardMetalHalfMatvecAutoPolicy(
             return true;
         }
         if (traits.siluGated()) {
-            return config.getNumHiddenLayers() >= 20
-                    && config.getHiddenSize() <= 2048
-                    && config.getIntermediateSize() >= 2048;
+            return config.numHiddenLayers() >= 20
+                    && config.hiddenSize() <= 2048
+                    && config.intermediateSize() >= 2048;
         }
-        return config.getNumHiddenLayers() >= 30
-                && config.getIntermediateSize() >= 4096
-                && config.getHiddenSize() <= 4096;
+        return config.numHiddenLayers() >= 30
+                && config.intermediateSize() >= 4096
+                && config.hiddenSize() <= 4096;
     }
 }

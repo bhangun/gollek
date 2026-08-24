@@ -3,6 +3,31 @@ plugins {
     id("io.quarkus")
 }
 
+// Prevent old tech.kayys.alkhawarizm:gollek-spi* published snapshots from landing on the
+// classpath alongside the live project modules.  Both carry identical Quarkus CDI extensions
+// that would register the same synthetic beans (e.g. KaggleConfig) twice, causing:
+//   IllegalStateException: A synthetic bean … is already registered
+configurations.all {
+    exclude(group = "tech.kayys.alkhawarizm", module = "gollek-spi")
+    exclude(group = "tech.kayys.alkhawarizm", module = "gollek-spi-inference")
+    exclude(group = "tech.kayys.alkhawarizm", module = "gollek-spi-multimodal")
+    exclude(group = "tech.kayys.alkhawarizm", module = "gollek-spi-plugin")
+    exclude(group = "tech.kayys.alkhawarizm", module = "gollek-spi-runtime")
+    
+    // Also exclude obsolete tech.kayys.gollek artifacts that have been merged/refactored
+    // (e.g. gollek-runtime-config was split into gollek-model-repo-hf and others)
+    exclude(group = "tech.kayys.gollek", module = "gollek-runtime-config")
+    exclude(group = "tech.kayys.gollek", module = "gollek-ir")
+    
+    // Exclude obsolete safetensor artifacts in the old namespace to avoid CDI issues
+    // where old engines (like WhisperEngine) try to inject the old excluded SPI.
+    exclude(group = "tech.kayys.gollek", module = "gollek-safetensor-audio")
+    exclude(group = "tech.kayys.gollek", module = "gollek-safetensor-api")
+    exclude(group = "tech.kayys.gollek", module = "gollek-safetensor-core")
+    exclude(group = "tech.kayys.gollek", module = "gollek-safetensor-loader")
+    exclude(group = "tech.kayys.gollek", module = "gollek-safetensor-spi")
+}
+
 val quarkusVersion = rootProject.extra["quarkusVersion"] as String
 
 dependencies {
@@ -33,19 +58,18 @@ dependencies {
     implementation("tech.kayys.alkhawarizm:alkhawarizm-spi-model:0.1.0-SNAPSHOT")
     implementation(project(":spi:gollek-spi-multimodal"))
     implementation(project(":spi:gollek-spi-runtime"))
-    implementation(project(":core:gollek-model-repository"))
-    implementation(project(":core:gollek-runtime-config"))
+    implementation(project(":core:gollek-core"))
     implementation(project(":core:gollek-tokenizer-core"))
-    implementation(project(":core:gollek-observability"))
     implementation("io.opentelemetry:opentelemetry-api")
-    implementation(project(":core:plugin:gollek-plugin-core"))
-    implementation(project(":core:plugin:gollek-plugin-kernel-core"))
-    implementation(project(":core:plugin:gollek-plugin-runner-core"))
-    implementation(project(":core:plugin:gollek-plugin-runner-gguf"))
+    implementation(project(":plugin:gollek-plugin-core"))
+    implementation(project(":plugin:gollek-plugin-kernel-core"))
+    implementation(project(":plugin:gollek-plugin-runner-core"))
+    implementation(project(":plugin:gollek-plugin-runner-gguf"))
+    implementation(project(":observability:gollek-observability"))
     implementation(project(":core:gollek-model-repo-hf"))
     implementation(project(":core:gollek-model-repo-kaggle"))
     implementation(project(":core:gollek-model-repo-local"))
-    implementation(project(":plugins:gollek-plugin-mcp"))
+
     implementation(project(":plugins:log-parser"))
     implementation(project(":runner:litert:gollek-runner-litert"))
     implementation(project(":runner:onnx:gollek-runner-onnx"))
@@ -57,9 +81,8 @@ dependencies {
     implementation("tech.kayys.alkhawarizm:alkhawarizm-safetensor-spi:0.1.0-SNAPSHOT")
     implementation("tech.kayys.alkhawarizm:alkhawarizm-safetensor-quantization:0.1.0-SNAPSHOT")
     implementation("tech.kayys.alkhawarizm:alkhawarizm-backend-metal:0.1.0-SNAPSHOT")
-    implementation(project(":models:gollek-model-gemma4"))
-    implementation(project(":models:gollek-model-qwen3-5-moe"))
-    implementation(project(":models:gollek-model-qwen3-moe"))
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-model-gemma:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-model-qwen:0.1.0-SNAPSHOT")
 
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
@@ -71,7 +94,6 @@ sourceSets {
     main {
         java {
             setSrcDirs(listOf("src/main/java"))
-            exclude("tech/kayys/gollek/cli/GollekCLI.java")
         }
         resources {
             setSrcDirs(listOf("src/main/resources"))

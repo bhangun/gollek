@@ -1,7 +1,7 @@
 package tech.kayys.gollek.exception;
 
 //import tech.kayys.gollek.engine.exception.InferenceException;
-import tech.kayys.gollek.error.ErrorCode;
+import tech.kayys.alkhawarizm.error.ErrorCode;
 import tech.kayys.gollek.spi.exception.InferenceException;
 
 /**

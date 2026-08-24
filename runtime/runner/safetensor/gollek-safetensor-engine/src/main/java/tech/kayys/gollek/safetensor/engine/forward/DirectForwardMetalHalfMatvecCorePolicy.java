@@ -41,7 +41,7 @@ record DirectForwardMetalHalfMatvecCorePolicy(
                 traits,
                 profileKey,
                 options.metalHalfMatvecMaxOutput());
-        if (logitsPolicy.shouldUseGemma3LogitsMetalHalfMatvec(traits, outputDim, profileKey, maxOutput)) {
+        if (logitsPolicy.shouldUseTurnAwarePromptBosLogitsMetalHalfMatvec(traits, outputDim, profileKey, maxOutput)) {
             return true;
         }
         if (options.enableMetalHalfMatvec() != null) {

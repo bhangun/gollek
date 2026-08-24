@@ -19,8 +19,8 @@ package tech.kayys.gollek.model.core;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
-import tech.kayys.gollek.model.config.HardwareConfig;
-import tech.kayys.gollek.spi.spec.HardwareCapabilities;
+import tech.kayys.gollek.core.config.HardwareConfig;
+import tech.kayys.alkhawarizm.spi.spec.HardwareCapabilities;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 

@@ -144,14 +144,14 @@ final class FlashAttentionMetalDenseSharedAttention {
                                         Math.toIntExact(batch), Math.toIntExact(seqLenQ), numQHeads, numKVHeads,
                                         headDim,
                                         blockSize, maxBlocks,
-                                        scale, causal ? 1 : 0, startPos, config.getSlidingWindowSize(), softCap)
+                                        scale, causal ? 1 : 0, startPos, config.slidingWindowSize(), softCap)
                                 : binding.attentionGqaWindowed(
                                         out.dataPtr(), qContiguous.dataPtr(), packedK, packedV,
                                         blockTable, contextLens,
                                         Math.toIntExact(batch), Math.toIntExact(seqLenQ), numQHeads, numKVHeads,
                                         headDim,
                                         blockSize, maxBlocks,
-                                        scale, causal ? 1 : 0, startPos, config.getSlidingWindowSize(), softCap))
+                                        scale, causal ? 1 : 0, startPos, config.slidingWindowSize(), softCap))
                         : (numKVHeads == numQHeads
                                 ? binding.attention(
                                         out.dataPtr(), qContiguous.dataPtr(), packedK, packedV,

@@ -11,9 +11,6 @@ import tech.kayys.gollek.sdk.mcp.McpServerView;
 import tech.kayys.gollek.sdk.mcp.McpTestReport;
 import tech.kayys.gollek.sdk.mcp.McpToolModel;
 import tech.kayys.alkhawarizm.spi.model.ModelInfo;
-import tech.kayys.gollek.spi.provider.ProviderCapabilities;
-import tech.kayys.gollek.spi.provider.ProviderHealth;
-import tech.kayys.gollek.spi.provider.ProviderInfo;
 
 import java.lang.reflect.Proxy;
 import java.util.List;
@@ -32,8 +29,8 @@ final class AgentFixtureSdk {
                 new Class<?>[] { GollekSdk.class },
                 (proxy, method, args) -> switch (method.getName()) {
                     case "getModelInfo" -> Optional.of(modelInfo((String) args[0]));
-                    case "listAvailableProviders" -> List.of(providerInfo());
-                    case "getPreferredProvider" -> Optional.of("fixture-provider");
+                    case "listAvailableProviders" -> List.of();
+                    case "getPreferredProvider" -> Optional.empty();
                     case "mcpRegistry" -> new FixtureMcpRegistry();
                     case "toString" -> "AgentFixtureSdk";
                     default -> throw new UnsupportedOperationException(method.getName());
@@ -57,22 +54,6 @@ final class AgentFixtureSdk {
             builder.embeddingSize(768);
         }
         return builder.build();
-    }
-
-    private static ProviderInfo providerInfo() {
-        return ProviderInfo.builder()
-                .id("fixture-provider")
-                .name("Fixture Provider")
-                .healthStatus(ProviderHealth.Status.HEALTHY)
-                .supportedModels(Set.of())
-                .capabilities(ProviderCapabilities.builder()
-                        .streaming(true)
-                        .functionCalling(true)
-                        .toolCalling(true)
-                        .maxContextTokens(8192)
-                        .maxOutputTokens(1024)
-                        .build())
-                .build();
     }
 
     private static boolean looksLikeEmbeddingModel(String modelId) {

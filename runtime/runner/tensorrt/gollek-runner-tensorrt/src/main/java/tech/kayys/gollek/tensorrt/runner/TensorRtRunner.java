@@ -12,7 +12,7 @@ import tech.kayys.gollek.extension.AbstractGollekRunner;
 import tech.kayys.gollek.tensorrt.binding.TensorRtBinding;
 import tech.kayys.gollek.tensorrt.binding.TensorRtCpuFallback;
 import tech.kayys.gollek.kvcache.PagedKVCacheManager;
-import tech.kayys.gollek.error.ErrorCode;
+import tech.kayys.alkhawarizm.error.ErrorCode;
 import tech.kayys.gollek.exception.RunnerInitializationException;
 
 import tech.kayys.gollek.spi.inference.InferenceRequest;

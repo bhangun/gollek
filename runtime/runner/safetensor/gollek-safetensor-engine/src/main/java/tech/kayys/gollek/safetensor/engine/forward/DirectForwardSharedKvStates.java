@@ -38,6 +38,6 @@ final class DirectForwardSharedKvStates {
     }
 
     private static boolean enabled(ModelConfig config) {
-        return config.getResolvedNumKvSharedLayers() > 0;
+        return config.resolvedNumKvSharedLayers() > 0;
     }
 }

@@ -6,7 +6,6 @@ import tech.kayys.gollek.spi.execution.ExecutionContext;
 import tech.kayys.gollek.spi.inference.InferencePhasePlugin;
 import tech.kayys.gollek.spi.observability.AuditPayload;
 import tech.kayys.gollek.spi.exception.ProviderException;
-import tech.kayys.gollek.observability.ProvenanceStore;
 import tech.kayys.gollek.spi.exception.PluginException;
 
 import java.util.Map;
@@ -24,9 +23,6 @@ public class AuditLoggerPlugin implements InferencePhasePlugin {
 
     @Inject
     AuditEventPublisher publisher;
-
-    @Inject
-    ProvenanceStore provenanceStore;
 
     @Override
     public String id() {
@@ -64,8 +60,7 @@ public class AuditLoggerPlugin implements InferencePhasePlugin {
 
         // Store and publish asynchronously (fire and forget for now, or handle
         // blocking)
-        provenanceStore.store(audit)
-                .chain(() -> publisher.publish(audit))
+        publisher.publish(audit)
                 .subscribe().with(
                         v -> {
                         },

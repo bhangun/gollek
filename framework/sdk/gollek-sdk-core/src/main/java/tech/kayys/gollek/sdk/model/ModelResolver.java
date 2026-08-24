@@ -188,7 +188,6 @@ public final class ModelResolver {
                 .name(file.getFileName().toString())
                 .sizeBytes(size)
                 .updatedAt(updated)
-                .requestContext(RequestContext.of("community", "community"))
                 .metadata(Map.of("path", file.toAbsolutePath().toString()))
                 .build();
     }

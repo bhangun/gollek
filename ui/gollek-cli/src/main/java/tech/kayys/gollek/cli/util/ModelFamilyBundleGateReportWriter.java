@@ -79,10 +79,12 @@ public final class ModelFamilyBundleGateReportWriter {
         report.put(Root.CONTRACT_VALIDATION, ModelFamilyContractViolationReports.validationReport(contract));
         report.put(Root.MANIFEST, ModelFamilyBundleManifestReports.manifest(manifest));
         report.put(Root.DISCOVERED_FAMILIES, discoveredFamilyIds);
-        report.put(Root.FAMILIES, registry.supportReports().stream()
+        report.put(Root.FAMILIES, registry.all().stream()
+                .flatMap(p -> { try { return java.util.stream.Stream.of(p.supportReport()); } catch (Exception e) { return java.util.stream.Stream.empty(); } })
                 .map(ModelFamilyBundleInventoryReports::family)
                 .toList());
-        report.put(Root.RUNTIME_MANIFESTS, registry.runtimeManifests().stream()
+        report.put(Root.RUNTIME_MANIFESTS, registry.all().stream()
+                .flatMap(p -> { try { return java.util.stream.Stream.of(p.runtimeManifest()); } catch (Exception e) { return java.util.stream.Stream.empty(); } })
                 .map(ModelFamilyBundleInventoryReports::runtimeManifest)
                 .toList());
         report.put(Root.RUNTIME_COMPATIBILITY, ModelFamilyRuntimeCompatibilityReports.compatibility(

@@ -1,6 +1,6 @@
 package tech.kayys.gollek.safetensor.engine.planning;
 
-import tech.kayys.gollek.safetensor.audio.model.AudioConfig;
+// AudioConfig was removed with gollek-safetensor-audio module; replaced by a local stub.
 import tech.kayys.gollek.safetensor.engine.backend.PreparedTextGeneration;
 import tech.kayys.gollek.safetensor.engine.backend.TextExecutionArtifactPlan;
 import tech.kayys.gollek.safetensor.engine.backend.PreparedTextModel;
@@ -13,6 +13,12 @@ import tech.kayys.alkhawarizm.safetensor.spi.SafetensorEngine;
 
 import java.nio.file.Path;
 import java.util.Objects;
+
+/**
+ * Minimal stub replacing the removed AudioConfig from gollek-safetensor-audio.
+ * Audio inference is currently excluded from this engine build.
+ */
+record AudioConfig() {}
 
 /**
  * Engine-owned prepared inference request.
@@ -32,7 +38,7 @@ public record PreparedInferenceRequest(
     public PreparedInferenceRequest {
         Objects.requireNonNull(modelPath, "modelPath");
         Objects.requireNonNull(ttsPrompt, "ttsPrompt");
-        Objects.requireNonNull(audioConfig, "audioConfig");
+        // audioConfig is nullable — audio inference is excluded from this build
         Objects.requireNonNull(conversationExecutionState, "conversationExecutionState");
     }
 

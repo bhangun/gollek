@@ -1,26 +1,50 @@
 package tech.kayys.gollek.core.config;
 
-import io.smallrye.config.ConfigMapping;
-import io.smallrye.config.WithDefault;
+import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-@ConfigMapping(prefix = "hardware")
-public interface HardwareConfig {
+@ApplicationScoped
+public class HardwareConfig {
 
-    @WithDefault("false")
-    boolean cudaEnabled();
+    @ConfigProperty(name = "hardware.cuda-enabled", defaultValue = "false")
+    boolean cudaEnabled;
 
-    @WithDefault("false")
-    boolean rocmEnabled();
+    @ConfigProperty(name = "hardware.rocm-enabled", defaultValue = "false")
+    boolean rocmEnabled;
 
-    @WithDefault("false")
-    boolean tpuEnabled();
+    @ConfigProperty(name = "hardware.tpu-enabled", defaultValue = "false")
+    boolean tpuEnabled;
 
-    @WithDefault("false")
-    boolean appleSiliconEnabled();
+    @ConfigProperty(name = "hardware.apple-silicon-enabled", defaultValue = "false")
+    boolean appleSiliconEnabled;
 
-    @WithDefault("false")
-    boolean openVINOEnabled();
+    @ConfigProperty(name = "hardware.openvino-enabled", defaultValue = "false")
+    boolean openVINOEnabled;
 
-    @WithDefault("8589934592")
-    long availableMemory();
+    @ConfigProperty(name = "hardware.available-memory", defaultValue = "8589934592")
+    long availableMemory;
+
+    public boolean cudaEnabled() {
+        return cudaEnabled;
+    }
+
+    public boolean rocmEnabled() {
+        return rocmEnabled;
+    }
+
+    public boolean tpuEnabled() {
+        return tpuEnabled;
+    }
+
+    public boolean appleSiliconEnabled() {
+        return appleSiliconEnabled;
+    }
+
+    public boolean openVINOEnabled() {
+        return openVINOEnabled;
+    }
+
+    public long availableMemory() {
+        return availableMemory;
+    }
 }

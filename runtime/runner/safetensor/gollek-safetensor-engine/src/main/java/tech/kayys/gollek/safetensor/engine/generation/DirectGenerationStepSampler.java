@@ -45,10 +45,10 @@ final class DirectGenerationStepSampler {
         TokenSampler resolvedTokenSampler = directGreedy ? null : tokenSampler.get();
         TokenSamplingMasks samplingMasks = mode == SamplingMode.TOKENIZER_AWARE
                 ? GenerationTokenPolicy.tokenSamplingMasksFor(model.baseTokenSamplingMasks(), model.tokenizer(),
-                        stops, config.getVocabSize(), cfg, model.runtimeTraits())
+                        stops, config.vocabSize(), cfg, model.runtimeTraits())
                 : null;
         GenerationTokenValidationCache validationCache = mode == SamplingMode.TOKENIZER_AWARE
-                ? new GenerationTokenValidationCache(config.getVocabSize())
+                ? new GenerationTokenValidationCache(config.vocabSize())
                 : null;
         return new SamplingState(mode, directGreedy, resolvedForwardPass, frequencies, rng, resolvedTokenSampler, stops,
                 samplingMasks, validationCache);

@@ -41,7 +41,7 @@ final class GenerationTokenPolicy {
             }
         }
         if (config != null) {
-            stops.addAll(config.getEosTokenIds());
+            stops.addAll(config.eosTokenIds());
         }
         return Collections.unmodifiableSet(stops);
     }
@@ -76,7 +76,7 @@ final class GenerationTokenPolicy {
     }
 
     static int[] initializePromptFrequencies(ModelConfig config, long[] tokenIds) {
-        int[] freq = new int[config.getVocabSize()];
+        int[] freq = new int[config.vocabSize()];
         if (tokenIds == null || tokenIds.length == 0) {
             return freq;
         }
@@ -153,7 +153,7 @@ final class GenerationTokenPolicy {
             ModelRuntimeTraits effectiveTraits = effectiveTraits(config, traits);
             MemorySegment seg = logits.dataPtr();
             long vocab = logits.numel();
-            Double cap = config.getFinalLogitSoftcapping();
+            Double cap = config.finalLogitSoftcapping();
             float softCap = cap != null && cap > 0 ? cap.floatValue() : 0.0f;
             BitSet baseMask = masks == null
                     ? GenerationTokenValidationPolicy.buildDisallowedTokenMask(

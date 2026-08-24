@@ -41,8 +41,8 @@ final class FlashAttentionShapeValidator {
                 && (expectedElements < 0 || actualElements == expectedElements)) {
             return;
         }
-        String modelType = config == null ? "<unknown>" : config.getModelType();
-        int hiddenSize = config == null ? 0 : config.getHiddenSize();
+        String modelType = config == null ? "<unknown>" : config.modelType();
+        int hiddenSize = config == null ? 0 : config.hiddenSize();
         throw new IllegalArgumentException(
                 "Attention " + label + " projection shape mismatch at layer " + layerIdx
                         + ": lastDim=" + actualLastDim

@@ -78,12 +78,12 @@ final class DirectForwardOutputProjection {
                     hidden.dataPtr(),
                     resolvedWeights.finalNorm().dataPtr(),
                     rows,
-                    config.getHiddenSize(),
-                    (float) config.getRmsNormEps(),
+                    config.hiddenSize(),
+                    (float) config.rmsNormEps(),
                     resolvedWeights.addOneRmsNorm());
             return normed;
         }
-        return AccelOps.rmsNorm(hidden, resolvedWeights.finalNorm(), config.getRmsNormEps(),
+        return AccelOps.rmsNorm(hidden, resolvedWeights.finalNorm(), config.rmsNormEps(),
                 resolvedWeights.addOneRmsNorm());
     }
 
@@ -95,8 +95,8 @@ final class DirectForwardOutputProjection {
         long tLogits0 = System.nanoTime();
         AccelTensor logits = linear(context, decodeLogitsPhase, input, lmHeadW, null, "logits", outputBuffer);
         
-        if (context.config().getFinalLogitSoftcapping() != null) {
-            float softcap = context.config().getFinalLogitSoftcapping().floatValue();
+        if (context.config().finalLogitSoftcapping() != null) {
+            float softcap = context.config().finalLogitSoftcapping().floatValue();
             if (softcap > 0.0f) {
                 applyFinalSoftcap(logits, softcap);
             }

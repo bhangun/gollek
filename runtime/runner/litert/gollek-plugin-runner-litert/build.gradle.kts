@@ -18,8 +18,8 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":core:plugin:gollek-plugin-runner-core"))
-    implementation(project(":core:gollek-runtime-config"))
+    implementation(project(":plugin:gollek-plugin-runner-core"))
+    implementation(project(":core:gollek-core"))
     implementation(project(":spi:gollek-spi"))
     implementation(project(":spi:gollek-spi-inference"))
     implementation(project(":runner:litert:gollek-runner-litert"))

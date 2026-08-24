@@ -30,7 +30,7 @@ final class FlashAttentionOutputStage {
             return projected;
         }
 
-        AccelTensor normed = normalizer.rmsNormReusingInput(projected, in.postAttnNormW, config.getRmsNormEps(),
+        AccelTensor normed = normalizer.rmsNormReusingInput(projected, in.postAttnNormW, config.rmsNormEps(),
                 addOneRmsNorm);
         if (normed != projected) {
             projected.close();

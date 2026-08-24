@@ -104,7 +104,7 @@ final class FlashAttentionDenseFallbackLoop {
 
     private static int slidingWindow(ModelConfig config, int layerIdx) {
         boolean slidingLayer = config != null && config.isSlidingAttentionLayer(layerIdx) && config.hasSlidingWindow();
-        return slidingLayer ? config.getSlidingWindowSize() : Integer.MAX_VALUE;
+        return slidingLayer ? config.slidingWindowSize() : Integer.MAX_VALUE;
     }
 
     interface KeyValueSource {

@@ -70,9 +70,11 @@ repositories {
 dependencies {
     implementation(project(":sdk:gollek-sdk-core"))
     implementation(platform("io.quarkus.platform:quarkus-bom:$quarkusVersion"))
+    // JAX-RS API — required by GracefulShutdownHandler.DrainFilter (ContainerRequestFilter)
+    implementation("jakarta.ws.rs:jakarta.ws.rs-api:3.1.0")
 
-    implementation(project(":core:gollek-runtime-config"))
-    implementation(project(":core:gollek-model-repository"))
+    implementation(project(":core:gollek-core"))
+    implementation(project(":core:gollek-core"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":core:gollek-tokenizer-core"))
     implementation(project(":sdk:gollek-sdk-core"))
@@ -89,7 +91,8 @@ dependencies {
     implementation("tech.kayys.alkhawarizm:alkhawarizm-safetensor-quantization:0.1.0-SNAPSHOT")
 
     implementation("tech.kayys.alkhawarizm:alkhawarizm-backend-metal:0.1.0-SNAPSHOT")
-    implementation("tech.kayys.gollek:gollek-safetensor-audio:0.1.0-SNAPSHOT")
+    // gollek-safetensor-audio removed — module does not exist in this repo;
+    // audio inference paths are excluded via sourceSets above.
 
     implementation("com.fasterxml.jackson.core:jackson-annotations:2.16.1")
     implementation("com.fasterxml.jackson.core:jackson-core:2.16.1")
@@ -108,7 +111,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
     // planning tests build ProviderRequest fixtures; resolved from mavenLocal()
     testImplementation("tech.kayys.gollek:gollek-spi-provider:0.1.0-SNAPSHOT")
-    testImplementation(project(":models:gollek-model-gemma4"))
+    testImplementation("tech.kayys.alkhawarizm:alkhawarizm-model-gemma:0.1.0-SNAPSHOT")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

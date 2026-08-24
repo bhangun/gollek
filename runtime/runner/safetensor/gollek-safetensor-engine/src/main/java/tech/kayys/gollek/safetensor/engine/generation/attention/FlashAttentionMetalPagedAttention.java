@@ -85,13 +85,13 @@ final class FlashAttentionMetalPagedAttention {
                                     blockTableSegment, contextLensSegment,
                                     (int) batch, (int) seqLen, numHeads, numKVHeads, headDim,
                                     kvSession.tokensPerBlock(), maxBlocks,
-                                    scale, causal ? 1 : 0, startPos, config.getSlidingWindowSize(), softCap)
+                                    scale, causal ? 1 : 0, startPos, config.slidingWindowSize(), softCap)
                             : binding.attentionGqaWindowed(
                                     out.dataPtr(), q.dataPtr(), kPool, vPool,
                                     blockTableSegment, contextLensSegment,
                                     (int) batch, (int) seqLen, numHeads, numKVHeads, headDim,
                                     kvSession.tokensPerBlock(), maxBlocks,
-                                    scale, causal ? 1 : 0, startPos, config.getSlidingWindowSize(), softCap))
+                                    scale, causal ? 1 : 0, startPos, config.slidingWindowSize(), softCap))
                     : (numKVHeads == numHeads
                             ? binding.attention(
                                     out.dataPtr(), q.dataPtr(), kPool, vPool,

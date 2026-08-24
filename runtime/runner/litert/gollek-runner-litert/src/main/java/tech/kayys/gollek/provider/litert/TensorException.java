@@ -1,6 +1,6 @@
 package tech.kayys.gollek.provider.litert;
 
-import tech.kayys.gollek.error.ErrorCode;
+import tech.kayys.alkhawarizm.error.ErrorCode;
 import tech.kayys.gollek.spi.exception.InferenceException;
 
 public class TensorException extends InferenceException {

@@ -48,8 +48,8 @@ public class ModelArchitectureRegistry {
      * @throws IllegalArgumentException if no registered architecture matches
      */
     public ModelArchitecture resolve(ModelConfig config) {
-        String primaryArch = config.getPrimaryArchitecture();
-        String modelType = config.getModelType();
+        String primaryArch = config.primaryArchitecture();
+        String modelType = config.modelType();
 
         for (ModelArchitecture arch : getAllArchitectures()) {
             if (arch.supportedArchClassNames().contains(primaryArch)) {

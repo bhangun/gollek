@@ -27,7 +27,7 @@ public class EarlyFusionEngine implements FusionEngine {
     @Override
     public FusionResult fuse(List<EncodedInput> inputs, ModelConfig config, InferenceRequest request) {
         int totalTokens = inputs.stream().mapToInt(EncodedInput::tokenCount).sum();
-        float[][] fusedEmbeds = new float[totalTokens][config.getHiddenSize()];
+        float[][] fusedEmbeds = new float[totalTokens][config.hiddenSize()];
         int[] positionIds = new int[totalTokens];
 
         int currentToken = 0;
@@ -39,7 +39,7 @@ public class EarlyFusionEngine implements FusionEngine {
             
             for (int i = 0; i < input.tokenCount(); i++) {
                 // Dim validation
-                if (input.hiddenSize() != config.getHiddenSize()) {
+                if (input.hiddenSize() != config.hiddenSize()) {
                     // In a production scenario, we'd add an alignment layer (linear projection)
                     // For now, assume encoders match LLM hidden size.
                 }

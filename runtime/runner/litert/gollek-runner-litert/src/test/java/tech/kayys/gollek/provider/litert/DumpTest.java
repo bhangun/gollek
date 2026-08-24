@@ -1,10 +1,12 @@
 package tech.kayys.gollek.provider.litert;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.TreeMap;
 
+@Disabled("Local manual debug test requiring gemma-4-E2B-it-web.task")
 public class DumpTest {
 
     @Test

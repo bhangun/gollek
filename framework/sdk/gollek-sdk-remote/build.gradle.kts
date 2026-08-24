@@ -22,7 +22,7 @@ val mutinyVersion = "2.5.5"
 val jakartaValidationVersion = "3.0.2"
 
 dependencies {
-    api(project(":sdk:gollek-sdk-agent"))
+
     api(project(":sdk:gollek-sdk-core"))
     api(project(":spi:gollek-spi"))
     api(project(":spi:gollek-spi-inference"))

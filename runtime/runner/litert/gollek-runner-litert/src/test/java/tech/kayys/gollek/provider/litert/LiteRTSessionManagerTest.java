@@ -1,47 +1,23 @@
 package tech.kayys.gollek.provider.litert;
- 
- import org.junit.jupiter.api.Test;
- import org.junit.jupiter.api.io.TempDir;
- import tech.kayys.gollek.provider.core.session.EwmaAdaptiveSessionEvictionPolicy;
- 
- import java.nio.file.Files;
- import java.nio.file.Path;
- import java.time.Duration;
- 
- import static org.junit.jupiter.api.Assertions.assertNotNull;
- import static org.junit.jupiter.api.Assertions.assertTrue;
- import static org.junit.jupiter.api.Assertions.assertEquals;
- 
- class LiteRTSessionManagerTest {
- 
-     @TempDir
-     Path tempDir;
- 
-     @Test
-     void adaptiveIdleTimeoutRespondsToPressureTelemetry() {
-         LiteRTSessionManager manager = new LiteRTSessionManager(config(tempDir), new EwmaAdaptiveSessionEvictionPolicy());
- 
-         int baseline = manager.adaptiveIdleTimeoutSeconds();
-         assertEquals(300, baseline);
- 
-         for (int i = 0; i < 8; i++) {
-             manager.recordAdaptiveTelemetryForTest(true, 0);
-         }
-         int tightened = manager.adaptiveIdleTimeoutSeconds();
-         assertTrue(tightened < baseline);
-         assertTrue(manager.adaptivePressureScoreForTest() > 0.60d);
- 
-         for (int i = 0; i < 12; i++) {
-             manager.recordAdaptiveTelemetryForTest(false, 0);
-         }
-         int recovered = manager.adaptiveIdleTimeoutSeconds();
-         assertTrue(recovered > tightened);
-         assertTrue(manager.adaptivePressureScoreForTest() < 0.35d);
-     }
- 
-     @Test
-     void acquiresAndReleasesSessionUsingPool() throws Exception {
-         LiteRTSessionManager manager = new LiteRTSessionManager(config(tempDir), new EwmaAdaptiveSessionEvictionPolicy());
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class LiteRTSessionManagerTest {
+
+    @TempDir
+    Path tempDir;
+
+    @Test
+    void acquiresAndReleasesSessionUsingPool() throws Exception {
+        LiteRTSessionManager manager = new LiteRTSessionManager(config(tempDir));
  
          Path modelPath = tempDir.resolve("demo.litertlm");
          Files.writeString(modelPath, "dummy");

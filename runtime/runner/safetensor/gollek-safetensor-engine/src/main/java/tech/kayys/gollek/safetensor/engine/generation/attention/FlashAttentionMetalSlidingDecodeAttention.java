@@ -54,7 +54,7 @@ final class FlashAttentionMetalSlidingDecodeAttention {
         long batch = q.size(0);
         int seqLen = (int) q.size(1);
         int totalTokens = startPos + seqLen;
-        int slidingWindow = config.getSlidingWindowSize();
+        int slidingWindow = config.slidingWindowSize();
         int contextStart = Math.max(0, totalTokens - slidingWindow);
         int contextTokens = totalTokens - contextStart;
         if (routing.shortDecodeUsesNativeAttention(contextTokens)) {

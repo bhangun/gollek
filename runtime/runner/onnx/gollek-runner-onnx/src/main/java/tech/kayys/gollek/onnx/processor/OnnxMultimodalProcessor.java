@@ -10,7 +10,7 @@ import tech.kayys.alkhawarizm.spi.model.ModalityType;
 import tech.kayys.alkhawarizm.spi.model.MultimodalContent;
 import tech.kayys.alkhawarizm.spi.model.MultimodalRequest;
 import tech.kayys.alkhawarizm.spi.model.MultimodalResponse;
-import tech.kayys.gollek.error.ErrorCode;
+import tech.kayys.alkhawarizm.error.ErrorCode;
 
 import tech.kayys.gollek.spi.processor.MultimodalProcessor;
 import tech.kayys.gollek.onnx.binding.OnnxRuntimeBinding;

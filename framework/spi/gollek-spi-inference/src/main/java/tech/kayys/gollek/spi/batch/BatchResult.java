@@ -1,6 +1,6 @@
 package tech.kayys.gollek.spi.batch;
 
-import tech.kayys.gollek.error.ErrorPayload;
+import tech.kayys.alkhawarizm.error.ErrorPayload;
 import tech.kayys.gollek.spi.inference.InferenceResponse;
 
 /**

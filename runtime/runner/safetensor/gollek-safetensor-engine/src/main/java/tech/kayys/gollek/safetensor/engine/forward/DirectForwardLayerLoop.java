@@ -41,7 +41,7 @@ final class DirectForwardLayerLoop {
     static MemorySegment run(Request request) {
         MemorySegment currentHidden = request.currentHidden();
         MemorySegment nextHidden = request.nextHidden();
-        for (int layer = 0; layer < request.config().getNumHiddenLayers(); layer++) {
+        for (int layer = 0; layer < request.config().numHiddenLayers(); layer++) {
             logLayerStart(request, layer);
             DirectForwardTransformerLayer.forward(
                     request.context(),
@@ -73,7 +73,7 @@ final class DirectForwardLayerLoop {
             return;
         }
         System.err.printf("[DEBUG] %s %d/%d start%n",
-                request.debugLabel(), layer, request.config().getNumHiddenLayers());
+                request.debugLabel(), layer, request.config().numHiddenLayers());
         System.err.flush();
     }
 

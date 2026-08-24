@@ -82,16 +82,16 @@ public final class JavaNativeGgufBackend implements GgufBackend {
         metadata.put("rowDotReady", profile.rowDotPrimitivesReady());
         metadata.put("generationReady", false);
         if (profile.modelConfig() != null) {
-            metadata.put("modelType", profile.modelConfig().getModelType());
-            metadata.put("layers", profile.modelConfig().getNumHiddenLayers());
-            metadata.put("hiddenSize", profile.modelConfig().getHiddenSize());
-            metadata.put("attentionHeads", profile.modelConfig().getNumAttentionHeads());
-            metadata.put("kvHeads", profile.modelConfig().getResolvedNumKvHeads());
-            metadata.put("headDim", profile.modelConfig().getResolvedHeadDim());
-            metadata.put("contextLength", profile.modelConfig().getMaxPositionEmbeddings());
-            metadata.put("vocabSize", profile.modelConfig().getVocabSize());
+            metadata.put("modelType", profile.modelConfig().modelType());
+            metadata.put("layers", profile.modelConfig().numHiddenLayers());
+            metadata.put("hiddenSize", profile.modelConfig().hiddenSize());
+            metadata.put("attentionHeads", profile.modelConfig().numAttentionHeads());
+            metadata.put("kvHeads", profile.modelConfig().resolvedNumKvHeads());
+            metadata.put("headDim", profile.modelConfig().resolvedHeadDim());
+            metadata.put("contextLength", profile.modelConfig().maxPositionEmbeddings());
+            metadata.put("vocabSize", profile.modelConfig().vocabSize());
         }
-        return Map.copyOf(metadata);
+        return java.util.Collections.unmodifiableMap(metadata);
     }
 
     @Override

@@ -11,7 +11,7 @@ import tech.kayys.gollek.runner.RunnerConfiguration;
 import tech.kayys.gollek.extension.AbstractGollekRunner;
 import tech.kayys.gollek.flashattn.binding.FlashAttention4Binding;
 import tech.kayys.gollek.kvcache.PagedKVCacheManager;
-import tech.kayys.gollek.error.ErrorCode;
+import tech.kayys.alkhawarizm.error.ErrorCode;
 import tech.kayys.gollek.exception.RunnerInitializationException;
 import tech.kayys.gollek.spi.inference.InferenceRequest;
 import tech.kayys.gollek.spi.inference.InferenceResponse;

@@ -46,6 +46,13 @@ final class LocalModelIndex {
         public String quantSourceModel;
         /** Whether the model is enabled for inference */
         public boolean enabled = true;
+
+        // ── Modality / task grouping ─────────────────────────────────
+        /**
+         * High-level task category derived from the HuggingFace pipeline_tag.
+         * Values: text, vision, tts, stt, ocr, multimodal, embedding, unknown.
+         */
+        public String taskType;
     }
 
     private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
@@ -378,6 +385,20 @@ final class LocalModelIndex {
                             }
                             e.sizeBytes = sizeBytes;
 
+                            // ── Task type / modality ─────────────────────────────
+                            e.taskType = text(node, "taskType");
+                            if (e.taskType == null || e.taskType.isBlank()) {
+                                // fall back to metadata.pipeline_tag
+                                var metaNode = node.path("metadata");
+                                if (!metaNode.isMissingNode() && metaNode.isObject()) {
+                                    String tag = metaNode.path("pipeline_tag").asText(null);
+                                    e.taskType = pipelineTagToTaskType(tag);
+                                }
+                            }
+                            if (e.taskType == null || e.taskType.isBlank()) {
+                                e.taskType = "text"; // safe default for GGUF chat/text models
+                            }
+
                             if (isUnknownArchitecture(e.architecture)) {
                                 detectArchitecture(e, Files.isDirectory(resolved) ? resolved : resolved.getParent());
                             }
@@ -521,6 +542,41 @@ final class LocalModelIndex {
         }
         String lower = file.getFileName().toString().toLowerCase(Locale.ROOT);
         return lower.endsWith(".onnx");
+    }
+
+    /**
+     * Maps a HuggingFace {@code pipeline_tag} value to a gollek task-type label.
+     * Returns {@code null} when the tag is blank or unrecognised (caller decides default).
+     */
+    static String pipelineTagToTaskType(String pipelineTag) {
+        if (pipelineTag == null || pipelineTag.isBlank()) {
+            return null;
+        }
+        return switch (pipelineTag.trim().toLowerCase(Locale.ROOT)) {
+            case "text-generation",
+                 "text2text-generation",
+                 "conversational",
+                 "fill-mask"             -> "text";
+            case "automatic-speech-recognition",
+                 "audio-classification"  -> "stt";
+            case "text-to-audio",
+                 "text-to-speech"        -> "tts";
+            case "image-to-text",
+                 "document-question-answering",
+                 "visual-question-answering",
+                 "image-text-to-text"    -> "vision";
+            case "image-classification",
+                 "object-detection",
+                 "image-segmentation",
+                 "image-to-image"        -> "vision";
+            case "feature-extraction",
+                 "sentence-similarity"   -> "embedding";
+            case "time-series-forecasting",
+                 "time-series-classification",
+                 "tabular-regression",
+                 "tabular-classification" -> "timeseries";
+            default                      -> null;
+        };
     }
 
     private static boolean isRunnableFormat(String format) {

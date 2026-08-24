@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
     implementation(project(":spi:gollek-spi"))
-    implementation(project(":core:gollek-error-code"))
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-error-code:0.1.0-SNAPSHOT")
     implementation("tech.kayys.alkhawarizm:alkhawarizm-spi-model:0.1.0-SNAPSHOT")
     implementation(project(":spi:gollek-spi-multimodal"))
     implementation("io.smallrye.reactive:mutiny:2.5.5")

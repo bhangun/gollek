@@ -24,11 +24,11 @@ dependencies {
     implementation(project(":sdk:gollek-sdk-api"))
     implementation("io.quarkus:quarkus-arc:3.32.2")
     implementation(project(":core:gollek-core"))
-    implementation(project(":core:gollek-model-repository"))
-    implementation(project(":core:gollek-observability"))
+    implementation(project(":core:gollek-core"))
+    implementation(project(":core:gollek-core"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
-    implementation(project(":plugins:gollek-plugin-mcp"))
-    implementation(project(":plugins:gollek-plugin-model-router"))
+
+    
     implementation("tech.kayys.alkhawarizm:alkhawarizm-gguf-converter:0.1.0-SNAPSHOT")
     implementation(project(":core:gollek-model-repo-hf"))
     implementation(project(":core:gollek-model-repo-local"))
@@ -40,9 +40,9 @@ dependencies {
     implementation(project(":spi:gollek-spi-plugin"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-gguf-core:0.1.0-SNAPSHOT")
     implementation("tech.kayys.alkhawarizm:alkhawarizm-safetensor-core:0.1.0-SNAPSHOT")
-    implementation(project(":runner:safetensor:gollek-safetensor-engine"))
+    // implementation(project(":runner:safetensor:gollek-safetensor-engine"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-safetensor-spi:0.1.0-SNAPSHOT")
-    implementation(project(":core:gollek-runtime-config"))
+    implementation(project(":core:gollek-core"))
     implementation(project(":optimization:gollek-plugin-kv-cache"))
 
 

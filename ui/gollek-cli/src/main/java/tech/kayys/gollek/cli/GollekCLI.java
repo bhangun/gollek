@@ -35,6 +35,7 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
+
 @Command(name = "gollek", mixinStandardHelpOptions = true, version = "gollek 2.0-gradle", description = "Gollek Gradle-native local CLI", subcommands = {
         GollekCLI.ListCommand.class,
         GollekCLI.RunCommand.class,
@@ -311,7 +312,6 @@ public class GollekCLI implements Callable<Integer> {
             }
 
             GollekSdk sdk = getSdk();
-            sdk.setPreferredProvider(selectedProvider);
 
             InferenceRequest request = buildRequest(
                     entry,
@@ -380,7 +380,6 @@ public class GollekCLI implements Callable<Integer> {
             }
 
             GollekSdk sdk = getSdk();
-            sdk.setPreferredProvider(selectedProvider);
 
             ChatSession session = new ChatSessionImpl(sdk, logicalModelId(entry), selectedProvider);
             session.setAutoContinue(true);

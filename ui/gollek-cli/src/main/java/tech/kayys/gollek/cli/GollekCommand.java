@@ -8,7 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import picocli.CommandLine.Command;
-import tech.kayys.gollek.cli.commands.AgentCommand;
 import tech.kayys.gollek.cli.commands.BenchmarkCommand;
 import tech.kayys.gollek.cli.commands.ChatCommand;
 import tech.kayys.gollek.cli.commands.PrepareCommand;
@@ -17,7 +16,6 @@ import tech.kayys.gollek.cli.commands.ExtensionsCommand;
 import tech.kayys.gollek.cli.commands.FeaturesCommand;
 import tech.kayys.gollek.cli.commands.InfoCommand;
 import tech.kayys.gollek.cli.commands.ListCommand;
-import tech.kayys.gollek.cli.commands.McpCommand;
 import tech.kayys.gollek.cli.commands.PullCommand;
 import tech.kayys.gollek.cli.commands.ModelCommand;
 import tech.kayys.gollek.cli.commands.PrewarmCommand;
@@ -37,6 +35,7 @@ import tech.kayys.gollek.cli.commands.OnnxCommand;
 import tech.kayys.gollek.cli.commands.QuantizeCommand;
 import tech.kayys.gollek.cli.commands.ServerCommand;
 import tech.kayys.gollek.cli.commands.ServeCommand;
+import tech.kayys.gollek.cli.commands.StopCommand;
 import tech.kayys.gollek.sdk.util.GollekHome;
 
 import picocli.CommandLine;
@@ -52,8 +51,6 @@ import picocli.CommandLine.Option;
         PrepareCommand.class,
         PrewarmCommand.class,
         ListCommand.class,
-        AgentCommand.class,
-        McpCommand.class,
         ShowCommand.class,
         DeleteCommand.class,
         ExtensionsCommand.class,
@@ -72,7 +69,8 @@ import picocli.CommandLine.Option;
         OnnxCommand.class,
         QuantizeCommand.class,
         ServerCommand.class,
-        ServeCommand.class
+        ServeCommand.class,
+        StopCommand.class
 })
 
 public class GollekCommand implements Runnable {

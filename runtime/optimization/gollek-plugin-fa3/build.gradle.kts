@@ -18,7 +18,7 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":core:plugin:gollek-plugin-optimization-core"))
+    implementation(project(":plugin:gollek-plugin-optimization-core"))
     implementation(group = "net.java.dev.jna", name = "jna", version = "5.14.0")
     implementation(project(":spi:gollek-spi-inference"))
     implementation(group = "io.quarkus", name = "quarkus-arc", version = "3.32.2")

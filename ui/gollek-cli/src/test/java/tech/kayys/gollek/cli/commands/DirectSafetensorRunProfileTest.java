@@ -40,7 +40,7 @@ class DirectSafetensorRunProfileTest {
 
         DirectSafetensorRunProfile profile = DirectSafetensorRunProfile.load(tempDir);
 
-        assertTrue(profile.gemma4Unified());
+        assertTrue(profile.unifiedMultimodal());
         assertTrue(profile.nativeBf16Matvec());
         assertFalse(profile.runtimeTraits().perLayerInputPath());
         assertTrue(profile.runtimeTraits().skipDefaultSystemPromptInjection());
@@ -84,7 +84,7 @@ class DirectSafetensorRunProfileTest {
 
         DirectSafetensorRunProfile profile = DirectSafetensorRunProfile.load(tempDir);
 
-        assertTrue(profile.gemma4Unified());
+        assertTrue(profile.unifiedMultimodal());
         assertTrue(profile.nativeBf16Matvec());
         assertTrue(profile.runtimeTraits().perLayerInputPath());
         assertTrue(profile.runtimeTraits().visionModel());
@@ -114,10 +114,10 @@ class DirectSafetensorRunProfileTest {
 
         DirectSafetensorRunProfile profile = DirectSafetensorRunProfile.load(tempDir);
 
-        assertTrue(profile.gemma4Unified());
+        assertTrue(profile.unifiedMultimodal());
         assertTrue(profile.config().requiresGemma4PackedMoeRuntime());
-        assertEquals(128, profile.config().getNumLocalExperts());
-        assertEquals(8, profile.config().getNumExpertsPerTok());
-        assertEquals(704, profile.config().getMoeIntermediateSize());
+        assertEquals(128, profile.config().numLocalExperts());
+        assertEquals(8, profile.config().numExpertsPerTok());
+        assertEquals(704, profile.config().moeIntermediateSize());
     }
 }

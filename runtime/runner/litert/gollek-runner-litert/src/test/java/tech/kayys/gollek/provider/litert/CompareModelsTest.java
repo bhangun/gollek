@@ -1,8 +1,10 @@
 package tech.kayys.gollek.provider.litert;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 
+@Disabled("Local manual debug test requiring gemma-4-E2B-it.litertlm")
 public class CompareModelsTest {
     private static int readUint32(byte[] data, int offset) {
         return (data[offset] & 0xFF) | ((data[offset + 1] & 0xFF) << 8) | ((data[offset + 2] & 0xFF) << 16) | ((data[offset + 3] & 0xFF) << 24);

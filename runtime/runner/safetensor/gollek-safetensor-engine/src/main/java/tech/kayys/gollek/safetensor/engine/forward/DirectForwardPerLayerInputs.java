@@ -22,7 +22,7 @@ final class DirectForwardPerLayerInputs {
             DirectForwardOperators operators) {
         if (!DirectForwardElementwisePolicy.shouldBuildPerLayerInputs(
                 traits,
-                config.getHiddenSizePerLayerInput())) {
+                config.hiddenSizePerLayerInput())) {
             return null;
         }
 
@@ -37,8 +37,8 @@ final class DirectForwardPerLayerInputs {
             return null;
         }
 
-        int numLayers = config.getNumHiddenLayers();
-        int pleDim = config.getHiddenSizePerLayerInput();
+        int numLayers = config.numHiddenLayers();
+        int pleDim = config.hiddenSizePerLayerInput();
         int seqLen = inputIds.length;
 
         AccelTensor tokenPleRaw = packedPleEmbeddings.indexSelect(inputIds)
@@ -46,13 +46,13 @@ final class DirectForwardPerLayerInputs {
         AccelTensor tokenPle = AccelOps.mulScalar(tokenPleRaw, (float) Math.sqrt(Math.max(1, pleDim)));
         tokenPleRaw.close();
         AccelTensor projectedPle = operators.linear(inputsEmbeds, pleProjection, null, "ple_projection", config);
-        float pleProjectionScale = (float) (1.0 / Math.sqrt(Math.max(1, config.getHiddenSize())));
+        float pleProjectionScale = (float) (1.0 / Math.sqrt(Math.max(1, config.hiddenSize())));
         AccelTensor projectedPleScaled = AccelOps.mulScalar(projectedPle, pleProjectionScale);
         projectedPle.close();
 
         AccelTensor projectedPle4d = projectedPleScaled.reshape(1L, seqLen, numLayers, pleDim);
         AccelTensor projectedPleNormed = AccelOps.rmsNorm(projectedPle4d, pleProjectionNorm,
-                config.getRmsNormEps(), resolvedWeights.addOneRmsNorm());
+                config.rmsNormEps(), resolvedWeights.addOneRmsNorm());
         projectedPle4d.close();
 
         AccelTensor combinedPle = AccelOps.add(projectedPleNormed, tokenPle);
@@ -94,7 +94,7 @@ final class DirectForwardPerLayerInputs {
     static boolean needed(ModelConfigTraits traits, ModelConfig config, ResolvedModelWeights resolvedWeights) {
         if (!DirectForwardElementwisePolicy.shouldBuildPerLayerInputs(
                 traits,
-                config.getHiddenSizePerLayerInput())) {
+                config.hiddenSizePerLayerInput())) {
             return false;
         }
         return resolvedWeights.packedPleEmbeddings() != null
@@ -143,11 +143,11 @@ final class DirectForwardPerLayerInputs {
                     projected.dataPtr(),
                     weights.normWeight().dataPtr(),
                     request.seqLen(),
-                    request.config().getHiddenSize(),
-                    (float) request.config().getRmsNormEps(),
+                    request.config().hiddenSize(),
+                    (float) request.config().rmsNormEps(),
                     request.addOneRmsNorm());
         } else {
-            normed = AccelOps.rmsNorm(projected, weights.normWeight(), request.config().getRmsNormEps(),
+            normed = AccelOps.rmsNorm(projected, weights.normWeight(), request.config().rmsNormEps(),
                     request.addOneRmsNorm());
         }
         projected.close();
@@ -159,7 +159,7 @@ final class DirectForwardPerLayerInputs {
                 normed,
                 request.hiddenSeg(),
                 request.seqLen(),
-                request.config().getHiddenSize(),
+                request.config().hiddenSize(),
                 request.useNativeElementwiseAdd());
         normed.close();
     }

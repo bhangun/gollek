@@ -18,12 +18,13 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":core:plugin:gollek-plugin-runner-core"))
+    implementation(project(":plugin:gollek-plugin-runner-core"))
+    implementation(project(":core:gollek-tokenizer-core"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-gguf-core:0.1.0-SNAPSHOT")
     implementation("tech.kayys.alkhawarizm:alkhawarizm-nn:0.1.0")
     implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0")
     implementation(project(":spi:gollek-spi-inference"))
-    implementation(project(":runner:safetensor:gollek-safetensor-engine"))
+    // implementation(project(":runner:safetensor:gollek-safetensor-engine"))
     testImplementation(group = "org.junit.jupiter", name = "junit-jupiter")
     testRuntimeOnly(group = "org.junit.platform", name = "junit-platform-launcher")
 }

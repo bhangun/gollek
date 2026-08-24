@@ -51,9 +51,9 @@ public class KVCacheManager {
         }
 
         public void allocate(ModelConfig config, tech.kayys.gollek.safetensor.generation.GenerationConfig genConfig) {
-            this.numLayers = config.getNumHiddenLayers();
-            this.numKVHeads = config.getResolvedMaxKvHeads();
-            this.headDim = config.getResolvedMaxHeadDim();
+            this.numLayers = config.numHiddenLayers();
+            this.numKVHeads = config.resolvedMaxKvHeads();
+            this.headDim = config.resolvedMaxHeadDim();
             this.tokensPerBlock = 16; // Default block size
             this.kvQuantization = genConfig.kvCacheQuant();
 
@@ -78,7 +78,7 @@ public class KVCacheManager {
             }
             
             this.workspace = new ForwardWorkspace();
-            this.workspace.ensureCapacity(config.getHiddenSize(), config.getHiddenSize(), config.getIntermediateSize());
+            this.workspace.ensureCapacity(config.hiddenSize(), config.hiddenSize(), config.intermediateSize());
         }
 
         public ForwardWorkspace getWorkspace() {

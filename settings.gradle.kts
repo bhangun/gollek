@@ -2,6 +2,7 @@ rootProject.name = "gollek-engine"
 
 // Include alkhawarizm as a composite build so gollek can depend on alkhawarizm projects during development
 includeBuild("../alkhawarizm")  // enabled: include local alkhawarizm composite build as source-of-truth for model modules
+includeBuild("../tafkir")       // enabled: include local tafkir composite build for quantizers
 fun includeOptionalProject(projectPath: String, vararg candidatePaths: String) {
     val projectDir = candidatePaths
         .map { file(it) }
@@ -37,7 +38,6 @@ fun includeOptionalProject(projectPath: String, vararg candidatePaths: String) {
 //includeOptionalProject("gollek-utils", "gollek-utils")
 includeOptionalProject("core:gollek-adapter", "runtime/adapter/gollek-adapter")
 includeOptionalProject("core:gollek-core", "framework/core/gollek-core")
-includeOptionalProject("core:gollek-error-code", "framework/core/gollek-error-code")
 includeOptionalProject("repository:gollek-model-database", "framework/repository/gollek-model-database")
 includeOptionalProject("repository:gollek-model-repo-common", "runtime/repository/gollek-model-repo-common")
 includeOptionalProject("core:gollek-model-repo-hf", "runtime/repository/gollek-model-repo-hf")
@@ -75,17 +75,17 @@ discoveredModelDirs.sortedBy { it.name }.forEach { modelProject ->
 }
 
 // Optional optimization plugins
-includeOptionalProject("optimization:gollek-plugin-elastic-ep", "runtime/optimization/gollek-plugin-elastic-ep")
+// includeOptionalProject("optimization:gollek-plugin-elastic-ep", "runtime/optimization/gollek-plugin-elastic-ep")
 // includeOptionalProject("optimization:gollek-plugin-evicpress", "runtime/optimization/gollek-plugin-evicpress")
-includeOptionalProject("optimization:gollek-plugin-fa3", "runtime/optimization/gollek-plugin-fa3")
-includeOptionalProject("optimization:gollek-plugin-fa4", "runtime/optimization/gollek-plugin-fa4")
+// includeOptionalProject("optimization:gollek-plugin-fa3", "runtime/optimization/gollek-plugin-fa3")
+// includeOptionalProject("optimization:gollek-plugin-fa4", "runtime/optimization/gollek-plugin-fa4")
 // includeOptionalProject("optimization:gollek-plugin-hybrid-attn", "runtime/optimization/gollek-plugin-hybrid-attn")
 includeOptionalProject("optimization:gollek-plugin-kv-cache", "runtime/optimization/gollek-plugin-kv-cache")
-includeOptionalProject("optimization:gollek-plugin-paged-attention", "runtime/optimization/gollek-plugin-paged-attention")
+// includeOptionalProject("optimization:gollek-plugin-paged-attention", "runtime/optimization/gollek-plugin-paged-attention")
 // includeOptionalProject("optimization:gollek-plugin-perfmode", "runtime/optimization/gollek-plugin-perfmode")
 // includeOptionalProject("optimization:gollek-plugin-prefill-decode", "runtime/optimization/gollek-plugin-prefill-decode")
 // includeOptionalProject("optimization:gollek-plugin-prompt-cache", "runtime/optimization/gollek-plugin-prompt-cache")
-includeOptionalProject("optimization:gollek-plugin-qlora", "runtime/optimization/gollek-plugin-qlora")
+// includeOptionalProject("optimization:gollek-plugin-qlora", "runtime/optimization/gollek-plugin-qlora")
 // includeOptionalProject("optimization:gollek-plugin-wait-scheduler", "runtime/optimization/gollek-plugin-wait-scheduler")
 // includeOptionalProject("optimization:gollek-plugin-weight-offload", "runtime/optimization/gollek-plugin-weight-offload")
 
@@ -123,21 +123,24 @@ includeOptionalProject("quantizer:gollek-quantizer-turboquant", "runtime/quantiz
 // Optional runners and runtimes
 includeOptionalProject("runner:gollek-diffusion", "runtime/runner/gollek-diffusion")
 includeOptionalProject("runtime:gollek-runtime-core", "runtime/core/gollek-runtime-core")
-includeOptionalProject("runtime:gollek-runtime-distributed", "runtime/core/gollek-runtime-distributed")
+// includeOptionalProject("runtime:distributed:gollek-runtime-distributed", "runtime/core/gollek-runtime-distributed")
 
 // Optional SDK
 includeOptionalProject("sdk:gollek-sdk", "framework/sdk/gollek-sdk")
 includeOptionalProject("sdk:gollek-sdk-api", "framework/sdk/gollek-sdk-api")
 includeOptionalProject("sdk:gollek-sdk-core", "framework/sdk/gollek-sdk-core")
 includeOptionalProject("sdk:gollek-sdk-local", "framework/sdk/gollek-sdk-local")
-includeOptionalProject("sdk:gollek-sdk-remote", "framework/sdk/gollek-sdk-remote")
+// includeOptionalProject("sdk:gollek-sdk-remote", "framework/sdk/gollek-sdk-remote")
 includeOptionalProject("sdk:gollek-sdk-protobuf", "framework/sdk/gollek-sdk-protobuf")
+includeOptionalProject("ui:gollek-sdk-protobuf", "ui/gollek-sdk-protobuf")
 if (file("framework/sdk/gollek-sdk-session").isDirectory) {
     include("sdk:gollek-sdk-session")
 }
 
 // Optional SPIs
 includeOptionalProject("spi:gollek-spi", "framework/spi/gollek-spi")
+includeOptionalProject("spi:gollek-spi-audio", "framework/spi/gollek-spi-audio")
+includeOptionalProject("spi:gollek-spi-image", "framework/spi/gollek-spi-image")
 includeOptionalProject("spi:gollek-spi-inference", "framework/spi/gollek-spi-inference")
 includeOptionalProject("spi:gollek-spi-model", "framework/spi/gollek-spi-model")
 includeOptionalProject("spi:gollek-spi-multimodal", "framework/spi/gollek-spi-multimodal")
@@ -173,6 +176,9 @@ includeOptionalProject("runner:diffuser:gollek-diffuser", "runtime/runner/diffus
 includeOptionalProject("runner:gguf:gollek-gguf-converter", "runtime/runner/gguf/gollek-gguf-converter")
 includeOptionalProject("runner:gguf:gollek-gguf-converter-java", "runtime/runner/gguf/gollek-gguf-converter-java")
 includeOptionalProject("runner:gguf:gollek-gguf-core", "runtime/runner/gguf/gollek-gguf-core")
+includeOptionalProject("runner:gguf:gollek-runner-gguf", "runtime/runner/gguf/gollek-runner-gguf")
+includeOptionalProject("runner:gguf:gollek-plugin-runner-gguf", "runtime/runner/gguf/gollek-plugin-runner-gguf")
+includeOptionalProject("runner:gguf:gollek-gguf-feature-text", "runtime/runner/gguf/gollek-gguf-feature-text")
 includeOptionalProject("runner:litert:gollek-litert-core", "runtime/runner/litert/gollek-litert-core")
 includeOptionalProject("runner:litert:gollek-plugin-runner-litert", "runtime/runner/litert/gollek-plugin-runner-litert")
 includeOptionalProject("runner:litert:gollek-runner-litert", "runtime/runner/litert/gollek-runner-litert")
@@ -180,19 +186,21 @@ includeOptionalProject("runner:litert:gollek-runner-litert", "runtime/runner/lit
 includeOptionalProject("runner:onnx:gollek-plugin-runner-onnx", "runtime/runner/onnx/gollek-plugin-runner-onnx")
 includeOptionalProject("runner:onnx:gollek-runner-onnx", "runtime/runner/onnx/gollek-runner-onnx")
 
-includeOptionalProject("runner:safetensor:gollek-runner-safetensor", "runtime/runner/safetensor/gollek-runner-safetensor")
-includeOptionalProject("runner:safetensor:gollek-runner-stable-diffusion", "runtime/runner/safetensor/gollek-runner-stable-diffusion")
-includeOptionalProject("runner:safetensor:gollek-safetensor-api", "runtime/runner/safetensor/gollek-safetensor-api")
-includeOptionalProject("runner:safetensor:gollek-safetensor-core", "runtime/runner/safetensor/gollek-safetensor-core")
 includeOptionalProject("runner:safetensor:gollek-safetensor-engine", "runtime/runner/safetensor/gollek-safetensor-engine")
-includeOptionalProject("runner:safetensor:gollek-safetensor-loader", "runtime/runner/safetensor/gollek-safetensor-loader")
-includeOptionalProject("runner:safetensor:gollek-safetensor-quantization", "runtime/runner/safetensor/gollek-safetensor-quantization")
-includeOptionalProject("runner:safetensor:gollek-safetensor-spi", "runtime/runner/safetensor/gollek-safetensor-spi")
-includeOptionalProject("runner:tensorrt:gollek-runner-tensorrt", "runtime/runner/tensorrt/gollek-runner-tensorrt")
-includeOptionalProject("runner:tensorrt:gollek-plugin-runner-tensorrt", "runtime/runner/tensorrt/gollek-plugin-runner-tensorrt")
-includeOptionalProject("runner:torch:gollek-runner-libtorch", "runtime/runner/torch/gollek-runner-libtorch")
+includeOptionalProject("runner:safetensor:gollek-runner-flux", "runtime/runner/safetensor/gollek-runner-flux")
+// includeOptionalProject("runner:safetensor:gollek-runner-safetensor", "runtime/runner/safetensor/gollek-runner-safetensor")
+// includeOptionalProject("runner:safetensor:gollek-runner-stable-diffusion", "runtime/runner/safetensor/gollek-runner-stable-diffusion")
+// includeOptionalProject("runner:safetensor:gollek-safetensor-api", "runtime/runner/safetensor/gollek-safetensor-api")
+// includeOptionalProject("runner:safetensor:gollek-safetensor-core", "runtime/runner/safetensor/gollek-safetensor-core")
+// includeOptionalProject("runner:safetensor:gollek-safetensor-loader", "runtime/runner/safetensor/gollek-safetensor-loader")
+// includeOptionalProject("runner:safetensor:gollek-safetensor-quantization", "runtime/runner/safetensor/gollek-safetensor-quantization")
+// includeOptionalProject("runner:safetensor:gollek-safetensor-spi", "runtime/runner/safetensor/gollek-safetensor-spi")
+// includeOptionalProject("runner:tensorrt:gollek-runner-tensorrt", "runtime/runner/tensorrt/gollek-runner-tensorrt")
+// includeOptionalProject("runner:tensorrt:gollek-plugin-runner-tensorrt", "runtime/runner/tensorrt/gollek-plugin-tensorrt")
+// includeOptionalProject("runner:torch:gollek-runner-libtorch", "runtime/runner/torch/gollek-runner-libtorch")
 
 
 
 
 
+includeBuild("../../Modules/suling")

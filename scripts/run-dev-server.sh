@@ -72,9 +72,18 @@ for arg in "$@"; do
     fi
 done
 
-exec ./gradlew :ui:gollek-cli:quarkusDev --quarkus-args="$QUARKUS_ARGS" \
-  -Pgollek.backend="${RESOLVED_BACKEND_PROPERTY}" \
-  -Pgollek.profile="${BUILD_PROFILE}" \
-  -Pgollek.model.formats="${FORMAT_TARGETS}" \
-  -Pgollek.llm.types="${LLM_TARGETS}" \
-  -Pgollek.architecture="${ARCHITECTURE_VALUE}"
+if [[ -n "${QUARKUS_ARGS// /}" ]]; then
+    exec ./gradlew :ui:gollek-cli:quarkusDev "--quarkus-args=$QUARKUS_ARGS" \
+      -Pgollek.backend="${RESOLVED_BACKEND_PROPERTY}" \
+      -Pgollek.profile="${BUILD_PROFILE}" \
+      -Pgollek.model.formats="${FORMAT_TARGETS}" \
+      -Pgollek.llm.types="${LLM_TARGETS}" \
+      -Pgollek.architecture="${ARCHITECTURE_VALUE}"
+else
+    exec ./gradlew :ui:gollek-cli:quarkusDev \
+      -Pgollek.backend="${RESOLVED_BACKEND_PROPERTY}" \
+      -Pgollek.profile="${BUILD_PROFILE}" \
+      -Pgollek.model.formats="${FORMAT_TARGETS}" \
+      -Pgollek.llm.types="${LLM_TARGETS}" \
+      -Pgollek.architecture="${ARCHITECTURE_VALUE}"
+fi

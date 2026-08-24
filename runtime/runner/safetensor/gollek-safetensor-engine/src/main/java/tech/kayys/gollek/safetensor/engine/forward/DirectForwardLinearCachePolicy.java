@@ -28,7 +28,7 @@ final class DirectForwardLinearCachePolicy {
                 profileKey,
                 isSingleTokenHalfLinearCandidate(input, weight),
                 weight.dequantizedByteSize(),
-                config.getNumHiddenLayers())) {
+                config.numHiddenLayers())) {
             return null;
         }
         // Do not preemptively dequantize to avoid SIGILL on unaligned quantized tensors.

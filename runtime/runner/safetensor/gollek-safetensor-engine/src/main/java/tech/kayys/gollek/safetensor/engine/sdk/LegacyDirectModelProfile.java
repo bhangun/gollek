@@ -10,7 +10,7 @@ import org.jboss.logging.Logger;
 import tech.kayys.gollek.models.core.ChatTemplateFormatter;
 import tech.kayys.gollek.safetensor.engine.runtime.ModelRuntimeTraitsResolver;
 import tech.kayys.alkhawarizm.spi.model.ModelConfig;
-import tech.kayys.alkhawarizm.spi.model.loader.ModelConfigLoader;
+import tech.kayys.alkhawarizm.spi.model.ModelConfig;
 import tech.kayys.alkhawarizm.spi.model.ModelRuntimeTraits;
 
 import java.nio.file.Files;
@@ -37,10 +37,10 @@ record LegacyDirectModelProfile(
             if (configDir == null) {
                 return unresolved();
             }
-            ModelConfig config = new ModelConfigLoader(OBJECT_MAPPER).loadFromDirectory(configDir);
+            ModelConfig config = ModelConfig.fromDirectory(configDir, OBJECT_MAPPER);
             return new LegacyDirectModelProfile(
                     config,
-                    config.getModelType(),
+                    config.modelType(),
                     ModelRuntimeTraitsResolver.resolve(config));
         } catch (Exception e) {
             if (log != null) {

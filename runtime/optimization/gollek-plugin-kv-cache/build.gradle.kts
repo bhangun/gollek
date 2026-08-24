@@ -21,8 +21,8 @@ dependencies {
     implementation(project(":spi:gollek-spi"))
     implementation(project(":spi:gollek-spi-inference"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-spi-model:0.1.0-SNAPSHOT")
-    implementation(project(":core:gollek-error-code"))
-    implementation(project(":core:gollek-model-runner"))
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-error-code:0.1.0-SNAPSHOT")
+    implementation(project(":core:gollek-core"))
 
     compileOnly(group = "jakarta.enterprise", name = "jakarta.enterprise.cdi-api")
     compileOnly(group = "jakarta.inject", name = "jakarta.inject-api")

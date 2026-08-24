@@ -24,7 +24,9 @@ import tech.kayys.alkhawarizm.safetensor.spi.SafetensorEngine;
 import tech.kayys.alkhawarizm.spi.model.ModelConfig;
 import tech.kayys.alkhawarizm.spi.model.ModelArchitecture;
 import tech.kayys.alkhawarizm.spi.model.ModelRuntimeTraits;
-import tech.kayys.gollek.model.registry.ModelArchitectureRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPluginRegistry;
+import tech.kayys.alkhawarizm.spi.model.ModelArchitecture;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilyPlugin;
 import tech.kayys.gollek.safetensor.engine.forward.DirectForwardPass;
 import tech.kayys.gollek.safetensor.engine.warmup.ModelWarmupService;
 import io.smallrye.mutiny.Multi;
@@ -68,7 +70,7 @@ public class DirectInferenceEngine implements SafetensorEngine {
     private DirectInferenceComponentGraph componentGraph;
 
     @Inject
-    ModelArchitectureRegistry archRegistry;
+    ModelFamilyPluginRegistry archRegistry;
 
     @Inject
     KVCacheManager kvCacheManager;
@@ -76,9 +78,9 @@ public class DirectInferenceEngine implements SafetensorEngine {
     @Inject
     ModelWarmupService modelWarmupService;
 
-    private ModelArchitectureRegistry architectureRegistry() {
+    private ModelFamilyPluginRegistry architectureRegistry() {
         archRegistry = DirectInferenceDependencies.resolve(
-                archRegistry, ModelArchitectureRegistry.class, "ModelArchitectureRegistry");
+                archRegistry, ModelFamilyPluginRegistry.class, "ModelFamilyPluginRegistry");
         return archRegistry;
     }
 

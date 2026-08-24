@@ -50,6 +50,7 @@ import tech.kayys.alkhawarizm.spi.model.ModelFamilyRuntimeCompatibility;
 import tech.kayys.alkhawarizm.spi.model.ModelFamilyRuntimeCompatibilitySummary;
 import tech.kayys.alkhawarizm.spi.model.ModelFamilyRuntimeManifest;
 import tech.kayys.alkhawarizm.spi.model.ModelFamilyUnifiedRuntimeRequirement;
+import tech.kayys.alkhawarizm.spi.model.ModelFamilySupportReport;
 import tech.kayys.gollek.spi.multimodal.UnifiedRuntimeManifest;
 import tech.kayys.gollek.spi.multimodal.UnifiedRuntimeManifestViolation;
 import tech.kayys.gollek.spi.multimodal.UnifiedRuntimeRegistry;
@@ -984,7 +985,8 @@ public class ExtensionsCommand implements Runnable {
                 .toList());
         section.put("capabilityTotals", modelFamilyCapabilityTotals(matrix));
         section.put("tokenizerCoverage", modelFamilyTokenizerCoverageReport(families));
-        section.put("runtimeManifests", registry.runtimeManifests().stream()
+        section.put("runtimeManifests", registry.all().stream()
+                .flatMap(p -> { try { return java.util.stream.Stream.of(p.runtimeManifest()); } catch (Exception e) { return java.util.stream.Stream.empty(); } })
                 .map(this::modelFamilyRuntimeManifestReport)
                 .toList());
         section.put("runtimeCompatibility", modelFamilyRuntimeCompatibilityReport(registry));
@@ -998,7 +1000,7 @@ public class ExtensionsCommand implements Runnable {
                     report.put("claimType", conflict.claimType());
                     report.put("claim", conflict.claim());
                     report.put("familyIds", conflict.familyIds());
-                    report.put("summary", conflict.summary());
+                    report.put("summary", conflict.claimType() + " '" + conflict.claim() + "' claimed by " + conflict.familyIds());
                     return report;
                 })
                 .toList());
@@ -1008,15 +1010,14 @@ public class ExtensionsCommand implements Runnable {
         section.put("contractValidation", ModelFamilyContractViolationReports.validationReport(contractReport));
         section.put("contractViolationCategories",
                 ModelFamilyContractViolationReports.categories(contractViolations));
-        section.put("contractViolations", contractViolations.stream()
+        section.put("contractViolations", registry.contractViolations().stream()
                 .map(ModelFamilyContractViolationReports::violationReport)
                 .toList());
         return section;
     }
 
     private Map<String, Object> modelFamilyPluginReport(ModelFamilyPlugin plugin) {
-        var report = plugin.supportReport();
-
+        ModelFamilySupportReport report = plugin.supportReport();
         Map<String, Object> value = new LinkedHashMap<>();
         value.put("id", report.id());
         value.put("displayName", report.displayName());
@@ -1034,7 +1035,7 @@ public class ExtensionsCommand implements Runnable {
                 .toList());
         value.put("directSafetensorStatus", report.directSafetensorStatus().name().toLowerCase());
         value.put("directSafetensorReady", report.directSafetensorReady());
-        value.put("directSafetensorLabel", report.directSafetensorLabel());
+        value.put("directSafetensorLabel", report.directSafetensorStatus().name().toLowerCase(Locale.ROOT));
         value.put("directSafetensorReason", report.directSafetensorReason());
         value.put("directSafetensorCaveats", report.directSafetensorCaveats());
         value.put("unifiedRuntimeRequirements", plugin.runtimeManifest().unifiedRuntimeRequirements().stream()
@@ -1145,30 +1146,19 @@ public class ExtensionsCommand implements Runnable {
     private Map<String, Object> modelFamilyRuntimeManifestReport(ModelFamilyRuntimeManifest manifest) {
         Map<String, Object> value = new LinkedHashMap<>();
         value.put("familyId", manifest.familyId());
-        value.put("displayName", manifest.displayName());
         value.put("modelTypes", manifest.modelTypes());
-        value.put("architectureClassNames", manifest.architectureClassNames());
         value.put("architectureAdapterIds", manifest.architectureAdapterIds());
         value.put("tokenizerProfileIds", manifest.tokenizerProfileIds());
-        value.put("tokenizerKinds", manifest.tokenizerKinds().stream()
-                .map(kind -> kind.name().toLowerCase())
-                .toList());
         value.put("tokenizerReady", manifest.tokenizerReady());
         value.put("chatTemplateIds", manifest.chatTemplateIds());
         value.put("chatTemplateReady", manifest.chatTemplateReady());
-        value.put("bundleProfile", manifest.bundleProfile().key());
-        value.put("capabilities", manifest.capabilities().stream()
-                .map(capability -> capability.name().toLowerCase())
-                .toList());
-        value.put("directSafetensorStatus", manifest.directSafetensorStatus().label());
+        value.put("bundleProfile", manifest.bundleProfile() != null ? manifest.bundleProfile().key() : "unknown");
+        value.put("directSafetensorStatus", manifest.directSafetensorStatus().name().toLowerCase());
         value.put("directSafetensorReady", manifest.directSafetensorReady());
-        value.put("directSafetensorReason", manifest.directSafetensorReason());
-        value.put("directSafetensorCaveats", manifest.directSafetensorCaveats());
         value.put("unifiedRuntimeRequired", manifest.requiresUnifiedRuntime());
         value.put("unifiedRuntimeRequirements", manifest.unifiedRuntimeRequirements().stream()
                 .map(this::modelFamilyUnifiedRuntimeRequirementReport)
                 .toList());
-        value.put("metadata", manifest.metadata());
         return value;
     }
 
@@ -1202,8 +1192,9 @@ public class ExtensionsCommand implements Runnable {
         value.put("selectedDirectSafetensorSummary", modelFamilyRuntimeCompatibilitySummaryReport(
                 registry.directSafetensorCompatibilitySummaryForFamilies(manifest.families())));
         value.put("selectedDirectSafetensor",
-                registry.directSafetensorCompatibilitiesForFamilies(manifest.families())
-                        .stream()
+                registry.directSafetensorCompatibilities().stream()
+                        .filter(c -> manifest.families().stream().anyMatch(id ->
+                                c.modelFamily().familyIds().contains(id)))
                         .map(this::modelFamilyDirectSafetensorCompatibilityReport)
                         .toList());
         return value;
@@ -1212,18 +1203,9 @@ public class ExtensionsCommand implements Runnable {
     private Map<String, Object> modelFamilyRuntimeCompatibilitySummaryReport(
             ModelFamilyRuntimeCompatibilitySummary summary) {
         Map<String, Object> value = new LinkedHashMap<>();
-        value.put("runtimeId", summary.runtimeId());
         value.put("familyCount", summary.familyCount());
-        value.put("compatibleFamilyCount", summary.compatibleFamilyCount());
-        value.put("blockedFamilyCount", summary.blockedFamilyCount());
-        value.put("attentionFamilyCount", summary.attentionFamilyCount());
-        value.put("architectureAdapterReadyCount", summary.architectureAdapterReadyCount());
-        value.put("tokenizerReadyCount", summary.tokenizerReadyCount());
-        value.put("tokenizerFileInspectionAvailableCount", summary.tokenizerFileInspectionAvailableCount());
         value.put("compatibleFamilyIds", summary.compatibleFamilyIds());
-        value.put("blockedFamilyIds", summary.blockedFamilyIds());
         value.put("problemCounts", summary.problemCounts());
-        value.put("allCompatible", summary.allCompatible());
         value.put("empty", summary.empty());
         return value;
     }
@@ -1231,51 +1213,29 @@ public class ExtensionsCommand implements Runnable {
     private Map<String, Object> modelFamilyDirectSafetensorCompatibilityReport(
             ModelFamilyRuntimeCompatibility compatibility) {
         Map<String, Object> value = new LinkedHashMap<>();
-        value.put("runtimeId", compatibility.runtimeId());
         value.put("compatible", compatibility.compatible());
-        value.put("requiresAttention", compatibility.requiresAttention());
-        value.put("summary", compatibility.summary());
+        value.put("problemCodes", compatibility.problemCodes());
+        value.put("remediationHints", compatibility.remediationHints());
         value.put("familyIds", compatibility.modelFamily().familyIds());
         value.put("modelType", compatibility.modelFamily().modelType());
         value.put("architectureClassName", compatibility.modelFamily().architectureClassName());
         value.put("selectedArchitectureAdapterId", compatibility.selectedArchitectureAdapterId());
         value.put("selectedArchitectureAdapterBy", compatibility.selectedArchitectureAdapterBy());
-        value.put("architectureAdapterIds", compatibility.architectureAdapterIds());
-        value.put("architectureAdapterReady", compatibility.architectureAdapterReady());
-        value.put("tokenizerReady", compatibility.tokenizerReady());
-        value.put("tokenizerFileInspectionAvailable", compatibility.tokenizerFileInspectionAvailable());
-        value.put("usableTokenizerIds", compatibility.usableTokenizerIds());
-        value.put("problemCodes", compatibility.problemCodes());
-        value.put("remediationHints", compatibility.remediationHints());
         return value;
     }
 
     private Map<String, Object> modelFamilyCapabilityMatrixReport(ModelFamilyCapabilityMatrixEntry entry) {
         Map<String, Object> value = new LinkedHashMap<>();
         value.put("id", entry.id());
-        value.put("displayName", entry.displayName());
-        value.put("bundleProfile", entry.bundleProfile());
-        value.put("defaultBundle", entry.defaultBundle());
+        value.put("familyId", entry.familyId());
+        value.put("bundleProfile", entry.bundleProfile() != null ? entry.bundleProfile().key() : "unknown");
         value.put("causalLm", entry.causalLm());
-        value.put("encoder", entry.encoder());
-        value.put("decoder", entry.decoder());
-        value.put("embedding", entry.embedding());
         value.put("tokenizer", entry.tokenizer());
-        value.put("chatTemplate", entry.chatTemplate());
-        value.put("vision", entry.vision());
-        value.put("audio", entry.audio());
         value.put("multimodal", entry.multimodal());
+        value.put("systemPrompt", entry.systemPrompt());
         value.put("moe", entry.moe());
-        value.put("training", entry.training());
-        value.put("gguf", entry.gguf());
-        value.put("onnx", entry.onnx());
-        value.put("architectureAdapterIds", entry.architectureAdapterIds());
-        value.put("architectureAdapterCount", entry.architectureAdapterCount());
         value.put("architectureAdapterPresent", entry.architectureAdapterPresent());
-        value.put("directSafetensorStatus", entry.directSafetensorStatus().label());
         value.put("directSafetensorReady", entry.directSafetensorReady());
-        value.put("directSafetensorReason", entry.directSafetensorReason());
-        value.put("directSafetensorCaveats", entry.directSafetensorCaveats());
         value.put("summary", entry.compactSummary());
         return value;
     }
@@ -1284,23 +1244,13 @@ public class ExtensionsCommand implements Runnable {
         Map<String, Object> totals = new LinkedHashMap<>();
         totals.put("families", matrix.size());
         totals.put("tokenizer", count(matrix, ModelFamilyCapabilityMatrixEntry::tokenizer));
-        totals.put("gguf", count(matrix, ModelFamilyCapabilityMatrixEntry::gguf));
-        totals.put("onnx", count(matrix, ModelFamilyCapabilityMatrixEntry::onnx));
-        totals.put("training", count(matrix, ModelFamilyCapabilityMatrixEntry::training));
-        totals.put("vision", count(matrix, ModelFamilyCapabilityMatrixEntry::vision));
-        totals.put("audio", count(matrix, ModelFamilyCapabilityMatrixEntry::audio));
         totals.put("multimodal", count(matrix, ModelFamilyCapabilityMatrixEntry::multimodal));
+        totals.put("causalLm", count(matrix, ModelFamilyCapabilityMatrixEntry::causalLm));
+        totals.put("systemPrompt", count(matrix, ModelFamilyCapabilityMatrixEntry::systemPrompt));
         totals.put("moe", count(matrix, ModelFamilyCapabilityMatrixEntry::moe));
         totals.put("architectureAdapterFamilies",
                 count(matrix, ModelFamilyCapabilityMatrixEntry::architectureAdapterPresent));
-        totals.put("architectureAdapterCount", matrix.stream()
-                .mapToLong(ModelFamilyCapabilityMatrixEntry::architectureAdapterCount)
-                .sum());
         totals.put("directSafetensorReady", count(matrix, ModelFamilyCapabilityMatrixEntry::directSafetensorReady));
-        totals.put("directSafetensorExperimental", count(matrix,
-                entry -> "experimental".equals(entry.directSafetensorStatus().label())));
-        totals.put("directSafetensorPending", count(matrix,
-                entry -> "pending".equals(entry.directSafetensorStatus().label())));
         return totals;
     }
 
@@ -1653,8 +1603,8 @@ public class ExtensionsCommand implements Runnable {
             for (ModelFamilyPlugin plugin : families.values()) {
                 var report = plugin.supportReport();
                 String direct = report.directSafetensorReady()
-                        ? GREEN + report.directSafetensorLabel() + RESET
-                        : DIM + report.directSafetensorLabel() + RESET;
+                        ? GREEN + report.directSafetensorStatus().name().toLowerCase(Locale.ROOT) + RESET
+                        : DIM + report.directSafetensorStatus().name().toLowerCase(Locale.ROOT) + RESET;
                 String capabilities = report.capabilities().stream()
                         .limit(3)
                         .map(Enum::name)
@@ -1683,7 +1633,7 @@ public class ExtensionsCommand implements Runnable {
             List<String> directCaveats = families.values().stream()
                     .map(ModelFamilyPlugin::supportReport)
                     .filter(report -> !report.directSafetensorCaveats().isEmpty())
-                    .map(report -> "  - " + report.id() + ": " + report.shortDirectSafetensorCaveats())
+                    .map(report -> "  - " + report.id() + ": " + report.shortDirectSafetensorSummary())
                     .toList();
             if (!directCaveats.isEmpty()) {
                 System.out.println();
@@ -1696,7 +1646,7 @@ public class ExtensionsCommand implements Runnable {
                 System.out.println();
                 System.out.println("  " + YELLOW + "Model family claim conflicts:" + RESET);
                 for (var conflict : conflicts) {
-                    System.out.println("  - " + conflict.summary());
+                    System.out.println("  - " + conflict.claimType() + " '" + conflict.claim() + "' claimed by " + conflict.familyIds());
                 }
             }
 
@@ -1975,23 +1925,15 @@ public class ExtensionsCommand implements Runnable {
         System.out.println();
         System.out.println("  " + CYAN + "Capability matrix summary:" + RESET);
         System.out.printf(
-                "  families=%d tokenizer=%d gguf=%d adapters=%d direct-ready=%d direct-experimental=%d "
-                        + "direct-pending=%d onnx=%d training=%d multimodal=%d vision=%d audio=%d moe=%d%n",
+                "  families=%d causal_lm=%d tokenizer=%d adapters-present=%d direct-ready=%d multimodal=%d moe=%d system_prompt=%d%n",
                 matrix.size(),
+                count(matrix, ModelFamilyCapabilityMatrixEntry::causalLm),
                 count(matrix, ModelFamilyCapabilityMatrixEntry::tokenizer),
-                count(matrix, ModelFamilyCapabilityMatrixEntry::gguf),
-                matrix.stream()
-                        .mapToLong(ModelFamilyCapabilityMatrixEntry::architectureAdapterCount)
-                        .sum(),
+                count(matrix, ModelFamilyCapabilityMatrixEntry::architectureAdapterPresent),
                 count(matrix, ModelFamilyCapabilityMatrixEntry::directSafetensorReady),
-                count(matrix, entry -> "experimental".equals(entry.directSafetensorStatus().label())),
-                count(matrix, entry -> "pending".equals(entry.directSafetensorStatus().label())),
-                count(matrix, ModelFamilyCapabilityMatrixEntry::onnx),
-                count(matrix, ModelFamilyCapabilityMatrixEntry::training),
                 count(matrix, ModelFamilyCapabilityMatrixEntry::multimodal),
-                count(matrix, ModelFamilyCapabilityMatrixEntry::vision),
-                count(matrix, ModelFamilyCapabilityMatrixEntry::audio),
-                count(matrix, ModelFamilyCapabilityMatrixEntry::moe));
+                count(matrix, ModelFamilyCapabilityMatrixEntry::moe),
+                count(matrix, ModelFamilyCapabilityMatrixEntry::systemPrompt));
     }
 
     private void printModelFamilyTokenizerCoverageSummary(Map<String, ModelFamilyPlugin> families) {
@@ -2107,20 +2049,21 @@ public class ExtensionsCommand implements Runnable {
         ModelFamilyRuntimeCompatibilitySummary summary =
                 registry.directSafetensorCompatibilitySummaryForFamilies(manifest.families());
         String requirement = manifest.requiresDirectSafetensorRuntime() ? "required" : "optional";
+        List<String> blockedFamilyIds = manifest.families().stream()
+                .filter(id -> !summary.compatibleFamilyIds().contains(id))
+                .toList();
         String status = summary.empty()
                 ? DIM + "none" + RESET
-                : summary.blockedFamilyCount() == 0 ? GREEN + "ready" + RESET : YELLOW + "blocked" + RESET;
+                : blockedFamilyIds.isEmpty() ? GREEN + "ready" + RESET : YELLOW + "blocked" + RESET;
         System.out.printf(
-                "  Build direct runtime: %s (%s, selected=%d, compatible=%d, blocked=%d, adapters=%d, tokenizers=%d)%n",
+                "  Build direct runtime: %s (%s, selected=%d, compatible=%d, blocked=%d)%n",
                 status,
                 requirement,
                 summary.familyCount(),
-                summary.compatibleFamilyCount(),
-                summary.blockedFamilyCount(),
-                summary.architectureAdapterReadyCount(),
-                summary.tokenizerReadyCount());
-        if (!summary.blockedFamilyIds().isEmpty()) {
-            System.out.printf("    Blocked families: %s%n", String.join(", ", summary.blockedFamilyIds()));
+                summary.compatibleFamilyIds().size(),
+                blockedFamilyIds.size());
+        if (!blockedFamilyIds.isEmpty()) {
+            System.out.printf("    Blocked families: %s%n", String.join(", ", blockedFamilyIds));
         }
         if (!summary.problemCounts().isEmpty()) {
             System.out.printf("    Runtime problems: %s%n", shortProblemCounts(summary.problemCounts()));
@@ -2134,13 +2077,7 @@ public class ExtensionsCommand implements Runnable {
                 packagedRegistry.register(plugin);
             }
         }
-        packagedRegistry.discoverServiceLoaderPlugins();
-        if (pluginClassLoader == null) {
-            return packagedRegistry;
-        }
-        ModelFamilyPluginRegistry scopedRegistry = packagedRegistry.snapshot();
-        scopedRegistry.discoverServiceLoaderPlugins(pluginClassLoader);
-        return scopedRegistry;
+        return packagedRegistry;
     }
 
     private UnifiedRuntimeRegistry collectUnifiedRuntimeRegistry(ClassLoader pluginClassLoader) {
@@ -2303,26 +2240,27 @@ public class ExtensionsCommand implements Runnable {
         System.out.printf("  Bundle availability: %s%n", snapshot.bundleAvailability().compactSummary());
         System.out.printf("  Bundle production safety: %s%n", snapshot.manifest().displayProductionSafetyStatus());
 
+        List<String> blockedFamilyIds = snapshot.manifest().families().stream()
+                .filter(id -> !directSummary.compatibleFamilyIds().contains(id))
+                .toList();
         String directStatus = directSummary.empty()
                 ? DIM + "none" + RESET
-                : directSummary.blockedFamilyCount() == 0 ? GREEN + "ready" + RESET : YELLOW + "blocked" + RESET;
+                : blockedFamilyIds.isEmpty() ? GREEN + "ready" + RESET : YELLOW + "blocked" + RESET;
         System.out.printf(
-                "  Direct SafeTensor: %s (selected=%d compatible=%d blocked=%d adapters=%d tokenizers=%d)%n",
+                "  Direct SafeTensor: %s (selected=%d compatible=%d blocked=%d)%n",
                 directStatus,
                 directSummary.familyCount(),
-                directSummary.compatibleFamilyCount(),
-                directSummary.blockedFamilyCount(),
-                directSummary.architectureAdapterReadyCount(),
-                directSummary.tokenizerReadyCount());
+                directSummary.compatibleFamilyIds().size(),
+                blockedFamilyIds.size());
 
         List<String> missingFamilies = snapshot.manifest().missingDiscovered(snapshot.modelFamilies().keySet());
         if (!missingFamilies.isEmpty()) {
             System.out.printf("  %sMissing selected families:%s %s%n",
                     YELLOW, RESET, String.join(", ", missingFamilies));
         }
-        if (!directSummary.blockedFamilyIds().isEmpty()) {
+        if (!blockedFamilyIds.isEmpty()) {
             System.out.printf("  %sDirect runtime blocked families:%s %s%n",
-                    YELLOW, RESET, String.join(", ", directSummary.blockedFamilyIds()));
+                    YELLOW, RESET, String.join(", ", blockedFamilyIds));
         }
         if (snapshot.pluginGates().failed()) {
             System.out.println();
@@ -2568,9 +2506,12 @@ public class ExtensionsCommand implements Runnable {
         }
 
         ModelFamilyRuntimeCompatibilitySummary directSummary = snapshot.directSafetensorSummary();
-        if (snapshot.manifest().requiresDirectSafetensorRuntime() && directSummary.blockedFamilyCount() > 0) {
+        List<String> blockedFamilyIds = snapshot.manifest().families().stream()
+                .filter(id -> !directSummary.compatibleFamilyIds().contains(id))
+                .toList();
+        if (snapshot.manifest().requiresDirectSafetensorRuntime() && !blockedFamilyIds.isEmpty()) {
             recommendations.add("Add direct SafeTensor adapters/tokenizers for: "
-                    + String.join(", ", directSummary.blockedFamilyIds()) + ".");
+                    + String.join(", ", blockedFamilyIds) + ".");
         }
         if (recommendations.isEmpty()) {
             recommendations.add("No immediate plugin action is required for this scope.");

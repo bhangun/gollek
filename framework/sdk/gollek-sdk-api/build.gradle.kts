@@ -2,6 +2,11 @@ plugins {
     java
 }
 
+configurations.configureEach {
+    exclude(group = "tech.kayys.aljabr")
+    exclude(group = "tech.kayys.tafkir")
+}
+
 dependencies {
     implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0-SNAPSHOT")
     implementation(project(":spi:gollek-spi-inference"))

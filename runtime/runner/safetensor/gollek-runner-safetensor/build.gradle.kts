@@ -18,7 +18,7 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":core:plugin:gollek-plugin-runner-core"))
+    implementation(project(":plugin:gollek-plugin-runner-core"))
     implementation(project(":spi:gollek-spi-inference"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-safetensor-spi:0.1.0-SNAPSHOT")
     implementation(project(":runner:safetensor:gollek-safetensor-engine"))
@@ -27,7 +27,7 @@ dependencies {
     implementation("tech.kayys.alkhawarizm:alkhawarizm-safetensor-quantization:0.1.0-SNAPSHOT")
     implementation("tech.kayys.alkhawarizm:alkhawarizm-spi-model:0.1.0-SNAPSHOT")
     implementation(project(":spi:gollek-spi-multimodal"))
-    implementation(project(":core:gollek-runtime-config"))
+    implementation(project(":core:gollek-core"))
     implementation("tech.kayys.tafkir:tafkir-quantizer-gptq:0.1.0-SNAPSHOT")
     implementation("com.fasterxml.jackson.core:jackson-annotations:2.16.1")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
