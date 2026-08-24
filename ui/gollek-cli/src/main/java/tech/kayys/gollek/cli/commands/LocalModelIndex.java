@@ -395,8 +395,14 @@ final class LocalModelIndex {
                                     e.taskType = pipelineTagToTaskType(tag);
                                 }
                             }
-                            if (e.taskType == null || e.taskType.isBlank()) {
-                                e.taskType = "text"; // safe default for GGUF chat/text models
+                            if (e.taskType == null || e.taskType.isBlank() || "text".equals(e.taskType)) {
+                                String lowerId = (e.id != null ? e.id : "").toLowerCase(Locale.ROOT);
+                                String lowerName = (e.name != null ? e.name : "").toLowerCase(Locale.ROOT);
+                                if (lowerId.contains("ocr") || lowerName.contains("ocr") || lowerId.contains("pix2text") || lowerName.contains("pix2text") || lowerId.contains("trocr") || lowerId.contains("nougat")) {
+                                    e.taskType = "ocr";
+                                } else if (e.taskType == null || e.taskType.isBlank()) {
+                                    e.taskType = "text";
+                                }
                             }
 
                             if (isUnknownArchitecture(e.architecture)) {
@@ -561,6 +567,8 @@ final class LocalModelIndex {
                  "audio-classification"  -> "stt";
             case "text-to-audio",
                  "text-to-speech"        -> "tts";
+            case "ocr",
+                 "optical-character-recognition" -> "ocr";
             case "image-to-text",
                  "document-question-answering",
                  "visual-question-answering",
