@@ -1132,7 +1132,7 @@ if [[ "$BUILD_ARGS" != *"-t"* ]]; then
     GRADLE_ARGS+=("-x" "test")
 fi
 
-GRADLE_TASKS=(":ui:gollek-cli:quarkusBuild")
+GRADLE_TASKS=(":ui:gollek-cli:quarkusBuild" ":ui:gollek-api:quarkusBuild")
 if [[ "$BUILD_ARGS" == *"-c"* ]]; then
     GRADLE_TASKS=("clean" "${GRADLE_TASKS[@]}")
 fi
@@ -1695,6 +1695,15 @@ if [ "$NATIVE_MODE" = false ]; then
     mv "${GOLLEK_RUNTIME_JAR}.tmp" "$GOLLEK_RUNTIME_JAR"
     JAR_PATH="$GOLLEK_RUNTIME_JAR"
     echo -e "${GREEN}✓ Installed CLI runtime jar to ${GOLLEK_RUNTIME_JAR}${NC}"
+
+    # Also install API server runtime
+    API_BUILD_DIR="${PROJECT_ROOT}/ui/gollek-api/build/quarkus-app"
+    if [ -d "$API_BUILD_DIR" ]; then
+        mkdir -p "${RUNTIME_DIR}/api"
+        rm -rf "${RUNTIME_DIR}/api"/*
+        cp -R "${API_BUILD_DIR}"/* "${RUNTIME_DIR}/api/"
+        echo -e "${GREEN}✓ Installed API server runtime to ${RUNTIME_DIR}/api/quarkus-run.jar${NC}"
+    fi
 fi
 
 # 4. Create the Shim/Binary link

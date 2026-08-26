@@ -159,32 +159,43 @@ public class HuggingFaceClient {
         long totalSize = headResponse.headers().firstValueAsLong("Content-Length").orElse(-1L);
 
         // Check if fully downloaded file already exists and matches size
-        if (Files.exists(targetPath) && totalSize > 0) {
+        if (Files.exists(targetPath)) {
             long existingSize = Files.size(targetPath);
-            if (existingSize == totalSize) {
+            if (totalSize > 0 && existingSize == totalSize) {
                 LOG.infof("File already exists and matches size (%d bytes), skipping download.", existingSize);
                 if (progressListener != null) {
-                    // Report 100% progress immediately
                     progressListener.onProgress(totalSize, totalSize, 1.0);
+                    progressListener.onComplete(totalSize);
                 }
                 return;
-            } else {
-                LOG.infof("File exists but size mismatch (expected %d, found %d), re-downloading.", totalSize,
-                        existingSize);
+            } else if (totalSize <= 0 && existingSize > 0) {
+                LOG.infof("File already exists locally (%d bytes), skipping download.", existingSize);
+                if (progressListener != null) {
+                    progressListener.onProgress(existingSize, existingSize, 1.0);
+                    progressListener.onComplete(existingSize);
+                }
+                return;
             }
         }
 
-        // Check for partial download
+        // Check for partial download (.part file)
         java.nio.file.Path tempPath = targetPath.resolveSibling(targetPath.getFileName() + ".part");
         long existingPartSize = Files.exists(tempPath) ? Files.size(tempPath) : 0;
 
+        if (existingPartSize > 0 && totalSize > 0 && existingPartSize >= totalSize) {
+            // Partial file is already full size, promote it to targetPath
+            Files.createDirectories(targetPath.getParent());
+            Files.move(tempPath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            if (progressListener != null) {
+                progressListener.onProgress(totalSize, totalSize, 1.0);
+                progressListener.onComplete(totalSize);
+            }
+            return;
+        }
+
         HttpRequest.Builder getBuilder = buildRequestBuilder(url, true, 600).GET();
-        if (existingPartSize > 0 && totalSize > 0 && existingPartSize < totalSize) {
+        if (existingPartSize > 0) {
             getBuilder.header("Range", "bytes=" + existingPartSize + "-");
-        } else if (existingPartSize >= totalSize && totalSize > 0) {
-            // Part file is larger than total size (maybe corrupted or changed on server)
-            existingPartSize = 0;
-            Files.deleteIfExists(tempPath);
         }
 
         HttpResponse<InputStream> response = httpClient.send(
@@ -221,7 +232,25 @@ public class HuggingFaceClient {
         if (!append) {
             existingPartSize = 0;
         }
-        long resolvedTotalSize = totalSize > 0 ? totalSize : response.headers().firstValueAsLong("Content-Length").orElse(-1L);
+
+        long resolvedTotalSize = totalSize;
+        String contentRange = response.headers().firstValue("Content-Range").orElse(null);
+        if (contentRange != null && contentRange.contains("/")) {
+            try {
+                String totalStr = contentRange.substring(contentRange.lastIndexOf('/') + 1).trim();
+                long parsedTotal = Long.parseLong(totalStr);
+                if (parsedTotal > 0) {
+                    resolvedTotalSize = parsedTotal;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (resolvedTotalSize <= 0) {
+            long cl = response.headers().firstValueAsLong("Content-Length").orElse(-1L);
+            if (cl > 0) {
+                resolvedTotalSize = append ? existingPartSize + cl : cl;
+            }
+        }
 
         // Download with progress tracking
         try (InputStream is = response.body()) {
@@ -245,14 +274,7 @@ public class HuggingFaceClient {
             throws IOException, InterruptedException {
         List<String> files = listFiles(modelId, revision);
 
-        // Filter for essential files if you want to optimize,
-        // but for conversion we might need everything except maybe other safetensors if
-        // checking strictly?
-        // For simplicity, download everything or at least:
-        // - config.json, tokenizer.json, *.safetensors, *.bin, tokenizer_config.json
-
         for (String file : files) {
-            // Skip .git attributes or large hidden files if any
             if (file.startsWith("."))
                 continue;
 
@@ -271,15 +293,14 @@ public class HuggingFaceClient {
 
         Files.createDirectories(targetPath.getParent());
 
-        byte[] buffer = new byte[8192];
+        byte[] buffer = new byte[128 * 1024];
         long downloadedBytes = existingPartSize;
         int bytesRead;
 
-        // Register shutdown hook to interrupt download on Ctrl+C
+        // Register shutdown hook to interrupt download cleanly on Ctrl+C / SIGINT
         Thread currentThread = Thread.currentThread();
         Thread shutdownHook = new Thread(() -> {
             try {
-                // Interrupt the download thread to stop the loop/IO
                 currentThread.interrupt();
             } catch (Exception e) {
                 // Best effort
@@ -291,9 +312,17 @@ public class HuggingFaceClient {
                 new java.nio.file.OpenOption[]{java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND} :
                 new java.nio.file.OpenOption[]{java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING, java.nio.file.StandardOpenOption.WRITE};
 
-        try (var outputStream = Files.newOutputStream(tempPath, options)) {
+        try (var rawOut = Files.newOutputStream(tempPath, options);
+             var outputStream = new java.io.BufferedOutputStream(rawOut, 256 * 1024)) {
+
+            // Notify initial progress for resume
+            if (progressListener != null && totalBytes > 0 && downloadedBytes > 0) {
+                progressListener.onProgress(downloadedBytes, totalBytes, (double) downloadedBytes / totalBytes);
+            }
+
             while ((bytesRead = inputStream.read(buffer)) != -1) {
                 if (Thread.currentThread().isInterrupted()) {
+                    outputStream.flush();
                     throw new InterruptedException("Download interrupted");
                 }
                 outputStream.write(buffer, 0, bytesRead);
@@ -304,19 +333,19 @@ public class HuggingFaceClient {
                     progressListener.onProgress(downloadedBytes, totalBytes, progress);
                 }
             }
+            outputStream.flush();
         } catch (IOException | InterruptedException e) {
-            // We do NOT delete the partial file here anymore so it can be resumed later.
+            // Partial file is preserved in tempPath (.part) on disk for future resumption
             throw e;
         } finally {
-            // Remove hook if finished normally
             try {
                 Runtime.getRuntime().removeShutdownHook(shutdownHook);
             } catch (IllegalStateException e) {
-                // Ignore if shutdown is in progress
+                // Ignore if shutdown is already in progress
             }
         }
 
-        // Move temp file to target path
+        // Move completed temp file to final target path
         Files.move(tempPath, targetPath, StandardCopyOption.REPLACE_EXISTING);
 
         if (progressListener != null) {

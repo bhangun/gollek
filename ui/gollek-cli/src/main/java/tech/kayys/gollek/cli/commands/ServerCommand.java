@@ -179,15 +179,24 @@ public class ServerCommand implements Runnable {
             // Find the gollek-api jar
             String jarPath = findGollekApiJar();
             if (jarPath == null) {
-                throw new RuntimeException("Gollek API server JAR not found. Please build the project first.");
+                throw new RuntimeException("Gollek API server JAR not found. Please build the project first (./gradlew :ui:gollek-api:quarkusBuild).");
             }
 
-            ProcessBuilder pb = new ProcessBuilder(
-                    "java",
-                    "-jar",
-                    jarPath,
-                    "-Dquarkus.http.port=" + (grpcOnly ? "-1" : String.valueOf(port))
-            );
+            String javaCmd = System.getProperty("java.home") + "/bin/java";
+            if (!new File(javaCmd).exists()) {
+                javaCmd = "java";
+            }
+
+            java.util.List<String> command = new java.util.ArrayList<>();
+            command.add(javaCmd);
+            command.add("--enable-preview");
+            command.add("--add-modules=jdk.incubator.vector");
+            command.add("--enable-native-access=ALL-UNNAMED");
+            command.add("-jar");
+            command.add(jarPath);
+            command.add("-Dquarkus.http.port=" + (grpcOnly ? "-1" : String.valueOf(port)));
+
+            ProcessBuilder pb = new ProcessBuilder(command);
 
             // Set environment variable for port
             pb.environment().put("QUARKUS_HTTP_PORT", grpcOnly ? "-1" : String.valueOf(port));
@@ -203,14 +212,33 @@ public class ServerCommand implements Runnable {
         }
 
         private String findGollekApiJar() {
-            // Try common locations where gradle/maven build artifacts are placed
+            // 1. Explicit env var
+            String envJar = System.getenv("GOLLEK_API_JAR");
+            if (envJar != null && !envJar.isBlank()) {
+                File f = new File(envJar);
+                if (f.exists() && f.isFile()) return f.getAbsolutePath();
+            }
+
+            // 2. Global/user runtime directory (~/.gollek/runtime/...)
+            String userHome = System.getProperty("user.home");
+            String[] runtimeLocations = {
+                    userHome + "/.gollek/runtime/api/quarkus-run.jar",
+                    userHome + "/.gollek/runtime/quarkus-app/quarkus-run.jar",
+                    userHome + "/.gollek/runtime/gollek-api.jar",
+            };
+            for (String loc : runtimeLocations) {
+                File f = new File(loc);
+                if (f.exists() && f.isFile()) return f.getAbsolutePath();
+            }
+
+            // 3. Known project build directories (both absolute and relative)
             String[] jarLocations = {
-                    // Gradle locations
+                    "/Users/bhangun/Workspace/workkayys/Products/Wayang/wayang-platform/Families/gollek/ui/gollek-api/build/quarkus-app/quarkus-run.jar",
                     "gollek/ui/gollek-api/build/quarkus-app/quarkus-run.jar",
-                    "gollek/ui/gollek-api/target/quarkus-app/quarkus-run.jar",
                     "ui/gollek-api/build/quarkus-app/quarkus-run.jar",
+                    "Families/gollek/ui/gollek-api/build/quarkus-app/quarkus-run.jar",
+                    "gollek/ui/gollek-api/target/quarkus-app/quarkus-run.jar",
                     "ui/gollek-api/target/quarkus-app/quarkus-run.jar",
-                    // Alternative gradle locations
                     "gollek/ui/gollek-api/build/libs/gollek-server-runtime-0.1.0-SNAPSHOT-runner.jar",
                     "gollek/ui/gollek-api/target/gollek-server-runtime-0.1.0-SNAPSHOT-runner.jar",
             };
@@ -230,6 +258,10 @@ public class ServerCommand implements Runnable {
                     return f.getAbsolutePath();
                 }
                 f = new File("../../" + location);
+                if (f.exists() && f.isFile()) {
+                    return f.getAbsolutePath();
+                }
+                f = new File("../../../" + location);
                 if (f.exists() && f.isFile()) {
                     return f.getAbsolutePath();
                 }

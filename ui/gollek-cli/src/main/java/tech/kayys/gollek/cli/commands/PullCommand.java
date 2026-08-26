@@ -203,6 +203,7 @@ public class PullCommand implements Runnable {
         record FileStatus(String name, String status, long localBytes, long totalBytes) {}
         List<FileStatus> plan = new ArrayList<>();
         long totalNew = 0, totalResume = 0, totalSkip = 0;
+        int filesToTransferCount = 0;
 
         for (String filename : filesToDownload) {
             if (filename.startsWith(".")) continue;
@@ -213,32 +214,50 @@ public class PullCommand implements Runnable {
             String status;
             long local = 0;
             if (force) {
-                // Delete both target and .part so HF client starts fresh
+                // Delete both target and .part only if explicitly forced
                 Files.deleteIfExists(dest);
                 Files.deleteIfExists(part);
                 status = "DOWNLOAD";
                 totalNew += known;
+                filesToTransferCount++;
             } else if (Files.exists(dest)) {
                 local = Files.size(dest);
                 if (known > 0 && local == known) {
                     status = "SKIP";
                     totalSkip += known;
+                } else if (known <= 0 && local > 0) {
+                    // Size was not returned in API metadata, but full local file exists
+                    status = "SKIP";
+                    totalSkip += local;
                 } else {
-                    // Wrong size — delete and re-download
-                    Files.deleteIfExists(dest);
-                    Files.deleteIfExists(part);
+                    // Size known and local size mismatch
                     status = "DOWNLOAD";
                     totalNew += known;
+                    filesToTransferCount++;
                 }
             } else if (Files.exists(part)) {
                 local = Files.size(part);
-                status = "RESUME";
-                totalResume += (known > local ? known - local : known);
+                if (known > 0 && local >= known) {
+                    try {
+                        Files.move(part, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        status = "SKIP";
+                        totalSkip += local;
+                    } catch (Exception e) {
+                        status = "RESUME";
+                        totalResume += (known > local ? known - local : 0);
+                        filesToTransferCount++;
+                    }
+                } else {
+                    status = "RESUME";
+                    totalResume += (known > local ? known - local : local);
+                    filesToTransferCount++;
+                }
             } else {
                 status = "DOWNLOAD";
                 totalNew += known;
+                filesToTransferCount++;
             }
-            plan.add(new FileStatus(filename, status, local, known));
+            plan.add(new FileStatus(filename, status, local, known > 0 ? known : local));
         }
 
         // ── Print the plan ────────────────────────────────────────────────────
@@ -255,7 +274,7 @@ public class PullCommand implements Runnable {
                     ? CLIUtils.formatSize(fs.totalBytes())
                     : "?";
             String resumeInfo = "RESUME".equals(fs.status()) && fs.localBytes() > 0
-                    ? DIM + " (+" + CLIUtils.formatSize(fs.totalBytes() - fs.localBytes()) + " to go)" + RESET
+                    ? DIM + " (+" + CLIUtils.formatSize(Math.max(0, fs.totalBytes() - fs.localBytes())) + " to go)" + RESET
                     : "";
             System.out.printf("  %s%-8s%s %-" + maxName + "s  %s%s%n",
                     colour, fs.status(), RESET,
@@ -265,10 +284,16 @@ public class PullCommand implements Runnable {
 
         long totalTransfer = totalNew + totalResume;
         System.out.println();
-        if (totalTransfer > 0) {
-            System.out.printf("  %s→ %s to transfer%s   %s%s already complete%s%n%n",
-                    BOLD, CLIUtils.formatSize(totalTransfer), RESET,
-                    DIM, CLIUtils.formatSize(totalSkip), RESET);
+        if (filesToTransferCount > 0) {
+            if (totalTransfer > 0) {
+                System.out.printf("  %s→ %s to transfer%s   %s%s already complete%s%n%n",
+                        BOLD, CLIUtils.formatSize(totalTransfer), RESET,
+                        DIM, CLIUtils.formatSize(totalSkip), RESET);
+            } else {
+                System.out.printf("  %s→ %d file(s) to transfer%s   %s%s already complete%s%n%n",
+                        BOLD, filesToTransferCount, RESET,
+                        DIM, CLIUtils.formatSize(totalSkip), RESET);
+            }
         } else {
             System.out.printf("  %s✔ All files already complete.%s  "
                     + "Use %s--force%s to re-download.%n%n",
@@ -673,6 +698,7 @@ public class PullCommand implements Runnable {
         private long lastRedrawNanos = 0L;
         private int  spinnerTick     = 0;
         private long fileStartNanos  = System.nanoTime();
+        private long initialBytes    = -1L;
 
         HfProgressRenderer(int totalFiles, int currentFileNo, String filename) {
             this.totalFiles    = Math.max(1, totalFiles);
@@ -686,6 +712,10 @@ public class PullCommand implements Runnable {
             if (now - lastRedrawNanos < MIN_NS && downloaded < total) return;
             lastRedrawNanos = now;
 
+            if (initialBytes < 0) {
+                initialBytes = downloaded;
+            }
+
             double pct    = Math.max(0.0, Math.min(1.0, progress));
             int    filled = (int) Math.round(BAR_WIDTH * pct);
             String bar    = "=".repeat(filled) + ".".repeat(BAR_WIDTH - filled);
@@ -693,7 +723,8 @@ public class PullCommand implements Runnable {
             double elapsedSec = Math.max(0.001, (now - fileStartNanos) / 1e9);
             double mbDone     = downloaded / 1024.0 / 1024.0;
             double mbTotal    = total > 0 ? total / 1024.0 / 1024.0 : 0.0;
-            double speed      = mbDone / elapsedSec;
+            double sessionMb  = Math.max(0.0, (downloaded - initialBytes) / 1024.0 / 1024.0);
+            double speed      = sessionMb / elapsedSec;
             String spin       = SPINNER[spinnerTick++ % SPINNER.length];
 
             System.out.printf(
