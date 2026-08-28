@@ -33,9 +33,6 @@ dependencies {
     implementation(project(":spi:gollek-spi-inference"))
     implementation(project(":core:gollek-tokenizer-core"))
     implementation(project(":optimization:gollek-plugin-kv-cache"))
-    if (findProject(":suling") != null) {
-        implementation(project(":suling"))
-    }
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-databind")
     implementation(group = "com.microsoft.onnxruntime", name = "onnxruntime", version = "1.19.2")
     implementation(group = "io.quarkus", name = "quarkus-arc")

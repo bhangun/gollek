@@ -45,7 +45,7 @@ public class ListCommand implements Runnable {
     boolean runnableOnly;
 
     @Option(names = { "-t", "--task-type",
-            "--category" }, description = "Filter by task category: text, vision, tts, stt, ocr, multimodal, embedding, timeseries")
+            "--category" }, description = "Filter by task category: text, vision, tts, stt, ocr, multimodal, embedding, timeseries, 3d")
     String filterTaskType;
 
     @Override

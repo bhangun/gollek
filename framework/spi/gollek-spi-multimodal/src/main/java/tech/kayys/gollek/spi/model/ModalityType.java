@@ -26,11 +26,13 @@ public enum ModalityType {
     /** Pre-computed dense vector embedding. */
     EMBEDDING,
     /** Numeric time-series data. */
-    TIME_SERIES;
+    TIME_SERIES,
+    /** 3D model, mesh, point cloud, or Gaussian Splat representation. */
+    THREE_DIMENSIONAL;
 
     /**
      * Returns true if this modality represents binary data (non-text).
-     * @return true for IMAGE, AUDIO, VIDEO, DOCUMENT, EMBEDDING, TIME_SERIES
+     * @return true for IMAGE, AUDIO, VIDEO, DOCUMENT, EMBEDDING, TIME_SERIES, THREE_DIMENSIONAL
      */
     public boolean isBinary() {
         return this != TEXT;

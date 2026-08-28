@@ -74,7 +74,7 @@ dependencies {
     implementation(project(":runner:litert:gollek-runner-litert"))
     implementation(project(":runner:onnx:gollek-runner-onnx"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-gguf-core:0.1.0-SNAPSHOT")
-    implementation(project(":suling"))
+    implementation("tech.kayys:suling:0.1.0")
     implementation("com.google.ai.edge.litertlm:litertlm-jvm:0.11.0")
     implementation(project(":runner:safetensor:gollek-safetensor-engine"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-safetensor-loader:0.1.0-SNAPSHOT")

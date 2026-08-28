@@ -79,7 +79,7 @@ dependencies {
     implementation(project(":core:gollek-tokenizer-core"))
     implementation(project(":sdk:gollek-sdk-core"))
     implementation(project(":spi:gollek-spi"))
-    implementation(project(":suling"))
+    implementation("tech.kayys:suling:0.1.0")
 
     implementation(project(":spi:gollek-spi-inference"))
     implementation("tech.kayys.alkhawarizm:alkhawarizm-spi-model:0.1.0-SNAPSHOT")

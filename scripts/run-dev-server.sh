@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export GGUF_CONTEXT_SIZE=8192
+
 set -euo pipefail
 
 RESET="$(printf '\033[0m')"

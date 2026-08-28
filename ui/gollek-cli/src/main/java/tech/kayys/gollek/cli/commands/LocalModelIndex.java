@@ -400,6 +400,8 @@ final class LocalModelIndex {
                                 String lowerName = (e.name != null ? e.name : "").toLowerCase(Locale.ROOT);
                                 if (lowerId.contains("ocr") || lowerName.contains("ocr") || lowerId.contains("pix2text") || lowerName.contains("pix2text") || lowerId.contains("trocr") || lowerId.contains("nougat")) {
                                     e.taskType = "ocr";
+                                } else if (lowerId.contains("3d") || lowerName.contains("3d") || lowerId.contains("block3d") || lowerName.contains("block3d") || lowerId.contains("trellis") || lowerName.contains("trellis") || lowerId.contains("shap-e") || lowerName.contains("shap-e") || lowerId.contains("mesh") || lowerName.contains("mesh") || lowerId.contains("splat") || lowerName.contains("splat")) {
+                                    e.taskType = "3d";
                                 } else if (e.taskType == null || e.taskType.isBlank()) {
                                     e.taskType = "text";
                                 }
@@ -583,6 +585,11 @@ final class LocalModelIndex {
                  "time-series-classification",
                  "tabular-regression",
                  "tabular-classification" -> "timeseries";
+            case "text-to-3d",
+                 "image-to-3d",
+                 "3d-generation",
+                 "mesh-generation",
+                 "3d"                    -> "3d";
             default                      -> null;
         };
     }
