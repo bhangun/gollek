@@ -1,8 +1,15 @@
 rootProject.name = "gollek-engine"
 
-// Include alkhawarizm as a composite build so gollek can depend on alkhawarizm projects during development
-includeBuild("../alkhawarizm")  // enabled: include local alkhawarizm composite build as source-of-truth for model modules
-includeBuild("../tafkir")       // enabled: include local tafkir composite build for quantizers
+// Include alkhawarizm and tafkir as composite builds if their directories exist locally (during local multi-project development)
+val alkhawarizmDir = file("../alkhawarizm")
+if (alkhawarizmDir.exists() && (alkhawarizmDir.resolve("build.gradle.kts").isFile || alkhawarizmDir.resolve("build.gradle").isFile || alkhawarizmDir.resolve("settings.gradle.kts").isFile || alkhawarizmDir.resolve("settings.gradle").isFile)) {
+    includeBuild("../alkhawarizm")
+}
+
+val tafkirDir = file("../tafkir")
+if (tafkirDir.exists() && (tafkirDir.resolve("build.gradle.kts").isFile || tafkirDir.resolve("build.gradle").isFile || tafkirDir.resolve("settings.gradle.kts").isFile || tafkirDir.resolve("settings.gradle").isFile)) {
+    includeBuild("../tafkir")
+}
 fun includeOptionalProject(projectPath: String, vararg candidatePaths: String) {
     val projectDir = candidatePaths
         .map { file(it) }
