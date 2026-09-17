@@ -9,7 +9,7 @@ import java.util.Optional;
 /**
  * HuggingFace configuration
  */
-@ConfigMapping(prefix = "wayang.inference.repository.huggingface")
+@ConfigMapping(prefix = "gollek.model.repository.huggingface")
 public interface HuggingFaceConfig {
 
     /**
@@ -56,7 +56,7 @@ public interface HuggingFaceConfig {
     /**
      * User agent for requests
      */
-    @WithDefault("wayang-inference/1.0")
+    @WithDefault("gollek-inference/1.0")
     String userAgent();
 
     /**

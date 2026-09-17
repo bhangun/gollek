@@ -391,8 +391,9 @@ public class HuggingFaceClient {
         // CLI usually maps env vars into config/system props, but keep a direct
         // fallback for packaged/runtime variants where that mapping is skipped.
         String[] fallbackKeys = new String[] {
-                "wayang.inference.repository.huggingface.token",
-                "WAYANG_INFERENCE_REPOSITORY_HUGGINGFACE_TOKEN",
+                "gollek.model.repository.huggingface.token",
+                "GOLLEK_MODEL_REPOSITORY_HUGGINGFACE_TOKEN",
+                "GOLLEK_HF_TOKEN",
                 "HF_TOKEN",
                 "HUGGING_FACE_HUB_TOKEN"
         };

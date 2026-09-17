@@ -8,7 +8,7 @@ import java.util.Optional;
 /**
  * Kaggle model repository configuration.
  */
-@ConfigMapping(prefix = "wayang.inference.repository.kaggle")
+@ConfigMapping(prefix = "gollek.model.repository.kaggle")
 public interface KaggleConfig {
 
     /**
@@ -66,7 +66,7 @@ public interface KaggleConfig {
     /**
      * User agent for requests
      */
-    @WithDefault("wayang-inference/1.0")
+    @WithDefault("gollek-inference/1.0")
     String userAgent();
 
     /**
