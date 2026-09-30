@@ -1330,6 +1330,14 @@ public class RunCommand implements Runnable {
                 requestBuilder.parameter("runner", effectiveRunnerRouteReport.normalizedRunner());
                 requestBuilder.metadata("runner", effectiveRunnerRouteReport.normalizedRunner());
             }
+            // Propagate --java / --llamacpp / --engine into request metadata so that
+            // GgufBackendSelection (Alkhawarizm) can route to the correct GGUF backend
+            // in the full CDI path (not just the standalone GgufFastRun path).
+            String ggufEngineHint = requestedGgufEngine();
+            if (ggufEngineHint != null && !ggufEngineHint.isBlank()) {
+                requestBuilder.metadata("gguf.backend", ggufEngineHint);
+                requestBuilder.parameter("gguf.backend", ggufEngineHint);
+            }
             if (featurePipelineId != null && !featurePipelineId.isBlank()) {
                 String pipelineId = featurePipelineId.trim();
                 requestBuilder.parameter("pipeline", pipelineId);

@@ -13,6 +13,7 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 import org.jboss.logging.Logger;
+import tech.kayys.alkhawarizm.gguf.llamacpp.*;
 import tech.kayys.gollek.spi.inference.StreamingInferenceChunk;
 import tech.kayys.gollek.spi.inference.LocalInferenceEngine;
 import tech.kayys.gollek.spi.exception.ProviderException;

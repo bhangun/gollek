@@ -507,22 +507,92 @@ public final class GgufFastRun {
         EngineMode engine = args.engineMode();
         if (engine == EngineMode.JAVA) {
             try {
-                System.out.println("Executing Java Native GGUF Engine...");
-                tech.kayys.gollek.plugin.runner.gguf.JavaNativeGgufBackend backend = new tech.kayys.gollek.plugin.runner.gguf.JavaNativeGgufBackend(modelPath);
-                
-                tech.kayys.gollek.plugin.runner.RunnerRequest request = new tech.kayys.gollek.plugin.runner.RunnerRequest(tech.kayys.gollek.plugin.runner.RequestType.INFER);
-                
-                tech.kayys.gollek.plugin.runner.RunnerResult<?> result = backend.execute(request);
-                
-                if (result.isSuccess()) {
-                    System.out.println(result.getData());
-                } else {
-                    System.err.println("Execution failed: " + result.getErrorMessage().orElse("Unknown error"));
+                long startNanos = System.nanoTime();
+                printRunHeader(modelPath, args, out);
+                if (!args.noInfo) {
+                    printExecutionRoute(out, "java-native", runnerName);
+                }
+
+                // Resolve prompt through the same model-specific chat template the llamacpp path uses.
+                String formattedPrompt = formatPromptForModel(args.prompt, modelPath);
+
+                // Build the InferenceRequest carrying prompt + sampling params.
+                // InferenceRequest.build() requires model to be non-null.
+                String modelName = modelPath.getFileName().toString();
+                tech.kayys.gollek.spi.inference.InferenceRequest inferenceRequest =
+                        tech.kayys.gollek.spi.inference.InferenceRequest.builder()
+                                .model(modelName)
+                                .prompt(formattedPrompt)
+                                .maxTokens(args.maxTokens)
+                                .temperature(args.temperature)
+                                .topP(args.topP)
+                                .topK(args.topK)
+                                .build();
+
+                // Wrap in RunnerRequest so JavaNativeGgufBackend can read it.
+                tech.kayys.gollek.plugin.runner.RunnerRequest runnerRequest =
+                        tech.kayys.gollek.plugin.runner.RunnerRequest.builder()
+                                .type(tech.kayys.gollek.plugin.runner.RequestType.INFER)
+                                .inferenceRequest(inferenceRequest)
+                                .build();
+
+                // Use GgufRunnerPlugin — JavaNativeGgufBackendProvider is its ServiceLoader provider.
+                tech.kayys.gollek.plugin.runner.gguf.GgufRunnerPlugin plugin =
+                        new tech.kayys.gollek.plugin.runner.gguf.GgufRunnerPlugin();
+                // Force backend=java; GgufBackendSelection reads this from load metadata.
+                tech.kayys.gollek.plugin.runner.RunnerContext ctx =
+                        tech.kayys.gollek.plugin.runner.RunnerContext.builder()
+                                .metadata(java.util.Map.of("gguf.backend", "java"))
+                                .build();
+                plugin.initialize(ctx);
+
+                tech.kayys.gollek.plugin.runner.ModelLoadRequest loadRequest =
+                        new tech.kayys.gollek.plugin.runner.ModelLoadRequest(
+                                modelPath.toString(),
+                                "gguf",
+                                tech.kayys.gollek.plugin.runner.RunnerConfig.defaultConfig(),
+                                java.util.Map.of("gguf.backend", "java"));
+
+                long openStartNanos = System.nanoTime();
+                tech.kayys.gollek.plugin.runner.ModelHandle handle = plugin.loadModel(loadRequest, ctx);
+                long openNanos = System.nanoTime() - openStartNanos;
+
+                long generateStartNanos = System.nanoTime();
+                tech.kayys.gollek.plugin.runner.RunnerResult<?> result = plugin.execute(runnerRequest, ctx);
+                long afterGenerateNanos = System.nanoTime();
+                long generateNanos = afterGenerateNanos - generateStartNanos;
+
+                plugin.unloadModel(handle, ctx);
+                plugin.shutdown();
+
+                if (!result.isSuccess()) {
+                    err.println("Java-native GGUF failed: " + result.getErrorMessage().orElse("unknown error"));
+                    return COMMAND_ERROR;
+                }
+
+                // Extract text from InferenceResponse.
+                String text = "";
+                Object data = result.getData();
+                if (data instanceof tech.kayys.gollek.spi.inference.InferenceResponse response) {
+                    text = response.getContent() != null ? response.getContent() : "";
+                } else if (data != null) {
+                    text = data.toString();
+                }
+
+                out.print(args.raw ? text : stripThinkingChannels(text));
+
+                if (!fastRunQuiet() && !args.noInfo) {
+                    // Approximate output tokens for stats.
+                    int outputTokens = text.isBlank() ? 0 : (int) (text.trim().split("\\s+").length * 1.3);
+                    printFastRunStats(out, "Java-native GGUF", outputTokens,
+                            startNanos, openNanos, generateNanos, afterGenerateNanos);
                 }
                 return 0;
             } catch (Throwable e) {
-                System.err.println("Java Native Engine crashed:");
-                e.printStackTrace(System.err);
+                err.println("Java-native GGUF engine crashed: " + e.getMessage());
+                if (fastRunDebug()) {
+                    e.printStackTrace(err);
+                }
                 return COMMAND_ERROR;
             }
         }

@@ -11,15 +11,19 @@ resolve_gollek_home() {
 
 GOLLEK_HOME_RESOLVED="$(resolve_gollek_home)"
 LLAMA_SRC="${GOLLEK_LLAMA_SOURCE_DIR:-$GOLLEK_HOME_RESOLVED/source/vendor/llama.cpp}"
+LLAMA_REPO_URL="${GOLLEK_LLAMA_REPO_URL:-https://github.com/bhangun/llama.cpp.git}"
 LLAMA_REF="${GOLLEK_LLAMA_REF:-origin/master}"
 
 mkdir -p "$(dirname "$LLAMA_SRC")"
 
 if [ ! -d "$LLAMA_SRC/.git" ]; then
-  git clone --depth 1 https://github.com/ggerganov/llama.cpp.git "$LLAMA_SRC"
+  rm -rf "$LLAMA_SRC"
+  git clone --depth 1 -b master "$LLAMA_REPO_URL" "$LLAMA_SRC"
+else
+  git -C "$LLAMA_SRC" remote set-url origin "$LLAMA_REPO_URL" || true
 fi
 
-git -C "$LLAMA_SRC" fetch --depth 1 origin
+git -C "$LLAMA_SRC" fetch --depth 1 origin master || git -C "$LLAMA_SRC" fetch --depth 1 origin
 
 TARGET_REF="$LLAMA_REF"
 if ! git -C "$LLAMA_SRC" show-ref --verify --quiet "refs/remotes/${TARGET_REF}"; then

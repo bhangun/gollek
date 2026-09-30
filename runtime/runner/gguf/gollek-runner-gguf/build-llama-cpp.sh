@@ -138,7 +138,7 @@ else
     # Default behavior: clone if not exists
     if [ ! -d "llama.cpp" ]; then
         echo "Cloning llama.cpp repository..."
-        git clone https://github.com/ggerganov/llama.cpp.git
+        git clone https://github.com/bhangun/llama.cpp.git
         cd llama.cpp
         
         # For backward compatibility, still support old version tag

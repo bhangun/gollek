@@ -14,9 +14,10 @@ dependencies {
     // added for ManifestStore
     implementation(project(":core:gollek-model-repo-local"))
     
-    // Alkhawarizm tokenizer
+    // Alkhawarizm tokenizer + GGUF llamacpp backend (FFM bindings + engine)
     implementation("tech.kayys.alkhawarizm:alkhawarizm-gguf-core:0.1.0-SNAPSHOT")
     implementation("tech.kayys.alkhawarizm:alkhawarizm-spi-model:0.1.0-SNAPSHOT")
+    implementation("tech.kayys.alkhawarizm:alkhawarizm-gguf-llamacpp:0.1.0-SNAPSHOT")
     
     implementation("org.jboss.logging:jboss-logging")
     implementation("io.smallrye.reactive:mutiny:2.5.5")

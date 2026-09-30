@@ -9,6 +9,7 @@ import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
+import tech.kayys.alkhawarizm.gguf.llamacpp.*;
 import tech.kayys.gollek.spi.observability.AdapterMetricSchema;
 import tech.kayys.gollek.spi.observability.AdapterMetricsRecorder;
 

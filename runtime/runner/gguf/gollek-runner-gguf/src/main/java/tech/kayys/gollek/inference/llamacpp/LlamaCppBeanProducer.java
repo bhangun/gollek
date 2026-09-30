@@ -4,6 +4,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.enterprise.inject.Disposes;
 import jakarta.inject.Inject;
+import tech.kayys.alkhawarizm.gguf.llamacpp.LlamaCppBinding;
+import tech.kayys.alkhawarizm.gguf.llamacpp.LlamaCppProviderConfig;
 
 @ApplicationScoped
 public class LlamaCppBeanProducer {

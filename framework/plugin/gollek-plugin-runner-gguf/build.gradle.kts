@@ -18,13 +18,11 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":plugin:gollek-plugin-runner-core"))
-    implementation(project(":core:gollek-tokenizer-core"))
-    implementation("tech.kayys.alkhawarizm:alkhawarizm-gguf-core:0.1.0-SNAPSHOT")
-    implementation("tech.kayys.alkhawarizm:alkhawarizm-nn:0.1.0")
-    implementation("tech.kayys.alkhawarizm:alkhawarizm-tensor:0.1.0")
-    implementation(project(":spi:gollek-spi-inference"))
-    // implementation(project(":runner:safetensor:gollek-safetensor-engine"))
+    api(project(":plugin:gollek-plugin-runner-core"))
+    api("tech.kayys.alkhawarizm:alkhawarizm-gguf-api:0.1.0-SNAPSHOT")
+    runtimeOnly("tech.kayys.alkhawarizm:alkhawarizm-gguf-java:0.1.0-SNAPSHOT")
+    runtimeOnly("tech.kayys.alkhawarizm:alkhawarizm-gguf-llamacpp:0.1.0-SNAPSHOT")
+
     testImplementation(group = "org.junit.jupiter", name = "junit-jupiter")
     testRuntimeOnly(group = "org.junit.platform", name = "junit-platform-launcher")
 }
@@ -46,7 +44,7 @@ tasks.jar {
             mapOf(
                 "Plugin-Id" to "gguf-runner",
                 "Plugin-Type" to "runner",
-                "Plugin-Provider" to "tech.kayys.gollek.plugin.runner.gguf.GgufRunnerPlugin",
+                "Plugin-Provider" to "tech.kayys.alkhawarizm.gguf.api.GgufRunnerPlugin",
                 "Plugin-Version" to "0.1.0-SNAPSHOT",
                 "Supported-Formats" to ".gguf"
             )

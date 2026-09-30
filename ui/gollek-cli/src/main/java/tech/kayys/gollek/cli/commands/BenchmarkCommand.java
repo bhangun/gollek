@@ -66,21 +66,49 @@ public class BenchmarkCommand implements Runnable {
         String outputContent = "";
         try {
             if ("gguf".equalsIgnoreCase(provider)) {
-                System.out.println("DEBUG: Executing JavaNativeGgufBackend...");
-                tech.kayys.gollek.cli.commands.GgufFastRun.FastArgs parsed = tech.kayys.gollek.cli.commands.GgufFastRun.FastArgs.parse(new String[]{"run", "--model", modelPath});
-                java.util.Optional<java.nio.file.Path> resolved = tech.kayys.gollek.cli.commands.GgufFastRun.resolveGgufModel(parsed);
+                System.out.println("INFO: Executing Java-native GGUF backend...");
+                tech.kayys.gollek.cli.commands.GgufFastRun.FastArgs parsed =
+                        tech.kayys.gollek.cli.commands.GgufFastRun.FastArgs.parse(
+                                new String[]{"run", "--model", modelPath});
+                java.util.Optional<java.nio.file.Path> resolved =
+                        tech.kayys.gollek.cli.commands.GgufFastRun.resolveGgufModel(parsed);
                 if (resolved.isEmpty()) {
                     throw new RuntimeException("Could not resolve GGUF model path for: " + modelPath);
                 }
-                tech.kayys.gollek.plugin.runner.gguf.JavaNativeGgufBackend backend = 
-                        new tech.kayys.gollek.plugin.runner.gguf.JavaNativeGgufBackend(resolved.get());
-                tech.kayys.gollek.plugin.runner.RunnerRequest rr = tech.kayys.gollek.plugin.runner.RunnerRequest.builder()
-                        .type(tech.kayys.gollek.plugin.runner.RequestType.INFER)
-                        .inferenceRequest(request)
-                        .build();
-                tech.kayys.gollek.plugin.runner.RunnerResult<?> result = backend.execute(rr);
+
+                // Route through GgufRunnerPlugin with explicit java backend selection.
+                tech.kayys.gollek.plugin.runner.gguf.GgufRunnerPlugin plugin =
+                        new tech.kayys.gollek.plugin.runner.gguf.GgufRunnerPlugin();
+                tech.kayys.gollek.plugin.runner.RunnerContext ctx =
+                        tech.kayys.gollek.plugin.runner.RunnerContext.builder()
+                                .metadata(java.util.Map.of("gguf.backend", "java"))
+                                .build();
+                plugin.initialize(ctx);
+
+                tech.kayys.gollek.plugin.runner.ModelLoadRequest loadRequest =
+                        new tech.kayys.gollek.plugin.runner.ModelLoadRequest(
+                                resolved.get().toString(),
+                                "gguf",
+                                tech.kayys.gollek.plugin.runner.RunnerConfig.defaultConfig(),
+                                java.util.Map.of("gguf.backend", "java"));
+                tech.kayys.gollek.plugin.runner.ModelHandle handle = plugin.loadModel(loadRequest, ctx);
+
+                tech.kayys.gollek.plugin.runner.RunnerRequest rr =
+                        tech.kayys.gollek.plugin.runner.RunnerRequest.builder()
+                                .type(tech.kayys.gollek.plugin.runner.RequestType.INFER)
+                                .inferenceRequest(request)
+                                .build();
+                tech.kayys.gollek.plugin.runner.RunnerResult<?> result = plugin.execute(rr, ctx);
+                plugin.unloadModel(handle, ctx);
+                plugin.shutdown();
+
                 if (result.isSuccess()) {
-                    outputContent = String.valueOf(result.getData());
+                    Object data = result.getData();
+                    if (data instanceof tech.kayys.gollek.spi.inference.InferenceResponse resp) {
+                        outputContent = resp.getContent() != null ? resp.getContent() : "";
+                    } else if (data != null) {
+                        outputContent = data.toString();
+                    }
                 } else {
                     throw new RuntimeException(result.getErrorMessage().orElse("GGUF execution failed"));
                 }
